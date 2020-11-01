@@ -5,7 +5,7 @@ image: 'rust:latest'
   - shopt -s extglob
   - mv !(namib_mud_controller) namib_mud_controller
   - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-  - ls -R
+  #- ls -R
   - cd namib_mud_controller
 
 stages:
@@ -23,7 +23,7 @@ build:
   script:
     - rustc --version
     - cargo --version
-    #- cargo build
+    - cargo build
 
 test:
   stage: test
@@ -35,7 +35,7 @@ test:
   script:
     - rustc --version
     - cargo --version
-    #- cargo test
+    - cargo test
 
 docs:
   stage: docs
@@ -46,9 +46,9 @@ docs:
     - *setup_before
   script:
     - cargo --version
-    #- cargo doc --no-deps
-    #- mv target/doc public
-    #- echo '<meta http-equiv="refresh" content="0;">' > public/index.html
-    #- ls public
+    - cargo doc --no-deps
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
+    - ls public
   only:
     - master
