@@ -4,8 +4,7 @@ image: 'rust:latest'
   - mkdir namib_mud_controller
   - shopt -s extglob
   - mv !(namib_mud_controller)
-  - apt update && apt install -y git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib-shared.git
+  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
   - cd namib_mud_controller
 
 stages:
