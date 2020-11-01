@@ -1,0 +1,22 @@
+image: 'rust:latest'
+
+stages:
+  - build
+  - docs
+
+build:
+  stage: build
+  script:
+    - rustc --version
+    - cargo --version
+    - cargo build
+
+docs:
+  stage: docs
+  script:
+    - cargo doc --no-deps
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
+    - ls public
+  only:
+    - master

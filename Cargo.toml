@@ -1,0 +1,5 @@
+[package]
+name = "namib_shared"
+version = "0.0.1"
+authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>"]
+edition = "2018"
