@@ -1,8 +1,10 @@
 image: 'rust:latest'
 
-include:
-    - project: 'namib/mud-controller-enforcer/namib-shared'
-      ref: master
+.setup_before: &setup_before
+  - mkdir namib_mud_controller
+  - mv * namib_mud_controller
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib-shared.git
+  - cd namib_mud_controller
 
 stages:
   - build
@@ -11,6 +13,11 @@ stages:
 
 build:
   stage: build
+  tags:
+    - linux
+    - docker
+  before_script:
+    - *setup_before
   script:
     - rustc --version
     - cargo --version
@@ -18,6 +25,11 @@ build:
 
 test:
   stage: test
+  tags:
+    - linux
+    - docker
+  before_script:
+    - *setup_before
   script:
     - rustc --version
     - cargo --version
@@ -25,6 +37,11 @@ test:
 
 docs:
   stage: docs
+  tags:
+    - linux
+    - docker
+  before_script:
+    - *setup_before
   script:
     - cargo doc --no-deps
     - mv target/doc public
