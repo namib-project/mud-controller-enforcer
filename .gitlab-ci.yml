@@ -1,0 +1,34 @@
+image: 'rust:latest'
+
+include:
+    - project: 'namib/mud-controller-enforcer/namib-shared'
+      ref: master
+
+stages:
+  - build
+  - test
+  - docs
+
+build:
+  stage: build
+  script:
+    - rustc --version
+    - cargo --version
+    - cargo build
+
+test:
+  stage: test
+  script:
+    - rustc --version
+    - cargo --version
+    - cargo test
+
+docs:
+  stage: docs
+  script:
+    - cargo doc --no-deps
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
+    - ls public
+  only:
+    - master

@@ -1,0 +1,8 @@
+[package]
+name = "namib_enforcer"
+version = "0.0.1"
+authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>"]
+edition = "2018"
+
+[dependencies]
+namib_shared = { path = "../namib_shared" }
