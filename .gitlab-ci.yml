@@ -2,7 +2,9 @@ image: 'rust:latest'
 
 .setup_before: &setup_before
   - mkdir namib_mud_controller
-  - mv * namib_mud_controller
+  - shopt -s extglob
+  - mv !(namib_mud_controller)
+  - apt update && apt install -y git
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib-shared.git
   - cd namib_mud_controller
 
