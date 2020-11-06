@@ -1,8 +1,22 @@
 [package]
 name = "namib_enforcer"
 version = "0.0.1"
-authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>"]
+authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
 
 [dependencies]
 namib_shared = { path = "../namib_shared" }
+tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util"] }
+log = "0.4"
+env_logger = "0.8"
+async-dnssd = { path = "../rust-async-dnssd" }
+futures = "0.3"
+rustls = "0.18"
+tokio-rustls = "0.20"
+tokio-util = "0.4"
+tarpc = { version = "0.23", features = ["full"] }
+serde = "1.0"
+pin-project = "1.0"
+tokio-serde = { version = "0.6" }
+snafu = { version = "0.6", default-features = false, features = ["std", "backtraces", "futures"] }
+dotenv = "0.15"

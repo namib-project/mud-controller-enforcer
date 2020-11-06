@@ -1,9 +1,16 @@
-use namib_shared as shared;
+use dotenv::dotenv;
 
-fn main() {
-    let user = shared::user::User {
-        name: String::from("Alice"),
-        admin: true
-    };
-    println!("[Enforcer] Here is the user '{}'. Nice name!", user.name);
+use error::Result;
+
+mod error;
+mod rpc;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    dotenv()?;
+    env_logger::init();
+
+    rpc::rpc_client::run().await?;
+
+    Ok(())
 }

@@ -1,51 +1,45 @@
-image: 'rust:latest'
-
-.setup_before: &setup_before
-  - mkdir namib_mud_controller
-  - shopt -s extglob
-  - mv !(namib_mud_controller) namib_mud_controller
-  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-  #- ls -R
-  - cd namib_mud_controller
-
 stages:
   - build
   - test
   - docs
 
-build:
-  stage: build
+default:
+  image: rustlang/rust:nightly-slim
+  cache:
+    paths:
+      - .cargo/
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+  before_script:
+    - mkdir namib_enforcer
+    - shopt -s extglob
+    - mv !(namib_enforcer) namib_enforcer
+    - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
+    - cd namib_enforcer
+    - rustc --version
+    - cargo --version
   tags:
     - linux
     - docker
-  before_script:
-    - *setup_before
+
+build:
+  stage: build
+  artifacts:
+    paths:
+      - target
   script:
-    - rustc --version
-    - cargo --version
     - cargo build
 
 test:
   stage: test
-  tags:
-    - linux
-    - docker
-  before_script:
-    - *setup_before
+  dependencies:
+    - build
   script:
-    - rustc --version
-    - cargo --version
     - cargo test
 
 docs:
   stage: docs
-  tags:
-    - linux
-    - docker
-  before_script:
-    - *setup_before
   script:
-    - cargo --version
     - cargo doc --no-deps
     - mv target/doc public
     - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
