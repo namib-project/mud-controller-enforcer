@@ -1,51 +1,49 @@
-image: 'rust:latest'
-
-.setup_before: &setup_before
-  - mkdir namib_mud_controller
-  - shopt -s extglob
-  - mv !(namib_mud_controller) namib_mud_controller
-  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-  #- ls -R
-  - cd namib_mud_controller
-
 stages:
   - build
   - test
   - docs
 
-build:
-  stage: build
+image: rustlang/rust:nightly
+
+cache:
+  paths:
+    - .cargo/
+
+before_script:
+  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
+  - export CARGO_HOME=${CI_PROJECT_DIR}/cargo
+  - mkdir namib_mud_controller
+  - shopt -s extglob
+  - mv !(namib_mud_controller) namib_mud_controller
+  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
+  - git clone https://gitlab-ci-token:${namib_async_dnssd_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
+  - cd namib_mud_controller
+  - rustc --version
+  - cargo --version
+
+default:
   tags:
     - linux
     - docker
-  before_script:
-    - *setup_before
+
+build:
+  stage: build
+  artifacts:
+    paths:
+      - namib_mud_controller/target
   script:
-    - rustc --version
-    - cargo --version
     - cargo build
 
 test:
   stage: test
-  tags:
-    - linux
-    - docker
-  before_script:
-    - *setup_before
+  dependencies:
+    - build
   script:
-    - rustc --version
-    - cargo --version
     - cargo test
 
 docs:
   stage: docs
-  tags:
-    - linux
-    - docker
-  before_script:
-    - *setup_before
   script:
-    - cargo --version
     - cargo doc --no-deps
     - mv target/doc public
     - echo '<meta http-equiv="refresh" content="0;">' > public/index.html

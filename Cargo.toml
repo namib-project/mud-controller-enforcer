@@ -1,8 +1,42 @@
 [package]
 name = "namib_mud_controller"
 version = "0.0.1"
-authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>"]
+authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
+
+[features]
+default = ["sqlite"]
+postgres = ["diesel/postgres", "rocket_contrib/diesel_postgres_pool"]
+sqlite = ["diesel/sqlite", "rocket_contrib/diesel_sqlite_pool"]
 
 [dependencies]
 namib_shared = { path = "../namib_shared" }
+log = "0.4"
+env_logger = "0.8"
+tokio = { version = "0.3", features = ["full"] }
+async-dnssd = { path = "../rust-async-dnssd" }
+futures = "0.3"
+rustls = "0.18"
+tokio-rustls = "0.20"
+tokio-util = "0.4"
+tokio-serde = { version = "0.6" }
+tarpc = { version = "0.23", features = ["full"] }
+pin-project = "1.0"
+ring = { version = "0.16", features = ["std"] }
+rust-argon2 = "0.8"
+diesel = { version = "1.4", features = ["r2d2", "chrono"] }
+diesel_migrations = "1.4"
+rocket = "0.4"
+rocket_contrib = { version = "0.4", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_derive = "1.0"
+dotenv = "0.15"
+dotenv_codegen = "0.15"
+rocket_okapi = "0.6.0-alpha-1"
+schemars = "0.8"
+okapi = { version = "0.5.0-alpha-1", features = ["derive_json_schema"] }
+jsonwebtoken = "7.2"
+chrono = { version = "0.4", features = ["serde"] }
+validator = { version = "0.11", features = ["derive"] }
+snafu = { version = "0.6", default-features = false, features = ["std", "backtraces", "futures"] }
