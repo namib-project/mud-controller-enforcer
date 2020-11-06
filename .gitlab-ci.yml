@@ -8,9 +8,8 @@ default:
   cache:
     paths:
       - .cargo/
-  variables:
-    CARGO_HOME: $CI_PROJECT_DIR/cargo
   before_script:
+    - export CARGO_HOME=${CI_PROJECT_DIR}/cargo
     - mkdir namib_enforcer
     - shopt -s extglob
     - mv !(namib_enforcer) namib_enforcer
