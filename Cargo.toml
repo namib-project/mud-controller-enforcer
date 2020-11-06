@@ -1,5 +1,11 @@
 [package]
 name = "namib_shared"
 version = "0.0.1"
-authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>"]
+authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
+
+[dependencies]
+snafu = "0.6"
+tokio-serde = { version = "0.6", features = ["bincode"] }
+tarpc = "0.23"
+serde = "1.0"
