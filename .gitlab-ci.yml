@@ -40,9 +40,9 @@ pages:
   stage: docs
   script:
     - cargo doc --no-deps
-    - mv target/doc public
-    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
+    - mv target/doc ../public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_enforcer/index.html">' > public/index.html
   artifacts:
     paths:
-      - namib_enforcer/public
+      - public
     expire_in: 7 days
