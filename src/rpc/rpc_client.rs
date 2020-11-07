@@ -50,9 +50,9 @@ pub async fn run() -> Result<()> {
             info!("Connected to RPC server");
             loop {
                 client.heartbeat(context::current()).await?;
-                sleep(Duration::from_secs(5)).await;
-
                 debug!("Heartbeat OK!");
+
+                sleep(Duration::from_secs(5)).await;
             }
         }
         None => {
