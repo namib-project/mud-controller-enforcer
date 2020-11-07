@@ -11,7 +11,7 @@ cache:
 
 before_script:
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
-  - export CARGO_HOME=${CI_PROJECT_DIR}/cargo
+  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - mkdir namib_mud_controller
   - shopt -s extglob
   - mv !(namib_mud_controller) namib_mud_controller
@@ -28,16 +28,11 @@ default:
 
 build:
   stage: build
-  artifacts:
-    paths:
-      - namib_mud_controller/target
   script:
     - cargo build
 
 test:
   stage: test
-  dependencies:
-    - build
   script:
     - cargo test
 
