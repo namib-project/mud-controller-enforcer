@@ -44,5 +44,5 @@ pages:
     - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
   artifacts:
     paths:
-      - public
+      - namib_enforcer/public
     expire_in: 7 days
