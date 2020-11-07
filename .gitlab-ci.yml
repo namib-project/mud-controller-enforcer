@@ -11,7 +11,7 @@ cache:
 
 before_script:
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
-  - export CARGO_HOME=${CI_PROJECT_DIR}/cargo
+  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - mkdir namib_enforcer
   - shopt -s extglob
   - mv !(namib_enforcer) namib_enforcer
@@ -28,16 +28,11 @@ default:
 
 build:
   stage: build
-  artifacts:
-    paths:
-      - namib_enforcer/target
   script:
     - cargo build
 
 test:
   stage: test
-  dependencies:
-    - build
   script:
     - cargo test
 
