@@ -36,12 +36,13 @@ test:
   script:
     - cargo test
 
-docs:
+pages:
   stage: docs
   script:
     - cargo doc --no-deps
-    - mv target/doc public
-    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
-    - ls public
-  only:
-    - master
+    - mv target/doc ../public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > ../public/index.html
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
