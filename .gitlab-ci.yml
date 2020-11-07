@@ -30,7 +30,7 @@ build:
   stage: build
   artifacts:
     paths:
-      - target
+      - namib_enforcer/target
   script:
     - cargo build
 
