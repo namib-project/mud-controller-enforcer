@@ -2,7 +2,7 @@ stages:
   - build
   - test
   - docs
-sdfsd
+
 image: rustlang/rust:nightly
 
 cache:
