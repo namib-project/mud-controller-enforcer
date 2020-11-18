@@ -22,14 +22,15 @@ use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig, UrlObject};
 
 use crate::error::*;
 
-mod error;
-mod routes;
-mod services;
-mod models;
-mod schema;
-mod db;
 mod auth;
+mod db;
+mod error;
+mod models;
+mod mud;
+mod routes;
 mod rpc;
+mod schema;
+mod services;
 
 fn run_server() {
     rocket::ignite()
@@ -38,12 +39,16 @@ fn run_server() {
             "Database Migrations",
             db::run_db_migrations,
         ))
-        .mount("/users", routes::all_routes())
+        .mount("/users", routes::users_controller::routes())
+        .mount("/mud", routes::mud_controller::routes())
         .mount("/", StaticFiles::from("public"))
         .mount(
             "/swagger-ui/",
             make_swagger_ui(&SwaggerUIConfig {
-                urls: vec![UrlObject::new("Users", "../users/openapi.json")],
+                urls: vec![
+                    UrlObject::new("Users", "../users/openapi.json"),
+                    UrlObject::new("MUD", "../mud/openapi.json"),
+                ],
                 ..Default::default()
             }),
         )
