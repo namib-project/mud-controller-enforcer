@@ -26,7 +26,6 @@ mod auth;
 mod db;
 mod error;
 mod models;
-mod mud;
 mod routes;
 mod rpc;
 mod schema;

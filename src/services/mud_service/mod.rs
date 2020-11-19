@@ -1,15 +1,14 @@
-use std::time::Duration;
-
-use chrono::{DateTime, Local, NaiveDateTime};
+use chrono::{Local, NaiveDateTime};
 use diesel::{QueryDsl, QueryResult, RunQueryDsl};
-use serde_json::Value;
+use isahc::ResponseExt;
 
-use crate::db::{ConnectionType, DbConn};
+use crate::db::ConnectionType;
 use crate::error::Result;
 use crate::models::mud_models::{MUDData, MUD};
-use crate::mud::parser;
 use crate::schema::mud_data;
-use isahc::ResponseExt;
+
+mod json_models;
+mod parser;
 
 #[derive(Insertable)]
 #[table_name = "mud_data"]

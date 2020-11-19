@@ -2,10 +2,8 @@ use std::clone::Clone;
 use std::net::IpAddr;
 use std::str::FromStr;
 
-use chrono::{DateTime, Duration, FixedOffset, Local, TimeZone};
-use serde::export::Into;
-use serde_json::{json, Value};
-use snafu::{ensure, OptionExt};
+use chrono::{Duration, Local};
+use snafu::ensure;
 
 use crate::error::*;
 use crate::models::mud_models::*;
@@ -167,7 +165,7 @@ fn parse_device_policy(
                             .clone()
                             .or_else(|| ipv4.src_dnsname.clone());
                     }
-                    if let Some(mud) = &aceitem.matches.mud {
+                    if let Some(_mud) = &aceitem.matches.mud {
                         // see https://github.com/CiscoDevNet/MUD-Manager/blob/master/src/mud_manager.c#L1472
                     }
                     ace.push(ACE {
