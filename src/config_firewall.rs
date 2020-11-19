@@ -25,7 +25,6 @@ pub enum EnNetwork {
 pub enum EnRoute {
     Src(EnNetwork),
     Des(EnNetwork),
-
 }
 
 #[derive(Clone)]
@@ -75,15 +74,14 @@ impl EnFirewallType {
 #[allow(dead_code)]
 impl EnRuleName {
     pub fn to_string(&self) -> String {
-        let mut r:String = "name='".to_string();
+        let mut r: String = "name='".to_string();
         match self {
             Self::Name(c) => {
                 r.push_str(c);
                 r.push_str("'");
                 r
-            },
+            }
         }
-
     }
 }
 
@@ -162,13 +160,15 @@ pub struct ConfigFirewall {
 
 #[allow(dead_code)]
 impl ConfigFirewall {
-    pub fn new(firewall_type: EnFirewallType,
-               rule_name: EnRuleName,
-               route_network_src: EnRoute,
-               route_network_dest: EnRoute,
-               protocol: EnProtocol,
-               target: EnTarget,
-               optional_settings: EnOptionalSettings, ) -> ConfigFirewall {
+    pub fn new(
+        firewall_type: EnFirewallType,
+        rule_name: EnRuleName,
+        route_network_src: EnRoute,
+        route_network_dest: EnRoute,
+        protocol: EnProtocol,
+        target: EnTarget,
+        optional_settings: EnOptionalSettings,
+    ) -> ConfigFirewall {
         ConfigFirewall {
             firewall_type,
             rule_name,
@@ -180,7 +180,7 @@ impl ConfigFirewall {
         }
     }
     pub fn to_vector_string(&self) -> Vec<String> {
-        let mut query:Vec<String> = Vec::new();
+        let mut query: Vec<String> = Vec::new();
         query.push(self.get_firewall_type().to_string());
         query.push(self.get_rule_name().to_string());
         query.push(self.get_route_network_src().to_string());
@@ -188,7 +188,7 @@ impl ConfigFirewall {
         query.push(self.get_protocol().to_string());
         query.push(self.get_target().to_string());
 
-        if self.optional_settings.unwrap() != Option::None{
+        if self.optional_settings.unwrap() != Option::None {
             let vec = self.optional_settings.unwrap().unwrap();
             for s in vec.iter() {
                 query.push(s.to_string());
@@ -218,6 +218,4 @@ impl ConfigFirewall {
     pub fn get_optional_settings(&self) -> &EnOptionalSettings {
         &self.optional_settings
     }
-
 }
-
