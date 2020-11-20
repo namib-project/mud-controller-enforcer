@@ -12,21 +12,44 @@ mod unix {
     use snafu::ensure;
 
     use libuci_sys::{
-        uci_alloc_context, uci_commit, uci_context, uci_free_context, uci_get_errorstr, uci_lookup_ptr, uci_option_type_UCI_TYPE_STRING, uci_ptr, uci_ptr_UCI_LOOKUP_COMPLETE,
-        uci_set, uci_set_confdir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
+        uci_alloc_context, uci_commit, uci_context, uci_delete, uci_free_context, uci_get_errorstr, uci_lookup_ptr, uci_option_type_UCI_TYPE_STRING, uci_ptr,
+        uci_ptr_UCI_LOOKUP_COMPLETE, uci_revert, uci_save, uci_set, uci_set_confdir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
     };
 
     use crate::error::*;
+    use std::ops::{Deref, DerefMut};
 
     const UCI_OK: i32 = libuci_sys::UCI_OK as i32;
 
-    pub struct UCI {
-        uci_context: *mut uci_context,
-    }
+    /// Contains the native uci_context
+    pub struct UCI(*mut uci_context);
 
     impl Drop for UCI {
         fn drop(&mut self) {
-            unsafe { uci_free_context(self.uci_context) }
+            unsafe { uci_free_context(self.0) }
+        }
+    }
+
+    /// Contains the native uci_ptr and it's raw CString key
+    /// this is done so the raw CString stays alive until the uci_ptr is dropped
+    struct UciPtr(uci_ptr, *mut i8);
+
+    impl Deref for UciPtr {
+        type Target = uci_ptr;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl DerefMut for UciPtr {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+
+    impl Drop for UciPtr {
+        fn drop(&mut self) {
+            unsafe { CString::from_raw(self.1) };
         }
     }
 
@@ -41,14 +64,14 @@ mod unix {
                     message: String::from("Could not alloc uci context"),
                 }
             );
-            Ok(UCI { uci_context: ctx })
+            Ok(UCI(ctx))
         }
 
         /// Sets the config directory of UCI, this is `/etc/config` by default.
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {
             let result = unsafe {
                 let raw = CString::new(config_dir)?;
-                uci_set_confdir(self.uci_context, raw.as_bytes_with_nul().as_ptr() as *const i8)
+                uci_set_confdir(self.0, raw.as_bytes_with_nul().as_ptr() as *const i8)
             };
             ensure!(
                 result == UCI_OK,
@@ -64,9 +87,79 @@ mod unix {
             Ok(())
         }
 
-        /// Sets an option value or section type in UCI, creates the key if necessary.
+        /// Delete an option or section in UCI.
+        /// UCI will keep the delta changes in a temporary location until `commit()` or `revert()` is called.
         ///
-        /// Allowed keys are like `network.wan.proto`, `network.interface[-1].iface`, `network.wan` and `network.interface[-1]`
+        /// Allowed keys are like `network.wan.proto`, `network.@interface[-1].iface`, `network.wan` and `network.@interface[-1]`
+        ///
+        /// if the deletion failed an `Err` is returned.
+        pub fn delete(&mut self, identifier: &str) -> Result<()> {
+            let mut ptr = self.get_ptr(identifier)?;
+            let result = unsafe { uci_delete(self.0, &mut ptr.0) };
+            ensure!(
+                result == UCI_OK,
+                UCIError {
+                    message: format!(
+                        "Could not delete uci key: {}, {}, {}",
+                        identifier,
+                        result,
+                        self.get_last_error().unwrap_or_else(|_| String::from("Unknown"))
+                    ),
+                }
+            );
+            let result = unsafe { uci_save(self.0, ptr.p) };
+            ensure!(
+                result == UCI_OK,
+                UCIError {
+                    message: format!(
+                        "Could not save uci key: {}, {}, {}",
+                        identifier,
+                        result,
+                        self.get_last_error().unwrap_or_else(|_| String::from("Unknown"))
+                    ),
+                }
+            );
+            Ok(())
+        }
+
+        /// Revert changes to an option, section or package
+        ///
+        /// Allowed keys are like `network`, `network.wan.proto`, `network.@interface[-1].iface`, `network.wan` and `network.@interface[-1]`
+        ///
+        /// if the deletion failed an `Err` is returned.
+        pub fn revert(&mut self, identifier: &str) -> Result<()> {
+            let mut ptr = self.get_ptr(identifier)?;
+            let result = unsafe { uci_revert(self.0, &mut ptr.0) };
+            ensure!(
+                result == UCI_OK,
+                UCIError {
+                    message: format!(
+                        "Could not revert uci key: {}, {}, {}",
+                        identifier,
+                        result,
+                        self.get_last_error().unwrap_or_else(|_| String::from("Unknown"))
+                    ),
+                }
+            );
+            let result = unsafe { uci_save(self.0, ptr.p) };
+            ensure!(
+                result == UCI_OK,
+                UCIError {
+                    message: format!(
+                        "Could not save uci key: {}, {}, {}",
+                        identifier,
+                        result,
+                        self.get_last_error().unwrap_or_else(|_| String::from("Unknown"))
+                    ),
+                }
+            );
+            Ok(())
+        }
+
+        /// Sets an option value or section type in UCI, creates the key if necessary.
+        /// UCI will keep the delta changes in a temporary location until `commit()` or `revert()` is called.
+        ///
+        /// Allowed keys are like `network.wan.proto`, `network.@interface[-1].iface`, `network.wan` and `network.@interface[-1]`
         ///
         /// if the assignment failed an `Err` is returned.
         pub fn set(&mut self, identifier: &str, val: &str) -> Result<()> {
@@ -76,8 +169,14 @@ mod unix {
                     message: format!("Values may not contain quotes: {}={}", identifier, val)
                 }
             );
-            let mut ptr = self.get_ptr(format!("{}='{}'", identifier, val).as_ref())?;
-            let result = unsafe { uci_set(self.uci_context, &mut ptr) };
+            let mut ptr = self.get_ptr(format!("{}={}", identifier, val).as_ref())?;
+            ensure!(
+                !ptr.value.is_null(),
+                UCIError {
+                    message: format!("parsed value is null: {}={}", identifier, val)
+                }
+            );
+            let result = unsafe { uci_set(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
                 UCIError {
@@ -90,15 +189,27 @@ mod unix {
                     ),
                 }
             );
+            let result = unsafe { uci_save(self.0, ptr.p) };
+            ensure!(
+                result == UCI_OK,
+                UCIError {
+                    message: format!(
+                        "Could not save uci key: {}={}, {}, {}",
+                        identifier,
+                        val,
+                        result,
+                        self.get_last_error().unwrap_or_else(|_| String::from("Unknown"))
+                    ),
+                }
+            );
             Ok(())
         }
 
+        /// Commit all changes to the specified package
+        /// writing the temporary delta to the config file
         pub fn commit(&mut self, package: &str) -> Result<()> {
             let mut ptr = self.get_ptr(package)?;
-            if !ptr.p.is_null() {
-                debug!("{:?}", unsafe { *ptr.p });
-            }
-            let result = unsafe { uci_commit(self.uci_context, &mut ptr.p, false) };
+            let result = unsafe { uci_commit(self.0, &mut ptr.p, false) };
             ensure!(
                 result == UCI_OK,
                 UCIError {
@@ -112,15 +223,16 @@ mod unix {
             );
             if !ptr.p.is_null() {
                 unsafe {
-                    uci_unload(self.uci_context, ptr.p);
+                    uci_unload(self.0, ptr.p);
                 }
             }
             Ok(())
         }
 
-        /// Queries an option value or section type from UCI
+        /// Queries an option value or section type from UCI.
+        /// If a key has been changed in the delta, the updated value will be returned.
         ///
-        /// Allowed keys are like `network.wan.proto`, `network.interface[-1].iface`, `network.lan` and `network.interface[-1]`
+        /// Allowed keys are like `network.wan.proto`, `network.@interface[-1].iface`, `network.lan` and `network.@interface[-1]`
         ///
         /// if the entry does not exist an `Err` is returned.
         pub fn get(&mut self, key: &str) -> Result<String> {
@@ -132,6 +244,7 @@ mod unix {
                 }
             );
             let last = unsafe { *ptr.last };
+            #[allow(non_upper_case_globals)]
             match last.type_ {
                 uci_type_UCI_TYPE_OPTION => {
                     let opt = unsafe { *ptr.o };
@@ -196,12 +309,12 @@ mod unix {
         ///
         /// This also supports advanced syntax like `network.@interface[-1].ifname` (get ifname of last interface)
         ///
-        /// An `Ok(result)` is guaranteed to not be a valid ptr and ptr.last will be set.
+        /// An `Ok(result)` is guaranteed to be a valid ptr and ptr.last will be set.
         ///
-        /// If the key could not be found `ptr.flags & UCI_LOOKUP_COMPLETE` will be false, but the ptr is still valid.
+        /// If the key could not be found `ptr.flags & UCI_LOOKUP_COMPLETE` will not be set, but the ptr is still valid.
         ///
         /// If `identifier` is assignment like `network.wan.proto="dhcp"`, `ptr.value` will be set.
-        fn get_ptr(&mut self, identifier: &str) -> Result<uci_ptr> {
+        fn get_ptr(&mut self, identifier: &str) -> Result<UciPtr> {
             let mut ptr = uci_ptr {
                 target: 0,
                 flags: 0,
@@ -214,12 +327,8 @@ mod unix {
                 option: ptr::null(),
                 value: ptr::null(),
             };
-            let result = unsafe {
-                let c_key_bytes = CString::new(identifier.clone())?.into_raw();
-                let r = uci_lookup_ptr(self.uci_context, &mut ptr, c_key_bytes, true);
-                let _ = CString::from_raw(c_key_bytes);
-                r
-            };
+            let raw = CString::new(identifier)?.into_raw();
+            let result = unsafe { uci_lookup_ptr(self.0, &mut ptr, raw, true) };
             ensure!(
                 result == UCI_OK,
                 UCIError {
@@ -238,14 +347,14 @@ mod unix {
                     message: format!("Cannot access null value: {}", identifier),
                 }
             );
-            Ok(ptr)
+            Ok(UciPtr(ptr, raw))
         }
 
         /// Obtains the most recent error from UCI as a string
         /// if no last_error is set, an `Err` is returned.
         fn get_last_error(&mut self) -> Result<String> {
             let mut raw: *mut std::os::raw::c_char = ptr::null_mut();
-            unsafe { uci_get_errorstr(self.uci_context, &mut raw, ptr::null()) };
+            unsafe { uci_get_errorstr(self.0, &mut raw, ptr::null()) };
             ensure!(
                 !raw.is_null(),
                 UCIError {
@@ -283,6 +392,16 @@ mod mock {
             Ok(())
         }
 
+        pub fn revert(&mut self, package: &str) -> Result<()> {
+            info!("revert {}", package);
+            Ok(())
+        }
+
+        pub fn delete(&mut self, key: &str) -> Result<()> {
+            info!("delete {}", key);
+            Ok(())
+        }
+
         pub fn get(&mut self, key: &str) -> Result<String> {
             info!("get {}", key);
             Ok(format!("{}_value", key))
@@ -305,6 +424,7 @@ mod tests {
     use crate::error::*;
 
     use super::*;
+    use std::{fs, fs::File, io::Read};
 
     fn init() -> Result<UCI> {
         let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).is_test(true).try_init();
@@ -319,10 +439,18 @@ mod tests {
     fn test_reading_key() -> Result<()> {
         let mut uci = init()?;
 
+        assert_eq!(uci.get("network.wan")?, "interface");
+        assert_eq!(uci.get("network.@interface[0]")?, "interface");
+        assert_eq!(uci.get("network.a")?, "alias");
+        assert_eq!(uci.get("network.@alias[-1]")?, "alias");
         assert_eq!(uci.get("network.wan.proto")?, "dhcp");
+        assert_eq!(uci.get("network.@interface[-1].proto")?, "dhcp");
         assert_eq!(uci.get("network.lan.proto")?, "static");
+        assert_eq!(uci.get("network.@interface[0].proto")?, "static");
+        assert_eq!(uci.get("broken.a").is_err(), true);
         assert_eq!(uci.get("broken.a.b").is_err(), true);
-        assert_eq!(uci.get("inexistant.b.d").is_err(), true);
+        assert_eq!(uci.get("inexistant.c").is_err(), true);
+        assert_eq!(uci.get("inexistant.c.d").is_err(), true);
         Ok(())
     }
 
@@ -330,9 +458,55 @@ mod tests {
     fn test_writing_key() -> Result<()> {
         let mut uci = init()?;
 
-        uci.set("network.wan.newkey", "value")?;
-        uci.commit("network")?;
-        assert_eq!(uci.get("network.wan.newkey")?, "value");
+        File::create("tests/config/new_network")?;
+
+        uci.set("new_network.a", "alias")?;
+        uci.set("new_network.a.interface", "lan")?;
+        uci.set("new_network.b", "alias")?;
+        uci.set("new_network.b.interface", "lan")?;
+        uci.set("new_network.lan", "interface")?;
+        uci.set("new_network.lan.proto", "static")?;
+        uci.set("new_network.lan.ifname", "eth0")?;
+        uci.set("new_network.lan.test", "123")?;
+        uci.set("new_network.lan.enabled", "off")?;
+        uci.set("new_network.lan.ipaddr", "2.3.4.5")?;
+        uci.set("new_network.wan", "interface")?;
+        uci.set("new_network.wan.proto", "dhcp")?;
+        uci.set("new_network.wan.ifname", "eth1")?;
+        uci.set("new_network.wan.enabled", "on")?;
+        uci.set("new_network.wan.aliases", "c d")?;
+        uci.set("new_network.c", "alias")?;
+        uci.set("new_network.c.interface", "wan")?;
+        uci.set("new_network.d", "alias")?;
+        uci.set("new_network.d.interface", "wan")?;
+        uci.commit("new_network")?;
+
+        let mut file = File::open("tests/config/new_network")?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        let mut file = File::open("tests/config/network")?;
+        let mut actual_contents = String::new();
+        file.read_to_string(&mut actual_contents)?;
+
+        fs::remove_file("tests/config/new_network")?;
+
+        assert_eq!(contents, actual_contents);
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete() -> Result<()> {
+        let mut uci = init()?;
+
+        assert_eq!(uci.get("network.wan.proto")?, "dhcp");
+        assert_eq!(uci.get("network.wan.ifname")?, "eth1");
+        uci.delete("network.wan")?;
+        assert_eq!(uci.get("network.wan.proto").is_err(), true);
+        assert_eq!(uci.get("network.wan.ifname").is_err(), true);
+        uci.revert("network")?;
+        assert_eq!(uci.get("network.wan.proto")?, "dhcp");
+        assert_eq!(uci.get("network.wan.ifname")?, "eth1");
         Ok(())
     }
 }
