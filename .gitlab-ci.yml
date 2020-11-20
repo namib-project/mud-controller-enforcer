@@ -10,7 +10,7 @@ cache:
     - .cargo/
 
 before_script:
-  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
+  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev cmake clang
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - mkdir namib_enforcer
   - shopt -s extglob
