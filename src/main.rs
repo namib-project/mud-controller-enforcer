@@ -54,7 +54,7 @@ fn run_server() {
         .launch();
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     dotenv()?;
     env_logger::init();

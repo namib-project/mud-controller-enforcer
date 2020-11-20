@@ -30,6 +30,7 @@ impl RPC for RPCServer {
 }
 
 pub async fn listen() -> Result<()> {
+    debug!("Registering in dnssd");
     let (_result, result) = async_dnssd::register("_namib_controller._tcp", 8734)?.await?;
     info!("Registered: {:?}", result);
 
