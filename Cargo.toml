@@ -18,6 +18,9 @@ tarpc = { version = "0.23", features = ["full"] }
 serde = "1.0"
 pin-project = "1.0"
 tokio-serde = { version = "0.6" }
-snafu = { version = "0.6", default-features = false, features = ["std", "backtraces", "futures"] }
+snafu = { version = "0.6", default-features = false, features = ["std", "backtraces-impl-backtrace-crate", "futures"] }
 dotenv = "0.15"
+
+[target.'cfg(unix)'.dependencies]
 libuci-sys = { path = "../libuci-sys" }
+libc = "0.2"

@@ -9,11 +9,8 @@ use std::{
 use dotenv::dotenv;
 use tarpc::context;
 
-use async_dnssd::StreamTimeoutExt;
 use error::Result;
-use futures::TryStreamExt;
 use namib_shared::{models::DHCPRequestData, rpc::*};
-use tokio::time::Duration;
 
 mod error;
 mod rpc;
