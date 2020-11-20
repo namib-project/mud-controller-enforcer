@@ -1,18 +1,25 @@
-mod error;
-mod rpc;
+#[macro_use]
+extern crate log;
+
+use std::{
+    net::IpAddr,
+    sync::{Arc, Mutex},
+};
 
 use dotenv::dotenv;
-
-use error::Result;
-
-use log::*;
-use namib_shared::models::DHCPRequestData;
-use namib_shared::rpc::*;
-use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
 use tarpc::context;
 
-#[tokio::main]
+use async_dnssd::StreamTimeoutExt;
+use error::Result;
+use futures::TryStreamExt;
+use namib_shared::{models::DHCPRequestData, rpc::*};
+use tokio::time::Duration;
+
+mod error;
+mod rpc;
+mod uci;
+
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     dotenv()?;
     env_logger::init();
@@ -34,7 +41,7 @@ async fn main() -> Result<()> {
                     request_timestamp: std::time::SystemTime::now(),
                 },
             )
-            .await;
+            .await?;
         drop(instance)
     }
 

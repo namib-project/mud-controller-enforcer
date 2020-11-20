@@ -20,3 +20,4 @@ pin-project = "1.0"
 tokio-serde = { version = "0.6" }
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces", "futures"] }
 dotenv = "0.15"
+libuci-sys = { path = "../libuci-sys" }
