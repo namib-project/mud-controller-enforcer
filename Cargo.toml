@@ -34,9 +34,10 @@ serde_derive = "1.0"
 dotenv = "0.15"
 dotenv_codegen = "0.15"
 rocket_okapi = "0.6.0-alpha-1"
-schemars = "0.8"
+schemars = { version = "0.8", features = ["chrono"] }
 okapi = { version = "0.5.0-alpha-1", features = ["derive_json_schema"] }
 jsonwebtoken = "7.2"
 chrono = { version = "0.4", features = ["serde"] }
 validator = { version = "0.11", features = ["derive"] }
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces", "futures"] }
+isahc = "0.9"

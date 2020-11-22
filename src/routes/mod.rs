@@ -1,8 +1,5 @@
 use rocket::Route;
 
-mod users_dto;
-mod users_controller;
-
-pub fn all_routes() -> Vec<Route> {
-    users_controller::routes()
-}
+mod dtos;
+pub mod mud_controller;
+pub mod users_controller;

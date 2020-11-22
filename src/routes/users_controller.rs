@@ -10,46 +10,65 @@ use crate::error::*;
 use crate::models::user_model::*;
 use crate::services::user_service;
 
-use super::users_dto::*;
+use crate::routes::dtos::users_dto::*;
 
 #[openapi]
 #[doc = "# Register a new user"]
 #[post("/signup", format = "json", data = "<signup_dto>")]
 pub fn signup(conn: DbConn, signup_dto: Json<SignupDto>) -> Result<Json<SuccessDto>> {
-    signup_dto.validate()
-        .or_else(|_| ResponseError { status: Status::BadRequest, message: None }.fail())?;
+    signup_dto.validate().or_else(|_| {
+        ResponseError {
+            status: Status::BadRequest,
+            message: None,
+        }
+        .fail()
+    })?;
 
     let user = User::new(signup_dto.username.clone(), signup_dto.password.clone())?;
 
     user_service::insert(user, &*conn)?;
 
-    Ok(Json(
-        SuccessDto { status: String::from("ok") }
-    ))
+    Ok(Json(SuccessDto {
+        status: String::from("ok"),
+    }))
 }
 
 #[openapi]
 #[doc = "# Login with username and password"]
 #[post("/login", format = "json", data = "<login_dto>")]
 pub fn login(conn: DbConn, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
-    login_dto.validate()
-        .or_else(|_| ResponseError { status: Status::BadRequest, message: None }.fail())?;
-
-    let user = user_service::find_by_username(login_dto.username.as_ref(), &*conn)
-        .or_else(|_| ResponseError { status: Status::Unauthorized, message: None }.fail())?;
-
-    User::verify_password(&user, login_dto.password.as_ref())
-        .or_else(|_| ResponseError { status: Status::Unauthorized, message: None }.fail())?;
-
-    Ok(Json(
-        TokenDto {
-            token: Auth::encode_token(&Auth::generate_auth(
-                user.id,
-                user.username,
-                "api".to_string(),
-            ))
+    login_dto.validate().or_else(|_| {
+        ResponseError {
+            status: Status::BadRequest,
+            message: None,
         }
-    ))
+        .fail()
+    })?;
+
+    let user =
+        user_service::find_by_username(login_dto.username.as_ref(), &*conn).or_else(|_| {
+            ResponseError {
+                status: Status::Unauthorized,
+                message: None,
+            }
+            .fail()
+        })?;
+
+    User::verify_password(&user, login_dto.password.as_ref()).or_else(|_| {
+        ResponseError {
+            status: Status::Unauthorized,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    Ok(Json(TokenDto {
+        token: Auth::encode_token(&Auth::generate_auth(
+            user.id,
+            user.username,
+            "api".to_string(),
+        )),
+    }))
 }
 
 #[openapi]
@@ -69,8 +88,13 @@ pub fn update_me(
     auth: Auth,
     update_user_dto: Json<UpdateUserDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_user_dto.validate()
-        .or_else(|_| ResponseError { status: Status::BadRequest, message: None }.fail())?;
+    update_user_dto.validate().or_else(|_| {
+        ResponseError {
+            status: Status::BadRequest,
+            message: None,
+        }
+        .fail()
+    })?;
 
     let mut user = user_service::find_by_id(&auth.id, &*conn)?;
 
@@ -80,9 +104,9 @@ pub fn update_me(
 
     user_service::update(user.id, user, &*conn)?;
 
-    Ok(Json(
-        SuccessDto { status: String::from("ok") }
-    ))
+    Ok(Json(SuccessDto {
+        status: String::from("ok"),
+    }))
 }
 
 #[openapi]
@@ -93,21 +117,31 @@ pub fn update_password(
     auth: Auth,
     update_password_dto: Json<UpdatePasswordDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_password_dto.validate()
-        .or_else(|_| ResponseError { status: Status::BadRequest, message: None }.fail())?;
+    update_password_dto.validate().or_else(|_| {
+        ResponseError {
+            status: Status::BadRequest,
+            message: None,
+        }
+        .fail()
+    })?;
 
     let mut user = user_service::find_by_id(&auth.id, &*conn)?;
 
-    User::verify_password(&user, &update_password_dto.old_password)
-        .or_else(|_| ResponseError { status: Status::Unauthorized, message: None }.fail())?;
+    User::verify_password(&user, &update_password_dto.old_password).or_else(|_| {
+        ResponseError {
+            status: Status::Unauthorized,
+            message: None,
+        }
+        .fail()
+    })?;
 
     user.password = User::hash_password(&update_password_dto.new_password, &user.salt)?;
 
     user_service::update(user.id, user, &*conn)?;
 
-    Ok(Json(
-        SuccessDto { status: String::from("ok") }
-    ))
+    Ok(Json(SuccessDto {
+        status: String::from("ok"),
+    }))
 }
 
 #[openapi]
@@ -116,20 +150,14 @@ pub fn update_password(
 pub fn get_roles(conn: DbConn, auth: Auth) -> Result<Json<RolesDto>> {
     let user = user_service::find_by_id(&auth.id, &*conn)?;
 
-    let roles: Vec<String> =
-        user_service::get_roles(&user, &*conn)?
-            .iter()
-            .map(|r| r.name.clone())
-            .collect();
+    let roles: Vec<String> = user_service::get_roles(&user, &*conn)?
+        .iter()
+        .map(|r| r.name.clone())
+        .collect();
 
     let permissions = user_service::get_permissions(&user, &*conn).unwrap_or(Vec::new());
 
-    Ok(Json(
-        RolesDto {
-            roles,
-            permissions,
-        }
-    ))
+    Ok(Json(RolesDto { roles, permissions }))
 }
 
 pub fn routes() -> Vec<Route> {

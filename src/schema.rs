@@ -1,4 +1,13 @@
 table! {
+    mud_data (url) {
+        url -> Text,
+        data -> Text,
+        created_at -> Timestamp,
+        expiration -> Timestamp,
+    }
+}
+
+table! {
     roles (id) {
         id -> Integer,
         name -> Text,
@@ -27,6 +36,7 @@ joinable!(users_roles -> roles (role_id));
 joinable!(users_roles -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
+    mud_data,
     roles,
     users,
     users_roles,
