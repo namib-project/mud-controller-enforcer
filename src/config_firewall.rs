@@ -1,4 +1,6 @@
-#[derive(Clone, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RuleName(String);
 
 impl RuleName {
@@ -16,29 +18,41 @@ impl RuleName {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EnNetwork {
-    Lan,
-    Wan,
+    LAN,
+    WAN,
     VPN,
 }
 
 impl EnNetwork {
     pub fn to_string(&self) -> String {
         match self {
-            Self::Lan => "lan".to_string(),
-            Self::Wan => "wan".to_string(),
+            Self::LAN => "lan".to_string(),
+            Self::WAN => "wan".to_string(),
             Self::VPN => "vpn".to_string(),
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Protocol(u32);
 
 impl Protocol {
     pub fn tcp() -> Self {
         Protocol(6)
+    }
+
+    pub fn udp() -> Self {
+        Protocol(17)
+    }
+
+    pub fn from_number(nr: u32) -> Self {
+        Protocol(nr)
+    }
+
+    pub fn all() -> Self {
+        Protocol(0)
     }
 
     pub fn to_string(&self) -> String {
@@ -50,35 +64,7 @@ impl Protocol {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum EnRoute {
-    Src(EnNetwork),
-    Des(EnNetwork),
-}
-
-impl EnRoute {
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Src(n) => format!("src='{}'", n.to_string()),
-            Self::Des(n) => format!("dest='{}'", n.to_string()),
-        }
-    }
-    pub fn get_network(&self) -> &EnNetwork {
-        match self {
-            Self::Src(n) => n,
-            Self::Des(n) => n,
-        }
-    }
-
-    pub fn to_option(&self) -> (String, String) {
-        match self {
-            Self::Src(n) => ("src".to_string(), n.to_string()),
-            Self::Des(n) => ("dest".to_string(), n.to_string()),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum EnTarget {
     ACCEPT,
     REJECT,
@@ -102,27 +88,23 @@ impl EnTarget {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum EnOptionalSettings {
-    None,
-    Settings(Vec<(String, String)>),
-}
+pub type EnOptionalSettings = Option<Vec<(String, String)>>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConfigFirewall {
     rule_name: RuleName,
-    route_network_src: EnRoute,
-    route_network_dest: EnRoute,
+    route_network_src: EnNetwork,
+    route_network_dest: EnNetwork,
     protocol: Protocol,
-    target: EnTarget,
+    pub target: EnTarget,
     optional_settings: EnOptionalSettings,
 }
 
 impl ConfigFirewall {
     pub fn new(
         rule_name: RuleName,
-        route_network_src: EnRoute,
-        route_network_dest: EnRoute,
+        route_network_src: EnNetwork,
+        route_network_dest: EnNetwork,
         protocol: Protocol,
         target: EnTarget,
         optional_settings: EnOptionalSettings,
@@ -139,12 +121,12 @@ impl ConfigFirewall {
     pub fn to_option(&self) -> Vec<(String, String)> {
         let mut query: Vec<(String, String)> = Vec::new();
         query.push(self.rule_name.to_option());
-        query.push(self.route_network_src.to_option());
-        query.push(self.route_network_dest.to_option());
+        query.push(("src".to_string(), self.route_network_src.to_string()));
+        query.push(("dest".to_string(), self.route_network_dest.to_string()));
         query.push(self.protocol.to_option());
         query.push(self.target.to_option());
 
-        if let EnOptionalSettings::Settings(v) = &self.optional_settings {
+        if let Some(v) = &self.optional_settings {
             for s in v.iter() {
                 query.push(s.clone());
             }
@@ -156,12 +138,12 @@ impl ConfigFirewall {
         let mut query: Vec<String> = Vec::new();
         query.push("rule".to_string());
         query.push(self.rule_name.to_string());
-        query.push(self.route_network_src.to_string());
-        query.push(self.route_network_dest.to_string());
+        query.push(format!("src='{}'", self.route_network_src.to_string()));
+        query.push(format!("dest='{}'", self.route_network_dest.to_string()));
         query.push(self.protocol.to_string());
         query.push(self.target.to_string());
 
-        if let EnOptionalSettings::Settings(v) = &self.optional_settings {
+        if let Some(v) = &self.optional_settings {
             for s in v.iter() {
                 query.push(format!("{}='{}'", s.0, s.1));
             }
