@@ -40,15 +40,17 @@ pub fn discover_controllers(reg_type: &str) -> Result<impl Stream<Item=Result<Sc
             Ok(Some(r.resolve_socket_address()?.timeout(ADDRESS_TIMEOUT)?))
         })
         .try_flatten()
-        .try_filter_map(|result| future::ready({
-            if result.flags.intersects(ResolvedHostFlags::ADD) {
-                info!("Address {} \t\t [{:?}]", result.address, result);
+        .try_filter_map(|result| {
+            future::ready({
+                if result.flags.intersects(ResolvedHostFlags::ADD) {
+                    info!("Address {} \t\t [{:?}]", result.address, result);
 
-                Ok(Some(result.address))
-            } else {
-                Ok(None)
-            }
-        }))
+                    Ok(Some(result.address))
+                } else {
+                    Ok(None)
+                }
+            })
+        })
         .map_err(|e| e.into());
 
     Ok(result)

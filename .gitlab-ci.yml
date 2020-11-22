@@ -10,13 +10,14 @@ cache:
     - .cargo/
 
 before_script:
-  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
+  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev cmake clang
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - mkdir namib_enforcer
   - shopt -s extglob
   - mv !(namib_enforcer) namib_enforcer
-  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-  - git clone https://gitlab-ci-token:${namib_async_dnssd_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
+  - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git
   - cd namib_enforcer
   - rustc --version
   - cargo --version
