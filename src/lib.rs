@@ -3,6 +3,7 @@ use std::io;
 
 use tokio_serde::formats::Bincode;
 
+pub mod config_firewall;
 pub mod models;
 pub mod rpc;
 
