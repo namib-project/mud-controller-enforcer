@@ -48,9 +48,13 @@ pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDD
         .execute(conn)?;
 
     // return muddata
-    return Ok(data);
+    Ok(data)
 }
 
 async fn fetch_mud(url: &String) -> Result<String> {
     Ok(isahc::get_async(url).await?.text_async().await?)
+}
+
+pub async fn get_config_version() -> String {
+    "test1".to_string()
 }
