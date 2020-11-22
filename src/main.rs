@@ -7,10 +7,11 @@ use std::{
 };
 
 use dotenv::dotenv;
+use log::*;
+use namib_shared::{models::DHCPRequestData, rpc::*};
 use tarpc::context;
 
 use error::Result;
-use namib_shared::{models::DHCPRequestData, rpc::*};
 
 mod error;
 mod rpc;

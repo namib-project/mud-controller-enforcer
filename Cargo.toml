@@ -4,6 +4,9 @@ version = "0.0.1"
 authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
 
+[features]
+execute_uci_commands = []
+
 [dependencies]
 namib_shared = { path = "../namib_shared" }
 tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util"] }
@@ -20,6 +23,7 @@ pin-project = "1.0"
 tokio-serde = { version = "0.6" }
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces-impl-backtrace-crate", "futures"] }
 dotenv = "0.15"
+
 
 [target.'cfg(unix)'.dependencies]
 libuci-sys = { path = "../libuci-sys" }

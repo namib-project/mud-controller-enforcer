@@ -1,0 +1,9 @@
+
+config rule 'namibrule'
+	option name 'Regel1'
+	option src 'vpn'
+	option dest 'lan'
+	option proto '6'
+	option target 'REJECT'
+	option namib '1'
+
