@@ -14,6 +14,7 @@ use namib_shared::{models::DHCPRequestData, rpc::*};
 
 mod error;
 mod rpc;
+mod services;
 mod uci;
 
 #[tokio::main(flavor = "current_thread")]

@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::services::config_firewall_service;
 use futures::{pin_mut, prelude::*};
 use log::*;
 use tarpc::{client, context};
@@ -51,11 +52,22 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
     loop {
         {
             let mut instance = client.lock().unwrap();
-            if let Err(e) = instance.heartbeat(context::current()).await {
-                error!("Error during heartbeat: {:?}", e);
-            } else {
-                debug!("Heartbeat OK!");
+            match instance.heartbeat(context::current(), config_firewall_service::get_config_version()).await {
+                Err(error) => error!("Error during heartbeat: {:?}", error),
+                Ok(config) => {
+                    // Option<Vec<ConfigFirewall>>
+                    debug!("Heartbeat OK!");
+                    match config {
+                        None => {},
+                        Some(config) => {
+                            debug!("Received new config {:?}", config);
+
+                            config_firewall_service::apply_config(config);
+                        },
+                    }
+                },
             }
+
             drop(instance);
         }
 
