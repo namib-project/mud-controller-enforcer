@@ -2,10 +2,12 @@ use chrono::{Local, NaiveDateTime};
 use diesel::{QueryDsl, QueryResult, RunQueryDsl};
 use isahc::ResponseExt;
 
-use crate::db::ConnectionType;
-use crate::error::Result;
-use crate::models::mud_models::{MUDData, MUD};
-use crate::schema::mud_data;
+use crate::{
+    db::ConnectionType,
+    error::Result,
+    models::mud_models::{MUDData, MUD},
+    schema::mud_data,
+};
 
 mod json_models;
 mod parser;
@@ -31,10 +33,10 @@ pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDD
     }
 
     // wenn nicht: fetch
-    let mud_json = fetch_mud(&url).await?;
+    let mud_json = fetch_mud(url.as_str()).await?;
 
     // ruf parse_mud auf
-    let data = parser::parse_mud(url.clone(), mud_json)?;
+    let data = parser::parse_mud(url.clone(), mud_json.as_str())?;
 
     // speichern in db
     let mud = InsertableMUD {
@@ -43,14 +45,12 @@ pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDD
         created_at: Local::now().naive_local(),
         expiration: data.expiration.naive_local(),
     };
-    diesel::insert_into(mud_data::table)
-        .values(mud)
-        .execute(conn)?;
+    diesel::insert_into(mud_data::table).values(mud).execute(conn)?;
 
     // return muddata
     return Ok(data);
 }
 
-async fn fetch_mud(url: &String) -> Result<String> {
+async fn fetch_mud(url: &str) -> Result<String> {
     Ok(isahc::get_async(url).await?.text_async().await?)
 }

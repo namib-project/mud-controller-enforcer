@@ -1,7 +1,11 @@
-use crate::schema::*;
+#![allow(clippy::field_reassign_with_default)]
+
+use std::net::IpAddr;
+
 use chrono::{DateTime, Local, NaiveDateTime};
 use schemars::JsonSchema;
-use std::net::IpAddr;
+
+use crate::schema::mud_data;
 
 #[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Clone, JsonSchema)]
 #[table_name = "mud_data"]

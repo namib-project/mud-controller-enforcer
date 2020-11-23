@@ -1,11 +1,10 @@
+#![allow(clippy::needless_pass_by_value)]
+
 use rocket::Route;
 use rocket_contrib::json::Json;
 use rocket_okapi::{openapi, routes_with_openapi};
 
-use crate::db::DbConn;
-use crate::error::*;
-use crate::models::mud_models::MUDData;
-use crate::services::mud_service;
+use crate::{db::DbConn, error::Result, models::mud_models::MUDData, services::mud_service};
 
 #[openapi]
 #[get("/?<url>")]

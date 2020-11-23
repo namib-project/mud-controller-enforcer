@@ -10,14 +10,15 @@ cache:
     - .cargo/
 
 before_script:
+  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - mkdir namib_mud_controller
-  - shopt -s extglob
-  - mv !(namib_mud_controller) namib_mud_controller
-  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-  - git clone https://gitlab-ci-token:${namib_async_dnssd_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
-  - cd namib_mud_controller
+  - wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
+  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
+  - git clone https://gitlab-ci-token:${namib_shared_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git ../namib_shared
+  - git clone https://gitlab-ci-token:${namib_async_dnssd_access_token}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git ../rust-async-dnssd
   - rustc --version
   - cargo --version
 
@@ -36,8 +37,27 @@ test:
   script:
     - cargo test
 
+warnings:
+  stage: test
+  script:
+    - cargo clippy -- -D warnings
+  allow_failure: true
+
+docs:
+  stage: docs
+  except:
+    - master
+  script:
+    - cargo doc --no-deps
+  artifacts:
+    paths:
+      - target/doc
+    expire_in: 7 days
+
 pages:
   stage: docs
+  only:
+    - master
   script:
     - cargo doc --no-deps
     - mv target/doc ../public

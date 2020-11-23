@@ -1,9 +1,12 @@
-use std::{io, pin::Pin};
-use std::future::Future;
-use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    io,
+    marker::PhantomData,
+    net::SocketAddr,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use futures::{prelude::*, ready};
 use pin_project::pin_project;
@@ -12,7 +15,7 @@ use tarpc::serde_transport::{self, Transport};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls as rustls;
 use tokio_rustls::TlsAcceptor;
-use tokio_serde::*;
+use tokio_serde::{Deserializer, Serializer};
 use tokio_util::codec::{length_delimited, length_delimited::LengthDelimitedCodec};
 
 /// Listens on `addr`, wrapping accepted connections in TCP transports.
@@ -21,10 +24,10 @@ pub async fn listen<Item, SinkItem, Codec, CodecFn>(
     addr: SocketAddr,
     codec_fn: CodecFn,
 ) -> io::Result<Incoming<Item, SinkItem, Codec, CodecFn>>
-    where
-        Item: for<'de> Deserialize<'de>,
-        Codec: Serializer<SinkItem> + Deserializer<Item>,
-        CodecFn: Fn() -> Codec,
+where
+    Item: for<'de> Deserialize<'de>,
+    Codec: Serializer<SinkItem>+Deserializer<Item>,
+    CodecFn: Fn() -> Codec,
 {
     let acceptor = TlsAcceptor::from(config);
     let listener = TcpListener::bind(addr).await?;
@@ -51,18 +54,16 @@ pub struct Incoming<Item, SinkItem, Codec, CodecFn> {
     local_addr: SocketAddr,
     codec_fn: CodecFn,
     config: length_delimited::Builder,
-    ghost: PhantomData<(fn() -> Item, fn(SinkItem), Codec)>,
+    ghost: PhantomData<(Item, SinkItem, Codec)>,
 }
 
 impl<Item, SinkItem, Codec, CodecFn> Incoming<Item, SinkItem, Codec, CodecFn> {
     /// Returns the address being listened on.
-    #[allow(dead_code)]
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
     }
 
     /// Returns an immutable reference to the length-delimited codec's config.
-    #[allow(dead_code)]
     pub fn config(&self) -> &length_delimited::Builder {
         &self.config
     }
@@ -74,11 +75,11 @@ impl<Item, SinkItem, Codec, CodecFn> Incoming<Item, SinkItem, Codec, CodecFn> {
 }
 
 impl<Item, SinkItem, Codec, CodecFn> Stream for Incoming<Item, SinkItem, Codec, CodecFn>
-    where
-        Item: for<'de> Deserialize<'de>,
-        SinkItem: Serialize,
-        Codec: Serializer<SinkItem> + Deserializer<Item>,
-        CodecFn: Fn() -> Codec
+where
+    Item: for<'de> Deserialize<'de>,
+    SinkItem: Serialize,
+    Codec: Serializer<SinkItem>+Deserializer<Item>,
+    CodecFn: Fn() -> Codec,
 {
     type Item = io::Result<Transport<rustls::server::TlsStream<TcpStream>, Item, SinkItem, Codec>>;
 
@@ -86,15 +87,13 @@ impl<Item, SinkItem, Codec, CodecFn> Stream for Incoming<Item, SinkItem, Codec, 
         let mut this = self.project();
 
         Poll::Ready(loop {
-            if let Some(conn) = this.pending_conn.as_mut().as_pin_mut(){
-                let accepted: rustls::server::TlsStream<TcpStream>
-                    = ready!(conn.poll(cx)?);
+            if let Some(conn) = this.pending_conn.as_mut().as_pin_mut() {
+                let accepted: rustls::server::TlsStream<TcpStream> = ready!(conn.poll(cx)?);
                 this.pending_conn.set(None);
 
-               break Some(Ok(serde_transport::new(this.config.new_framed(accepted), (this.codec_fn)())))
+                break Some(Ok(serde_transport::new(this.config.new_framed(accepted), (this.codec_fn)())));
             } else {
-                let conn: TcpStream =
-                    ready!(this.listener.as_mut().poll_accept(cx)?).0;
+                let conn: TcpStream = ready!(this.listener.as_mut().poll_accept(cx)?).0;
 
                 this.pending_conn.set(Some(this.acceptor.accept(conn)))
             }

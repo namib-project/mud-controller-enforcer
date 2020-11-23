@@ -1,4 +1,12 @@
 #![feature(proc_macro_hygiene, decl_macro)]
+#![warn(clippy::all, clippy::style, clippy::pedantic)]
+#![allow(
+    dead_code,
+    clippy::manual_range_contains,
+    clippy::unseparated_literal_suffix,
+    clippy::module_name_repetitions,
+    clippy::default_trait_access
+)]
 
 #[macro_use]
 extern crate diesel;
@@ -20,7 +28,7 @@ use rocket::fairing::AdHoc;
 use rocket_contrib::serve::StaticFiles;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig, UrlObject};
 
-use crate::error::*;
+use crate::error::Result;
 
 mod auth;
 mod db;
@@ -34,20 +42,14 @@ mod services;
 fn run_server() {
     rocket::ignite()
         .attach(db::DbConn::fairing())
-        .attach(AdHoc::on_attach(
-            "Database Migrations",
-            db::run_db_migrations,
-        ))
+        .attach(AdHoc::on_attach("Database Migrations", db::run_db_migrations))
         .mount("/users", routes::users_controller::routes())
         .mount("/mud", routes::mud_controller::routes())
         .mount("/", StaticFiles::from("public"))
         .mount(
             "/swagger-ui/",
             make_swagger_ui(&SwaggerUIConfig {
-                urls: vec![
-                    UrlObject::new("Users", "../users/openapi.json"),
-                    UrlObject::new("MUD", "../mud/openapi.json"),
-                ],
+                urls: vec![UrlObject::new("Users", "../users/openapi.json"), UrlObject::new("MUD", "../mud/openapi.json")],
                 ..Default::default()
             }),
         )

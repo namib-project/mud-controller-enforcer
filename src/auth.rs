@@ -1,11 +1,13 @@
-use chrono::{Duration, Utc};
-use rocket::http::Status;
-use rocket::request::{self, FromRequest, Request};
-use rocket::Outcome;
-use serde::{Deserialize, Serialize};
 use std::env;
 
+use chrono::{Duration, Utc};
 use jsonwebtoken as jwt;
+use rocket::{
+    http::Status,
+    request::{self, FromRequest, Request},
+    Outcome,
+};
+use serde::{Deserialize, Serialize};
 
 static HEADER_PREFIX: &str = "Bearer ";
 
@@ -40,11 +42,7 @@ impl Auth {
         jwt::encode(
             &jwt::Header::default(),
             self,
-            &jwt::EncodingKey::from_secret(
-                env::var("JWT_SECRET")
-                    .expect("JWT_SECRET must be set")
-                    .as_ref(),
-            ),
+            &jwt::EncodingKey::from_secret(env::var("JWT_SECRET").expect("JWT_SECRET must be set").as_ref()),
         )
         .expect("jwt")
     }
@@ -55,11 +53,7 @@ impl Auth {
 
         jwt::decode(
             token,
-            &jwt::DecodingKey::from_secret(
-                env::var("JWT_SECRET")
-                    .expect("JWT_SECRET must be set")
-                    .as_ref(),
-            ),
+            &jwt::DecodingKey::from_secret(env::var("JWT_SECRET").expect("JWT_SECRET must be set").as_ref()),
             &Validation::new(Algorithm::HS256),
         )
         .map_err(|err| {
@@ -79,10 +73,7 @@ fn extract_auth_from_request(request: &Request) -> Option<Auth> {
 }
 
 fn extract_token_from_header(header: &str) -> Option<&str> {
-    match header.starts_with(HEADER_PREFIX) {
-        true => Some(&header[HEADER_PREFIX.len()..]),
-        false => None,
-    }
+    header.strip_prefix(HEADER_PREFIX)
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for Auth {
@@ -96,7 +87,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Auth {
     fn from_request(request: &'a Request<'r>) -> request::Outcome<Auth, Self::Error> {
         match extract_auth_from_request(request) {
             Some(auth) => Outcome::Success(auth),
-            _ => Outcome::Failure((Status::Forbidden, "Unauthorized")),
+            None => Outcome::Failure((Status::Forbidden, "Unauthorized")),
         }
     }
 }

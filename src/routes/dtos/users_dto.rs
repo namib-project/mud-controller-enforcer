@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use rocket_okapi::JsonSchema;
 
 #[derive(Validate, Serialize, Deserialize, JsonSchema)]
@@ -75,14 +77,12 @@ fn update_password_example() -> UpdatePasswordDto {
 
 fn update_user_example() -> UpdateUserDto {
     UpdateUserDto {
-        username: Some(String::from("alfred"))
+        username: Some(String::from("alfred")),
     }
 }
 
 fn success_example() -> SuccessDto {
-    SuccessDto {
-        status: String::from("ok")
-    }
+    SuccessDto { status: String::from("ok") }
 }
 
 fn roles_example() -> RolesDto {

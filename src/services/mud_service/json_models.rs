@@ -106,11 +106,11 @@ pub struct Udp {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Port {
     pub operator: Option<String>,
-    pub port: Option<i64>,
+    pub port: Option<u32>,
     #[serde(rename = "lower-port")]
-    pub lower_port: Option<i64>,
+    pub lower_port: Option<u32>,
     #[serde(rename = "upper-port")]
-    pub upper_port: Option<i64>,
+    pub upper_port: Option<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -129,7 +129,7 @@ pub struct MudExtension {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4 {
-    pub protocol: Option<i64>,
+    pub protocol: Option<u32>,
     #[serde(rename = "source-ipv4-network")]
     pub source_ipv4_network: Option<String>,
     #[serde(rename = "destination-ipv4-network")]
@@ -142,7 +142,7 @@ pub struct Ipv4 {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6 {
-    pub protocol: Option<i64>,
+    pub protocol: Option<u32>,
     #[serde(rename = "source-ipv6-network")]
     pub source_ipv6_network: Option<String>,
     #[serde(rename = "destination-ipv6-network")]

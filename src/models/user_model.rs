@@ -1,12 +1,16 @@
+#![allow(clippy::field_reassign_with_default)]
+
 use std::str::Split;
 
 use argon2::{self, Config};
-use ring::rand::{SecureRandom, SystemRandom};
+use rand::{rngs::OsRng, Rng};
 use schemars::JsonSchema;
 use snafu::ensure;
 
-use crate::error::*;
-use crate::schema::*;
+use crate::{
+    error::{PasswordVerifyError, Result},
+    schema::{roles, users, users_roles},
+};
 
 const SALT_LENGTH: usize = 32;
 
@@ -41,14 +45,14 @@ pub struct Role {
 
 // Local methods
 impl User {
-    pub fn new(username: String, password: String) -> Result<Self> {
+    pub fn new(username: String, password: &str) -> Result<Self> {
         let mut salt = vec![0u8; SALT_LENGTH];
-        SystemRandom::new().fill(&mut salt)?;
+        OsRng::default().fill(salt.as_mut_slice());
 
         Ok(Self {
             id: 0,
-            username: username.clone(),
-            password: User::hash_password(&password, &salt)?,
+            username,
+            password: User::hash_password(password, &salt)?,
             salt,
         })
     }
@@ -59,19 +63,15 @@ impl User {
         Ok(())
     }
 
-    pub fn hash_password(password: &String, salt: &Vec<u8>) -> Result<String> {
+    pub fn hash_password(password: &str, salt: &[u8]) -> Result<String> {
         let argon_config = Config::default();
 
-        Ok(argon2::hash_encoded(
-            password.as_bytes(),
-            salt,
-            &argon_config,
-        )?)
+        Ok(argon2::hash_encoded(password.as_bytes(), salt, &argon_config)?)
     }
 }
 
 impl Role {
-    pub fn permissions(&self) -> Split<&'static str> {
-        self.permissions.split(r#","#)
+    pub fn permissions(&self) -> Split<char> {
+        self.permissions.split('x')
     }
 }

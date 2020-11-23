@@ -32,6 +32,6 @@ pub fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
         Err(e) => {
             error!("Failed to run database migrations: {:?}", e);
             Err(rocket)
-        }
+        },
     }
 }

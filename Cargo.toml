@@ -22,7 +22,7 @@ tokio-util = "0.4"
 tokio-serde = { version = "0.6" }
 tarpc = { version = "0.23", features = ["full"] }
 pin-project = "1.0"
-ring = { version = "0.16", features = ["std"] }
+rand = "0.7"
 rust-argon2 = "0.8"
 diesel = { version = "1.4", features = ["r2d2", "chrono"] }
 diesel_migrations = "1.4"
