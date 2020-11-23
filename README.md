@@ -34,10 +34,12 @@ vcpkg install libpq sqlite3
 
 Add the following Environment variables: 
 
-| PATH | ...\vcpkg\installed\x86-windows\bin |
-| PG_LIB_DIR | ...\vcpkg\installed\x86-windows\lib |
-| SQLITE3_LIB_DIR | ...\vcpkg\installed\x86-windows\lib |
-| BONJOUR_SDK_HOME | C:\Program Files\Bonjour SDK |
+Variable | Value
+--- | ---
+ PATH | ...\vcpkg\installed\x86-windows\bin 
+ PG_LIB_DIR | ...\vcpkg\installed\x86-windows\lib 
+ SQLITE3_LIB_DIR | ...\vcpkg\installed\x86-windows\lib 
+ BONJOUR_SDK_HOME | C:\Program Files\Bonjour SDK 
 
 Replace `...\vcpkg` with your vcpk install location
 
