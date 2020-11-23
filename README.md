@@ -56,8 +56,5 @@ git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/rust
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_shared.git
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_enforcer.git
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_mud_controller.git
-
-cd namib_mud_controller
-rustup override set nightly
 ```
 
