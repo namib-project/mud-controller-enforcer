@@ -5,7 +5,7 @@ use crate::services::device_service::Device;
 use namib_shared::config_firewall::*;
 use std::net::{IpAddr, ToSocketAddrs};
 
-pub fn convert_model_to_config(device: &Device) -> Result<Vec<ConfigFirewall>> {
+pub fn convert_device_to_config(device: &Device) -> Result<Vec<ConfigFirewall>> {
     let mut index = 0;
     let mut result: Vec<ConfigFirewall> = Vec::new();
     let mud_data = &device.mud_data;
@@ -75,10 +75,9 @@ pub fn convert_model_to_config(device: &Device) -> Result<Vec<ConfigFirewall>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::*;
     use crate::models::mud_models::*;
     use chrono::Local;
-    use std::net::ToSocketAddrs;
+    use std::net::Ipv4Addr;
 
     #[test]
     fn test_converting() -> Result<()> {
@@ -110,7 +109,14 @@ mod tests {
             }],
         };
 
-        let x = convert_model_to_config(mud_data)?;
+        let device = Device {
+            mud_url: "".to_string(),
+            mac: "".to_string(),
+            ip_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            mud_data: mud_data,
+        };
+
+        let x = convert_device_to_config(&device)?;
 
         println!("{:#?}", x);
 

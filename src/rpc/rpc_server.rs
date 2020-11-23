@@ -37,7 +37,7 @@ impl RPC for RPCServer {
             let config: Vec<ConfigFirewall> = devices
                 .iter()
                 .flat_map(move |d| {
-                    config_firewall_service::convert_model_to_config(d)
+                    config_firewall_service::convert_device_to_config(d)
                         .unwrap_or_else(|_| Vec::new())
                 })
                 .collect();
