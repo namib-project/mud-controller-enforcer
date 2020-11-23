@@ -1,5 +1,4 @@
 use crate::models::DHCPRequestData;
-use tarpc;
 
 #[tarpc::service]
 pub trait RPC {

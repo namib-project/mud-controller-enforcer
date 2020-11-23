@@ -14,15 +14,32 @@ build:
     - cargo --version
     - cargo build
 
+warnings:
+  stage: test
+  script:
+    - cargo clippy -- -D warnings
+  allow_failure: true
+
 docs:
   stage: docs
-  tags:
-    - linux
-    - docker
+  except:
+    - master
   script:
     - cargo doc --no-deps
-    - mv target/doc public
-    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
-    - ls public
+  artifacts:
+    paths:
+      - target/doc
+    expire_in: 7 days
+
+pages:
+  stage: docs
   only:
     - master
+  script:
+    - cargo doc --no-deps
+    - mv target/doc ../public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > ../public/index.html
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
