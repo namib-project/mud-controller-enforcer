@@ -37,10 +37,11 @@ test:
   script:
     - cargo test
 
-test_warnings:
+warnings:
   stage: test
   script:
     - cargo clippy -- -D warnings
+  allow_failure: true
 
 docs:
   stage: docs
