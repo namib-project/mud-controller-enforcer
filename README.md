@@ -19,4 +19,4 @@ Make sure you are using nightly rust (`rustup override set nightly`)
 
 with logs:
 
-`RUST_LOG=debug cargo test --show-output`
+`RUST_LOG=debug cargo test -- --show-output`
