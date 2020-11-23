@@ -1,13 +1,13 @@
+#![allow(dead_code)]
+
 #[macro_use]
 extern crate log;
 
-use std::{
-    net::IpAddr,
-    sync::{Arc, Mutex},
-};
+use std::{net::IpAddr, sync::Arc};
 
 use dotenv::dotenv;
 use tarpc::context;
+use tokio::sync::Mutex;
 
 use error::Result;
 use namib_shared::{models::DHCPRequestData, rpc::*};
@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     info!("Connected to RPC server");
 
     {
-        let mut instance = client.lock().unwrap();
+        let mut instance = client.lock().await;
         instance
             .dhcp_request(
                 context::current(),
@@ -39,7 +39,6 @@ async fn main() -> Result<()> {
                 },
             )
             .await?;
-        drop(instance)
     }
 
     let heartbeat_task = rpc::rpc_client::heartbeat(client);

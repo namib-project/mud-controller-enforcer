@@ -1,12 +1,13 @@
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::{net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
 use log::*;
+use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context};
-use tokio::time::{sleep, Duration};
+use tokio::{
+    sync::Mutex,
+    time::{sleep, Duration},
+};
 use tokio_rustls::{rustls, webpki::DNSNameRef};
 
 use namib_shared::{codec, open_file_with, rpc::*};
@@ -14,7 +15,6 @@ use namib_shared::{codec, open_file_with, rpc::*};
 use crate::error::*;
 
 use super::{controller_discovery::discover_controllers, tls_serde_transport};
-use snafu::{Backtrace, GenerateBacktrace};
 
 pub async fn run() -> Result<RPCClient> {
     let tls_cfg = {
@@ -50,7 +50,7 @@ pub async fn run() -> Result<RPCClient> {
 pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
     loop {
         {
-            let mut instance = client.lock().unwrap();
+            let mut instance = client.lock().await;
             if let Err(e) = instance.heartbeat(context::current()).await {
                 error!("Error during heartbeat: {:?}", e);
             } else {
