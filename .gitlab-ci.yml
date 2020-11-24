@@ -1,18 +1,32 @@
-image: 'rust:latest'
-
 stages:
   - build
   - test
   - docs
 
-build:
-  stage: build
+image: 'rust:latest'
+
+cache:
+  paths:
+    - .cargo/
+
+before_script:
+  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
+  - wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
+  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
+  - rustup component add clippy
+  - rustc --version
+  - cargo --version
+
+default:
   tags:
     - linux
     - docker
+
+build:
+  stage: build
   script:
-    - rustc --version
-    - cargo --version
     - cargo build
 
 warnings:
@@ -38,8 +52,8 @@ pages:
     - master
   script:
     - cargo doc --no-deps
-    - mv target/doc ../public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > ../public/index.html
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > public/index.html
   artifacts:
     paths:
       - public
