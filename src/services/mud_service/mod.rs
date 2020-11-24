@@ -56,5 +56,6 @@ async fn fetch_mud(url: &String) -> Result<String> {
 }
 
 pub async fn get_config_version() -> String {
-    "test1".to_string()
+    // TODO: Implement getting a hash of the config
+    "version".to_string()
 }

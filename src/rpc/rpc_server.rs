@@ -26,7 +26,10 @@ pub struct RPCServer(SocketAddr);
 #[server]
 impl RPC for RPCServer {
     async fn heartbeat(self, _: context::Context, version: String) -> Option<Vec<ConfigFirewall>> {
-        debug!("Received a heartbeat from: {:?} {}", self.0, version);
+        debug!(
+            "Received a heartbeat from client {:?} with version {}",
+            self.0, version
+        );
         let current_config_version = mud_service::get_config_version().await;
         if current_config_version != version {
             debug!(
@@ -41,6 +44,8 @@ impl RPC for RPCServer {
                         .unwrap_or_else(|_| Vec::new())
                 })
                 .collect();
+
+            debug!("Returning Heartbeat to client with config: {:#?}", config);
             return Some(config);
         }
 
