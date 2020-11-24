@@ -60,8 +60,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                     match config {
                         None => {},
                         Some(config) => {
-                            debug!("Received new config {:?}", config);
-
+                            debug!("Received new config {:#?}", config);
                             config_firewall_service::apply_config(config);
                         },
                     }

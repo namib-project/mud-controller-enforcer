@@ -6,4 +6,5 @@ pub fn get_config_version() -> String {
 
 pub fn apply_config(config_firewall: Vec<ConfigFirewall>) {
     debug!("TODO: applying config");
+    // TODO: Store the ConfigFirewall
 }
