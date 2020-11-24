@@ -1,6 +1,5 @@
 use crate::config_firewall::ConfigFirewall;
 use crate::models::DHCPRequestData;
-use tarpc;
 
 #[tarpc::service]
 pub trait RPC {
