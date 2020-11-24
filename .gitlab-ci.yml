@@ -3,7 +3,7 @@ stages:
   - test
   - docs
 
-image: rustlang/rust:stable
+image: rust:latest
 
 cache:
   paths:
