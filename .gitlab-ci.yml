@@ -3,7 +3,7 @@ stages:
   - test
   - docs
 
-image: rustlang/rust:nightly
+image: rust:latest
 
 cache:
   paths:
@@ -12,13 +12,14 @@ cache:
 before_script:
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev cmake clang
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - mkdir namib_enforcer
-  - shopt -s extglob
-  - mv !(namib_enforcer) namib_enforcer
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
-  - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git
-  - cd namib_enforcer
+  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
+  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} ../namib_shared || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git ../namib_shared
+  - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git ../rust-async-dnssd
+  - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git ../libuci-sys
+  - rustup component add clippy
   - rustc --version
   - cargo --version
 
@@ -37,13 +38,33 @@ test:
   script:
     - cargo test
 
-pages:
+warnings:
+  stage: test
+  script:
+    - cargo clippy -- -D warnings
+  allow_failure: true
+
+docs:
   stage: docs
+  except:
+    - master
   script:
     - cargo doc --no-deps
-    - mv target/doc ../public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_enforcer/index.html">' > ../public/index.html
+  artifacts:
+    paths:
+      - target/doc
+    expire_in: 7 days
+
+pages:
+  stage: docs
+  only:
+    - master
+  script:
+    - cargo doc --no-deps
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_enforcer/index.html">' > public/index.html
   artifacts:
     paths:
       - public
     expire_in: 7 days
+
