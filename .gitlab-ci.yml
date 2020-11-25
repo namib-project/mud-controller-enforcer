@@ -10,7 +10,7 @@ cache:
     - .cargo/
 
 before_script:
-  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
+  - apt-get update && apt-get install -y wget git libavahi-compat-libdnssd-dev
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
   - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
