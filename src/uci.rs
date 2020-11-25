@@ -409,6 +409,11 @@ mod mock {
             Ok(())
         }
 
+        pub fn set_save_dir(&mut self, save_dir: &str) -> Result<()> {
+            info!("set_save_dir {}", save_dir);
+            Ok(())
+        }
+
         pub fn revert(&mut self, package: &str) -> Result<()> {
             info!("revert {}", package);
             Ok(())

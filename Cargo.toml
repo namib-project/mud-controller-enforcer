@@ -5,7 +5,8 @@ authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewi
 edition = "2018"
 
 [features]
-execute_uci_commands = []
+default = ["execute_uci_commands"]
+execute_uci_commands = ["libuci-sys", "libc"]
 
 [dependencies]
 namib_shared = { path = "../namib_shared" }
@@ -23,8 +24,6 @@ pin-project = "1.0"
 tokio-serde = { version = "0.6" }
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces-impl-backtrace-crate", "futures"] }
 dotenv = "0.15"
+libuci-sys = { path = "../libuci-sys", optional = true }
+libc = { version = "0.2", optional = true }
 
-
-[target.'cfg(feature = "execute_uci_commands")'.dependencies]
-libuci-sys = { path = "../libuci-sys" }
-libc = "0.2"

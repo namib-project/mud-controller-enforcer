@@ -1,6 +1,5 @@
 use crate::{error::*, uci::*};
 use namib_shared::config_firewall::*;
-use std::process::{Command, Output};
 
 const CONFIG_DIR: &str = "config";
 
@@ -38,7 +37,7 @@ pub fn apply_new_configuration(cfg_list: Vec<ConfigFirewall>) -> Result<()> {
     #[cfg(feature = "execute_uci_commands")]
     {
         let output = restart_firewall_command();
-        debug!("restart firewall: {}", output.stderr as &str);
+        debug!("restart firewall: {:?}", std::str::from_utf8(&output.stderr));
     }
     Ok(())
 }
@@ -61,20 +60,18 @@ fn delete_all_config(uci: &mut UCI) -> Result<()> {
 }
 
 #[cfg(feature = "execute_uci_commands")]
-pub fn restart_firewall_command() -> Output {
-    Command::new("sh").arg("-c").arg("service firewall restart").output().expect("failed to execute process")
+pub fn restart_firewall_command() -> std::process::Output {
+    std::process::Command::new("sh")
+        .arg("-c")
+        .arg("service firewall restart")
+        .output()
+        .expect("failed to execute process")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{error::*, uci::*};
-    use std::{
-        collections::hash_map::DefaultHasher,
-        fs,
-        fs::File,
-        io::{Read, Seek},
-    };
+    use std::{fs, fs::File, io::Read};
 
     #[test]
     fn test_trivial_apply_config() -> Result<()> {
@@ -83,7 +80,7 @@ mod tests {
         File::create("tests/config/test_trivial_apply_config/firewall")?;
 
         let mut uci = UCI::new()?;
-        uci.set_save_dir("/tmp/.uci_trivial_apply_config");
+        uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
         uci.set_config_dir("tests/config/test_trivial_apply_config")?;
 
         let cfg = ConfigFirewall::new(
@@ -119,7 +116,7 @@ mod tests {
         fs::copy("tests/config/test_delete_all_config/firewall_before", "tests/config/test_delete_all_config/firewall")?;
 
         let mut uci = UCI::new()?;
-        uci.set_save_dir("/tmp/.uci_delete_all_config");
+        uci.set_save_dir("/tmp/.uci_delete_all_config")?;
         uci.set_config_dir("tests/config/test_delete_all_config")?;
 
         delete_all_config(&mut uci)?;
@@ -147,7 +144,7 @@ mod tests {
         fs::copy("tests/config/test_apply_and_delete/firewall_before", "tests/config/test_apply_and_delete/firewall")?;
 
         let mut uci = UCI::new()?;
-        uci.set_save_dir("/tmp/.uci_apply_and_delete");
+        uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
         uci.set_config_dir("tests/config/test_apply_and_delete")?;
 
         let cfg = ConfigFirewall::new(
@@ -198,6 +195,9 @@ mod tests {
     }
 
     fn init() {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).is_test(true).try_init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
+            .is_test(true)
+            .try_init()
+            .ok();
     }
 }
