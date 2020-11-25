@@ -1,3 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 #[derive(Clone, Debug)]
 pub struct RuleName(String);
 
@@ -13,6 +16,12 @@ impl RuleName {
     }
     pub fn to_option(&self) -> (String, String) {
         ("name".to_string(), self.0.clone())
+    }
+}
+
+impl Hash for RuleName {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }
 
@@ -136,6 +145,12 @@ impl ConfigFirewall {
             optional_settings,
         }
     }
+    pub fn hash(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        self.rule_name().0.hash(&mut hasher);
+        hasher.finish().to_string()
+    }
+
     pub fn to_option(&self) -> Vec<(String, String)> {
         let mut query: Vec<(String, String)> = Vec::new();
         query.push(self.rule_name.to_option());
@@ -167,5 +182,9 @@ impl ConfigFirewall {
             }
         }
         query
+    }
+
+    pub fn rule_name(&self) -> &RuleName {
+        &self.rule_name
     }
 }
