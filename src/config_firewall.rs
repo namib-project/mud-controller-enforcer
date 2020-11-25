@@ -1,7 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct RuleName(String);
 
 impl RuleName {
@@ -16,12 +16,6 @@ impl RuleName {
     }
     pub fn to_option(&self) -> (String, String) {
         ("name".to_string(), self.0.clone())
-    }
-}
-
-impl Hash for RuleName {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
     }
 }
 
@@ -145,6 +139,7 @@ impl ConfigFirewall {
             optional_settings,
         }
     }
+
     pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
         self.rule_name().0.hash(&mut hasher);
