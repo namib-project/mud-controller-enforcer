@@ -15,7 +15,6 @@ before_script:
   - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
   - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
   - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
-  - rustup component add clippy
   - rustc --version
   - cargo --version
 
@@ -32,8 +31,18 @@ build:
 warnings:
   stage: test
   script:
+    - rustup default nightly
+    - rustup component add clippy
     - cargo clippy -- -D warnings
   allow_failure: true
+
+formatting:
+  stage: test
+  script:
+    - rustup default nightly
+    - rustup component add rustfmt
+    - cargo fmt -- --check
+
 
 docs:
   stage: docs
