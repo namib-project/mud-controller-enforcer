@@ -25,6 +25,6 @@ snafu = { version = "0.6", default-features = false, features = ["std", "backtra
 dotenv = "0.15"
 
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(feature = "execute_uci_commands")'.dependencies]
 libuci-sys = { path = "../libuci-sys" }
 libc = "0.2"

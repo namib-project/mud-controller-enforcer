@@ -5,5 +5,5 @@ config rule 'namibrule_18352413083402012524'
 	option dest 'wan'
 	option proto '6'
 	option target 'DROP'
-	option namib 'namibrule_18352413083402012524'
+	option namib '1'
 

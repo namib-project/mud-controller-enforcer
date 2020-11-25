@@ -1,9 +1,9 @@
-#[cfg(not(unix))]
+#[cfg(not(feature = "execute_uci_commands"))]
 pub use mock::*;
-#[cfg(unix)]
+#[cfg(feature = "execute_uci_commands")]
 pub use unix::*;
 
-#[cfg(unix)]
+#[cfg(feature = "execute_uci_commands")]
 mod unix {
     use core::ptr;
     use std::ffi::{CStr, CString};
@@ -13,7 +13,7 @@ mod unix {
 
     use libuci_sys::{
         uci_alloc_context, uci_commit, uci_context, uci_delete, uci_free_context, uci_get_errorstr, uci_lookup_ptr, uci_option_type_UCI_TYPE_STRING, uci_ptr,
-        uci_ptr_UCI_LOOKUP_COMPLETE, uci_revert, uci_save, uci_set, uci_set_confdir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
+        uci_ptr_UCI_LOOKUP_COMPLETE, uci_revert, uci_save, uci_set, uci_set_confdir, uci_set_savedir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
     };
 
     use crate::error::*;
@@ -84,6 +84,22 @@ mod unix {
                 }
             );
             info!("Set config dir to: {}", config_dir);
+            Ok(())
+        }
+
+        /// Sets the save directory of UCI, this is `/tmp/.uci` by default.
+        pub fn set_save_dir(&mut self, save_dir: &str) -> Result<()> {
+            let result = unsafe {
+                let raw = CString::new(save_dir)?;
+                uci_set_savedir(self.0, raw.as_bytes_with_nul().as_ptr() as *const i8)
+            };
+            ensure!(
+                result == UCI_OK,
+                UCIError {
+                    message: format!("Cannot set save dir: {}, {}", save_dir, self.get_last_error().unwrap_or_else(|_| String::from("Unknown")))
+                }
+            );
+            info!("Set save dir to: {}", save_dir);
             Ok(())
         }
 
@@ -376,7 +392,7 @@ mod unix {
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(not(feature = "execute_uci_commands"))]
 mod mock {
     use crate::error::*;
 
