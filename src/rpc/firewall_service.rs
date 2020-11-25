@@ -1,7 +1,10 @@
 use crate::{error::*, uci::*};
 use namib_shared::config_firewall::*;
 use std::process::{Command, Output};
+
 //TODO Test für löschen unserer Rules. Attribute Option Namib prüfen, Liste von Regeln anwenden (mit format! (einzigartiger name)) (flash) und commit.
+
+const CONFIG_DIR: &str = "config";
 
 pub fn create_query(cfg: ConfigFirewall) {
     let command_as_string = create_command(cfg.to_vector_string());
@@ -20,15 +23,48 @@ pub fn create_query(cfg: ConfigFirewall) {
     }
 }
 
-fn apply_config(cfg: ConfigFirewall) -> Result<()> {
+pub fn apply_config(cfg: ConfigFirewall) -> Result<()> {
     let mut uci = UCI::new()?;
-    uci.set_config_dir("config")?;
-    uci.set("firewall.namibrule", "rule")?;
-    let cfg_option = cfg.to_option();
-    for c in cfg_option.iter() {
-        uci.set(format!("firewall.namibrule.{}", c.0).as_str(), c.1.as_str())?;
+    uci.set_config_dir(CONFIG_DIR)?;
+    let cfg_n = format!("firewall.namibrule_{}", cfg.hash());
+    uci.set(cfg_n.as_str(), "rule")?;
+    for c in cfg.to_option().iter() {
+        uci.set(format!("{}.{}", cfg_n, c.0).as_str(), c.1.as_str())?;
     }
-    uci.set("firewall.namibrule.namib", "1");
+    uci.set(format!("{}.namib", cfg_n).as_str(), format!("namibrule_{}", cfg.hash().as_str()).as_str());
+    uci.commit("firewall")?;
+    Ok(())
+}
+
+pub fn apply_config_list(cfg_list: Vec<ConfigFirewall>) -> Result<()> {
+    for c in cfg_list.iter() {
+        apply_config(c.clone())?;
+    }
+    Ok(())
+}
+
+pub fn delete_config(identifier: &str) -> Result<()> {
+    let mut uci = UCI::new()?;
+    uci.set_config_dir(CONFIG_DIR)?;
+    uci.delete(identifier)?;
+    uci.commit("firewall")?;
+    Ok(())
+}
+
+pub fn flash_config() -> Result<()> {
+    let mut uci = UCI::new()?;
+    uci.set_config_dir(CONFIG_DIR)?;
+    let end_rule = format!("firewall.{}", uci.get("firewall.@rule[-1].namib")?);
+    println!("{}", end_rule);
+    let mut i = 0;
+    let mut iter_str = format!("firewall.{}", uci.get(format!("firewall.@rule[{}].namib", i).as_str())?);
+    while !iter_str.eq(&end_rule) {
+        uci.delete(iter_str.as_str())?;
+        println!("{}", iter_str);
+        i += 1;
+        iter_str = format!("firewall.{}", uci.get(format!("firewall.@rule[{}].namib", i).as_str())?);
+    }
+    uci.delete(end_rule.as_str())?;
     uci.commit("firewall")?;
     Ok(())
 }
@@ -77,18 +113,114 @@ fn restart_firewall_command() -> Output {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::*;
+    use crate::{error::*, uci::*};
+    use std::{
+        collections::hash_map::DefaultHasher,
+        fs::File,
+        io::{Read, Seek},
+    };
+
     #[test]
-    fn testsmt() -> Result<()> {
+    fn test_trivial_apply_config() -> Result<()> {
         init();
-        apply_config(ConfigFirewall::new(
-            RuleName::new("Regel1".to_string()),
-            EnRoute::Src(EnNetwork::VPN),
-            EnRoute::Des(EnNetwork::Lan),
+        let mut uci = UCI::new()?;
+        uci.set_config_dir("config")?;
+        let cfg = ConfigFirewall::new(
+            RuleName::new("Regel2".to_string()),
+            EnRoute::Src(EnNetwork::Lan),
+            EnRoute::Des(EnNetwork::Wan),
             Protocol::tcp(),
-            EnTarget::REJECT,
+            EnTarget::DROP,
             EnOptionalSettings::None,
-        ))?;
+        );
+        apply_config(cfg.clone())?;
+
+        let mut expected_string = String::new();
+        let mut test_string = String::new();
+
+        let mut expected_file = File::open("tests/config/test_trivial_apply_config/expected_firewall")?;
+        let mut test_file = File::open("config/firewall")?;
+
+        expected_file.read_to_string(&mut expected_string)?;
+        test_file.read_to_string(&mut test_string)?;
+
+        println!("test: {} \n expected: {}", test_string, expected_string);
+
+        assert_eq!(test_string, expected_string);
+        Ok(())
+    }
+
+    #[test]
+    fn test_trivial_delete_config() -> Result<()> {
+        init();
+
+        let mut uci = UCI::new()?;
+        uci.set_config_dir("config")?;
+
+        let cfg = ConfigFirewall::new(
+            RuleName::new("Regel3".to_string()),
+            EnRoute::Src(EnNetwork::Lan),
+            EnRoute::Des(EnNetwork::Wan),
+            Protocol::tcp(),
+            EnTarget::DROP,
+            EnOptionalSettings::None,
+        );
+        apply_config(cfg.clone())?;
+
+        let mut expected_firewall = File::open("tests/config/test_trivial_delete_config/expected_firewall")?;
+        let mut firewall_before = File::open("tests/config/test_trivial_delete_config/firewall_before")?;
+        let mut firewall = File::open("config/firewall")?;
+
+        let mut expected_firewall_string = String::new();
+        let mut firewall_before_string = String::new();
+        let mut firewall_string = String::new();
+
+        expected_firewall.read_to_string(&mut expected_firewall_string)?;
+        firewall_before.read_to_string(&mut firewall_before_string)?;
+        firewall.read_to_string(&mut firewall_string)?;
+
+        assert_eq!(firewall_string, expected_firewall_string);
+        assert_ne!(firewall_string, firewall_before_string);
+
+        delete_config("firewall.namibrule_8749447068245335151")?;
+
+        let mut firewall = File::open("config/firewall")?;
+
+        firewall_string = "".to_string();
+        firewall.read_to_string(&mut firewall_string)?;
+
+        assert_ne!(firewall_string, expected_firewall_string);
+        assert_eq!(firewall_string, firewall_before_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_list_() -> Result<()> {
+        init();
+
+        let mut uci = UCI::new()?;
+        uci.set_config_dir("config")?;
+
+        let mut vec = Vec::new();
+        for i in 0..10 {
+            vec.push(ConfigFirewall::new(
+                RuleName::new(format!("Regel{}", i)),
+                EnRoute::Src(EnNetwork::Lan),
+                EnRoute::Des(EnNetwork::Wan),
+                Protocol::tcp(),
+                EnTarget::DROP,
+                EnOptionalSettings::None,
+            ));
+        }
+        apply_config_list(vec)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_() -> Result<()> {
+        init();
+        flash_config()?;
         Ok(())
     }
 
