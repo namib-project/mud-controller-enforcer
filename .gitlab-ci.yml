@@ -3,7 +3,7 @@ stages:
   - test
   - docs
 
-image: rustlang/rust:nightly
+image: rustlang/rust:nightly-slim
 
 cache:
   paths:
@@ -45,7 +45,6 @@ warnings:
 formatting:
   stage: test
   script:
-    - rustup component add rustfmt --toolchain nightly
     - cargo fmt -- --check
 
 docs:
