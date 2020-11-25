@@ -19,7 +19,6 @@ before_script:
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} ../namib_shared || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git ../namib_shared
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git ../rust-async-dnssd
   - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git ../libuci-sys
-  - rustup component add clippy
   - rustc --version
   - cargo --version
 
@@ -41,8 +40,17 @@ test:
 warnings:
   stage: test
   script:
+    - rustup default nightly
+    - rustup component add clippy
     - cargo clippy -- -D warnings
   allow_failure: true
+
+formatting:
+  stage: test
+  script:
+    - rustup default nightly
+    - rustup component add rustfmt
+    - cargo fmt -- --check
 
 docs:
   stage: docs
