@@ -40,12 +40,14 @@ test:
 warnings:
   stage: test
   script:
+    - rustup component add clippy
     - cargo clippy -- -D warnings
   allow_failure: true
 
 formatting:
   stage: test
   script:
+    - rustup component add rustfmt
     - cargo fmt -- --check
 
 docs:
