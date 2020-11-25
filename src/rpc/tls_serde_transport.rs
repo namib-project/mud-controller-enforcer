@@ -26,7 +26,7 @@ pub struct Connect<T, Item, SinkItem, CodecFn> {
     pending_conn: Option<tokio_rustls::Connect<TcpStream>>,
     codec_fn: CodecFn,
     config: length_delimited::Builder,
-    ghost: PhantomData<(fn(SinkItem), fn() -> Item)>,
+    ghost: PhantomData<(SinkItem, Item)>,
 }
 
 impl<T, Item, SinkItem, Codec, CodecFn> Future for Connect<T, Item, SinkItem, CodecFn>
@@ -59,13 +59,11 @@ where
 
 impl<T, Item, SinkItem, CodecFn> Connect<T, Item, SinkItem, CodecFn> {
     /// Returns an immutable reference to the length-delimited codec's config.
-    #[allow(dead_code)]
     pub fn config(&self) -> &length_delimited::Builder {
         &self.config
     }
 
     /// Returns a mutable reference to the length-delimited codec's config.
-    #[allow(dead_code)]
     pub fn config_mut(&mut self) -> &mut length_delimited::Builder {
         &mut self.config
     }

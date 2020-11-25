@@ -9,7 +9,7 @@ execute_uci_commands = []
 
 [dependencies]
 namib_shared = { path = "../namib_shared" }
-tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util"] }
+tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util", "sync"] }
 log = "0.4"
 env_logger = "0.8"
 async-dnssd = { path = "../rust-async-dnssd" }

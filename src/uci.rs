@@ -6,9 +6,11 @@ pub use unix::*;
 #[cfg(feature = "execute_uci_commands")]
 mod unix {
     use core::ptr;
-    use std::ffi::{CStr, CString};
+    use std::{
+        ffi::{CStr, CString},
+        ops::{Deref, DerefMut},
+    };
 
-    use libc;
     use snafu::ensure;
 
     use libuci_sys::{
@@ -17,7 +19,6 @@ mod unix {
     };
 
     use crate::error::*;
-    use std::ops::{Deref, DerefMut};
 
     const UCI_OK: i32 = libuci_sys::UCI_OK as i32;
 
@@ -180,7 +181,7 @@ mod unix {
         /// if the assignment failed an `Err` is returned.
         pub fn set(&mut self, identifier: &str, val: &str) -> Result<()> {
             ensure!(
-                !val.contains("'"),
+                !val.contains('\''),
                 UCIError {
                     message: format!("Values may not contain quotes: {}={}", identifier, val)
                 }
@@ -437,10 +438,11 @@ mod mock {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, fs::File, io::Read};
+
     use crate::error::*;
 
     use super::*;
-    use std::{fs, fs::File, io::Read};
 
     fn init() -> Result<UCI> {
         let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).is_test(true).try_init();
