@@ -45,6 +45,7 @@ warnings:
 formatting:
   stage: test
   script:
+    - rustup component add rustfmt --toolchain nightly
     - cargo fmt -- --check
 
 docs:
