@@ -1,4 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
+#![feature(once_cell)]
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
 #![allow(
     dead_code,
@@ -49,7 +50,7 @@ fn run_server() {
             let pool = rocket.state::<DbConnPool>().expect("could not get db connection pool").clone();
             let td = thread::spawn(move || {
                 let rt = runtime::Builder::new_current_thread().enable_all().build().expect("could not construct tokio runtime");
-                rt.block_on(rpc::rpc_server::listen(pool));
+                rt.block_on(rpc::rpc_server::listen(pool)).expect("failed to run rpc server");
             });
             Ok(rocket.manage(td))
         }))

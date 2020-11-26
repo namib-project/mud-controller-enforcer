@@ -1,7 +1,8 @@
 table! {
-    devices (mac_addr) {
-        mac_addr -> Text,
+    devices (id) {
+        id -> Integer,
         ip_addr -> Text,
+        mac_addr -> Nullable<Text>,
         hostname -> Text,
         vendor_class -> Text,
         mud_url -> Nullable<Text>,

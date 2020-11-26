@@ -1,15 +1,28 @@
 use crate::{
+    db::DbConnPool,
     error::*,
-    models::mud_models::{ACLDirection, *},
-    services::device_service::Device,
+    models::{
+        device_model::DeviceData,
+        mud_models::{ACLDirection, *},
+    },
 };
 use namib_shared::config_firewall::*;
-use std::net::{IpAddr, ToSocketAddrs};
+use std::{
+    lazy::{SyncLazy, SyncOnceCell},
+    net::{IpAddr, ToSocketAddrs},
+    sync::Mutex,
+};
 
-pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
+static mut VERSION: i32 = 0;
+
+pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
     let mut result: Vec<FirewallRule> = Vec::new();
-    let mud_data = &device.mud_data;
+    let mud_data = match &device.mud_data {
+        Some(mud_data) => mud_data,
+        None => return Ok(result),
+    };
+
     for acl in &mud_data.acllist {
         for ace in &acl.ace {
             let rule_name = RuleName::new(format!("rule_{}", index));
@@ -66,10 +79,20 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
     Ok(result)
 }
 
+pub async fn get_config_version(pool: DbConnPool) -> String {
+    unsafe { VERSION.to_string() }
+}
+
+pub async fn update_config_version(pool: DbConnPool) {
+    unsafe {
+        VERSION = VERSION + 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::mud_models::*;
+    use crate::models::{device_model::DeviceData, mud_models::*};
     use chrono::Local;
     use std::net::Ipv4Addr;
 
@@ -104,10 +127,13 @@ mod tests {
         };
 
         let device = Device {
+            mac_addr: "".to_string(),
+            ip_addr: "127.0.0.1",
+            hostname: "".to_string(),
+            vendor_class: "".to_string(),
             mud_url: "".to_string(),
-            mac: "".to_string(),
-            ip_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             mud_data,
+            last_interaction: (),
         };
 
         let x = convert_device_to_fw_rules(&device)?;

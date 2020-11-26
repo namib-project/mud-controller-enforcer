@@ -3,7 +3,7 @@ use diesel::{QueryDsl, QueryResult, RunQueryDsl};
 use isahc::ResponseExt;
 
 use crate::{
-    db::ConnectionType,
+    db::DbConn,
     error::Result,
     models::mud_models::{MUDData, MUD},
     schema::mud_data,
@@ -21,9 +21,9 @@ pub struct InsertableMUD {
     pub expiration: NaiveDateTime,
 }
 
-pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDData> {
+pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
-    let existing_mud: QueryResult<MUD> = mud_data::table.find(&url).get_result::<MUD>(conn);
+    let existing_mud: QueryResult<MUD> = mud_data::table.find(&url).get_result::<MUD>(&*conn);
     if let Ok(mud) = existing_mud {
         if mud.expiration > Local::now().naive_local() {
             if let Ok(mud) = serde_json::from_str::<MUDData>(mud.data.as_str()) {
@@ -45,7 +45,7 @@ pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDD
         created_at: Local::now().naive_local(),
         expiration: data.expiration.naive_local(),
     };
-    diesel::insert_into(mud_data::table).values(mud).execute(conn)?;
+    diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
 
     // return muddata
     Ok(data)
@@ -53,9 +53,4 @@ pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDD
 
 async fn fetch_mud(url: &str) -> Result<String> {
     Ok(isahc::get_async(url).await?.text_async().await?)
-}
-
-pub async fn get_config_version() -> String {
-    // TODO: Implement getting a hash of the config
-    "version".to_string()
 }

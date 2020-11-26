@@ -6,7 +6,6 @@ use log::*;
 use namib_shared::{
     codec,
     config_firewall::{FirewallConfig, FirewallRule},
-    models::DHCPRequestData,
     open_file_with,
     rpc::RPC,
 };
@@ -20,10 +19,12 @@ use tarpc::{
 use crate::{
     db::DbConnPool,
     error::Result,
-    services::{config_firewall_service, device_service, mud_service, user_service},
+    services::{config_firewall_service, device_service, mud_service},
 };
 
 use super::tls_serde_transport;
+use crate::models::device_model::DeviceData;
+use namib_shared::models::DhcpEvent;
 
 #[derive(Clone)]
 pub struct RPCServer(SocketAddr, DbConnPool);
@@ -32,13 +33,13 @@ pub struct RPCServer(SocketAddr, DbConnPool);
 impl RPC for RPCServer {
     async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<FirewallConfig> {
         debug!("Received a heartbeat from client {:?} with version {:?}", self.0, version);
-        let current_config_version = mud_service::get_config_version().await;
+        let current_config_version = config_firewall_service::get_config_version(self.1.clone()).await;
         if Some(&current_config_version) != version.as_ref() {
             debug!("Client has outdated version \"{}\". Starting update...", current_config_version);
-            let devices = device_service::get_all_devices().await;
+            let devices = device_service::get_all_devices(self.1.clone()).await.unwrap_or_default();
             let rules: Vec<FirewallRule> = devices
                 .iter()
-                .flat_map(move |d| config_firewall_service::convert_device_to_fw_rules(d).unwrap_or_else(|_| Vec::new()))
+                .flat_map(move |d| config_firewall_service::convert_device_to_fw_rules(d).unwrap_or_default())
                 .collect();
 
             debug!("Returning Heartbeat to client with config: {:#?}", rules);
@@ -48,8 +49,32 @@ impl RPC for RPCServer {
         None
     }
 
-    async fn dhcp_request(self, _: context::Context, dhcp_data: DHCPRequestData) {
-        debug!("dhcp_request from: {:?}. Data: {:?}", self.0, dhcp_data);
+    async fn dhcp_request(self, _: context::Context, dhcp_event: DhcpEvent) {
+        debug!("dhcp_request from: {:?}. Data: {:?}", self.0, dhcp_event);
+
+        // TODO: Handle different dhcp event lease types (currently handles everything as "add")
+        let lease_info = match dhcp_event {
+            DhcpEvent::LeaseAdded { lease_info, .. } => lease_info,
+            _ => return,
+        };
+
+        let mut dhcp_device_data = DeviceData::from(lease_info);
+        match device_service::find_by_ip(dhcp_device_data.ip_addr, self.1.clone()).await {
+            Ok(device) => {
+                dhcp_device_data.id = device.id;
+                device_service::update_device(&dhcp_device_data, self.1.clone()).await;
+            },
+            Err(_) => {
+                device_service::insert_device(&dhcp_device_data, self.1.clone()).await;
+            },
+        };
+
+        match dhcp_device_data.mud_url {
+            Some(url) => mud_service::get_mud_from_url(url, self.1.get_one().expect("couldn't get db conn from pool")).await.ok(),
+            None => None,
+        };
+
+        config_firewall_service::update_config_version(self.1.clone()).await;
     }
 }
 
