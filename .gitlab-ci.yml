@@ -1,28 +1,66 @@
-image: 'rust:latest'
-
 stages:
   - build
+  - test
   - docs
+
+image: 'rust:latest'
+
+cache:
+  paths:
+    - .cargo/
+
+before_script:
+  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
+  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
+  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
+  - rustc --version
+  - cargo --version
+
+default:
+  tags:
+    - linux
+    - docker
 
 build:
   stage: build
-  tags:
-    - linux
-    - docker
   script:
-    - rustc --version
-    - cargo --version
     - cargo build
+
+warnings:
+  stage: test
+  script:
+    - rustup toolchain install nightly --component clippy --no-self-update
+    - cargo +nightly clippy -- --check
+  allow_failure: true
+
+formatting:
+  stage: test
+  script:
+    - rustup toolchain install nightly --component rustfmt --no-self-update
+    - cargo +nightly fmt -- --check
 
 docs:
   stage: docs
-  tags:
-    - linux
-    - docker
+  except:
+    - master
+  script:
+    - cargo doc --no-deps
+  artifacts:
+    paths:
+      - target/doc
+    expire_in: 7 days
+
+pages:
+  stage: docs
+  only:
+    - master
   script:
     - cargo doc --no-deps
     - mv target/doc public
-    - echo '<meta http-equiv="refresh" content="0;">' > public/index.html
-    - ls public
-  only:
-    - master
+    - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > public/index.html
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
