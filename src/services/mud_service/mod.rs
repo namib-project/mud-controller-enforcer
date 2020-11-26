@@ -12,7 +12,7 @@ use crate::{
 mod json_models;
 mod parser;
 
-#[derive(Insertable)]
+#[derive(Insertable, AsChangeset)]
 #[table_name = "mud_data"]
 pub struct InsertableMUD {
     pub url: String,
@@ -24,12 +24,14 @@ pub struct InsertableMUD {
 pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
     let existing_mud: QueryResult<MUD> = mud_data::table.find(&url).get_result::<MUD>(&*conn);
+    let mut exists = false;
     if let Ok(mud) = existing_mud {
         if mud.expiration > Local::now().naive_local() {
             if let Ok(mud) = serde_json::from_str::<MUDData>(mud.data.as_str()) {
                 return Ok(mud);
             }
         }
+        exists = true;
     }
 
     // wenn nicht: fetch
@@ -45,7 +47,12 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
         created_at: Local::now().naive_local(),
         expiration: data.expiration.naive_local(),
     };
-    diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
+
+    if !exists {
+        diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
+    } else {
+        diesel::update(mud_data::table.find(url)).set(mud).execute(&*conn)?;
+    }
 
     // return muddata
     Ok(data)

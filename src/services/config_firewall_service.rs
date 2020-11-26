@@ -9,7 +9,7 @@ use crate::{
 use namib_shared::config_firewall::*;
 use std::{
     lazy::{SyncLazy, SyncOnceCell},
-    net::{IpAddr, ToSocketAddrs},
+    net::{IpAddr, SocketAddr, ToSocketAddrs},
     sync::Mutex,
 };
 
@@ -44,7 +44,10 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
             };
 
             if let Some(dnsname) = &ace.matches.dnsname {
-                let socket_addresses = format!("{}:443", dnsname).to_socket_addrs()?;
+                let socket_addresses = match format!("{}:443", dnsname).to_socket_addrs() {
+                    Ok(socket) => socket,
+                    Err => Vec::new().into_iter(),
+                };
                 for addr in socket_addresses {
                     match addr.ip() {
                         IpAddr::V4(_) => {
