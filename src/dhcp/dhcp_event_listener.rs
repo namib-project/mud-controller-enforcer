@@ -5,6 +5,7 @@ use namib_shared::{
     rpc::{RPCClient, RPC},
 };
 use std::sync::Arc;
+use tarpc::context;
 use tokio::{
     io::AsyncReadExt,
     net::{UnixListener, UnixStream},
