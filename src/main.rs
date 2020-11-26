@@ -27,8 +27,9 @@ use dotenv::dotenv;
 use rocket::fairing::AdHoc;
 use rocket_contrib::serve::StaticFiles;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig, UrlObject};
+use tokio::runtime;
 
-use crate::error::Result;
+use crate::{db::DbConnPool, error::Result};
 
 mod auth;
 mod db;
@@ -43,6 +44,15 @@ fn run_server() {
     rocket::ignite()
         .attach(db::DbConn::fairing())
         .attach(AdHoc::on_attach("Database Migrations", db::run_db_migrations))
+        .attach(AdHoc::on_attach("RPC Server", |rocket| {
+            info!("Launching RPC server");
+            let pool = rocket.state::<DbConnPool>().expect("could not get db connection pool").clone();
+            let td = thread::spawn(move || {
+                let rt = runtime::Builder::new_current_thread().enable_all().build().expect("could not construct tokio runtime");
+                rt.block_on(rpc::rpc_server::listen(pool));
+            });
+            Ok(rocket.manage(td))
+        }))
         .mount("/users", routes::users_controller::routes())
         .mount("/mud", routes::mud_controller::routes())
         .mount("/", StaticFiles::from("public"))
@@ -56,14 +66,11 @@ fn run_server() {
         .launch();
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     dotenv()?;
     env_logger::init();
 
-    thread::spawn(run_server);
-
-    rpc::rpc_server::listen().await?;
+    run_server();
 
     Ok(())
 }
