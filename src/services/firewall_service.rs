@@ -100,6 +100,7 @@ pub fn restart_firewall_command() -> std::process::Output {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, Protocol, RuleName};
     use std::{fs, fs::File, io::Read};
 
     /// The test checks a single added rule on the firewall and compare two files.

@@ -458,6 +458,7 @@ mod tests {
 
         let mut uci = UCI::new()?;
         uci.set_config_dir("tests/config")?;
+        uci.set_save_dir("/tmp/.uci_tests")?;
 
         Ok(uci)
     }

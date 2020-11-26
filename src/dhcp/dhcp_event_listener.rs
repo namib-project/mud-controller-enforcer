@@ -33,8 +33,8 @@ pub(crate) async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
                 active_listeners.push(tokio::spawn(async move {
                     handle_dhcp_script_connection(rpc_client_copy, event_stream).await;
                 }));
-            }
-            Err(_) => {}
+            },
+            Err(_) => {},
         }
     }
     join_all(active_listeners).await;
@@ -49,9 +49,9 @@ async fn handle_dhcp_script_connection(rpc_client: Arc<Mutex<RPCClient>>, mut st
             debug!("Received DHCP event: {:?}", &dhcp_event);
             let mut unlocked_rpc = rpc_client.lock().await;
             unlocked_rpc.dhcp_request(context::current(), dhcp_event).await.unwrap();
-        }
+        },
         Err(e) => {
             warn!("DHCP event was received, but could not be parsed: {}", e);
-        }
+        },
     }
 }
