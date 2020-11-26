@@ -1,24 +1,39 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+/// This file represent the config for firewall on openwrt.
+///
+/// Created on 11.11.2020.
+///
+/// @author Namib Group 3.
+
+/// Represent the name of the Config.
 #[derive(Clone, Debug, Hash)]
 pub struct RuleName(String);
 
 impl RuleName {
+    /// Create new Rulename.
     pub fn new(name: String) -> Self {
         RuleName(name)
     }
+
+    /// Return the string of the of the name.
+    /// Example: "name='YOURNAME'
     pub fn to_string(&self) -> String {
         let mut r: String = "name='".to_string();
         r.push_str(self.0.as_str());
         r.push_str("'");
         r
     }
+
+    /// Return the key, value pair.
+    /// Example: key = name, value YOURNAME.
     pub fn to_option(&self) -> (String, String) {
         ("name".to_string(), self.0.clone())
     }
 }
 
+/// Enum for the source or destination
 #[derive(Clone, Debug)]
 pub enum EnNetwork {
     Lan,
@@ -27,6 +42,7 @@ pub enum EnNetwork {
 }
 
 impl EnNetwork {
+    /// Return the string of the enum.
     pub fn to_string(&self) -> String {
         match self {
             Self::Lan => "lan".to_string(),
@@ -36,23 +52,28 @@ impl EnNetwork {
     }
 }
 
+/// Struct for protocol
 #[derive(Clone, Debug)]
 pub struct Protocol(u32);
 
 impl Protocol {
+    /// Returns the tcp value used from uci.
     pub fn tcp() -> Self {
         Protocol(6)
     }
 
+    /// Return the string of the protocol.
     pub fn to_string(&self) -> String {
         format!("proto='{}'", self.0)
     }
 
+    /// Return the key, value pair.
     pub fn to_option(&self) -> (String, String) {
         ("proto".to_string(), self.0.to_string())
     }
 }
 
+/// Enum for source oder destination of the firewall.
 #[derive(Clone, Debug)]
 pub enum EnRoute {
     Src(EnNetwork),
@@ -60,12 +81,15 @@ pub enum EnRoute {
 }
 
 impl EnRoute {
+    /// Returns the string of source or destination with protocol.
     pub fn to_string(&self) -> String {
         match self {
             Self::Src(n) => format!("src='{}'", n.to_string()),
             Self::Des(n) => format!("dest='{}'", n.to_string()),
         }
     }
+
+    /// Returns the string of source or destination with protocol.
     pub fn get_network(&self) -> &EnNetwork {
         match self {
             Self::Src(n) => n,
@@ -73,6 +97,7 @@ impl EnRoute {
         }
     }
 
+    /// Returns the key, value pair with the key, value of the network.
     pub fn to_option(&self) -> (String, String) {
         match self {
             Self::Src(n) => ("src".to_string(), n.to_string()),
@@ -81,6 +106,7 @@ impl EnRoute {
     }
 }
 
+/// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug)]
 pub enum EnTarget {
     ACCEPT,
@@ -89,6 +115,7 @@ pub enum EnTarget {
 }
 
 impl EnTarget {
+    /// Return the string of the target.
     pub fn to_string(&self) -> String {
         match self {
             Self::ACCEPT => "target='ACCEPT'".to_string(),
@@ -96,6 +123,8 @@ impl EnTarget {
             Self::DROP => "target='DROP'".to_string(),
         }
     }
+
+    /// Return the key, value pair of target.
     pub fn to_option(&self) -> (String, String) {
         match self {
             Self::ACCEPT => ("target".to_string(), "ACCEPT".to_string()),
@@ -105,12 +134,14 @@ impl EnTarget {
     }
 }
 
+/// Enum for optional settings. Here can be added some specified rules in key, value format.
 #[derive(Clone, Debug)]
 pub enum EnOptionalSettings {
     None,
     Settings(Vec<(String, String)>),
 }
 
+/// This struct contains the main configuration which is needed for firewall rules.
 #[derive(Clone, Debug)]
 pub struct ConfigFirewall {
     rule_name: RuleName,
@@ -122,6 +153,8 @@ pub struct ConfigFirewall {
 }
 
 impl ConfigFirewall {
+    /// Create a new ConfigFirewall.
+    /// Takes Rulename, EnRoute with EnNetwork, Protocol and EnTarget.
     pub fn new(
         rule_name: RuleName,
         route_network_src: EnRoute,
@@ -140,12 +173,14 @@ impl ConfigFirewall {
         }
     }
 
+    /// Takes the name of the RuleName and execute the hash.
     pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
         self.rule_name().0.hash(&mut hasher);
         hasher.finish().to_string()
     }
 
+    /// Takes a config as &self and return the config as vector in key, value pairs.
     pub fn to_option(&self) -> Vec<(String, String)> {
         let mut query: Vec<(String, String)> = Vec::new();
         query.push(self.rule_name.to_option());
@@ -162,6 +197,7 @@ impl ConfigFirewall {
         query
     }
 
+    /// Takes a config as &self and return the config as vector in strings.
     pub fn to_vector_string(&self) -> Vec<String> {
         let mut query: Vec<String> = Vec::new();
         query.push("rule".to_string());
@@ -179,6 +215,7 @@ impl ConfigFirewall {
         query
     }
 
+    /// rule_name getter.
     pub fn rule_name(&self) -> &RuleName {
         &self.rule_name
     }
