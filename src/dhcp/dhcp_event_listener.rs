@@ -32,8 +32,8 @@ pub(crate) async fn listen_for_dhcp_events() {
                 active_listeners.push(tokio::spawn(async move {
                     handle_dhcp_script_connection(event_stream).await;
                 }));
-            }
-            Err(e) => {}
+            },
+            Err(e) => {},
         }
     }
     join_all(active_listeners).await;

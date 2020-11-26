@@ -1,8 +1,7 @@
 use std::{io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use namib_shared::config_firewall::FirewallConfig;
-use namib_shared::{codec, open_file_with, rpc::RPCClient};
+use namib_shared::{codec, config_firewall::FirewallConfig, open_file_with, rpc::RPCClient};
 use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context};
 use tokio::{
@@ -11,8 +10,10 @@ use tokio::{
 };
 use tokio_rustls::{rustls, webpki::DNSNameRef};
 
-use crate::error::{Error, Result};
-use crate::services::firewall_service;
+use crate::{
+    error::{Error, Result},
+    services::firewall_service,
+};
 
 use super::{controller_discovery::discover_controllers, tls_serde_transport};
 
@@ -59,7 +60,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                     if let Err(e) = firewall_service::apply_config(config) {
                         error!("Failed to apply config! {}", e)
                     }
-                }
+                },
                 _ => debug!("Heartbeat OK!"),
             }
 

@@ -114,12 +114,12 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent, DhcpDataExtractionError> {
         IpAddr::V4(ip_addr) => {
             mac_address = Some(args[2].replace(":", ""));
             DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation { ip_addr })
-        }
+        },
         IpAddr::V6(ip_addr) => {
             mac_address = std::env::var("DNSMASQ_MAC").ok().map(|v| v.replace(":", ""));
 
             DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation { ip_addr })
-        }
+        },
     };
     // Parse MAC Address from supplied string.
     // We use a match instead of the map function here to allow the decode_to_slice function to return
@@ -129,7 +129,7 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent, DhcpDataExtractionError> {
             let mut mac_addr_array: MacAddress = [0; 6];
             hex::decode_to_slice(mac_str, &mut mac_addr_array)?;
             Some(mac_addr_array)
-        }
+        },
         None => None,
     };
 
@@ -147,7 +147,7 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent, DhcpDataExtractionError> {
                         .expect("Lease expiry time cannot be represented as DateTime (overflow).")
                         .into(),
                 )
-            }
+            },
             Err(e) => return Result::Err(DhcpDataExtractionError::InvalidLeaseTime(e)),
         }
     } else if let Ok(lease_length) = std::env::var("DNSMASQ_LEASE_LENGTH") {
