@@ -1,5 +1,7 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -15,15 +17,6 @@ impl RuleName {
     /// Create new Rulename.
     pub fn new(name: String) -> Self {
         RuleName(name)
-    }
-
-    /// Return the string of the of the name.
-    /// Example: "name='YOURNAME'
-    pub fn to_string(&self) -> String {
-        let mut r: String = "name='".to_string();
-        r.push_str(self.0.as_str());
-        r.push_str("'");
-        r
     }
 
     /// Return the key, value pair.
@@ -62,11 +55,6 @@ impl Protocol {
         Protocol(6)
     }
 
-    /// Return the string of the protocol.
-    pub fn to_string(&self) -> String {
-        format!("proto='{}'", self.0)
-    }
-
     /// Return the key, value pair.
     pub fn to_option(&self) -> (String, String) {
         ("proto".to_string(), self.0.to_string())
@@ -81,14 +69,6 @@ pub enum EnRoute {
 }
 
 impl EnRoute {
-    /// Returns the string of source or destination with protocol.
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Src(n) => format!("src='{}'", n.to_string()),
-            Self::Des(n) => format!("dest='{}'", n.to_string()),
-        }
-    }
-
     /// Returns the string of source or destination with protocol.
     pub fn get_network(&self) -> &EnNetwork {
         match self {
@@ -115,15 +95,6 @@ pub enum EnTarget {
 }
 
 impl EnTarget {
-    /// Return the string of the target.
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::ACCEPT => "target='ACCEPT'".to_string(),
-            Self::REJECT => "target='REJECT'".to_string(),
-            Self::DROP => "target='DROP'".to_string(),
-        }
-    }
-
     /// Return the key, value pair of target.
     pub fn to_option(&self) -> (String, String) {
         match self {
@@ -192,24 +163,6 @@ impl ConfigFirewall {
         if let EnOptionalSettings::Settings(v) = &self.optional_settings {
             for s in v.iter() {
                 query.push(s.clone());
-            }
-        }
-        query
-    }
-
-    /// Takes a config as &self and return the config as vector in strings.
-    pub fn to_vector_string(&self) -> Vec<String> {
-        let mut query: Vec<String> = Vec::new();
-        query.push("rule".to_string());
-        query.push(self.rule_name.to_string());
-        query.push(self.route_network_src.to_string());
-        query.push(self.route_network_dest.to_string());
-        query.push(self.protocol.to_string());
-        query.push(self.target.to_string());
-
-        if let EnOptionalSettings::Settings(v) = &self.optional_settings {
-            for s in v.iter() {
-                query.push(format!("{}='{}'", s.0, s.1));
             }
         }
         query
