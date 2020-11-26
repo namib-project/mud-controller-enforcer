@@ -1,5 +1,5 @@
-use crate::{error::*, uci::*};
-use namib_shared::config_firewall::*;
+use crate::{error::Result, uci::UCI};
+use namib_shared::config_firewall::{FirewallConfig, FirewallRule};
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -18,15 +18,15 @@ pub fn get_config_version() -> Result<String> {
 }
 
 /// This function create new configuration that should be uploaded on the firewall.
-/// It use the function apply_uci_config.
+/// It use the function `apply_uci_config`.
 /// Return Result<()>.
 pub fn apply_config(cfg: FirewallConfig) -> Result<()> {
-    debug!("Applying {} configs", cfg.rules().len());
+    debug!("Applyinrpc_client.rs:64g {} configs", cfg.rules().len());
     let mut uci = UCI::new()?;
     uci.set_config_dir(CONFIG_DIR)?;
 
     // if an error occurred roll back any changes
-    if let Err(e) = apply_uci_config(&mut uci, cfg) {
+    if let Err(e) = apply_uci_config(&mut uci, &cfg) {
         uci.revert("firewall")?;
         return Err(e);
     }
@@ -43,7 +43,7 @@ pub fn apply_config(cfg: FirewallConfig) -> Result<()> {
 /// and commit these changes. This function delete all previous changes from "Namib" and upload all
 /// new changes with "Namib".
 /// Return Result<()>.
-fn apply_uci_config(uci: &mut UCI, cfg: FirewallConfig) -> Result<()> {
+fn apply_uci_config(uci: &mut UCI, cfg: &FirewallConfig) -> Result<()> {
     uci.set("firewall.namib_config_version", cfg.version())?;
     delete_all_config(uci)?;
     for c in cfg.rules() {
@@ -59,7 +59,7 @@ fn apply_rule(uci: &mut UCI, rule: &FirewallRule) -> Result<()> {
     let cfg_n = format!("firewall.namibrule_{}", rule.hash());
     debug!("Creating rule {}", cfg_n);
     uci.set(cfg_n.as_str(), "rule")?;
-    for c in rule.to_option().iter() {
+    for c in &rule.to_option() {
         uci.set(format!("{}.{}", cfg_n, c.0).as_str(), c.1.as_str())?;
     }
     uci.set(format!("{}.namib", cfg_n).as_str(), "1")?;

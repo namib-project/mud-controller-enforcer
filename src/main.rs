@@ -4,10 +4,10 @@
 #[macro_use]
 extern crate log;
 
-use std::{net::IpAddr, sync::Arc};
+use std::sync::Arc;
 
 use dotenv::dotenv;
-use namib_shared::{models::DHCPRequestData, rpc::RPCClient};
+use namib_shared::rpc::RPCClient;
 use tarpc::context;
 use tokio::sync::Mutex;
 
