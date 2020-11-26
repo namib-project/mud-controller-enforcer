@@ -1,13 +1,14 @@
-use crate::error::*;
-use crate::models::mud_models::ACLDirection;
-use crate::models::mud_models::*;
-use crate::services::device_service::Device;
+use crate::{
+    error::*,
+    models::mud_models::{ACLDirection, *},
+    services::device_service::Device,
+};
 use namib_shared::config_firewall::*;
 use std::net::{IpAddr, ToSocketAddrs};
 
-pub fn convert_device_to_config(device: &Device) -> Result<Vec<ConfigFirewall>> {
+pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
-    let mut result: Vec<ConfigFirewall> = Vec::new();
+    let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = &device.mud_data;
     for acl in &mud_data.acllist {
         for ace in &acl.ace {
@@ -37,14 +38,14 @@ pub fn convert_device_to_config(device: &Device) -> Result<Vec<ConfigFirewall>> 
                             if acl.acl_type == ACLType::IPV6 {
                                 continue;
                             }
-                        }
+                        },
                         IpAddr::V6(_) => {
                             if acl.acl_type == ACLType::IPV4 {
                                 continue;
                             }
-                        }
+                        },
                     };
-                    let config_firewall = ConfigFirewall::new(
+                    let config_firewall = FirewallRule::new(
                         rule_name.clone(),
                         route_network_src.clone(),
                         route_network_dest.clone(),
@@ -55,14 +56,7 @@ pub fn convert_device_to_config(device: &Device) -> Result<Vec<ConfigFirewall>> 
                     result.push(config_firewall);
                 }
             } else {
-                let config_firewall = ConfigFirewall::new(
-                    rule_name,
-                    route_network_src,
-                    route_network_dest,
-                    protocol,
-                    target,
-                    None,
-                );
+                let config_firewall = FirewallRule::new(rule_name, route_network_src, route_network_dest, protocol, target, None);
                 result.push(config_firewall);
             }
             index += 1;
@@ -113,10 +107,10 @@ mod tests {
             mud_url: "".to_string(),
             mac: "".to_string(),
             ip_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            mud_data: mud_data,
+            mud_data,
         };
 
-        let x = convert_device_to_config(&device)?;
+        let x = convert_device_to_fw_rules(&device)?;
 
         println!("{:#?}", x);
 

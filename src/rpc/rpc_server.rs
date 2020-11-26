@@ -12,44 +12,32 @@ use tarpc::{
 use namib_shared::{codec, models::DHCPRequestData, open_file_with, rpc::RPC};
 
 use crate::error::Result;
-use namib_shared::config_firewall::ConfigFirewall;
-use namib_shared::models::DHCPRequestData;
-use namib_shared::rpc::RPC;
-use namib_shared::{codec, open_file_with};
+use namib_shared::config_firewall::{FirewallConfig, FirewallRule};
 
 use super::tls_serde_transport;
-use crate::error::*;
-use crate::services::config_firewall_service;
-use crate::services::device_service;
-use crate::services::mud_service;
+use crate::{
+    error::*,
+    services::{config_firewall_service, device_service, mud_service},
+};
 
 #[derive(Clone)]
 pub struct RPCServer(SocketAddr);
 
 #[server]
 impl RPC for RPCServer {
-    async fn heartbeat(self, _: context::Context, version: String) -> Option<Vec<ConfigFirewall>> {
-        debug!(
-            "Received a heartbeat from client {:?} with version {}",
-            self.0, version
-        );
+    async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<FirewallConfig> {
+        debug!("Received a heartbeat from client {:?} with version {:?}", self.0, version);
         let current_config_version = mud_service::get_config_version().await;
-        if current_config_version != version {
-            debug!(
-                "Client has outdated version \"{}\". Starting update...",
-                current_config_version
-            );
+        if Some(&current_config_version) != version.as_ref() {
+            debug!("Client has outdated version \"{}\". Starting update...", current_config_version);
             let devices = device_service::get_all_devices().await;
-            let config: Vec<ConfigFirewall> = devices
+            let rules: Vec<FirewallRule> = devices
                 .iter()
-                .flat_map(move |d| {
-                    config_firewall_service::convert_device_to_config(d)
-                        .unwrap_or_else(|_| Vec::new())
-                })
+                .flat_map(move |d| config_firewall_service::convert_device_to_fw_rules(d).unwrap_or_else(|_| Vec::new()))
                 .collect();
 
-            debug!("Returning Heartbeat to client with config: {:#?}", config);
-            return Some(config);
+            debug!("Returning Heartbeat to client with config: {:#?}", rules);
+            return Some(FirewallConfig::new(current_config_version, rules));
         }
 
         None
@@ -62,7 +50,7 @@ impl RPC for RPCServer {
 
 pub async fn listen() -> Result<()> {
     debug!("Registering in dnssd");
-    let (_, result) = async_dnssd::register("_namib_controller._tcp", 8734)?.await?;
+    let (_registration, result) = async_dnssd::register("_namib_controller._tcp", 8734)?.await?;
     info!("Registered: {:?}", result);
 
     // Build TLS configuration.

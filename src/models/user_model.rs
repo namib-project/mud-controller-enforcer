@@ -72,6 +72,6 @@ impl User {
 
 impl Role {
     pub fn permissions(&self) -> Split<char> {
-        self.permissions.split('x')
+        self.permissions.split(',')
     }
 }
