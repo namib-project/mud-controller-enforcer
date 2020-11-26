@@ -16,9 +16,14 @@ pub async fn get_all_devices(pool: DbConnPool) -> Result<Vec<DeviceData>> {
         .filter_map(|device| async {
             let mut device_data = DeviceData::from(device);
             device_data.mud_data = match device_data.mud_url.clone() {
-                Some(url) => get_mud_from_url(url, pool.get_one().expect("couldn't get db conn from pool")).await.ok(),
+                Some(url) => {
+                    let data = get_mud_from_url(url.clone(), pool.get_one().expect("couldn't get db conn from pool")).await;
+                    debug!("Get all devices: mud url {:?}: {:?}", url, data);
+                    data.ok()
+                },
                 None => None,
             };
+
             Some(device_data)
         })
         .collect::<Vec<DeviceData>>()

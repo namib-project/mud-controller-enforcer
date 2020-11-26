@@ -37,9 +37,14 @@ impl RPC for RPCServer {
         if Some(&current_config_version) != version.as_ref() {
             debug!("Client has outdated version \"{}\". Starting update...", current_config_version);
             let devices = device_service::get_all_devices(self.1.clone()).await.unwrap_or_default();
+            debug!("heartbeat all devices {:?}", devices);
             let rules: Vec<FirewallRule> = devices
                 .iter()
-                .flat_map(move |d| config_firewall_service::convert_device_to_fw_rules(d).unwrap_or_default())
+                .flat_map(move |d| {
+                    config_firewall_service::convert_device_to_fw_rules(d)
+                        .map_err(|err| error!("Flat Map Error {:#?}", err))
+                        .unwrap_or_default()
+                })
                 .collect();
 
             debug!("Returning Heartbeat to client with config: {:#?}", rules);
