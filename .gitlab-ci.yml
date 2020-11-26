@@ -18,6 +18,7 @@ before_script:
   - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} ../namib_shared || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git ../namib_shared
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git ../rust-async-dnssd
+  - rustup toolchain install nightly --component rustfmt,clippy --no-self-update
   - rustup default nightly
   - rustc --version
   - cargo --version
@@ -40,15 +41,13 @@ test:
 warnings:
   stage: test
   script:
-    - rustup component add clippy
-    - cargo clippy -- -D warnings
+    - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
 formatting:
   stage: test
   script:
-    - rustup component add rustfmt
-    - cargo fmt -- --check
+    - cargo +nightly fmt -- --check
 
 docs:
   stage: docs

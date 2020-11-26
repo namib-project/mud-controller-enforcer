@@ -1,6 +1,8 @@
-use crate::models::mud_models::{ACEAction, ACEMatches, ACLDirection, ACLType, MUDData, ACE, ACL};
-use chrono::Local;
 use std::net::{IpAddr, Ipv4Addr};
+
+use chrono::Local;
+
+use crate::models::mud_models::{ACEAction, ACEMatches, ACLDirection, ACLType, MUDData, ACE, ACL};
 
 pub async fn get_all_devices() -> Vec<Device> {
     // TODO: Implement SQL Logic here
@@ -38,7 +40,7 @@ pub async fn get_all_devices() -> Vec<Device> {
         mud_url: "".to_string(),
         mac: "".to_string(),
         ip_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        mud_data: mud_data,
+        mud_data,
     };
     mockDevices.push(device);
     mockDevices
