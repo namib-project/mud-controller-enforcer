@@ -57,7 +57,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
         acllist,
     };
     info!(
-        "MUD URI <{}> Last Update <{}> System Info <{}> Cache-Validity <{}> MASA <{:?}> Expiration <{}>",
+        "MUD URI <{}> Last Update <{}> System Info <{:?}> Cache-Validity <{}> MASA <{:?}> Expiration <{}>",
         data.url, data.last_update, data.systeminfo, cachevalidity, data.masa_url, exptime
     );
 
@@ -81,8 +81,8 @@ fn parse_device_policy(policy: &json_models::Policy, mud_json: &json_models::Mud
                     let mut destination_port = None;
                     if let Some(udp) = &aceitem.matches.udp {
                         protocol = Some(ACEProtocol::UDP);
-                        source_port = Some(parse_mud_port(&udp.source_port)?);
-                        destination_port = Some(parse_mud_port(&udp.destination_port)?);
+                        source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                        destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     } else if let Some(tcp) = &aceitem.matches.tcp {
                         protocol = Some(ACEProtocol::TCP);
                         if let Some(dir) = &tcp.direction_initiated {
@@ -96,8 +96,8 @@ fn parse_device_policy(policy: &json_models::Policy, mud_json: &json_models::Mud
                             });
                         }
 
-                        source_port = Some(parse_mud_port(&tcp.source_port)?);
-                        destination_port = Some(parse_mud_port(&tcp.destination_port)?);
+                        source_port = tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                        destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     }
                     if let Some(ipv6) = &aceitem.matches.ipv6 {
                         if acl_type != ACLType::IPV6 {

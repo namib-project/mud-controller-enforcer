@@ -2,7 +2,7 @@
 pub struct MudJson {
     #[serde(rename = "ietf-mud:mud")]
     pub mud: MudDefinition,
-    #[serde(rename = "ietf-access-control-list:acls")]
+    #[serde(alias = "ietf-access-control-list:acls", alias = "ietf-access-control-list:access-lists")]
     pub acls: IetfAccessControlListAcls,
 }
 
@@ -18,12 +18,12 @@ pub struct MudDefinition {
     pub cache_validity: Option<i64>,
     #[serde(rename = "is-supported")]
     pub is_supported: bool,
-    pub systeminfo: String,
+    pub systeminfo: Option<String>,
     #[serde(rename = "mfg-name")]
-    pub mfg_name: String,
-    pub documentation: String,
+    pub mfg_name: Option<String>,
+    pub documentation: Option<String>,
     #[serde(rename = "model-name")]
-    pub model_name: String,
+    pub model_name: Option<String>,
     #[serde(rename = "from-device-policy")]
     pub from_device_policy: Policy,
     #[serde(rename = "to-device-policy")]
@@ -88,9 +88,9 @@ pub struct Matches {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Tcp {
     #[serde(rename = "source-port")]
-    pub source_port: Port,
+    pub source_port: Option<Port>,
     #[serde(rename = "destination-port")]
-    pub destination_port: Port,
+    pub destination_port: Option<Port>,
     #[serde(rename = "ietf-mud:direction-initiated")]
     pub direction_initiated: Option<String>,
 }
@@ -98,9 +98,9 @@ pub struct Tcp {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Udp {
     #[serde(rename = "source-port")]
-    pub source_port: Port,
+    pub source_port: Option<Port>,
     #[serde(rename = "destination-port")]
-    pub destination_port: Port,
+    pub destination_port: Option<Port>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

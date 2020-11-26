@@ -74,6 +74,8 @@ impl RPC for RPCServer {
             },
         };
 
+        debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
+
         match dhcp_device_data.mud_url {
             Some(url) => mud_service::get_mud_from_url(url, self.1.get_one().expect("couldn't get db conn from pool")).await.ok(),
             None => None,

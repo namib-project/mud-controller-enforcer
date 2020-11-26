@@ -12,7 +12,7 @@ use crate::{
 mod json_models;
 mod parser;
 
-#[derive(Insertable, AsChangeset)]
+#[derive(Debug, Insertable, AsChangeset)]
 #[table_name = "mud_data"]
 pub struct InsertableMUD {
     pub url: String,
@@ -47,6 +47,8 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
         created_at: Local::now().naive_local(),
         expiration: data.expiration.naive_local(),
     };
+
+    debug!("save mud file (exists: {:?}): {:#?}", exists, mud);
 
     if !exists {
         diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
