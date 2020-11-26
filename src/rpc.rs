@@ -1,7 +1,7 @@
-use crate::{config_firewall::FirewallConfig, models::DHCPRequestData};
+use crate::{config_firewall::FirewallConfig, models::DhcpEvent};
 
 #[tarpc::service]
 pub trait RPC {
     async fn heartbeat(version: Option<String>) -> Option<FirewallConfig>;
-    async fn dhcp_request(message: DHCPRequestData);
+    async fn dhcp_request(event: DhcpEvent);
 }

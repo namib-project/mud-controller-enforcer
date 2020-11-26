@@ -17,9 +17,18 @@ pub struct DHCPRequestData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum DhcpEvent {
-    LeaseAdded(DhcpLeaseInformation),
-    LeaseDestroyed(DhcpLeaseInformation),
-    ExistingLeaseUpdate(DhcpLeaseInformation),
+    LeaseAdded {
+        event_timestamp: DateTime<FixedOffset>,
+        lease_info: DhcpLeaseInformation,
+    },
+    LeaseDestroyed {
+        event_timestamp: DateTime<FixedOffset>,
+        lease_info: DhcpLeaseInformation,
+    },
+    ExistingLeaseUpdate {
+        event_timestamp: DateTime<FixedOffset>,
+        lease_info: DhcpLeaseInformation,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,7 +37,7 @@ pub enum LeaseExpiryTime {
     LeaseExpiryTime(DateTime<FixedOffset>),
 }
 
-pub type MacAddress = [u8; 6];
+pub type MacAddress = [u8; 8];
 pub type DuidContent = Vec<u8>;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -69,4 +78,5 @@ pub struct DhcpLeaseInformation {
     pub time_remaining: Duration,
     pub receiver_interface: Option<String>,
     pub mac_address: Option<MacAddress>,
+    pub mud_url: Option<String>,
 }
