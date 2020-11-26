@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 use error::Result;
 use namib_shared::{models::DHCPRequestData, rpc::*};
 
+mod dhcp;
 mod error;
 mod rpc;
 mod uci;
@@ -44,6 +45,8 @@ async fn main() -> Result<()> {
 
     let heartbeat_task = rpc::rpc_client::heartbeat(client);
 
-    tokio::join!(heartbeat_task);
+    let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events();
+
+    tokio::join!(heartbeat_task, dhcp_event_task);
     Ok(())
 }

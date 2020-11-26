@@ -3,6 +3,7 @@ name = "namib_enforcer"
 version = "0.0.1"
 authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
+default-run = "namib_enforcer"
 
 [features]
 default = ["execute_uci_commands"]
@@ -19,11 +20,20 @@ rustls = "0.18"
 tokio-rustls = "0.20"
 tokio-util = "0.4"
 tarpc = { version = "0.23", features = ["full"] }
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 pin-project = "1.0"
 tokio-serde = { version = "0.6" }
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces-impl-backtrace-crate", "futures"] }
 dotenv = "0.15"
 libuci-sys = { path = "../libuci-sys", optional = true }
 libc = { version = "0.2", optional = true }
+chrono = {version = "0.4", features = ["serde"]}
+hex = "0.4"
+serde_json = "1.0"
 
+[[bin]]
+name = "namib_enforcer"
+
+[[bin]]
+name = "namib_dnsmasq_hook"
+path = "src/dhcp/dnsmasq_hook.rs"
