@@ -20,15 +20,6 @@ impl RuleName {
         RuleName(name)
     }
 
-    /// Return the string of the of the name.
-    /// Example: "name='YOURNAME'
-    pub fn to_string(&self) -> String {
-        let mut r: String = "name='".to_string();
-        r.push_str(self.0.as_str());
-        r.push_str("'");
-        r
-    }
-
     /// Return the key, value pair.
     /// Example: key = name, value YOURNAME.
     pub fn to_option(&self) -> (String, String) {
@@ -97,15 +88,6 @@ pub enum EnTarget {
 }
 
 impl EnTarget {
-    /// Return the string of the target.
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::ACCEPT => "target='ACCEPT'".to_string(),
-            Self::REJECT => "target='REJECT'".to_string(),
-            Self::DROP => "target='DROP'".to_string(),
-        }
-    }
-
     /// Return the key, value pair of target.
     pub fn to_option(&self) -> (String, String) {
         match self {
@@ -170,24 +152,6 @@ impl FirewallRule {
         if let Some(v) = &self.optional_settings {
             for s in v.iter() {
                 query.push(s.clone());
-            }
-        }
-        query
-    }
-
-    /// Takes a config as &self and return the config as vector in strings.
-    pub fn to_vector_string(&self) -> Vec<String> {
-        let mut query: Vec<String> = Vec::new();
-        query.push("rule".to_string());
-        query.push(self.rule_name.to_string());
-        query.push(format!("src='{}'", self.route_network_src.to_string()));
-        query.push(format!("dest='{}'", self.route_network_dest.to_string()));
-        query.push(self.protocol.to_string());
-        query.push(self.target.to_string());
-
-        if let Some(v) = &self.optional_settings {
-            for s in v.iter() {
-                query.push(format!("{}='{}'", s.0, s.1));
             }
         }
         query
