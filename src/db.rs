@@ -9,7 +9,7 @@ use rocket_contrib::database;
 embed_migrations!("migrations/postgres");
 
 #[cfg(feature = "postgres")]
-#[database("postgres")]
+#[database("postgres_db")]
 pub struct DbConn(PgConnection);
 
 #[cfg(feature = "postgres")]
