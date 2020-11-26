@@ -1,27 +1,33 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use async_dnssd;
 use futures::{future, StreamExt, TryStreamExt};
 use log::*;
+use namib_shared::models::DHCPRequestData;
+use namib_shared::rpc::RPC;
+use namib_shared::{codec, open_file_with};
 use rustls::RootCertStore;
 use tarpc::rpc::server::{BaseChannel, Channel, Handler};
 use tarpc::{context, server};
 
-use async_dnssd;
-use namib_shared::models::DHCPRequestData;
-use namib_shared::rpc::RPC;
-use namib_shared::{codec, open_file_with};
+use crate::db::DbConnPool;
+use crate::error::*;
+use crate::services::user_service;
 
 use super::tls_serde_transport;
-use crate::error::*;
 
 #[derive(Clone)]
-pub struct RPCServer(SocketAddr);
+pub struct RPCServer(SocketAddr, DbConnPool);
 
 #[server]
 impl RPC for RPCServer {
     async fn heartbeat(self, _: context::Context) {
         debug!("Received a heartbeat from: {:?}", self.0);
+        debug!(
+            "Users: {:?}",
+            user_service::get_all(&*self.1.get_one().expect("could not get db conn"))
+        );
     }
 
     async fn dhcp_request(self, _: context::Context, dhcp_data: DHCPRequestData) {
@@ -29,7 +35,7 @@ impl RPC for RPCServer {
     }
 }
 
-pub async fn listen() -> Result<()> {
+pub async fn listen(pool: DbConnPool) -> Result<()> {
     debug!("Registering in dnssd");
     let (_result, result) = async_dnssd::register("_namib_controller._tcp", 8734)?.await?;
     info!("Registered: {:?}", result);
@@ -84,6 +90,7 @@ pub async fn listen() -> Result<()> {
                     .0
                     .peer_addr()
                     .unwrap(),
+                pool.clone(),
             );
             channel.respond_with(server.serve()).execute()
         })

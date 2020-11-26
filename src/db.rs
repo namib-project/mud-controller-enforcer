@@ -35,3 +35,15 @@ pub fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
         }
     }
 }
+
+impl DbConnPool {
+    pub fn get_one(&self) -> Option<DbConn> {
+        self.0.get().ok().map(DbConn)
+    }
+}
+
+impl Clone for DbConnPool {
+    fn clone(&self) -> Self {
+        DbConnPool(self.0.clone())
+    }
+}

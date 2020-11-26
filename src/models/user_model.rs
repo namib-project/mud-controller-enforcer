@@ -10,7 +10,7 @@ use crate::schema::*;
 
 const SALT_LENGTH: usize = 32;
 
-#[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Debug, Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Clone, JsonSchema)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
