@@ -1,8 +1,7 @@
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
 #![allow(clippy::map_err_ignore)]
 
-use std::fs::File;
-use std::io;
+use std::{fs::File, io};
 
 use tokio_serde::formats::Bincode;
 
