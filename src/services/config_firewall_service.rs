@@ -5,6 +5,7 @@ use crate::{
         device_model::DeviceData,
         mud_models::{ACEAction, ACEProtocol, ACLDirection, ACLType},
     },
+    services::config_service::{get_config_value, set_config_value},
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, Protocol, RuleName};
 use std::net::{IpAddr, ToSocketAddrs};
@@ -82,14 +83,24 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
     Ok(result)
 }
 
-pub async fn get_config_version(_: DbConnPool) -> String {
-    unsafe { VERSION.to_string() }
+pub async fn get_config_version(pool: DbConnPool) -> String {
+    get_config_value("version".to_string(), pool).await.unwrap_or("0".to_string())
 }
 
-pub async fn update_config_version(_: DbConnPool) {
-    unsafe {
-        VERSION += 1;
-    }
+pub async fn update_config_version(pool: DbConnPool) {
+    set_config_value(
+        "version".to_string(),
+        (get_config_value("version".to_string(), pool.clone())
+            .await
+            .unwrap_or("0".to_string())
+            .parse::<u32>()
+            .unwrap_or(1)
+            + 1)
+        .to_string(),
+        pool,
+    )
+    .await
+    .expect("failed to write config");
 }
 
 #[cfg(test)]

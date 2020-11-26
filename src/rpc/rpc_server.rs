@@ -30,8 +30,11 @@ pub struct RPCServer(SocketAddr, DbConnPool);
 #[server]
 impl RPC for RPCServer {
     async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<FirewallConfig> {
-        debug!("Received a heartbeat from client {:?} with version {:?}", self.0, version);
         let current_config_version = config_firewall_service::get_config_version(self.1.clone()).await;
+        debug!(
+            "Received a heartbeat from client {:?} with version {:?}, current version {:?}",
+            self.0, version, current_config_version
+        );
         if Some(&current_config_version) != version.as_ref() {
             debug!("Client has outdated version \"{}\". Starting update...", current_config_version);
             let devices = device_service::get_all_devices(self.1.clone()).await.unwrap_or_default();
