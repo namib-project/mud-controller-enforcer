@@ -16,7 +16,7 @@ use tokio::{
 #[cfg(unix)]
 pub(crate) async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
     match std::fs::remove_file("/tmp/namib_dhcp.sock") {
-        Ok(_) => {} // TODO: Logmessage
+        Ok(_) => Ok(()),
         Err(e) => match e.kind() {
             std::io::ErrorKind::NotFound => Ok(()),
             e => Err(e),
