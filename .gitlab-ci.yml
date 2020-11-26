@@ -2,6 +2,7 @@ stages:
   - build
   - test
   - docs
+  - binary
 
 image: rust:latest
 
@@ -74,3 +75,15 @@ pages:
       - public
     expire_in: 7 days
 
+binary:
+  stage: binary
+  only:
+    - master
+    - friday_presentation # TODO: remove
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/namib_enforcer
+      - target/release/namib_dnsmasq_hook
+    expire_in: 7 days
