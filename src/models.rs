@@ -80,3 +80,12 @@ pub struct DhcpLeaseInformation {
     pub mac_address: Option<MacAddr>,
     pub mud_url: Option<String>,
 }
+
+impl DhcpLeaseInformation {
+    pub fn ip_addr(&self) -> IpAddr {
+        match &self.version_specific_information {
+            DhcpLeaseVersionSpecificInformation::V4(info) => info.ip_addr.into(),
+            DhcpLeaseVersionSpecificInformation::V6(info) => info.ip_addr.into(),
+        }
+    }
+}
