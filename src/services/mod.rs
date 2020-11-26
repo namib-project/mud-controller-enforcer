@@ -1,1 +1,1 @@
-pub mod config_firewall_service;
+pub mod firewall_service;

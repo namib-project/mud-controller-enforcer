@@ -3,33 +3,20 @@ use namib_shared::config_firewall::*;
 
 const CONFIG_DIR: &str = "config";
 
-fn apply_config(uci: &mut UCI, cfg: &ConfigFirewall) -> Result<()> {
-    let cfg_n = format!("firewall.namibrule_{}", cfg.hash());
-    debug!("Creating rule {}", cfg_n);
-    uci.set(cfg_n.as_str(), "rule")?;
-    for c in cfg.to_option().iter() {
-        uci.set(format!("{}.{}", cfg_n, c.0).as_str(), c.1.as_str())?;
-    }
-    uci.set(format!("{}.namib", cfg_n).as_str(), "1")?;
-    Ok(())
+pub fn get_config_version() -> Result<String> {
+    debug!("Getting config version");
+    let mut uci = UCI::new()?;
+    uci.set_config_dir(CONFIG_DIR)?;
+    uci.get("firewall.namib_config_version")
 }
 
-fn apply_uci_config(uci: &mut UCI, cfg_list: Vec<ConfigFirewall>) -> Result<()> {
-    delete_all_config(uci)?;
-    for c in cfg_list.iter() {
-        apply_config(uci, c)?;
-    }
-    uci.commit("firewall")?;
-    Ok(())
-}
-
-pub fn apply_new_configuration(cfg_list: Vec<ConfigFirewall>) -> Result<()> {
-    debug!("Applying {} configs", cfg_list.len());
+pub fn apply_config(cfg: FirewallConfig) -> Result<()> {
+    debug!("Applying {} configs", cfg.rules().len());
     let mut uci = UCI::new()?;
     uci.set_config_dir(CONFIG_DIR)?;
 
     // if an error occurred roll back any changes
-    if let Err(e) = apply_uci_config(&mut uci, cfg_list) {
+    if let Err(e) = apply_uci_config(&mut uci, cfg) {
         uci.revert("firewall")?;
         return Err(e);
     }
@@ -39,6 +26,27 @@ pub fn apply_new_configuration(cfg_list: Vec<ConfigFirewall>) -> Result<()> {
         let output = restart_firewall_command();
         debug!("restart firewall: {:?}", std::str::from_utf8(&output.stderr));
     }
+    Ok(())
+}
+
+fn apply_uci_config(uci: &mut UCI, cfg: FirewallConfig) -> Result<()> {
+    uci.set("firewall.namib_config_version", cfg.version())?;
+    delete_all_config(uci)?;
+    for c in cfg.rules() {
+        apply_rule(uci, c)?;
+    }
+    uci.commit("firewall")?;
+    Ok(())
+}
+
+fn apply_rule(uci: &mut UCI, rule: &FirewallRule) -> Result<()> {
+    let cfg_n = format!("firewall.namibrule_{}", rule.hash());
+    debug!("Creating rule {}", cfg_n);
+    uci.set(cfg_n.as_str(), "rule")?;
+    for c in rule.to_option().iter() {
+        uci.set(format!("{}.{}", cfg_n, c.0).as_str(), c.1.as_str())?;
+    }
+    uci.set(format!("{}.namib", cfg_n).as_str(), "1")?;
     Ok(())
 }
 
@@ -83,15 +91,15 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
         uci.set_config_dir("tests/config/test_trivial_apply_config")?;
 
-        let cfg = ConfigFirewall::new(
+        let cfg = FirewallRule::new(
             RuleName::new("Regel2".to_string()),
-            EnRoute::Src(EnNetwork::Lan),
-            EnRoute::Des(EnNetwork::Wan),
+            EnNetwork::LAN,
+            EnNetwork::WAN,
             Protocol::tcp(),
             EnTarget::DROP,
             EnOptionalSettings::None,
         );
-        apply_config(&mut uci, &cfg)?;
+        apply_rule(&mut uci, &cfg)?;
         uci.commit("firewall")?;
 
         let mut expected_string = String::new();
@@ -147,17 +155,17 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
         uci.set_config_dir("tests/config/test_apply_and_delete")?;
 
-        let cfg = ConfigFirewall::new(
+        let cfg = FirewallRule::new(
             RuleName::new("Regel3".to_string()),
-            EnRoute::Src(EnNetwork::Lan),
-            EnRoute::Des(EnNetwork::Wan),
+            EnNetwork::LAN,
+            EnNetwork::WAN,
             Protocol::tcp(),
             EnTarget::DROP,
             EnOptionalSettings::None,
         );
 
         // apply the config
-        apply_config(&mut uci, &cfg)?;
+        apply_rule(&mut uci, &cfg)?;
         uci.commit("firewall")?;
 
         let mut expected_firewall_string = String::new();

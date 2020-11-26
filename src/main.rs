@@ -46,8 +46,8 @@ async fn main() -> Result<()> {
 
     let heartbeat_task = rpc::rpc_client::heartbeat(client);
 
-    let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events();
+    // let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events();
 
-    tokio::join!(heartbeat_task, dhcp_event_task);
+    tokio::join!(heartbeat_task /*, dhcp_event_task */);
     Ok(())
 }

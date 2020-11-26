@@ -37,7 +37,7 @@ pub(crate) async fn listen_for_dhcp_events() {
 
 async fn handle_dhcp_script_connection(mut stream: UnixStream) {
     let mut inc_data = Vec::new();
-    stream.read_to_end(&mut inc_data).await;
+    stream.read_to_end(&mut inc_data).await.unwrap();
     let dhcp_event: DhcpEvent = serde_json::from_slice(inc_data.as_slice()).unwrap();
     debug!("Received DHCP event: {:?}", &dhcp_event);
     // TODO do something with the received event.
