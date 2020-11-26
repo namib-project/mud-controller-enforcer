@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
-#![allow(dead_code)]
+#![allow(dead_code, clippy::module_name_repetitions)]
 
 #[macro_use]
 extern crate log;
@@ -11,7 +11,7 @@ use tarpc::context;
 use tokio::sync::Mutex;
 
 use error::Result;
-use namib_shared::{models::DHCPRequestData, rpc::*};
+use namib_shared::{models::DHCPRequestData, rpc::RPCClient};
 
 mod dhcp;
 mod error;

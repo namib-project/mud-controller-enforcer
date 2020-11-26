@@ -4,6 +4,7 @@ pub use mock::*;
 pub use unix::*;
 
 #[cfg(feature = "execute_uci_commands")]
+#[allow(clippy::shadow_unrelated)]
 mod unix {
     use core::ptr;
     use std::{
@@ -18,11 +19,12 @@ mod unix {
         uci_ptr_UCI_LOOKUP_COMPLETE, uci_revert, uci_save, uci_set, uci_set_confdir, uci_set_savedir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
     };
 
-    use crate::error::*;
+    use crate::error::{Result, UCIError};
 
+    #[allow(clippy::cast_possible_wrap)]
     const UCI_OK: i32 = libuci_sys::UCI_OK as i32;
 
-    /// Contains the native uci_context
+    /// Contains the native `uci_context`
     pub struct UCI(*mut uci_context);
 
     impl Drop for UCI {
@@ -31,8 +33,8 @@ mod unix {
         }
     }
 
-    /// Contains the native uci_ptr and it's raw CString key
-    /// this is done so the raw CString stays alive until the uci_ptr is dropped
+    /// Contains the native `uci_ptr` and it's raw `CString` key
+    /// this is done so the raw `CString` stays alive until the `uci_ptr` is dropped
     struct UciPtr(uci_ptr, *mut i8);
 
     impl Deref for UciPtr {
@@ -42,6 +44,7 @@ mod unix {
             &self.0
         }
     }
+
     impl DerefMut for UciPtr {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
@@ -56,7 +59,7 @@ mod unix {
 
     impl UCI {
         /// Creates a new UCI context.
-        /// The `C` memory will be freed when the object is dropped.
+        /// The C memory will be freed when the object is dropped.
         pub fn new() -> Result<UCI> {
             let ctx = unsafe { uci_alloc_context() };
             ensure!(
@@ -368,7 +371,7 @@ mod unix {
         }
 
         /// Obtains the most recent error from UCI as a string
-        /// if no last_error is set, an `Err` is returned.
+        /// if no `last_error` is set, an `Err` is returned.
         fn get_last_error(&mut self) -> Result<String> {
             let mut raw: *mut std::os::raw::c_char = ptr::null_mut();
             unsafe { uci_get_errorstr(self.0, &mut raw, ptr::null()) };
@@ -394,8 +397,9 @@ mod unix {
 }
 
 #[cfg(not(feature = "execute_uci_commands"))]
+#[allow(clippy::unused_self)]
 mod mock {
-    use crate::error::*;
+    use crate::error::Result;
 
     pub struct UCI {}
 
@@ -445,7 +449,7 @@ mod mock {
 mod tests {
     use std::{fs, fs::File, io::Read};
 
-    use crate::error::*;
+    use crate::error::Result;
 
     use super::*;
 

@@ -2,7 +2,6 @@ use std::{net::SocketAddr, sync::Arc};
 
 use crate::services::config_firewall_service;
 use futures::{pin_mut, prelude::*};
-use log::*;
 use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context};
 use tokio::{
@@ -11,9 +10,9 @@ use tokio::{
 };
 use tokio_rustls::{rustls, webpki::DNSNameRef};
 
-use namib_shared::{codec, open_file_with, rpc::*};
+use namib_shared::{codec, open_file_with, rpc::RPCClient};
 
-use crate::error::*;
+use crate::error::{Error, Result};
 
 use super::{controller_discovery::discover_controllers, tls_serde_transport};
 
@@ -83,7 +82,7 @@ async fn try_connect(addr: SocketAddr, dns_name: DNSNameRef<'static>, cfg: Arc<r
     }
 
     let mut transport = tls_serde_transport::connect(cfg, dns_name, addr, codec());
-    transport.config_mut().max_frame_length(4294967296);
+    transport.config_mut().max_frame_length(50 * 1024 * 1024);
 
     Ok(Some(RPCClient::new(client::Config::default(), transport.await?).spawn()?))
 }
