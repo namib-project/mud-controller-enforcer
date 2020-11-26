@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Hash, Deserialize, Serialize)]
 pub struct RuleName(String);
@@ -93,7 +93,7 @@ impl EnTarget {
 pub type EnOptionalSettings = Option<Vec<(String, String)>>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ConfigFirewall {
+pub struct FirewallRule {
     rule_name: RuleName,
     route_network_src: EnNetwork,
     route_network_dest: EnNetwork,
@@ -102,7 +102,7 @@ pub struct ConfigFirewall {
     optional_settings: EnOptionalSettings,
 }
 
-impl ConfigFirewall {
+impl FirewallRule {
     pub fn new(
         rule_name: RuleName,
         route_network_src: EnNetwork,
@@ -110,8 +110,8 @@ impl ConfigFirewall {
         protocol: Protocol,
         target: EnTarget,
         optional_settings: EnOptionalSettings,
-    ) -> ConfigFirewall {
-        ConfigFirewall {
+    ) -> FirewallRule {
+        FirewallRule {
             rule_name,
             route_network_src,
             route_network_dest,
@@ -162,5 +162,25 @@ impl ConfigFirewall {
 
     pub fn rule_name(&self) -> &RuleName {
         &self.rule_name
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct FirewallConfig {
+    version: String,
+    rules: Vec<FirewallRule>,
+}
+
+impl FirewallConfig {
+    pub fn new(version: String, rules: Vec<FirewallRule>) -> Self {
+        FirewallConfig { version, rules }
+    }
+
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn rules(&self) -> &Vec<FirewallRule> {
+        &self.rules
     }
 }
