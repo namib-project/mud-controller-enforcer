@@ -7,11 +7,7 @@ use crate::{
     },
 };
 use namib_shared::config_firewall::*;
-use std::{
-    lazy::{SyncLazy, SyncOnceCell},
-    net::{IpAddr, ToSocketAddrs},
-    sync::Mutex,
-};
+use std::net::{IpAddr, ToSocketAddrs};
 
 static mut VERSION: i32 = 0;
 
@@ -79,11 +75,11 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
     Ok(result)
 }
 
-pub async fn get_config_version(pool: DbConnPool) -> String {
+pub async fn get_config_version(_: DbConnPool) -> String {
     unsafe { VERSION.to_string() }
 }
 
-pub async fn update_config_version(pool: DbConnPool) {
+pub async fn update_config_version(_: DbConnPool) {
     unsafe {
         VERSION = VERSION + 1;
     }

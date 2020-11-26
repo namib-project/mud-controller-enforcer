@@ -62,10 +62,10 @@ impl RPC for RPCServer {
         match device_service::find_by_ip(dhcp_device_data.ip_addr, self.1.clone()).await {
             Ok(device) => {
                 dhcp_device_data.id = device.id;
-                device_service::update_device(&dhcp_device_data, self.1.clone()).await;
+                device_service::update_device(&dhcp_device_data, self.1.clone()).await.unwrap();
             },
             Err(_) => {
-                device_service::insert_device(&dhcp_device_data, self.1.clone()).await;
+                device_service::insert_device(&dhcp_device_data, self.1.clone()).await.unwrap();
             },
         };
 

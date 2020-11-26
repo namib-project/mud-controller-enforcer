@@ -1,6 +1,7 @@
 use crate::{models::mud_models::MUDData, schema::*};
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac_addr::macaddr, models::DhcpLeaseInformation, MacAddr};
+use schemars::JsonSchema;
 use std::net::IpAddr;
 
 #[derive(Debug, Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Clone)]
@@ -53,7 +54,7 @@ impl From<&DeviceData> for InsertableDevice {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceData {
     pub id: i32,
     pub ip_addr: IpAddr,

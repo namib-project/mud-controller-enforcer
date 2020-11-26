@@ -55,12 +55,17 @@ fn run_server() {
             Ok(rocket.manage(td))
         }))
         .mount("/users", routes::users_controller::routes())
+        .mount("/devices", routes::device_controller::routes())
         .mount("/mud", routes::mud_controller::routes())
         .mount("/", StaticFiles::from("public"))
         .mount(
             "/swagger-ui/",
             make_swagger_ui(&SwaggerUIConfig {
-                urls: vec![UrlObject::new("Users", "../users/openapi.json"), UrlObject::new("MUD", "../mud/openapi.json")],
+                urls: vec![
+                    UrlObject::new("Users", "../users/openapi.json"),
+                    UrlObject::new("MUD", "../mud/openapi.json"),
+                    UrlObject::new("Devices", "../devices/openapi.json"),
+                ],
                 ..Default::default()
             }),
         )
