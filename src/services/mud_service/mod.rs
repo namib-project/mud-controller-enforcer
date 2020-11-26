@@ -50,10 +50,10 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
 
     debug!("save mud file (exists: {:?}): {:#?}", exists, mud);
 
-    if !exists {
-        diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
-    } else {
+    if exists {
         diesel::update(mud_data::table.find(url)).set(mud).execute(&*conn)?;
+    } else {
+        diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
     }
 
     // return muddata

@@ -1,4 +1,4 @@
-use crate::{models::mud_models::MUDData, schema::*};
+use crate::{models::mud_models::MUDData, schema::devices};
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac_addr::macaddr, models::DhcpLeaseInformation, MacAddr};
 use schemars::JsonSchema;

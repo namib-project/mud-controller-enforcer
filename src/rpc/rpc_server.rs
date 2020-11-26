@@ -1,8 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use async_dnssd;
 use futures::{future, StreamExt, TryStreamExt};
-use log::*;
 use namib_shared::{
     codec,
     config_firewall::{FirewallConfig, FirewallRule},

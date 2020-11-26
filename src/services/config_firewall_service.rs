@@ -1,13 +1,13 @@
 use crate::{
     db::DbConnPool,
-    error::*,
+    error::Result,
     models::{
         device_model::DeviceData,
-        mud_models::{ACLDirection, *},
+        mud_models::{ACEAction, ACEProtocol, ACLDirection, ACLType},
     },
 };
-use namib_shared::config_firewall::*;
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, Protocol, RuleName};
+use std::net::{IpAddr, ToSocketAddrs};
 
 static mut VERSION: i32 = 0;
 
@@ -57,13 +57,17 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
                             }
                         },
                     };
+                    let (src_ip, dest_ip) = match acl.packet_direction {
+                        ACLDirection::FromDevice => (device.ip_addr.to_string(), addr.ip().to_string()),
+                        ACLDirection::ToDevice => (addr.ip().to_string(), device.ip_addr.to_string()),
+                    };
                     let config_firewall = FirewallRule::new(
                         rule_name.clone(),
                         route_network_src.clone(),
                         route_network_dest.clone(),
                         protocol.clone(),
                         target.clone(),
-                        Some(vec![("dest_ip".to_string(), addr.ip().to_string())]),
+                        Some(vec![("src_ip".to_string(), src_ip), ("dest_ip".to_string(), dest_ip)]),
                     );
                     result.push(config_firewall);
                 }
@@ -84,7 +88,7 @@ pub async fn get_config_version(_: DbConnPool) -> String {
 
 pub async fn update_config_version(_: DbConnPool) {
     unsafe {
-        VERSION = VERSION + 1;
+        VERSION += 1;
     }
 }
 

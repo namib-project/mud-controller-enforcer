@@ -48,10 +48,4 @@ joinable!(devices -> mud_data (mud_url));
 joinable!(users_roles -> roles (role_id));
 joinable!(users_roles -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(
-    devices,
-    mud_data,
-    roles,
-    users,
-    users_roles,
-);
+allow_tables_to_appear_in_same_query!(devices, mud_data, roles, users, users_roles,);
