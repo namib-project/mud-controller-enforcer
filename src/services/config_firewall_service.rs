@@ -97,6 +97,7 @@ mod tests {
     use super::*;
     use crate::models::{device_model::DeviceData, mud_models::*};
     use chrono::Local;
+    use namib_shared::macaddr;
     use std::net::Ipv4Addr;
 
     #[test]
@@ -105,10 +106,10 @@ mod tests {
             url: "example.com/.well-known/mud".to_string(),
             masa_url: None,
             last_update: "some_last_update".to_string(),
-            systeminfo: "some_systeminfo".to_string(),
-            mfg_name: "some_mfg_name".to_string(),
-            model_name: "some_model_name".to_string(),
-            documentation: "some_documentation".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
             expiration: Local::now(),
             acllist: vec![ACL {
                 name: "some_acl_name".to_string(),
@@ -129,14 +130,15 @@ mod tests {
             }],
         };
 
-        let device = Device {
-            mac_addr: "".to_string(),
-            ip_addr: "127.0.0.1",
+        let device = DeviceData {
+            id: 0,
+            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().into()),
+            ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "".to_string(),
             vendor_class: "".to_string(),
-            mud_url: "".to_string(),
-            mud_data,
-            last_interaction: (),
+            mud_url: Some("http://example.com/mud_url.json".to_string()),
+            mud_data: Some(mud_data),
+            last_interaction: Local::now().naive_local(),
         };
 
         let x = convert_device_to_fw_rules(&device)?;
