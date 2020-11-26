@@ -48,9 +48,14 @@ pub async fn get_mud_from_url(url: String, conn: &ConnectionType) -> Result<MUDD
     diesel::insert_into(mud_data::table).values(mud).execute(conn)?;
 
     // return muddata
-    return Ok(data);
+    Ok(data)
 }
 
 async fn fetch_mud(url: &str) -> Result<String> {
     Ok(isahc::get_async(url).await?.text_async().await?)
+}
+
+pub async fn get_config_version() -> String {
+    // TODO: Implement getting a hash of the config
+    "version".to_string()
 }

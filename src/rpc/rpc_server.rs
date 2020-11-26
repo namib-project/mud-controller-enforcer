@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use async_dnssd;
 use futures::{future, StreamExt, TryStreamExt};
 use rustls::RootCertStore;
 use tarpc::{
@@ -11,16 +12,47 @@ use tarpc::{
 use namib_shared::{codec, models::DHCPRequestData, open_file_with, rpc::RPC};
 
 use crate::error::Result;
+use namib_shared::config_firewall::ConfigFirewall;
+use namib_shared::models::DHCPRequestData;
+use namib_shared::rpc::RPC;
+use namib_shared::{codec, open_file_with};
 
 use super::tls_serde_transport;
+use crate::error::*;
+use crate::services::config_firewall_service;
+use crate::services::device_service;
+use crate::services::mud_service;
 
 #[derive(Clone)]
 pub struct RPCServer(SocketAddr);
 
 #[server]
 impl RPC for RPCServer {
-    async fn heartbeat(self, _: context::Context) {
-        debug!("Received a heartbeat from: {:?}", self.0);
+    async fn heartbeat(self, _: context::Context, version: String) -> Option<Vec<ConfigFirewall>> {
+        debug!(
+            "Received a heartbeat from client {:?} with version {}",
+            self.0, version
+        );
+        let current_config_version = mud_service::get_config_version().await;
+        if current_config_version != version {
+            debug!(
+                "Client has outdated version \"{}\". Starting update...",
+                current_config_version
+            );
+            let devices = device_service::get_all_devices().await;
+            let config: Vec<ConfigFirewall> = devices
+                .iter()
+                .flat_map(move |d| {
+                    config_firewall_service::convert_device_to_config(d)
+                        .unwrap_or_else(|_| Vec::new())
+                })
+                .collect();
+
+            debug!("Returning Heartbeat to client with config: {:#?}", config);
+            return Some(config);
+        }
+
+        None
     }
 
     async fn dhcp_request(self, _: context::Context, dhcp_data: DHCPRequestData) {
