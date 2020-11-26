@@ -1,4 +1,15 @@
 table! {
+    devices (mac_addr) {
+        mac_addr -> Text,
+        ip_addr -> Text,
+        hostname -> Text,
+        vendor_class -> Text,
+        mud_url -> Nullable<Text>,
+        last_interaction -> Timestamp,
+    }
+}
+
+table! {
     mud_data (url) {
         url -> Text,
         data -> Text,
@@ -32,7 +43,14 @@ table! {
     }
 }
 
+joinable!(devices -> mud_data (mud_url));
 joinable!(users_roles -> roles (role_id));
 joinable!(users_roles -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(mud_data, roles, users, users_roles,);
+allow_tables_to_appear_in_same_query!(
+    devices,
+    mud_data,
+    roles,
+    users,
+    users_roles,
+);
