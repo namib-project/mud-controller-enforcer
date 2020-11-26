@@ -40,17 +40,15 @@ test:
 warnings:
   stage: test
   script:
-    - rustup default nightly
-    - rustup component add clippy
-    - cargo clippy -- -D warnings
+    - rustup toolchain install nightly --component clippy
+    - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
 formatting:
   stage: test
   script:
-    - rustup default nightly
-    - rustup component add rustfmt
-    - cargo fmt -- --check
+    - rustup toolchain install nightly --component rustfmt
+    - cargo +nightly fmt -- --check
 
 docs:
   stage: docs
