@@ -1,18 +1,19 @@
+use std::{
+    convert::TryInto,
+    env, net,
+    net::{IpAddr, Ipv4Addr},
+    num,
+    os::unix::net::UnixStream,
+    str::FromStr,
+    time::{Duration, UNIX_EPOCH},
+};
+
 use chrono::prelude::*;
 use hex;
 use log::*;
 use namib_shared::models::{
-    DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation,
-    DhcpV4LeaseVersionSpecificInformation, MacAddress,
+    DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, LeaseExpiryTime, MacAddress,
 };
-use namib_shared::models::{DhcpV6LeaseVersionSpecificInformation, LeaseExpiryTime};
-use std::convert::TryInto;
-use std::net::{IpAddr, Ipv4Addr};
-use std::num;
-use std::os::unix::net::UnixStream;
-use std::str::FromStr;
-use std::time::{Duration, UNIX_EPOCH};
-use std::{env, net};
 
 /// List of event types supported by this script.
 const SUPPORTED_EVENT_TYPES: [&str; 3] = ["add", "del", "old"];
@@ -71,8 +72,7 @@ fn main() {
     // the enforcer.
     let dhcp_event = extract_dhcp_hook_data().expect("Error while constructing DHCP event");
     debug!("Constructed DHCP Event: {:?}", &dhcp_event);
-    let socket =
-        UnixStream::connect("/tmp/namib_dhcp.sock").expect("Failed to connect to enforcer");
+    let socket = UnixStream::connect("/tmp/namib_dhcp.sock").expect("Failed to connect to enforcer");
     serde_json::to_writer(socket, &dhcp_event).unwrap();
     info!("DHCP Event successfully transferred to enforcer");
 }
@@ -98,17 +98,11 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent, DhcpDataExtractionError> {
     let receiver_interface = std::env::var("DNSMASQ_INTERFACE").ok();
     let time_remaining: Duration = std::env::var("DNSMASQ_TIME_REMAINING")
         .map_err(DhcpDataExtractionError::from)
-        .and_then(|x| {
-            x.parse::<u64>()
-                .map(Duration::from_secs)
-                .map_err(|x| x.into())
-        })?;
+        .and_then(|x| x.parse::<u64>().map(Duration::from_secs).map_err(|x| x.into()))?;
 
     let mut user_classes = Vec::new();
     let mut uc_idx = 0;
-    while let Ok(new_user_class) =
-        std::env::var(format!("{}{}", "DNSMASQ_USER_CLASS", uc_idx.to_string()))
-    {
+    while let Ok(new_user_class) = std::env::var(format!("{}{}", "DNSMASQ_USER_CLASS", uc_idx.to_string())) {
         user_classes.push(new_user_class);
         uc_idx += 1;
     }
@@ -119,18 +113,12 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent, DhcpDataExtractionError> {
     let version_specific_information = match ip_addr {
         IpAddr::V4(ip_addr) => {
             mac_address = Some(args[2].replace(":", ""));
-            DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation {
-                ip_addr,
-            })
+            DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation { ip_addr })
         }
         IpAddr::V6(ip_addr) => {
-            mac_address = std::env::var("DNSMASQ_MAC")
-                .ok()
-                .map(|v| v.replace(":", ""));
+            mac_address = std::env::var("DNSMASQ_MAC").ok().map(|v| v.replace(":", ""));
 
-            DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation {
-                ip_addr,
-            })
+            DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation { ip_addr })
         }
     };
     // Parse MAC Address from supplied string.

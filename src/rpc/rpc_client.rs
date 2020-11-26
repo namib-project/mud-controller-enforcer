@@ -1,7 +1,8 @@
 use std::{io, net::SocketAddr, sync::Arc};
 
-use crate::services::firewall_service;
 use futures::{pin_mut, prelude::*};
+use namib_shared::config_firewall::FirewallConfig;
+use namib_shared::{codec, open_file_with, rpc::RPCClient};
 use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context};
 use tokio::{
@@ -10,12 +11,10 @@ use tokio::{
 };
 use tokio_rustls::{rustls, webpki::DNSNameRef};
 
-use namib_shared::{codec, open_file_with, rpc::RPCClient};
-
 use crate::error::{Error, Result};
+use crate::services::firewall_service;
 
 use super::{controller_discovery::discover_controllers, tls_serde_transport};
-use namib_shared::config_firewall::FirewallConfig;
 
 pub async fn run() -> Result<RPCClient> {
     let tls_cfg = {

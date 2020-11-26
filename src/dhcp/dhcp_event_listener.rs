@@ -1,13 +1,18 @@
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
+
 use chrono::prelude::*;
 use futures::future::join_all;
 use log::debug;
 use namib_shared::models::DhcpEvent;
 use serde::{Deserialize, Serialize, Serializer};
-use std::net::{Ipv4Addr, Ipv6Addr};
-use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use tokio::net::{UnixListener, UnixStream};
-use tokio::stream::StreamExt;
+use tokio::{
+    io::AsyncReadExt,
+    net::{UnixListener, UnixStream},
+    stream::StreamExt,
+};
 
 /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
 pub(crate) async fn listen_for_dhcp_events() {
@@ -19,8 +24,7 @@ pub(crate) async fn listen_for_dhcp_events() {
         },
     }
     .expect("Unable to get access to socket file");
-    let mut listener = UnixListener::bind("/tmp/namib_dhcp.sock")
-        .expect("Could not open socket for DHCP event listener.");
+    let mut listener = UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
     let mut active_listeners = Vec::new();
     while let Some(event_stream) = listener.next().await {
         match event_stream {
