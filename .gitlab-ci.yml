@@ -2,6 +2,7 @@ stages:
   - build
   - test
   - docs
+  - binary
 
 image: rust:latest
 
@@ -12,14 +13,13 @@ cache:
 before_script:
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev cmake clang
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
   - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
   - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
   - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} ../namib_shared || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git ../namib_shared
   - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git ../rust-async-dnssd
   - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git ../libuci-sys
-  - rustup component add clippy
   - rustc --version
   - cargo --version
 
@@ -41,8 +41,15 @@ test:
 warnings:
   stage: test
   script:
-    - cargo clippy -- -D warnings
+    - rustup toolchain install nightly --component clippy --no-self-update
+    - cargo +nightly clippy -- -D warnings
   allow_failure: true
+
+formatting:
+  stage: test
+  script:
+    - rustup toolchain install nightly --component rustfmt --no-self-update
+    - cargo +nightly fmt -- --check
 
 docs:
   stage: docs
@@ -68,3 +75,15 @@ pages:
       - public
     expire_in: 7 days
 
+binary:
+  stage: binary
+  only:
+    - master
+    - friday_presentation # TODO: remove
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/namib_enforcer
+      - target/release/namib_dnsmasq_hook
+    expire_in: 7 days

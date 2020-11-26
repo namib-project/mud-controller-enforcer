@@ -1,3 +1,5 @@
+#![allow(clippy::pub_enum_variant_names)]
+
 use snafu::{Backtrace, Snafu};
 
 #[derive(Debug, Snafu)]

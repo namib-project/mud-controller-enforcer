@@ -1,11 +1,10 @@
 use std::time::Duration;
 
 use futures::{future, Stream, TryStreamExt};
-use log::*;
 
 use async_dnssd::{ResolvedHostFlags, ScopedSocketAddr, StreamTimeoutExt};
 
-use crate::error::*;
+use crate::error::Result;
 
 const SEARCH_TIMEOUT: Duration = Duration::from_secs(10);
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(3);

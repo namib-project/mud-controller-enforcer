@@ -5,6 +5,10 @@ authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewi
 edition = "2018"
 default-run = "namib_enforcer"
 
+[features]
+default = ["execute_uci_commands"]
+execute_uci_commands = ["libuci-sys", "libc"]
+
 [dependencies]
 namib_shared = { path = "../namib_shared" }
 tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util", "sync"] }
@@ -26,8 +30,8 @@ hex = "0.4"
 serde_json = "1.0"
 macaddr = { version = "1.0.1", features = ["serde_std"] }
 [target.'cfg(unix)'.dependencies]
-libuci-sys = { path = "../libuci-sys" }
-libc = "0.2"
+libuci-sys = { path = "../libuci-sys", optional = true}
+libc = { version = "0.2", optional = true }
 
 [[bin]]
 name = "namib_enforcer"

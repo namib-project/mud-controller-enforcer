@@ -1,7 +1,7 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use log::*;
+use namib_shared::{codec, config_firewall::FirewallConfig, open_file_with, rpc::RPCClient};
 use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context};
 use tokio::{
@@ -10,9 +10,10 @@ use tokio::{
 };
 use tokio_rustls::{rustls, webpki::DNSNameRef};
 
-use namib_shared::{codec, open_file_with, rpc::*};
-
-use crate::error::*;
+use crate::{
+    error::{Error, Result},
+    services::firewall_service,
+};
 
 use super::{controller_discovery::discover_controllers, tls_serde_transport};
 
@@ -51,11 +52,18 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
     loop {
         {
             let mut instance = client.lock().await;
-            if let Err(e) = instance.heartbeat(context::current()).await {
-                error!("Error during heartbeat: {:?}", e);
-            } else {
-                debug!("Heartbeat OK!");
+            let heartbeat: io::Result<Option<FirewallConfig>> = instance.heartbeat(context::current(), firewall_service::get_config_version().ok()).await;
+            match heartbeat {
+                Err(error) => error!("Error during heartbeat: {:?}", error),
+                Ok(Some(config)) => {
+                    debug!("Received new config {:#?}", config);
+                    if let Err(e) = firewall_service::apply_config(config) {
+                        error!("Failed to apply config! {}", e)
+                    }
+                },
+                _ => debug!("Heartbeat OK!"),
             }
+
             drop(instance);
         }
 
@@ -72,7 +80,7 @@ async fn try_connect(addr: SocketAddr, dns_name: DNSNameRef<'static>, cfg: Arc<r
     }
 
     let mut transport = tls_serde_transport::connect(cfg, dns_name, addr, codec());
-    transport.config_mut().max_frame_length(4294967296);
+    transport.config_mut().max_frame_length(50 * 1024 * 1024);
 
     Ok(Some(RPCClient::new(client::Config::default(), transport.await?).spawn()?))
 }

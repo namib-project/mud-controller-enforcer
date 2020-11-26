@@ -1,0 +1,9 @@
+
+config rule 'namibrule_18352413083402012524'
+	option name 'Regel2'
+	option src 'lan'
+	option dest 'wan'
+	option proto '6'
+	option target 'DROP'
+	option namib '1'
+

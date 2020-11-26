@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
-#![allow(dead_code)]
+#![allow(dead_code, clippy::module_name_repetitions)]
 
 #[macro_use]
 extern crate log;
@@ -7,15 +7,16 @@ extern crate log;
 use std::{net::IpAddr, sync::Arc};
 
 use dotenv::dotenv;
+use namib_shared::{models::DHCPRequestData, rpc::RPCClient};
 use tarpc::context;
 use tokio::sync::Mutex;
 
 use error::Result;
-use namib_shared::{models::DHCPRequestData, rpc::*};
 
 mod dhcp;
 mod error;
 mod rpc;
+mod services;
 mod uci;
 
 #[tokio::main(flavor = "current_thread")]
