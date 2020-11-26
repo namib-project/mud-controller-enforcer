@@ -1,8 +1,17 @@
 use crate::{error::*, uci::*};
 use namib_shared::config_firewall::*;
 
+/// This file represent the service for firewall on openwrt.
+///
+/// Created on 11.11.2020.
+///
+/// @author Namib Group 3.
+
+/// The folder where the configuration file should be stored.
 const CONFIG_DIR: &str = "config";
 
+/// This function takes a UCI context and a configuration that should be uploaded to the firewall.
+/// Return Result<()>.
 fn apply_config(uci: &mut UCI, cfg: &ConfigFirewall) -> Result<()> {
     let cfg_n = format!("firewall.namibrule_{}", cfg.hash());
     debug!("Creating rule {}", cfg_n);
@@ -14,6 +23,10 @@ fn apply_config(uci: &mut UCI, cfg: &ConfigFirewall) -> Result<()> {
     Ok(())
 }
 
+/// This function takes an UCI context and a Vector of configurations that should be uploaded on firewall.
+/// and commit these changes. This function delete all previous changes from "Namib" and upload all
+/// new changes with "Namib".
+/// Return Result<()>.
 fn apply_uci_config(uci: &mut UCI, cfg_list: Vec<ConfigFirewall>) -> Result<()> {
     delete_all_config(uci)?;
     for c in cfg_list.iter() {
@@ -23,6 +36,9 @@ fn apply_uci_config(uci: &mut UCI, cfg_list: Vec<ConfigFirewall>) -> Result<()> 
     Ok(())
 }
 
+/// This function create new configuration that should be uploaded on the firewall.
+/// It use the function apply_uci_config.
+/// Return Result<()>.
 pub fn apply_new_configuration(cfg_list: Vec<ConfigFirewall>) -> Result<()> {
     debug!("Applying {} configs", cfg_list.len());
     let mut uci = UCI::new()?;
@@ -42,6 +58,8 @@ pub fn apply_new_configuration(cfg_list: Vec<ConfigFirewall>) -> Result<()> {
     Ok(())
 }
 
+/// This function delete all config changes with "Namib".
+/// Return Result<()>.
 fn delete_all_config(uci: &mut UCI) -> Result<()> {
     debug!("Deleting all namib configs");
     let mut index = 0;
@@ -59,6 +77,9 @@ fn delete_all_config(uci: &mut UCI) -> Result<()> {
     Ok(())
 }
 
+/// This function restart the Firewall.
+/// It should be used after succeeded commit.
+/// Return an Output.
 #[cfg(feature = "execute_uci_commands")]
 pub fn restart_firewall_command() -> std::process::Output {
     std::process::Command::new("sh")
@@ -73,6 +94,7 @@ mod tests {
     use super::*;
     use std::{fs, fs::File, io::Read};
 
+    /// The test checks a single added rule on the firewall and compare two files.
     #[test]
     fn test_trivial_apply_config() -> Result<()> {
         init();
@@ -109,6 +131,7 @@ mod tests {
         Ok(())
     }
 
+    /// The test checks a delete all rules with "Namib" on the firewall and compare two files.
     #[test]
     fn test_delete_config() -> Result<()> {
         init();
@@ -137,6 +160,7 @@ mod tests {
         Ok(())
     }
 
+    /// This test apply few config firewall changes with "Namib" and delete there again.
     #[test]
     fn test_apply_and_delete_config() -> Result<()> {
         init();
