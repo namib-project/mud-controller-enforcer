@@ -3,9 +3,11 @@
 
 use std::{fs::File, io};
 
+pub use mac_addr::*;
 use tokio_serde::formats::Bincode;
 
 pub mod config_firewall;
+pub mod mac_addr;
 pub mod models;
 pub mod rpc;
 

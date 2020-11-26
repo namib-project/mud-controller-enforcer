@@ -1,4 +1,5 @@
-use chrono::{DateTime, FixedOffset};
+use crate::MacAddr;
+use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -8,11 +9,11 @@ use std::{
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DHCPRequestData {
     pub ip_addr: IpAddr,
-    pub mac_addr: [u8; 8],
-    pub mud_url: String,
+    pub mac_addr: MacAddr,
+    pub mud_url: Option<String>,
     pub hostname: String,
     pub vendor_class: String,
-    pub request_timestamp: std::time::SystemTime,
+    pub request_timestamp: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,7 +38,6 @@ pub enum LeaseExpiryTime {
     LeaseExpiryTime(DateTime<FixedOffset>),
 }
 
-pub type MacAddress = [u8; 8];
 pub type DuidContent = Vec<u8>;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,6 +77,6 @@ pub struct DhcpLeaseInformation {
     pub lease_expiry: LeaseExpiryTime,
     pub time_remaining: Duration,
     pub receiver_interface: Option<String>,
-    pub mac_address: Option<MacAddress>,
+    pub mac_address: Option<MacAddr>,
     pub mud_url: Option<String>,
 }
