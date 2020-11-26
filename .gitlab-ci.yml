@@ -40,14 +40,14 @@ test:
 warnings:
   stage: test
   script:
-    - rustup toolchain install nightly --component clippy
+    - rustup toolchain install nightly --component clippy --no-self-update
     - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
 formatting:
   stage: test
   script:
-    - rustup toolchain install nightly --component rustfmt
+    - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
 docs:
