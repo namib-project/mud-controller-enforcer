@@ -1,3 +1,5 @@
+#![allow(clippy::large_enum_variant)]
+
 use crate::{config_firewall::FirewallConfig, models::DhcpEvent};
 
 #[tarpc::service]

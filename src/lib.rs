@@ -1,10 +1,11 @@
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
-#![allow(clippy::map_err_ignore)]
+#![allow(clippy::must_use_candidate, clippy::default_trait_access)]
 
 use std::{fs::File, io};
 
-pub use mac_addr::*;
 use tokio_serde::formats::Bincode;
+
+pub use mac_addr::*;
 
 pub mod config_firewall;
 pub mod mac_addr;
@@ -15,6 +16,7 @@ pub mod rpc;
 ///
 /// # Errors
 /// if opening the file fails or if `F` returns an error
+#[allow(clippy::map_err_ignore)]
 pub fn open_file_with<F, T>(file: &str, method: F) -> io::Result<T>
 where
     F: FnOnce(&mut dyn io::BufRead) -> Result<T, ()>,

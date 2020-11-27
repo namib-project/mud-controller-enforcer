@@ -1,8 +1,11 @@
-use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
 };
+
+use serde::export::Formatter;
+use serde::{Deserialize, Serialize};
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -15,7 +18,7 @@ use std::{
 pub struct RuleName(String);
 
 impl RuleName {
-    /// Create new Rulename.
+    /// Create new `RuleName`.
     pub fn new(name: String) -> Self {
         RuleName(name)
     }
@@ -35,13 +38,12 @@ pub enum EnNetwork {
     VPN,
 }
 
-impl EnNetwork {
-    /// Return the string of the enum.
-    pub fn to_string(&self) -> String {
+impl fmt::Display for EnNetwork {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LAN => "lan".to_string(),
-            Self::WAN => "wan".to_string(),
-            Self::VPN => "vpn".to_string(),
+            Self::LAN => f.write_str("lan"),
+            Self::WAN => f.write_str("wan"),
+            Self::VPN => f.write_str("vpn"),
         }
     }
 }
@@ -66,11 +68,6 @@ impl Protocol {
 
     pub fn all() -> Self {
         Protocol(0)
-    }
-
-    /// Return the string of the protocol.
-    pub fn to_string(&self) -> String {
-        format!("proto='{}'", self.0)
     }
 
     /// Return the key, value pair.
@@ -108,13 +105,13 @@ pub struct FirewallRule {
     route_network_src: EnNetwork,
     route_network_dest: EnNetwork,
     protocol: Protocol,
-    pub target: EnTarget,
+    target: EnTarget,
     optional_settings: EnOptionalSettings,
 }
 
 impl FirewallRule {
-    /// Create a new ConfigFirewall.
-    /// Takes Rulename, EnRoute with EnNetwork, Protocol and EnTarget.
+    /// Create a new `ConfigFirewall`.
+    /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
     pub fn new(
         rule_name: RuleName,
         route_network_src: EnNetwork,
@@ -133,14 +130,14 @@ impl FirewallRule {
         }
     }
 
-    /// Takes the name of the RuleName and execute the hash.
+    /// Creates a hash of this firewall rule
     pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
         self.rule_name().0.hash(&mut hasher);
         hasher.finish().to_string()
     }
 
-    /// Takes a config as &self and return the config as vector in key, value pairs.
+    /// Returns this firewall rule as list of key, value pairs.
     pub fn to_option(&self) -> Vec<(String, String)> {
         let mut query: Vec<(String, String)> = Vec::new();
         query.push(self.rule_name.to_option());
@@ -157,12 +154,13 @@ impl FirewallRule {
         query
     }
 
-    /// rule_name getter.
+    /// Returns this rule's name
     pub fn rule_name(&self) -> &RuleName {
         &self.rule_name
     }
 }
 
+/// Stores a set of firewall rules and a config version
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallConfig {
     version: String,
@@ -170,14 +168,17 @@ pub struct FirewallConfig {
 }
 
 impl FirewallConfig {
+    /// Construct a new firewall config with the given version and firewall rules
     pub fn new(version: String, rules: Vec<FirewallRule>) -> Self {
         FirewallConfig { version, rules }
     }
 
+    /// Returns the version of this config
     pub fn version(&self) -> &str {
         &self.version
     }
 
+    /// Returns a reference to the firewall rules in this config
     pub fn rules(&self) -> &Vec<FirewallRule> {
         &self.rules
     }
