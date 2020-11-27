@@ -1,6 +1,6 @@
 use crate::{models::mud_models::MUDData, schema::devices};
 use chrono::{Local, NaiveDateTime};
-use namib_shared::{mac_addr::macaddr, models::DhcpLeaseInformation, MacAddr};
+use namib_shared::{macaddr, models::DhcpLeaseInformation, MacAddr};
 use schemars::JsonSchema;
 use std::net::IpAddr;
 
