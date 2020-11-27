@@ -32,14 +32,11 @@ mod unix {
         let mut listener = UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
         let mut active_listeners = Vec::new();
         while let Some(event_stream) = listener.next().await {
-            match event_stream {
-                Ok(event_stream) => {
-                    let rpc_client_copy = rpc_client.clone();
-                    active_listeners.push(tokio::spawn(async move {
-                        handle_dhcp_script_connection(rpc_client_copy, event_stream).await;
-                    }));
-                },
-                Err(_) => {},
+            if let Ok(event_stream) = event_stream {
+                let rpc_client_copy = rpc_client.clone();
+                active_listeners.push(tokio::spawn(async move {
+                    handle_dhcp_script_connection(rpc_client_copy, event_stream).await;
+                }));
             }
         }
         join_all(active_listeners).await;

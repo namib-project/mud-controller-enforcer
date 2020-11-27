@@ -58,7 +58,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                 Err(error) => error!("Error during heartbeat: {:?}", error),
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
-                    if let Err(e) = firewall_service::apply_config(config) {
+                    if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
                 },

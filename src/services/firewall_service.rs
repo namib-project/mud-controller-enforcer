@@ -20,8 +20,8 @@ pub fn get_config_version() -> Result<String> {
 /// This function create new configuration that should be uploaded on the firewall.
 /// It use the function `apply_uci_config`.
 /// Return Result<()>.
-pub fn apply_config(cfg: FirewallConfig) -> Result<()> {
-    debug!("Applyinrpc_client.rs:64g {} configs", cfg.rules().len());
+pub fn apply_config(cfg: &FirewallConfig) -> Result<()> {
+    debug!("Applying {} configs", cfg.rules().len());
     let mut uci = UCI::new()?;
     uci.set_config_dir(CONFIG_DIR)?;
 
