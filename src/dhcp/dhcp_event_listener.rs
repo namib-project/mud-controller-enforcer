@@ -18,7 +18,7 @@ use namib_shared::{
 /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
 #[cfg(unix)]
 pub(crate) async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
-    match std::fs::remove_file("/tmp/namib_dhcp.sock") {
+    match std::fs::remove_file("/tmp/namib_dhcp2.sock") {
         Ok(_) => Ok(()),
         Err(e) => match e.kind() {
             std::io::ErrorKind::NotFound => Ok(()),
@@ -26,7 +26,7 @@ pub(crate) async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
         },
     }
     .expect("Unable to get access to socket file");
-    let mut listener = UnixListener::bind("/var/run/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
+    let mut listener = UnixListener::bind("/tmp/namib_dhcp2.sock").expect("Could not open socket for DHCP event listener.");
     let mut active_listeners = Vec::new();
     while let Some(event_stream) = listener.next().await {
         match event_stream {
