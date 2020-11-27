@@ -1,11 +1,10 @@
-use std::fmt;
 use std::{
     collections::hash_map::DefaultHasher,
+    fmt,
     hash::{Hash, Hasher},
 };
 
-use serde::export::Formatter;
-use serde::{Deserialize, Serialize};
+use serde::{export::Formatter, Deserialize, Serialize};
 
 /// This file represent the config for firewall on openwrt.
 ///

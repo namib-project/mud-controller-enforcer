@@ -32,7 +32,7 @@ warnings:
   stage: test
   script:
     - rustup toolchain install nightly --component clippy --no-self-update
-    - cargo +nightly clippy -- --check
+    - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
 formatting:
