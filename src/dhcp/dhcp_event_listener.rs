@@ -1,16 +1,18 @@
+use std::sync::Arc;
+
 use futures::future::join_all;
 use log::debug;
-use namib_shared::{
-    models::DhcpEvent,
-    rpc::{RPCClient, RPC},
-};
-use std::sync::Arc;
 use tarpc::context;
 use tokio::{
     io::AsyncReadExt,
     net::{UnixListener, UnixStream},
     stream::StreamExt,
     sync::Mutex,
+};
+
+use namib_shared::{
+    models::DhcpEvent,
+    rpc::{RPCClient, RPC},
 };
 
 /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
@@ -24,7 +26,7 @@ pub(crate) async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
         },
     }
     .expect("Unable to get access to socket file");
-    let mut listener = UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
+    let mut listener = UnixListener::bind("/var/run/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
     let mut active_listeners = Vec::new();
     while let Some(event_stream) = listener.next().await {
         match event_stream {

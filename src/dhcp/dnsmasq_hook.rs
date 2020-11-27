@@ -68,7 +68,7 @@ fn main() {
     // the enforcer.
     let dhcp_event = extract_dhcp_hook_data().expect("Error while constructing DHCP event");
     debug!("Constructed DHCP Event: {:?}", &dhcp_event);
-    let socket = UnixStream::connect("/tmp/namib_dhcp.sock").expect("Failed to connect to enforcer");
+    let socket = UnixStream::connect("/var/run/namib_dhcp.sock").expect("Failed to connect to enforcer");
     serde_json::to_writer(socket, &dhcp_event).unwrap();
     info!("DHCP Event successfully transferred to enforcer");
 }
