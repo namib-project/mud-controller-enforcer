@@ -7,9 +7,12 @@ use crate::{
     },
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, Protocol, RuleName};
-use std::net::{IpAddr, ToSocketAddrs};
+use std::{
+    net::{IpAddr, ToSocketAddrs},
+    sync::atomic::{AtomicU32, Ordering},
+};
 
-static mut VERSION: i32 = 0;
+static VERSION: AtomicU32 = AtomicU32::new(0);
 
 pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
@@ -83,13 +86,11 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
 }
 
 pub async fn get_config_version(_: DbConnPool) -> String {
-    unsafe { VERSION.to_string() }
+    VERSION.load(Ordering::SeqCst).to_string()
 }
 
 pub async fn update_config_version(_: DbConnPool) {
-    unsafe {
-        VERSION += 1;
-    }
+    VERSION.fetch_add(1, Ordering::SeqCst);
 }
 
 #[cfg(test)]

@@ -1,5 +1,4 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-#![feature(once_cell)]
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
 #![allow(
     dead_code,
