@@ -11,13 +11,12 @@ execute_uci_commands = ["libuci-sys", "libc"]
 
 [dependencies]
 namib_shared = { path = "../namib_shared" }
-tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util", "sync"] }
+tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
 log = "0.4"
 env_logger = "0.8"
 async-dnssd = { path = "../rust-async-dnssd" }
 futures = "0.3"
-rustls = "0.18"
-tokio-rustls = "0.20"
+tokio-native-tls = "0.2"
 tokio-util = "0.4"
 tarpc = { version = "0.23", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }

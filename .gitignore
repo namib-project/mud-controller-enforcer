@@ -1,4 +1,5 @@
 *.pem
+*.pfx
 
 tests/config/test_delete_all_config/firewall
 tests/config/test_apply_and_delete/firewall

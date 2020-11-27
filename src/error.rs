@@ -6,15 +6,13 @@ use snafu::{Backtrace, Snafu};
 pub enum Error {
     #[snafu(display("IoError: {}", source), context(false))]
     IoError { source: std::io::Error, backtrace: Backtrace },
-    #[snafu(display("TlsError: {}", source), context(false))]
-    TlsError { source: rustls::TLSError, backtrace: Backtrace },
-    #[snafu(display("JoinError: {}", source), context(false))]
-    JoinError { source: tokio::task::JoinError, backtrace: Backtrace },
-    #[snafu(display("InvalidDNSNameError: {}", source), context(false))]
-    InvalidDNSNameError {
-        source: tokio_rustls::webpki::InvalidDNSNameError,
+    #[snafu(display("NativeTlsError: {}", source), context(false))]
+    NativeTlsError {
+        source: tokio_native_tls::native_tls::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("JoinError: {}", source), context(false))]
+    JoinError { source: tokio::task::JoinError, backtrace: Backtrace },
     #[snafu(display("ConnectionError {}", message), visibility(pub))]
     ConnectionError { message: &'static str, backtrace: Backtrace },
     #[snafu(display("DotEnvError: {}", source), context(false))]
