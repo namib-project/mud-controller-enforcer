@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use dotenv::dotenv;
 use namib_shared::rpc::RPCClient;
-use tarpc::context;
 use tokio::sync::Mutex;
 
 use error::Result;

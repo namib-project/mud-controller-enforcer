@@ -27,6 +27,8 @@ pub enum Error {
     Utf8Error { source: std::str::Utf8Error, backtrace: Backtrace },
     #[snafu(display("NulError: {}", source), context(false))]
     NulError { source: std::ffi::NulError, backtrace: Backtrace },
+    #[snafu(display("NoneError"), visibility(pub))]
+    NoneError { backtrace: Backtrace },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

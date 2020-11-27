@@ -399,7 +399,8 @@ mod unix {
 #[cfg(not(feature = "execute_uci_commands"))]
 #[allow(clippy::unused_self)]
 mod mock {
-    use crate::error::Result;
+
+    use crate::error::{NoneError, Result};
 
     pub struct UCI {}
 
@@ -430,7 +431,7 @@ mod mock {
 
         pub fn get(&mut self, key: &str) -> Result<String> {
             info!("get {}", key);
-            Ok(format!("{}_value", key))
+            NoneError {}.fail()
         }
 
         pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
