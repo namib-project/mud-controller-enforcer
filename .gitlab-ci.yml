@@ -121,7 +121,7 @@ openwrt_package_x86_64:
     - make defconfig
     - make package/namib/compile
     - mkdir ${CI_PROJECT_DIR}/output
-    - cp -r /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
+    - cp -r bin/packages/*/base/namib_0.1.0-*.ipk package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
     paths:
       - output
@@ -135,11 +135,11 @@ openwrt_package_brcm2708_bcm2708:
     - master
     - openwrt_package
   variables:
-    RUST_TRIPLE: arm-unknown-linux-gnueabihf
+    RUST_TRIPLE: arm-unknown-linux-musleabihf
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
     - source $HOME/.cargo/env
-    - sudo apt-get update && sudo apt-get install -y clang --no-install-recommends # build dependency for bindgen
+    - sudo apt-get update && sudo apt-get install -y clang libc6-dev-i386 --no-install-recommends # build dependency for bindgen
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
@@ -161,7 +161,7 @@ openwrt_package_brcm2708_bcm2708:
     - make package/namib/compile
     - make package/namib/compile V=s
     - mkdir ${CI_PROJECT_DIR}/output
-    - cp -r /home/build/openwrt/bin/packages/brcm2708-bcm2708/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
+    - cp -r bin/packages/*/base/namib_0.1.0-*.ipk package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
     paths:
       - output
