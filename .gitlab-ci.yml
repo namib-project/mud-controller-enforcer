@@ -90,6 +90,7 @@ binary:
 openwrt_package:
   stage: binary
   image: openwrtorg/sdk:x86_64-19.07.4
+  dependencies: [ ]
   cache: { }
   only:
     - master
