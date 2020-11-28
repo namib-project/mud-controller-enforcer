@@ -102,7 +102,7 @@ openwrt_package:
     - ./scripts/feeds install libavahi-compat-libdnssd libuci
   script:
     - cd /home/build/openwrt
-    - cp -r ${CI_PROJECT_DIR}/openwrt ./packages/namib
+    - cp -r ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
     - cd package/namib/src
     - cp -r ${CI_PROJECT_DIR} namib_enforcer
