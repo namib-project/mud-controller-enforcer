@@ -106,6 +106,7 @@ openwrt_package_x86_64:
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
   script:
     - cd /home/build/openwrt
+    - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
     - cd package/namib/src
@@ -117,7 +118,6 @@ openwrt_package_x86_64:
     - ./gen_ca.sh
     - ./gen_client_cert.sh
     - cd /home/build/openwrt
-    - cp ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - make defconfig
     - make
     - mkdir ${CI_PROJECT_DIR}/output
@@ -145,6 +145,7 @@ openwrt_package_brcm2708_bcm2708:
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
   script:
     - cd /home/build/openwrt
+    - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
     - cd package/namib/src
@@ -156,7 +157,6 @@ openwrt_package_brcm2708_bcm2708:
     - ./gen_ca.sh
     - ./gen_client_cert.sh
     - cd /home/build/openwrt
-    - cp ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - make defconfig
     - make
     - mkdir ${CI_PROJECT_DIR}/output
