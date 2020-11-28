@@ -102,18 +102,17 @@ openwrt_package:
     - ./scripts/feeds install libavahi-compat-libdnssd libuci
   script:
     - cd /home/build/openwrt
-    - cp ${CI_PROJECT_DIR}/openwrt ./packages/namib
+    - cp -r ${CI_PROJECT_DIR}/openwrt ./packages/namib
     - mkdir packages/namib/src
-    - pushd packages/namib/src
-    - cp ${CI_PROJECT_DIR} namib_enforcer
+    - cd packages/namib/src
+    - cp -r ${CI_PROJECT_DIR} namib_enforcer
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git
-    - pushd namib_shared/certs
+    - cd namib_shared/certs
     - ./gen_ca.sh
     - ./gen_client_cert.sh
-    - popd
-    - popd
+    - cd /home/build/openwrt
     - cp ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - make defconfig
     - make V=s
