@@ -120,7 +120,6 @@ openwrt_package_x86_64:
     - cd /home/build/openwrt
     - make defconfig
     - make package/namib/compile
-    - make package/namib/install
     - mkdir ${CI_PROJECT_DIR}/output
     - cp -r /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
@@ -160,7 +159,7 @@ openwrt_package_brcm2708_bcm2708:
     - cd /home/build/openwrt
     - make defconfig
     - make package/namib/compile
-    - make package/namib/install
+    - make package/namib/compile V=s
     - mkdir ${CI_PROJECT_DIR}/output
     - cp -r /home/build/openwrt/bin/packages/brcm2708-bcm2708/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
