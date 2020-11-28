@@ -87,7 +87,7 @@ binary:
       - target/release/namib_dnsmasq_hook
     expire_in: 7 days
 
-openwrt_package:
+openwrt_package_x86_64:
   stage: binary
   image: openwrtorg/sdk:x86_64-19.07.4
   dependencies: [ ]
@@ -99,9 +99,11 @@ openwrt_package:
     RUST_TRIPLE: x86_64-unknown-linux-musl
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
+    - source $HOME/.cargo/env
+    - sudo apt-get update && sudo apt-get install -y clang --no-install-recommends # build dependency for bindgen
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
-    - ./scripts/feeds install libavahi-compat-libdnssd libuci
+    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
   script:
     - cd /home/build/openwrt
     - cp -r ${CI_PROJECT_DIR}/openwrt ./package/namib
@@ -117,9 +119,9 @@ openwrt_package:
     - cd /home/build/openwrt
     - cp ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - make defconfig
-    - make V=s
+    - make
+    - mkdir ${CI_PROJECT_DIR}/output
+    - cp /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-*.ipk /home/build/openwrt/packages/namib/src/namib_shared/certs/ca.pem /home/build/openwrt/packages/namib/src/namib_shared/certs/ca-key.pem ${CI_PROJECT_DIR}/output
   artifacts:
     paths:
-      - /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-1_x86_64.ipk
-      - /home/build/openwrt/packages/namib/src/namib_shared/certs/ca.pem
-      - /home/build/openwrt/packages/namib/src/namib_shared/certs/ca-key.pem
+      - output
