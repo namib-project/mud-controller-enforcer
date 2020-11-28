@@ -79,7 +79,6 @@ binary:
   stage: binary
   only:
     - master
-    - friday_presentation # TODO: remove
   script:
     - cargo build --release
   artifacts:
@@ -87,3 +86,39 @@ binary:
       - target/release/namib_enforcer
       - target/release/namib_dnsmasq_hook
     expire_in: 7 days
+
+openwrt_package:
+  stage: binary
+  image: openwrtorg/sdk:x86_64-19.07.4
+  only:
+    - master
+    - openwrt_package
+  variables:
+    RUST_TRIPLE: x86_64-unknown-linux-musl
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
+    - cd /home/build/openwrt
+    - ./scripts/feeds update base packages
+    - ./scripts/feeds install libavahi-compat-libdnssd libuci
+  script:
+    - cd /home/build/openwrt
+    - cp ${CI_PROJECT_DIR}/openwrt ./packages/namib
+    - mkdir packages/namib/src
+    - pushd packages/namib/src
+    - cp ${CI_PROJECT_DIR} namib_enforcer
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git
+    - pushd namib_shared/certs
+    - ./gen_ca.sh
+    - ./gen_client_cert.sh
+    - popd
+    - popd
+    - cp ${CI_PROJECT_DIR}/openwrt/config.diff .config
+    - make defconfig
+    - make V=s
+  artifacts:
+    paths:
+      - /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-1_x86_64.ipk
+      - /home/build/openwrt/packages/namib/src/namib_shared/certs/ca.pem
+      - /home/build/openwrt/packages/namib/src/namib_shared/certs/ca-key.pem

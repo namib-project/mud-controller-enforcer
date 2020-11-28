@@ -20,7 +20,7 @@ mod uci;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    dotenv()?;
+    dotenv().ok();
     env_logger::init();
 
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));
