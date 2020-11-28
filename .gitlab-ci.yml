@@ -119,9 +119,10 @@ openwrt_package_x86_64:
     - ./gen_client_cert.sh
     - cd /home/build/openwrt
     - make defconfig
-    - make
+    - make package/namib/compile
+    - make package/namib/install
     - mkdir ${CI_PROJECT_DIR}/output
-    - cp /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-*.ipk /home/build/openwrt/packages/namib/src/namib_shared/certs/ca.pem /home/build/openwrt/packages/namib/src/namib_shared/certs/ca-key.pem ${CI_PROJECT_DIR}/output
+    - cp -r /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
     paths:
       - output
@@ -158,9 +159,10 @@ openwrt_package_brcm2708_bcm2708:
     - ./gen_client_cert.sh
     - cd /home/build/openwrt
     - make defconfig
-    - make
+    - make package/namib/compile
+    - make package/namib/install
     - mkdir ${CI_PROJECT_DIR}/output
-    - cp /home/build/openwrt/bin/packages/x86_64/base/namib_0.1.0-*.ipk /home/build/openwrt/packages/namib/src/namib_shared/certs/ca.pem /home/build/openwrt/packages/namib/src/namib_shared/certs/ca-key.pem ${CI_PROJECT_DIR}/output
+    - cp -r /home/build/openwrt/bin/packages/brcm2708-bcm2708/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
     paths:
       - output
