@@ -106,7 +106,7 @@ openwrt_package_x86_64:
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
   script:
     - cd /home/build/openwrt
-    - cp -r ${CI_PROJECT_DIR}/openwrt ./package/namib
+    - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
     - cd package/namib/src
     - cp -r ${CI_PROJECT_DIR} namib_enforcer
@@ -145,7 +145,7 @@ openwrt_package_brcm2708_bcm2708:
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
   script:
     - cd /home/build/openwrt
-    - cp -r ${CI_PROJECT_DIR}/openwrt ./package/namib
+    - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
     - cd package/namib/src
     - cp -r ${CI_PROJECT_DIR} namib_enforcer
