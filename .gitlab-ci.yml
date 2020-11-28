@@ -103,8 +103,8 @@ openwrt_package:
   script:
     - cd /home/build/openwrt
     - cp -r ${CI_PROJECT_DIR}/openwrt ./packages/namib
-    - mkdir packages/namib/src
-    - cd packages/namib/src
+    - mkdir package/namib/src
+    - cd package/namib/src
     - cp -r ${CI_PROJECT_DIR} namib_enforcer
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
