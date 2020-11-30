@@ -112,6 +112,7 @@ openwrt_package_bcm2711:
   only:
     - master
     - openwrt_package
+  before_script: [ ]
   script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
     - source $HOME/.cargo/env
