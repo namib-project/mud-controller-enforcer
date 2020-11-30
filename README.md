@@ -53,7 +53,6 @@ cd namib
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_shared.git
 git clone --recurse-submodules git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/libuci-sys.git
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/rust-async-dnssd.git
-git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_shared.git
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_enforcer.git
 git clone git@gitlab.informatik.uni-bremen.de:namib/mud-controller-enforcer/namib_mud_controller.git
 ```
