@@ -134,7 +134,7 @@ openwrt_package_bcm2711:
     - ./gen_client_cert.sh
     - cd /home/build/openwrt
     - make defconfig
-    - make package/namib/compile
+    - make package/namib/compile || make package/namib/compile V=s
     - mkdir ${CI_PROJECT_DIR}/output
     - cp -r bin/packages/*/base/namib_0.1.0-*.ipk package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
