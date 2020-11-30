@@ -88,62 +88,37 @@ binary:
     expire_in: 7 days
 
 openwrt_package_x86_64:
-  stage: binary
+  extends: .openwrt_package_base
   image: openwrtorg/sdk:x86_64-19.07.4
-  dependencies: [ ]
-  cache: { }
-  only:
-    - master
-    - openwrt_package
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
-  before_script:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
-    - source $HOME/.cargo/env
-    - sudo apt-get update && sudo apt-get install -y clang --no-install-recommends # build dependency for bindgen
-    - cd /home/build/openwrt
-    - ./scripts/feeds update base packages
-    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
-  script:
-    - cd /home/build/openwrt
-    - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
-    - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
-    - mkdir package/namib/src
-    - cd package/namib/src
-    - cp -r ${CI_PROJECT_DIR} namib_enforcer
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git --branch ${CI_COMMIT_BRANCH} || git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git
-    - cd namib_shared/certs
-    - ./gen_ca.sh
-    - ./gen_client_cert.sh
-    - cd /home/build/openwrt
-    - make defconfig
-    - make package/namib/compile
-    - mkdir ${CI_PROJECT_DIR}/output
-    - cp -r bin/packages/*/base/namib_0.1.0-*.ipk package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
-  artifacts:
-    paths:
-      - output
 
-openwrt_package_brcm2708_bcm2708:
-  stage: binary
+openwrt_package_bcm2708:
+  extends: .openwrt_package_base
   image: openwrtorg/sdk:brcm2708-bcm2708-19.07.4
+  variables:
+    RUST_TRIPLE: arm-unknown-linux-musleabihf # raspberry v1
+
+openwrt_package_bcm2711:
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk:bcm27xx-bcm2711-snapshot
+  variables:
+    RUST_TRIPLE: armv7-unknown-linux-musleabihf # raspberry v4
+
+.openwrt_package_base:
+  stage: binary
   dependencies: [ ]
   cache: { }
   only:
     - master
     - openwrt_package
-  variables:
-    RUST_TRIPLE: arm-unknown-linux-musleabihf
-  before_script:
+  script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
     - source $HOME/.cargo/env
     - sudo apt-get update && sudo apt-get install -y clang libc6-dev-i386 --no-install-recommends # build dependency for bindgen
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
-  script:
     - cd /home/build/openwrt
     - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
@@ -159,7 +134,6 @@ openwrt_package_brcm2708_bcm2708:
     - cd /home/build/openwrt
     - make defconfig
     - make package/namib/compile
-    - make package/namib/compile V=s
     - mkdir ${CI_PROJECT_DIR}/output
     - cp -r bin/packages/*/base/namib_0.1.0-*.ipk package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
   artifacts:
