@@ -126,9 +126,9 @@ config include
 
 config rule 'namibrule_8749447068245335151'
 	option name 'Regel3'
-	option src 'lan'
-	option dest 'wan'
 	option proto '6'
 	option target 'DROP'
+	option src 'lan'
+	option dest 'wan'
 	option namib '1'
 

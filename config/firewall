@@ -124,13 +124,5 @@ config rule
 config include
 	option path '/etc/firewall.user'
 
-config version 'namib_config_version'
-
-config rule 'namibrule_6616799555974068280'
-	option name 'rule_0'
-	option src 'wan'
-	option dest 'lan'
-	option proto '0'
-	option target 'ACCEPT'
-	option namib '1'
+config 0 'namib_config_version'
 

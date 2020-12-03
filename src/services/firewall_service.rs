@@ -100,7 +100,7 @@ pub fn restart_firewall_command() -> std::process::Output {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, Protocol, RuleName};
+    use namib_shared::config_firewall::{EnConfigNetwork, EnNetwork, EnOptionalSettings, EnTarget, Protocol, RuleName};
     use std::{fs, fs::File, io::Read};
 
     /// The test checks a single added rule on the firewall and compare two files.
@@ -114,10 +114,12 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
         uci.set_config_dir("tests/config/test_trivial_apply_config")?;
 
+        let mut network_configs: Vec<EnConfigNetwork> = Vec::new();
+        network_configs.push(EnConfigNetwork::SRC(EnNetwork::LAN));
+        network_configs.push(EnConfigNetwork::DES(EnNetwork::WAN));
         let cfg = FirewallRule::new(
             RuleName::new("Regel2".to_string()),
-            EnNetwork::LAN,
-            EnNetwork::WAN,
+            network_configs,
             Protocol::tcp(),
             EnTarget::DROP,
             EnOptionalSettings::None,
@@ -180,10 +182,13 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
         uci.set_config_dir("tests/config/test_apply_and_delete")?;
 
+        let mut network_configs: Vec<EnConfigNetwork> = Vec::new();
+        network_configs.push(EnConfigNetwork::SRC(EnNetwork::LAN));
+        network_configs.push(EnConfigNetwork::DES(EnNetwork::WAN));
+
         let cfg = FirewallRule::new(
             RuleName::new("Regel3".to_string()),
-            EnNetwork::LAN,
-            EnNetwork::WAN,
+            network_configs,
             Protocol::tcp(),
             EnTarget::DROP,
             EnOptionalSettings::None,
