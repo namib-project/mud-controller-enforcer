@@ -29,6 +29,30 @@ impl RuleName {
     }
 }
 
+/// Wraps network or ip-address for specific input or output.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum EnConfigNetwork {
+    SRC(EnNetwork),
+    DES(EnNetwork),
+    SrcIp(String),
+    DesIp(String),
+    SrcPort(String),
+    DesPort(String),
+}
+
+impl EnConfigNetwork {
+    fn to_option(&self) -> (String, String) {
+        match self {
+            Self::SRC(n) => ("src".to_string(), n.to_string()),
+            Self::DES(n) => ("dest".to_string(), n.to_string()),
+            Self::SrcIp(n) => ("src_ip".to_string(), n.to_string()),
+            Self::DesIp(n) => ("dest_ip".to_string(), n.to_string()),
+            Self::SrcPort(n) => ("src_port".to_string(), n.to_string()),
+            Self::DesPort(n) => ("dest_port".to_string(), n.to_string()),
+        }
+    }
+}
+
 /// Enum for the source or destination
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EnNetwork {
@@ -101,8 +125,7 @@ pub type EnOptionalSettings = Option<Vec<(String, String)>>;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
     rule_name: RuleName,
-    route_network_src: EnNetwork,
-    route_network_dest: EnNetwork,
+    network_configs: Vec<EnConfigNetwork>,
     protocol: Protocol,
     target: EnTarget,
     optional_settings: EnOptionalSettings,
@@ -111,18 +134,10 @@ pub struct FirewallRule {
 impl FirewallRule {
     /// Create a new `ConfigFirewall`.
     /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(
-        rule_name: RuleName,
-        route_network_src: EnNetwork,
-        route_network_dest: EnNetwork,
-        protocol: Protocol,
-        target: EnTarget,
-        optional_settings: EnOptionalSettings,
-    ) -> FirewallRule {
+    pub fn new(rule_name: RuleName, network_configs: Vec<EnConfigNetwork>, protocol: Protocol, target: EnTarget, optional_settings: EnOptionalSettings) -> FirewallRule {
         FirewallRule {
             rule_name,
-            route_network_src,
-            route_network_dest,
+            network_configs,
             protocol,
             target,
             optional_settings,
@@ -140,15 +155,11 @@ impl FirewallRule {
     pub fn to_option(&self) -> Vec<(String, String)> {
         let mut query: Vec<(String, String)> = Vec::new();
         query.push(self.rule_name.to_option());
-        query.push(("src".to_string(), self.route_network_src.to_string()));
-        query.push(("dest".to_string(), self.route_network_dest.to_string()));
         query.push(self.protocol.to_option());
         query.push(self.target.to_option());
-
+        self.network_configs.iter().for_each(|o| query.push(o.to_option()));
         if let Some(v) = &self.optional_settings {
-            for s in v.iter() {
-                query.push(s.clone());
-            }
+            v.iter().for_each(|o| query.push(o.clone()));
         }
         query
     }
