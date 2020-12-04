@@ -8,12 +8,7 @@ use crate::{
     services::config_service::{get_config_value, set_config_value},
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, Protocol, RuleName};
-use std::{
-    net::{IpAddr, ToSocketAddrs},
-    sync::atomic::{AtomicU32, Ordering},
-};
-
-static VERSION: AtomicU32 = AtomicU32::new(0);
+use std::net::{IpAddr, ToSocketAddrs};
 
 pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRule>> {
     let mut index = 0;

@@ -11,7 +11,7 @@ pub async fn get_config_value(key: String, pool: DbConnPool) -> Result<String> {
 pub async fn set_config_value(key: String, value: String, pool: DbConnPool) -> Result<()> {
     let conn = pool.get_one().expect("couldn't get db conn from pool");
 
-    match get_config_value(key.clone(), pool.clone()).await {
+    match get_config_value(key.clone(), pool).await {
         Ok(_) => diesel::update(config::table.find(&key))
             .set(Config {
                 key: key.clone(),
