@@ -35,7 +35,7 @@ mod unix {
 
     /// Contains the native `uci_ptr` and it's raw `CString` key
     /// this is done so the raw `CString` stays alive until the `uci_ptr` is dropped
-    struct UciPtr(uci_ptr, *mut i8);
+    struct UciPtr(uci_ptr, *mut std::os::raw::c_char);
 
     impl Deref for UciPtr {
         type Target = uci_ptr;
@@ -75,7 +75,7 @@ mod unix {
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {
             let result = unsafe {
                 let raw = CString::new(config_dir)?;
-                uci_set_confdir(self.0, raw.as_bytes_with_nul().as_ptr() as *const i8)
+                uci_set_confdir(self.0, raw.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char)
             };
             ensure!(
                 result == UCI_OK,
@@ -95,7 +95,7 @@ mod unix {
         pub fn set_save_dir(&mut self, save_dir: &str) -> Result<()> {
             let result = unsafe {
                 let raw = CString::new(save_dir)?;
-                uci_set_savedir(self.0, raw.as_bytes_with_nul().as_ptr() as *const i8)
+                uci_set_savedir(self.0, raw.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char)
             };
             ensure!(
                 result == UCI_OK,
