@@ -93,17 +93,17 @@ openwrt_package_x86_64:
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
 
-openwrt_package_bcm2708:
+openwrt_package_bcm2708: # raspberry v1
   extends: .openwrt_package_base
   image: openwrtorg/sdk:brcm2708-bcm2708-19.07.4
   variables:
-    RUST_TRIPLE: arm-unknown-linux-musleabihf # raspberry v1
+    RUST_TRIPLE: arm-unknown-linux-musleabihf
 
-openwrt_package_bcm2711:
+openwrt_package_bcm2710: # raspberry v3
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:bcm27xx-bcm2711-snapshot
+  image: openwrtorg/sdk:brcm2708-bcm2708-19.07.4
   variables:
-    RUST_TRIPLE: aarch64-unknown-linux-musl # raspberry v4
+    RUST_TRIPLE: aarch64-unknown-linux-musl
 
 .openwrt_package_base:
   stage: binary

@@ -29,14 +29,14 @@ pub async fn run() -> Result<RPCClient> {
     let identity = {
         // set client auth cert
         let mut vec = Vec::new();
-        let mut file = File::open(env::var("IDENTITY")?).await?;
+        let mut file = File::open(env::var("NAMIB_IDENTITY")?).await?;
         file.read_to_end(&mut vec).await?;
         Identity::from_pkcs12(&vec, "client")?
     };
     let ca = {
         // verify server cert using CA
         let mut vec = Vec::new();
-        let mut file = File::open(env::var("CA_CERT")?).await?;
+        let mut file = File::open(env::var("NAMIB_CA_CERT")?).await?;
         file.read_to_end(&mut vec).await?;
         Certificate::from_pem(&vec)?
     };
