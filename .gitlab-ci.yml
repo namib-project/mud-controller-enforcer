@@ -142,3 +142,4 @@ openwrt_package_bcm2710: # raspberry v3
   artifacts:
     paths:
       - output
+    when: always
