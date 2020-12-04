@@ -103,7 +103,7 @@ openwrt_package_bcm2711:
   extends: .openwrt_package_base
   image: openwrtorg/sdk:bcm27xx-bcm2711-snapshot
   variables:
-    RUST_TRIPLE: armv7-unknown-linux-musleabihf # raspberry v4
+    RUST_TRIPLE: aarch64-unknown-linux-musl # raspberry v4
 
 .openwrt_package_base:
   stage: binary
@@ -134,9 +134,11 @@ openwrt_package_bcm2711:
     - ./gen_client_cert.sh
     - cd /home/build/openwrt
     - make defconfig
-    - make package/namib/compile || make package/namib/compile V=s
+    - make package/namib/compile
+  after_script:
     - mkdir ${CI_PROJECT_DIR}/output
-    - cp -r bin/packages/*/base/namib_0.1.0-*.ipk package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output
+    - cp -r /home/build/openwrt/logs/package/namib ${CI_PROJECT_DIR}/output/logs || true
+    - cp -r /home/build/openwrt/bin/packages/*/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output || true
   artifacts:
     paths:
       - output
