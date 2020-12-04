@@ -8,9 +8,12 @@ use crate::{
     services::config_service::{get_config_value, set_config_value},
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, Protocol, RuleName};
-use std::net::{IpAddr, ToSocketAddrs};
+use std::{
+    net::{IpAddr, ToSocketAddrs},
+    sync::atomic::{AtomicU32, Ordering},
+};
 
-static mut VERSION: i32 = 0;
+static VERSION: AtomicU32 = AtomicU32::new(0);
 
 pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
@@ -73,7 +76,20 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
                     result.push(config_firewall);
                 }
             } else {
-                let config_firewall = FirewallRule::new(rule_name, route_network_src, route_network_dest, protocol, target, None);
+                let config_firewall = FirewallRule::new(
+                    rule_name,
+                    route_network_src,
+                    route_network_dest,
+                    protocol,
+                    target,
+                    Some(vec![(
+                        match acl.packet_direction {
+                            ACLDirection::FromDevice => "src_ip".to_string(),
+                            ACLDirection::ToDevice => "dest_ip".to_string(),
+                        },
+                        device.ip_addr.to_string(),
+                    )]),
+                );
                 result.push(config_firewall);
             }
             index += 1;
@@ -106,10 +122,12 @@ pub async fn update_config_version(pool: DbConnPool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{device_model::DeviceData, mud_models::*};
+    use crate::models::{
+        device_model::DeviceData,
+        mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
+    };
     use chrono::Local;
     use namib_shared::macaddr;
-    use std::net::Ipv4Addr;
 
     #[test]
     fn test_converting() -> Result<()> {
@@ -130,7 +148,7 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: ACEAction::Accept,
                     matches: ACEMatches {
-                        protocol: None,
+                        protocol: Some(ACEProtocol::TCP),
                         direction_initiated: None,
                         address_mask: None,
                         dnsname: None,
@@ -143,7 +161,7 @@ mod tests {
 
         let device = DeviceData {
             id: 0,
-            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().into()),
+            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
             ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "".to_string(),
             vendor_class: "".to_string(),
@@ -156,7 +174,13 @@ mod tests {
 
         println!("{:#?}", x);
 
-        assert_eq!(x[0].target, EnTarget::ACCEPT);
+        let opts = x[0].to_option();
+        assert!(opts.iter().any(|x| x.0 == "name" && x.1 == "rule_0"));
+        assert!(opts.iter().any(|x| x.0 == "src" && x.1 == "wan"));
+        assert!(opts.iter().any(|x| x.0 == "dest" && x.1 == "lan"));
+        assert!(opts.iter().any(|x| x.0 == "dest_ip" && x.1 == "127.0.0.1"));
+        assert!(opts.iter().any(|x| x.0 == "proto" && x.1 == "6"));
+        assert!(opts.iter().any(|x| x.0 == "target" && x.1 == "ACCEPT"));
 
         Ok(())
     }

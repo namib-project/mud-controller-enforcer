@@ -48,7 +48,7 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
         expiration: data.expiration.naive_local(),
     };
 
-    debug!("save mud file (exists: {:?}): {:#?}", exists, mud);
+    debug!("save mud file (exists: {:?}): {:?}", exists, mud);
 
     if exists {
         diesel::update(mud_data::table.find(url)).set(mud).execute(&*conn)?;

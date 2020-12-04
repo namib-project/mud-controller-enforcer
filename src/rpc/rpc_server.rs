@@ -1,12 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use futures::{future, StreamExt, TryStreamExt};
-use namib_shared::{
-    codec,
-    config_firewall::{FirewallConfig, FirewallRule},
-    open_file_with,
-    rpc::RPC,
-};
 use rustls::RootCertStore;
 use tarpc::{
     context,
@@ -14,15 +8,22 @@ use tarpc::{
     server,
 };
 
+use namib_shared::{
+    codec,
+    config_firewall::{FirewallConfig, FirewallRule},
+    models::DhcpEvent,
+    open_file_with,
+    rpc::RPC,
+};
+
 use crate::{
     db::DbConnPool,
     error::Result,
+    models::device_model::DeviceData,
     services::{config_firewall_service, device_service, mud_service},
 };
 
 use super::tls_serde_transport;
-use crate::models::device_model::DeviceData;
-use namib_shared::models::DhcpEvent;
 
 #[derive(Clone)]
 pub struct RPCServer(SocketAddr, DbConnPool);
@@ -48,7 +49,7 @@ impl RPC for RPCServer {
                 })
                 .collect();
 
-            debug!("Returning Heartbeat to client with config: {:#?}", rules);
+            debug!("Returning Heartbeat to client with config: {:?}", rules);
             return Some(FirewallConfig::new(current_config_version, rules));
         }
 
