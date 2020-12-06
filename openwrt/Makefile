@@ -54,7 +54,7 @@ define Build/Compile
 		OPENSSL_DIR=$(STAGING_DIR)/usr/ \
 		OPENSSL_STATIC=1 \
 		UCI_DIR=$(STAGING_DIR)/usr \
-		RUSTFLAGS="-C linker=$(TARGET_CC_NOCACHE) -C ar=$(TARGET_AR)" \
+		RUSTFLAGS="-C linker=$(TARGET_CC_NOCACHE) -C ar=$(TARGET_AR) -C target-feature=-crt-static" \
 		TARGET=$(RUST_TRIPLE) \
 		TARGET_CC=$(TARGET_CC_NOCACHE) \
 		TARGET_CXX=$(TARGET_CXX_NOCACHE) \
