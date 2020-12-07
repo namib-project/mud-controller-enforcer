@@ -29,30 +29,6 @@ impl RuleName {
     }
 }
 
-/// Wraps network or ip-address for specific input or output.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum EnConfigNetwork {
-    SRC(EnNetwork),
-    DES(EnNetwork),
-    SrcIp(String),
-    DesIp(String),
-    SrcPort(String),
-    DesPort(String),
-}
-
-impl EnConfigNetwork {
-    fn to_option(&self) -> (String, String) {
-        match self {
-            Self::SRC(n) => ("src".to_string(), n.to_string()),
-            Self::DES(n) => ("dest".to_string(), n.to_string()),
-            Self::SrcIp(n) => ("src_ip".to_string(), n.to_string()),
-            Self::DesIp(n) => ("dest_ip".to_string(), n.to_string()),
-            Self::SrcPort(n) => ("src_port".to_string(), n.to_string()),
-            Self::DesPort(n) => ("dest_port".to_string(), n.to_string()),
-        }
-    }
-}
-
 /// Enum for the source or destination
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EnNetwork {
@@ -68,6 +44,19 @@ impl fmt::Display for EnNetwork {
             Self::WAN => f.write_str("wan"),
             Self::VPN => f.write_str("vpn"),
         }
+    }
+}
+/// Struct for src and dest configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct NetworkConfig {
+    typ: EnNetwork,
+    ip: Option<String>,
+    port: Option<String>,
+}
+
+impl NetworkConfig {
+    pub fn new(typ: EnNetwork, ip: Option<String>, port: Option<String>) -> NetworkConfig {
+        NetworkConfig { typ, ip, port }
     }
 }
 
@@ -125,7 +114,8 @@ pub type EnOptionalSettings = Option<Vec<(String, String)>>;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
     rule_name: RuleName,
-    network_configs: Vec<EnConfigNetwork>,
+    src: NetworkConfig,
+    dst: NetworkConfig,
     protocol: Protocol,
     target: EnTarget,
     optional_settings: EnOptionalSettings,
@@ -134,10 +124,11 @@ pub struct FirewallRule {
 impl FirewallRule {
     /// Create a new `ConfigFirewall`.
     /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(rule_name: RuleName, network_configs: Vec<EnConfigNetwork>, protocol: Protocol, target: EnTarget, optional_settings: EnOptionalSettings) -> FirewallRule {
+    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: EnTarget, optional_settings: EnOptionalSettings) -> FirewallRule {
         FirewallRule {
             rule_name,
-            network_configs,
+            src,
+            dst,
             protocol,
             target,
             optional_settings,
@@ -157,7 +148,20 @@ impl FirewallRule {
         query.push(self.rule_name.to_option());
         query.push(self.protocol.to_option());
         query.push(self.target.to_option());
-        self.network_configs.iter().for_each(|o| query.push(o.to_option()));
+        query.push(("src".to_string(), self.src.typ.to_string()));
+        if let Some(ip) = &self.src.ip {
+            query.push(("src_ip".to_string(), ip.clone()));
+        }
+        if let Some(port) = &self.src.port {
+            query.push(("src_port".to_string(), port.clone()));
+        }
+        query.push(("dest".to_string(), self.dst.typ.to_string()));
+        if let Some(ip) = &self.dst.ip {
+            query.push(("dest_ip".to_string(), ip.clone()));
+        }
+        if let Some(port) = &self.dst.port {
+            query.push(("dst_port".to_string(), port.clone()));
+        }
         if let Some(v) = &self.optional_settings {
             v.iter().for_each(|o| query.push(o.clone()));
         }
