@@ -3,6 +3,7 @@ stages:
   - test
   - docs
   - binary
+  - imagebuilder
 
 image: rust:latest
 
@@ -142,3 +143,11 @@ openwrt_package_bcm2710: # raspberry v3
     paths:
       - output
     when: always
+
+imagebuilder:
+  stage: imagebuilder
+  trigger:
+    include:
+      - project: namib/mud-controller-enforcer/controller-enforcer-metaproject
+        ref: master
+        file: .gitlab-ci.imagebuilder.yml
