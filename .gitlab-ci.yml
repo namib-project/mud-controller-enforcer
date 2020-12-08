@@ -151,3 +151,4 @@ imagebuilder:
       - project: namib/mud-controller-enforcer/controller-enforcer-metaproject
         ref: master
         file: .gitlab-ci.imagebuilder.yml
+    strategy: depend
