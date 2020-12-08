@@ -106,6 +106,12 @@ openwrt_package_bcm2710: # raspberry v3
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
+openwrt_package_bcm2710_snapshot: # raspberry v3
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk:bcm27xx-bcm2710-snapshot
+  variables:
+    RUST_TRIPLE: aarch64-unknown-linux-musl
+
 .openwrt_package_base:
   stage: binary
   dependencies: [ ]
