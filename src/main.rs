@@ -4,7 +4,9 @@
     clippy::manual_range_contains,
     clippy::unseparated_literal_suffix,
     clippy::module_name_repetitions,
-    clippy::default_trait_access
+    clippy::default_trait_access,
+    clippy::missing_errors_doc,
+    clippy::must_use_candidate
 )]
 
 use dotenv::dotenv;
@@ -19,7 +21,7 @@ use tokio::runtime;
 fn run_server() {
     rocket::ignite()
         .attach(db::DbConn::fairing())
-        .attach(AdHoc::on_attach("Database Migrations", db::run_db_migrations))
+        .attach(AdHoc::on_attach("Database Migrations", db::run_rocket_db_migrations))
         .attach(AdHoc::on_attach("RPC Server", |rocket| {
             info!("Launching RPC server");
             let pool = rocket.state::<DbConnPool>().expect("could not get db connection pool").clone();

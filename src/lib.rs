@@ -5,7 +5,9 @@
     clippy::manual_range_contains,
     clippy::unseparated_literal_suffix,
     clippy::module_name_repetitions,
-    clippy::default_trait_access
+    clippy::default_trait_access,
+    clippy::missing_errors_doc,
+    clippy::must_use_candidate
 )]
 
 #[macro_use]

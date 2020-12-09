@@ -1,44 +1,24 @@
 use diesel::prelude::*;
-use diesel_migrations::embed_migrations;
 use dotenv::dotenv;
 use log::{debug, info};
-use namib_mud_controller::db::DbConn;
+use namib_mud_controller::db::{run_db_migrations, ConnectionType, DbConnPool};
 use rocket_contrib::databases::{DatabaseConfig, Poolable};
 use std::{borrow::Borrow, env, fs};
 
-#[cfg(feature = "sqlite")]
-embed_migrations!("migrations/sqlite");
-
-#[cfg(feature = "sqlite")]
-pub type ConnectionType = SqliteConnection;
-
-/// The pool type.
-pub struct DbConnPool(rocket_contrib::databases::r2d2::Pool<<SqliteConnection as rocket_contrib::databases::Poolable>::Manager>);
-
-impl DbConnPool {
-    pub fn get_one(&self) -> Option<DbConn> {
-        self.0.get().ok().map(DbConn)
-    }
-}
-
-impl Clone for DbConnPool {
-    fn clone(&self) -> Self {
-        DbConnPool(self.0.clone())
-    }
-}
-
-pub struct DbContext {
+pub struct IntegrationTestContext {
     pub db_url: String,
     pub db_name: String,
     pub db_pool: Option<DbConnPool>,
 }
 
-impl DbContext {
+impl IntegrationTestContext {
     /// Creates a new DB context, so you can access the database.
     /// Added a db_name option, so tests can run parallel and independent
     /// When using SQLite, TESTING_DATABASE_URL is a path where the sqlite files are created
     pub fn new(db_name: &str) -> Self {
-        dotenv().expect("Failed to read .env file");
+        dotenv().ok();
+        env_logger::try_init().ok();
+
         let base_url = env::var("TESTING_DATABASE_URL").expect("Failed to load DB URL from .env");
 
         #[cfg(feature = "sqlite")]
@@ -49,7 +29,7 @@ impl DbContext {
 
         info!("Using DB {:?}", db_url);
 
-        let pool = DbConnPool(
+        let pool = DbConnPool::new(
             ConnectionType::pool(DatabaseConfig {
                 url: db_url.as_ref(),
                 pool_size: 10,
@@ -58,8 +38,9 @@ impl DbContext {
             .expect("Couldn't establish connection pool for database"),
         );
 
+        // pool::get_one().expect("Couldn't establish connection to database")
         let migration_conn = ConnectionType::establish(db_url.as_ref()).expect("Couldn't establish connection to database");
-        embedded_migrations::run(&migration_conn).expect("Couldn't run database migrations");
+        run_db_migrations(&migration_conn).expect("Database migrations failed");
         drop(migration_conn);
 
         Self {
@@ -70,7 +51,7 @@ impl DbContext {
     }
 }
 
-impl Drop for DbContext {
+impl Drop for IntegrationTestContext {
     /// Removes/cleans the DB context
     /// When using SQLite, the database is just getting deleted
     /// TODO: Postgres destruction
@@ -86,6 +67,7 @@ impl Drop for DbContext {
     }
 }
 
+/// Ensures that given string has a trailing slash, if not: returns the string with a trailing slash
 fn ensure_trailing_slash(input: String) -> String {
     let last_char = match input.chars().last() {
         Some(char) => char,
@@ -98,7 +80,8 @@ fn ensure_trailing_slash(input: String) -> String {
     }
 }
 
-fn remove_sqlite_db(context: &DbContext) -> () {
+/// Basic wrapper for deleting a SQLite Database at given IntegrationTestContext db_url path
+fn remove_sqlite_db(context: &IntegrationTestContext) -> () {
     debug!("Removing SQLite DB at {}", context.db_url);
     fs::remove_file(context.db_url.clone()).expect(format!("Couldn't remove SQLite DB at {}", context.db_url).as_ref())
 }
