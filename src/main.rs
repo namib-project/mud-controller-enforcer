@@ -1,4 +1,3 @@
-#![feature(proc_macro_hygiene, decl_macro)]
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
 #![allow(
     dead_code,
@@ -8,37 +7,14 @@
     clippy::default_trait_access
 )]
 
-#[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate diesel_migrations;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate rocket;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate validator;
-
-use std::thread;
-
 use dotenv::dotenv;
+use log::info;
+use namib_mud_controller::{db, db::DbConnPool, error::Result, routes, rpc};
 use rocket::fairing::AdHoc;
 use rocket_contrib::serve::StaticFiles;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig, UrlObject};
+use std::thread;
 use tokio::runtime;
-
-use crate::{db::DbConnPool, error::Result};
-
-mod auth;
-mod db;
-mod error;
-mod models;
-mod routes;
-mod rpc;
-mod schema;
-mod services;
 
 fn run_server() {
     rocket::ignite()
