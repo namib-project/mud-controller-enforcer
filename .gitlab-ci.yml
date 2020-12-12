@@ -41,10 +41,20 @@ build-release:
   script:
     - cargo build --release
     - cargo install --root ./install --path .
+    - export lpwd=`pwd`
+    - echo $lpwd
+    - cd ../namib_shared/certs/
+    - ./gen_ca.sh
+    - ./gen_server_cert.sh
+    - cd $lpwd
+    - mkdir -p ./namib_shared/certs
+    - cp ../namib_shared/certs/ca.pem ./namib_shared/certs/
   artifacts:
     paths:
       - install/bin
+      - certs
       - Dockerfile
+      - namib_shared
 
 test:
   stage: test
@@ -97,7 +107,7 @@ create-docker:
     entrypoint: [ "" ]
   script:
     - mkdir -p /kaniko/.docker
-    - ls -lash
+    - ls -lashR
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --verbosity debug --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
   #only:
