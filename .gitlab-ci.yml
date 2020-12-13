@@ -81,7 +81,7 @@ binary:
   only:
     - master
   script:
-    - cargo build --release
+    - cargo build --features="dnsmasq_hook" --release
   artifacts:
     paths:
       - target/release/namib_enforcer
