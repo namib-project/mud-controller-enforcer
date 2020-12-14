@@ -13,3 +13,4 @@ serde_derive = "1.0"
 chrono = {version = "0.4", features = ["serde"]}
 macaddr = { version = "1.0.1", features = ["serde_std"] }
 schemars = { version = "0.8", features = ["chrono"] }
+hex = "0.4"
