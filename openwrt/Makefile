@@ -61,7 +61,7 @@ define Build/Compile
 		PKG_CONFIG_ALLOW_CROSS=1 \
 		CROSS_COMPILE=$(CROSS_PREFIX) \
 \
-		cargo build --release --target $(RUST_TRIPLE) --bin namib_enforcer --bin namib_dnsmasq_hook \
+		cargo build --release --target $(RUST_TRIPLE) --features="dnsmasq_hook" --bin namib_enforcer --bin namib_dnsmasq_hook \
 	)
 endef
 
