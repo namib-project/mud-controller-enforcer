@@ -6,8 +6,11 @@ use snafu::Snafu;
 
 use namib_shared::{
     mac_addr::MacAddr,
-    models::{DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, LeaseExpiryTime},
+    models::{
+        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
+    },
 };
+use std::convert::TryInto;
 
 enum EventType {
     Add,
@@ -48,6 +51,12 @@ enum DhcpDataExtractionError {
     /// The supplied MAC-Address is not of the correct format.
     #[snafu(display("Supplied MAC address \"{}\" is not valid: {}", "supplied_mac", "source"))]
     InvalidMacAddress { supplied_mac: String, source: macaddr::ParseError },
+    /// The supplied DUID is not of the correct format.
+    #[snafu(display("Supplied DUID \"{}\" is not valid: {}", "supplied_duid", "source"))]
+    InvalidDuid { supplied_duid: String, source: hex::FromHexError },
+    /// The supplied DUID is of an invalid length.
+    #[snafu(display("Supplied DUID \"{}\" is does not have the right size: {}", "supplied_duid", "size"))]
+    InvalidDuidSize { supplied_duid: String, duid_size: usize },
     /// The event type this script was called with is not supported.
     #[snafu(display("Supplied event type \"{}\" is not supported", "supplied_type"))]
     UnsupportedEventType { supplied_type: String },
@@ -88,12 +97,19 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
     }
 
     // Non version-specific parameters.
+    let hostname;
+    if (args.len() >= 5) {
+        hostname = Some((&args[4]).to_owned())
+    } else {
+        hostname = None;
+    }
     let event_type = (&args[1]).as_str().parse::<EventType>()?;
     let domain = env::var("DNSMASQ_DOMAIN").ok();
     let client_provided_hostname = env::var("DNSMASQ_SUPPLIED_HOSTNAME").ok();
     let old_hostname = env::var("DNSMASQ_OLD_HOSTNAME").ok();
     let receiver_interface = env::var("DNSMASQ_INTERFACE").ok();
     let mud_url = env::var("DNSMASQ_MUD_URL").ok();
+    let tags = env::var("DNSMASQ_TAGS").map_or(Vec::new(), |t| t.split(" ").filter(|v| v != &"").map(|v| v.to_string()).collect());
     let time_remaining = env::var("DNSMASQ_TIME_REMAINING");
     let time_remaining: Duration = time_remaining
         .clone()
@@ -130,8 +146,25 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
         },
         IpAddr::V6(ip_addr) => {
             mac_address = env::var("DNSMASQ_MAC").ok();
-
-            DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation { ip_addr })
+            let duid_str = (&args[2]).to_string().replace(":", "");
+            let duid = hex::decode(duid_str.clone()).map_err(|e| DhcpDataExtractionError::InvalidDuid {
+                supplied_duid: duid_str.clone(),
+                source: e,
+            })?;
+            if (duid.len() < 3) {
+                return Err(DhcpDataExtractionError::InvalidDuidSize {
+                    supplied_duid: duid_str,
+                    duid_size: duid.len(),
+                });
+            }
+            let duid = match &duid[0..2] {
+                [0x0, 0x1] => Duid::Llt(Vec::from(&duid[2..])),
+                [0x0, 0x2] => Duid::En(Vec::from(&duid[2..])),
+                [0x0, 0x3] => Duid::Ll(Vec::from(&duid[2..])),
+                [0x0, 0x4] => Duid::Uuid(Vec::from(&duid[2..])),
+                t => Duid::Other(t.try_into().unwrap(), Vec::from(&duid[2..])),
+            };
+            DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation { ip_addr, duid })
         },
     };
     // Parse MAC Address from supplied string.
@@ -163,6 +196,8 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
         receiver_interface,
         mac_address,
         mud_url,
+        tags,
+        hostname,
     };
 
     // Wrap in correct DhcpEvent instance and return.
