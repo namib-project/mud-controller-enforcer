@@ -46,6 +46,19 @@ impl fmt::Display for EnNetwork {
         }
     }
 }
+/// Struct for src and dest configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct NetworkConfig {
+    typ: EnNetwork,
+    ip: Option<String>,
+    port: Option<String>,
+}
+
+impl NetworkConfig {
+    pub fn new(typ: EnNetwork, ip: Option<String>, port: Option<String>) -> NetworkConfig {
+        NetworkConfig { typ, ip, port }
+    }
+}
 
 /// Struct for protocol
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -101,8 +114,8 @@ pub type EnOptionalSettings = Option<Vec<(String, String)>>;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
     rule_name: RuleName,
-    route_network_src: EnNetwork,
-    route_network_dest: EnNetwork,
+    src: NetworkConfig,
+    dst: NetworkConfig,
     protocol: Protocol,
     target: EnTarget,
     optional_settings: EnOptionalSettings,
@@ -111,18 +124,11 @@ pub struct FirewallRule {
 impl FirewallRule {
     /// Create a new `ConfigFirewall`.
     /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(
-        rule_name: RuleName,
-        route_network_src: EnNetwork,
-        route_network_dest: EnNetwork,
-        protocol: Protocol,
-        target: EnTarget,
-        optional_settings: EnOptionalSettings,
-    ) -> FirewallRule {
+    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: EnTarget, optional_settings: EnOptionalSettings) -> FirewallRule {
         FirewallRule {
             rule_name,
-            route_network_src,
-            route_network_dest,
+            src,
+            dst,
             protocol,
             target,
             optional_settings,
@@ -140,15 +146,24 @@ impl FirewallRule {
     pub fn to_option(&self) -> Vec<(String, String)> {
         let mut query: Vec<(String, String)> = Vec::new();
         query.push(self.rule_name.to_option());
-        query.push(("src".to_string(), self.route_network_src.to_string()));
-        query.push(("dest".to_string(), self.route_network_dest.to_string()));
         query.push(self.protocol.to_option());
         query.push(self.target.to_option());
-
+        query.push(("src".to_string(), self.src.typ.to_string()));
+        if let Some(ip) = &self.src.ip {
+            query.push(("src_ip".to_string(), ip.clone()));
+        }
+        if let Some(port) = &self.src.port {
+            query.push(("src_port".to_string(), port.clone()));
+        }
+        query.push(("dest".to_string(), self.dst.typ.to_string()));
+        if let Some(ip) = &self.dst.ip {
+            query.push(("dest_ip".to_string(), ip.clone()));
+        }
+        if let Some(port) = &self.dst.port {
+            query.push(("dst_port".to_string(), port.clone()));
+        }
         if let Some(v) = &self.optional_settings {
-            for s in v.iter() {
-                query.push(s.clone());
-            }
+            v.iter().for_each(|o| query.push(o.clone()));
         }
         query
     }
