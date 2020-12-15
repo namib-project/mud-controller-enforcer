@@ -10,7 +10,7 @@ use namib_shared::{
         DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
     },
 };
-use regex::{Regex, RegexSet};
+use regex::Regex;
 use std::convert::TryInto;
 
 enum EventType {
@@ -53,6 +53,9 @@ impl From<DnsmasqHookError> for DnsmasqHookReturn {
 
 /// Error wrapper type for the dnsmasq hook script.
 #[derive(Debug, Snafu)]
+// Because this script will only ever produce at most one instance of this error per execution, I
+// think we can safely ignore the wasted memory space here.
+#[allow(clippy::large_enum_variant)]
 enum DnsmasqHookError {
     /// The IP address that was supplied was not properly formatted.
     #[snafu(display("Supplied IP Address \"{}\" is not valid: {}", "supplied_address", "source"))]
@@ -99,23 +102,20 @@ type Result<T> = std::result::Result<T, DnsmasqHookError>;
 #[allow(unreachable_code)]
 fn main() {
     env_logger::init();
-    run_dnsmasq_hook()
-        .or_else(|e| {
-            // In case an error occurred, we give some error output and exit.
-            // Ideally, we would use the [Termination trait](https://doc.rust-lang.org/std/process/trait.Termination.html)
-            // here, but as of the time of writing this this trait is a nightly-only API.
-            eprintln!("An error occurred while generating the DHCP event: {:?}", e);
-            std::process::exit(DnsmasqHookReturn::from(e));
-            Err(())
-        })
-        .unwrap();
+    if let Err(e) = run_dnsmasq_hook() {
+        // In case an error occurred, we give some error output and exit.
+        // Ideally, we would use the [Termination trait](https://doc.rust-lang.org/std/process/trait.Termination.html)
+        // here, but as of the time of writing this this trait is a nightly-only API.
+        eprintln!("An error occurred while generating the DHCP event: {:?}", e);
+        std::process::exit(DnsmasqHookReturn::from(e));
+    }
 }
 
 fn run_dnsmasq_hook() -> Result<()> {
     let dhcp_event = extract_dhcp_hook_data()?;
     debug!("Constructed DHCP Event: {:?}", &dhcp_event);
     let socket = UnixStream::connect("/tmp/namib_dhcp.sock").map_err(|e| DnsmasqHookError::EnforcerConnectionError { source: e })?;
-    serde_json::to_writer(socket, &dhcp_event).map_err(|e| DnsmasqHookError::EventSerializationError { event: dhcp_event, source: e });
+    serde_json::to_writer(socket, &dhcp_event).map_err(|e| DnsmasqHookError::EventSerializationError { event: dhcp_event, source: e })?;
     info!("DHCP Event successfully transferred to enforcer");
     Ok(())
 }
@@ -147,7 +147,7 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
     let old_hostname = env::var("DNSMASQ_OLD_HOSTNAME").ok();
     let receiver_interface = env::var("DNSMASQ_INTERFACE").ok();
     let mud_url = env::var("DNSMASQ_MUD_URL").ok();
-    let tags = env::var("DNSMASQ_TAGS").map_or(Vec::new(), |t| t.split(" ").filter(|v| v != &"").map(|v| v.to_string()).collect());
+    let tags = env::var("DNSMASQ_TAGS").map_or(Vec::new(), |t| t.split(' ').filter(|v| v != &"").map(|v| v.to_string()).collect());
     let time_remaining = env::var("DNSMASQ_TIME_REMAINING");
     let time_remaining: Duration = time_remaining
         .clone()

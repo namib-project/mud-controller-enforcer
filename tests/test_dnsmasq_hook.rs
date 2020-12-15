@@ -1,27 +1,23 @@
 #[cfg(feature = "dnsmasq_hook")]
 mod test_dnsmasq_hook {
-    use chrono::{DateTime, FixedOffset, Local, TimeZone};
     use core::time::Duration;
-    use namib_shared::{
-        models::{
-            DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid,
-            LeaseExpiryTime,
-        },
-        MacAddr,
-    };
-    use serial_test::serial;
     use std::{
         collections::HashMap,
         env,
-        ffi::OsStr,
         io::Read,
         net::{Ipv4Addr, Ipv6Addr},
         os::unix::net::UnixListener,
         path::PathBuf,
         process::{Command, Stdio},
-        sync::mpsc::Sender,
         thread,
         thread::JoinHandle,
+    };
+
+    use chrono::{DateTime, FixedOffset, Local, TimeZone};
+    use serial_test::serial;
+
+    use namib_shared::models::{
+        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
     };
 
     fn full_lease_info_v4() -> DhcpLeaseInformation {
@@ -115,7 +111,7 @@ mod test_dnsmasq_hook {
             Ok(_) => Ok(()),
             Err(err) => match err.kind() {
                 std::io::ErrorKind::NotFound => Ok(()),
-                e => Err(err),
+                _e => Err(err),
             },
         }?;
         let listener = UnixListener::bind("/tmp/namib_dhcp.sock")?;
@@ -127,7 +123,7 @@ mod test_dnsmasq_hook {
 
     /// Spawns a thread running the event listener dummy, returning a join handle for it.
     fn event_listener_thread() -> JoinHandle<DhcpDummyListenerResult> {
-        thread::spawn(|| event_listener_dummy())
+        thread::spawn(event_listener_dummy)
     }
 
     /// Convert a DHCP event into the equivalent command line args and environment variables if they
@@ -136,15 +132,15 @@ mod test_dnsmasq_hook {
         let mut args = Vec::new();
         let mut envs: HashMap<String, String> = HashMap::new();
         let lease_info = match event {
-            DhcpEvent::LeaseAdded { event_timestamp, lease_info } => {
+            DhcpEvent::LeaseAdded { event_timestamp: _, lease_info } => {
                 args.push("add".to_string());
                 lease_info
             },
-            DhcpEvent::LeaseDestroyed { event_timestamp, lease_info } => {
+            DhcpEvent::LeaseDestroyed { event_timestamp: _, lease_info } => {
                 args.push("del".to_string());
                 lease_info
             },
-            DhcpEvent::ExistingLeaseUpdate { event_timestamp, lease_info } => {
+            DhcpEvent::ExistingLeaseUpdate { event_timestamp: _, lease_info } => {
                 args.push("old".to_string());
                 lease_info
             },
@@ -174,10 +170,8 @@ mod test_dnsmasq_hook {
         if let Some(old_hostname) = &lease_info.old_hostname {
             envs.insert("DNSMASQ_OLD_HOSTNAME".to_string(), old_hostname.to_string());
         }
-        let mut class_num = 0;
-        for user_class in &lease_info.user_classes {
+        for (class_num, user_class) in lease_info.user_classes.iter().enumerate() {
             envs.insert(format!("DNSMASQ_USER_CLASS{}", class_num).to_string(), user_class.to_string());
-            class_num += 1;
         }
 
         match &lease_info.version_specific_information {
@@ -205,13 +199,14 @@ mod test_dnsmasq_hook {
     /// would if the supplied DHCP event occurred..
     fn start_hook_script_with_event_data(event: &DhcpEvent) -> i32 {
         // Unset previous environment variables
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
         let (args, envs) = create_args_and_env_map_from_event(event);
-        result_command.args(args);
-        result_command.envs(envs);
-        result_command.stdout(Stdio::null()).stderr(Stdio::null());
         result_command
+            .args(args)
+            .env_clear()
+            .envs(envs)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .expect("Error while running command.")
             .code()
@@ -324,7 +319,7 @@ mod test_dnsmasq_hook {
 
         let event = DhcpEvent::LeaseAdded {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
-            lease_info: lease_info.clone(),
+            lease_info,
         };
 
         assert_script_result_equal(event);
@@ -353,7 +348,7 @@ mod test_dnsmasq_hook {
 
         let event = DhcpEvent::LeaseAdded {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
-            lease_info: lease_info.clone(),
+            lease_info,
         };
 
         assert_script_result_equal(event);
@@ -379,9 +374,8 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(3);
         args.remove(2);
 
@@ -405,17 +399,20 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(2);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_ne!(
             0,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -430,17 +427,20 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(2);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_ne!(
             0,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -455,17 +455,20 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(0);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_ne!(
             0,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -480,17 +483,20 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(0);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_ne!(
             0,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -505,17 +511,20 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_ne!(
             0,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -530,17 +539,20 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_ne!(
             0,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -555,18 +567,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("192.168.123.256".to_string());
         args.swap_remove(2);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             4,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -581,18 +594,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("2001:0db8:85a3:0000:0000:8a2e:0370:73gg".to_string());
         args.swap_remove(2);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             4,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -607,18 +621,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("aa".to_string());
         args.swap_remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             6,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -633,18 +648,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff".to_string());
         args.swap_remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             6,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -659,18 +675,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("aa:bb:cc:dd:ee:gg".to_string());
         args.swap_remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             6,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -685,17 +702,18 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (args, mut envs) = create_args_and_env_map_from_event(&event);
         envs.insert("DNSMASQ_MAC".to_string(), "aa".to_string());
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             6,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -710,17 +728,18 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (args, mut envs) = create_args_and_env_map_from_event(&event);
         envs.insert("DNSMASQ_MAC".to_string(), "aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff".to_string());
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             6,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -735,17 +754,18 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (args, mut envs) = create_args_and_env_map_from_event(&event);
         envs.insert("DNSMASQ_MAC".to_string(), "aa:bb:cc:dd:ee:gg".to_string());
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             6,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -760,18 +780,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("aa:bb:cc:dd:ee:ff:gg".to_string());
         args.swap_remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             7,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -786,18 +807,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("aa".to_string());
         args.swap_remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             7,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -812,18 +834,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v6(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc".to_string());
         args.swap_remove(1);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             7,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -838,18 +861,19 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (mut args, envs) = create_args_and_env_map_from_event(&event);
         args.push("tftp".to_string());
         args.swap_remove(0);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             8,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -864,17 +888,18 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (args, mut envs) = create_args_and_env_map_from_event(&event);
         envs.remove("DNSMASQ_TIME_REMAINING");
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             3,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -889,17 +914,18 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (args, mut envs) = create_args_and_env_map_from_event(&event);
         envs.remove("DNSMASQ_LEASE_EXPIRES");
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             3,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
@@ -914,16 +940,17 @@ mod test_dnsmasq_hook {
             event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
             lease_info: full_lease_info_v4(),
         };
-        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
-        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+        let (args, envs) = create_args_and_env_map_from_event(&event);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
-        // Removing a command line argument will make the program assume something else is the missing argument.
-        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             63,
             result_command
+                .args(args)
+                .env_clear()
+                .envs(envs)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()
                 .expect("Error while running command.")
                 .code()
