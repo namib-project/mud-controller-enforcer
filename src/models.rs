@@ -102,7 +102,7 @@ impl ToString for Duid {
                 result
             },
             Duid::Other(t, c) => {
-                let mut result = String::from(format!("{}:{}", hex::encode(slice::from_ref(&t[0])), hex::encode(slice::from_ref(&t[1]))));
+                let mut result = format!("{}:{}", hex::encode(slice::from_ref(&t[0])), hex::encode(slice::from_ref(&t[1])));
                 for b in c {
                     result.push_str(format!(":{}", hex::encode(slice::from_ref(b))).as_str());
                 }
