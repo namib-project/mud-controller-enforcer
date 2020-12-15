@@ -109,7 +109,7 @@ pub fn restart_firewall_command() -> std::process::Output {
 mod tests {
     use std::{fs, fs::File, io::Read};
 
-    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, Protocol, RuleName};
+    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, NetworkConfig, Protocol, RuleName};
 
     use super::*;
 
@@ -124,14 +124,9 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
         uci.set_config_dir("tests/config/test_trivial_apply_config")?;
 
-        let cfg = FirewallRule::new(
-            RuleName::new("Regel2".to_string()),
-            EnNetwork::LAN,
-            EnNetwork::WAN,
-            Protocol::tcp(),
-            EnTarget::DROP,
-            EnOptionalSettings::None,
-        );
+        let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
+        let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
+        let cfg = FirewallRule::new(RuleName::new("Regel2".to_string()), src, dst, Protocol::tcp(), EnTarget::DROP, EnOptionalSettings::None);
         apply_rule(&mut uci, &cfg)?;
         uci.commit("firewall")?;
 
@@ -190,14 +185,10 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
         uci.set_config_dir("tests/config/test_apply_and_delete")?;
 
-        let cfg = FirewallRule::new(
-            RuleName::new("Regel3".to_string()),
-            EnNetwork::LAN,
-            EnNetwork::WAN,
-            Protocol::tcp(),
-            EnTarget::DROP,
-            EnOptionalSettings::None,
-        );
+        let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
+        let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
+
+        let cfg = FirewallRule::new(RuleName::new("Regel3".to_string()), src, dst, Protocol::tcp(), EnTarget::DROP, EnOptionalSettings::None);
 
         // apply the config
         apply_rule(&mut uci, &cfg)?;
