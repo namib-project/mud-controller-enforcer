@@ -86,6 +86,7 @@ mod test_dnsmasq_hook {
         cargo_dir().join(format!("namib_dnsmasq_hook{}", env::consts::EXE_SUFFIX))
     }
 
+    /// Error type for the event listener dummy.
     #[derive(Debug)]
     enum DhcpDummyListenerError {
         Io(std::io::Error),
@@ -104,8 +105,11 @@ mod test_dnsmasq_hook {
         }
     }
 
+    /// Result type for the event listener dummy.
     type DhcpDummyListenerResult = Result<DhcpEvent, DhcpDummyListenerError>;
 
+    /// Starts a dummy event listener, which emulates the behaviour of the enforcer and captures the
+    /// first event supplied to it by the hook script for further evaluation by tests.
     fn event_listener_dummy() -> DhcpDummyListenerResult {
         match std::fs::remove_file("/tmp/namib_dhcp.sock") {
             Ok(_) => Ok(()),
@@ -121,10 +125,13 @@ mod test_dnsmasq_hook {
         Ok(serde_json::from_slice::<DhcpEvent>(inc_data.as_slice())?)
     }
 
+    /// Spawns a thread running the event listener dummy, returning a join handle for it.
     fn event_listener_thread() -> JoinHandle<DhcpDummyListenerResult> {
         thread::spawn(|| event_listener_dummy())
     }
 
+    /// Convert a DHCP event into the equivalent command line args and environment variables if they
+    /// were set by dnsmasq.
     fn create_args_and_env_map_from_event(event: &DhcpEvent) -> (Vec<String>, HashMap<String, String>) {
         let mut args = Vec::new();
         let mut envs: HashMap<String, String> = HashMap::new();
@@ -194,20 +201,33 @@ mod test_dnsmasq_hook {
         (args, envs)
     }
 
-    fn start_hook_script_with_event_data(event: &DhcpEvent) {
+    /// Starts the dnsmasq hook script, setting all environment variables the same way dnsmasq
+    /// would if the supplied DHCP event occurred..
+    fn start_hook_script_with_event_data(event: &DhcpEvent) -> i32 {
         // Unset previous environment variables
         std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
         let (args, envs) = create_args_and_env_map_from_event(event);
         result_command.args(args);
         result_command.envs(envs);
-        result_command.output().expect("Error while running command.");
+        result_command.stdout(Stdio::null()).stderr(Stdio::null());
+        result_command
+            .status()
+            .expect("Error while running command.")
+            .code()
+            .expect("Command was terminated by a signal.")
     }
 
+    /// Verifies that the given event when passed to the DHCP script in the way dnsmasq would would
+    /// be passed to the enforcer correctly. Test will fail if either the supplied event does not
+    /// match the one returned the hook script or if the hook script returns a non-zero status code
+    /// altogether.
     fn assert_script_result_equal(event: DhcpEvent) {
         let dhcp_listener_result = event_listener_thread();
         let actual_event_type;
-        start_hook_script_with_event_data(&event);
+        // Execute hook script with environment set for given event and assert that the hook script
+        // terminated successfully.
+        assert_eq!(0, start_hook_script_with_event_data(&event));
         let actual_lease_info = match event {
             DhcpEvent::LeaseAdded {
                 event_timestamp: _,
@@ -879,6 +899,30 @@ mod test_dnsmasq_hook {
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
             3,
+            result_command
+                .status()
+                .expect("Error while running command.")
+                .code()
+                .expect("Command was terminated by a signal.")
+        );
+    }
+
+    #[test]
+    #[serial(dnsmasq_hook)]
+    fn test_enforcer_connection_error() {
+        let event = DhcpEvent::LeaseAdded {
+            event_timestamp: DateTime::<FixedOffset>::from(Local::now()),
+            lease_info: full_lease_info_v4(),
+        };
+        std::env::vars().filter(|(k, v)| k.starts_with("DNSMASQ_")).for_each(|(k, v)| env::remove_var(k));
+        let mut result_command = Command::new(namib_dnsmasq_hook_exe());
+        let (mut args, mut envs) = create_args_and_env_map_from_event(&event);
+
+        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
+        // Removing a command line argument will make the program assume something else is the missing argument.
+        // The error code may not be for a missing argument, but instead for an invalid value for another argument.
+        assert_eq!(
+            63,
             result_command
                 .status()
                 .expect("Error while running command.")
