@@ -8,6 +8,7 @@ default-run = "namib_enforcer"
 [features]
 default = ["execute_uci_commands"]
 execute_uci_commands = ["libuci-sys", "libc"]
+dnsmasq_hook  = []
 
 [dependencies]
 namib_shared = { path = "../namib_shared" }
@@ -39,3 +40,4 @@ name = "namib_enforcer"
 [[bin]]
 name = "namib_dnsmasq_hook"
 path = "src/dhcp/dnsmasq_hook.rs"
+required-features = ["dnsmasq_hook"]

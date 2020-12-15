@@ -1,4 +1,4 @@
-use std::{io, net::SocketAddr, sync::Arc};
+use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
 use snafu::{Backtrace, GenerateBacktrace};
@@ -29,14 +29,14 @@ pub async fn run() -> Result<RPCClient> {
     let identity = {
         // set client auth cert
         let mut vec = Vec::new();
-        let mut file = File::open("certs/identity.pfx").await?;
+        let mut file = File::open(env::var("NAMIB_IDENTITY").expect("NAMIB_IDENTITY env is missing")).await?;
         file.read_to_end(&mut vec).await?;
         Identity::from_pkcs12(&vec, "client")?
     };
     let ca = {
         // verify server cert using CA
         let mut vec = Vec::new();
-        let mut file = File::open("../namib_shared/certs/ca.pem").await?;
+        let mut file = File::open(env::var("NAMIB_CA_CERT").expect("NAMIB_CA_CERT env is missing")).await?;
         file.read_to_end(&mut vec).await?;
         Certificate::from_pem(&vec)?
     };

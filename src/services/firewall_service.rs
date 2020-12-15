@@ -1,5 +1,6 @@
-use crate::{error::Result, uci::UCI};
 use namib_shared::config_firewall::{FirewallConfig, FirewallRule};
+
+use crate::{error::Result, services::is_system_mode, uci::UCI};
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -9,11 +10,15 @@ use namib_shared::config_firewall::{FirewallConfig, FirewallRule};
 
 /// The folder where the configuration file should be stored.
 const CONFIG_DIR: &str = "config";
+const SAVE_DIR: &str = "/tmp/.uci_namib";
 
 pub fn get_config_version() -> Result<String> {
     debug!("Getting config version");
     let mut uci = UCI::new()?;
-    uci.set_config_dir(CONFIG_DIR)?;
+    if !is_system_mode() {
+        uci.set_config_dir(CONFIG_DIR)?;
+        uci.set_save_dir(SAVE_DIR)?;
+    }
     uci.get("firewall.namib_config_version")
 }
 
@@ -23,7 +28,10 @@ pub fn get_config_version() -> Result<String> {
 pub fn apply_config(cfg: &FirewallConfig) -> Result<()> {
     debug!("Applying {} configs", cfg.rules().len());
     let mut uci = UCI::new()?;
-    uci.set_config_dir(CONFIG_DIR)?;
+    if !is_system_mode() {
+        uci.set_config_dir(CONFIG_DIR)?;
+        uci.set_save_dir(SAVE_DIR)?;
+    }
 
     // if an error occurred roll back any changes
     if let Err(e) = apply_uci_config(&mut uci, &cfg) {
@@ -99,9 +107,11 @@ pub fn restart_firewall_command() -> std::process::Output {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, NetworkConfig, Protocol, RuleName};
     use std::{fs, fs::File, io::Read};
+
+    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, NetworkConfig, Protocol, RuleName};
+
+    use super::*;
 
     /// The test checks a single added rule on the firewall and compare two files.
     #[test]
