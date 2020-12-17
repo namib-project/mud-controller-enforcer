@@ -94,6 +94,23 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
             index += 1;
         }
     }
+    result.push(FirewallRule::new(
+        RuleName::new(format!("rule_default_{}", index)),
+        EnNetwork::LAN,
+        EnNetwork::WAN,
+        Protocol::all(),
+        EnTarget::REJECT,
+        Some(vec![("src_ip".to_string(), device.ip_addr.to_string())]),
+    ));
+    index += 1;
+    result.push(FirewallRule::new(
+        RuleName::new(format!("rule_default_{}", index)),
+        EnNetwork::WAN,
+        EnNetwork::LAN,
+        Protocol::all(),
+        EnTarget::REJECT,
+        Some(vec![("dest_ip".to_string(), device.ip_addr.to_string())]),
+    ));
 
     Ok(result)
 }
