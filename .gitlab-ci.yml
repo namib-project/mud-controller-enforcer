@@ -20,6 +20,8 @@ before_script:
   - cargo --version
 
 default:
+  except:
+    - tags
   tags:
     - linux
     - docker
