@@ -2,6 +2,7 @@ stages:
   - build
   - test
   - docs
+  - release
 
 image: 'rust:latest'
 
@@ -64,3 +65,12 @@ pages:
     paths:
       - public
     expire_in: 7 days
+
+tag:
+  stage: release
+  only:
+    - master
+  script:
+    - "export PACKAGE_VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)"
+    - git tag $PACKAGE_VERSION
+    - git push origin $PACKAGE_VERSION
