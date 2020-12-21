@@ -7,7 +7,7 @@ use crate::{
     },
     services::config_service::{get_config_value, set_config_value},
 };
-use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, Protocol, RuleName};
+use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
 use std::net::{IpAddr, ToSocketAddrs};
 
 pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRule>> {
@@ -21,10 +21,6 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
     for acl in &mud_data.acllist {
         for ace in &acl.ace {
             let rule_name = RuleName::new(format!("rule_{}", index));
-            let (route_network_src, route_network_dest) = match acl.packet_direction {
-                ACLDirection::FromDevice => (EnNetwork::LAN, EnNetwork::WAN),
-                ACLDirection::ToDevice => (EnNetwork::WAN, EnNetwork::LAN),
-            };
             let protocol = match &ace.matches.protocol {
                 None => Protocol::all(),
                 Some(proto) => match proto {
@@ -56,21 +52,22 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
                             }
                         },
                     };
-                    let (src_ip, dest_ip) = match acl.packet_direction {
-                        ACLDirection::FromDevice => (device.ip_addr.to_string(), addr.ip().to_string()),
-                        ACLDirection::ToDevice => (addr.ip().to_string(), device.ip_addr.to_string()),
+                    let route_network_lan = NetworkConfig::new(EnNetwork::LAN, Some(device.ip_addr.to_string()), None);
+                    let route_network_wan = NetworkConfig::new(EnNetwork::WAN, Some(addr.ip().to_string()), None);
+                    let (route_network_src, route_network_dest) = match acl.packet_direction {
+                        ACLDirection::FromDevice => (route_network_lan, route_network_wan),
+                        ACLDirection::ToDevice => (route_network_wan, route_network_lan),
                     };
-                    let config_firewall = FirewallRule::new(
-                        rule_name.clone(),
-                        route_network_src.clone(),
-                        route_network_dest.clone(),
-                        protocol.clone(),
-                        target.clone(),
-                        Some(vec![("src_ip".to_string(), src_ip), ("dest_ip".to_string(), dest_ip)]),
-                    );
+                    let config_firewall = FirewallRule::new(rule_name.clone(), route_network_src, route_network_dest, protocol.clone(), target.clone(), None);
                     result.push(config_firewall);
                 }
             } else {
+                let route_network_lan = NetworkConfig::new(EnNetwork::LAN, None, None);
+                let route_network_wan = NetworkConfig::new(EnNetwork::WAN, None, None);
+                let (route_network_src, route_network_dest) = match acl.packet_direction {
+                    ACLDirection::FromDevice => (route_network_lan, route_network_wan),
+                    ACLDirection::ToDevice => (route_network_wan, route_network_lan),
+                };
                 let config_firewall = FirewallRule::new(
                     rule_name,
                     route_network_src,
@@ -90,6 +87,23 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
             index += 1;
         }
     }
+    result.push(FirewallRule::new(
+        RuleName::new(format!("rule_default_{}", index)),
+        NetworkConfig::new(EnNetwork::LAN, Some(device.ip_addr.to_string()), None),
+        NetworkConfig::new(EnNetwork::WAN, None, None),
+        Protocol::all(),
+        EnTarget::REJECT,
+        None,
+    ));
+    index += 1;
+    result.push(FirewallRule::new(
+        RuleName::new(format!("rule_default_{}", index)),
+        NetworkConfig::new(EnNetwork::WAN, None, None),
+        NetworkConfig::new(EnNetwork::LAN, Some(device.ip_addr.to_string()), None),
+        Protocol::all(),
+        EnTarget::REJECT,
+        Some(vec![("dest_ip".to_string(), device.ip_addr.to_string())]),
+    ));
 
     Ok(result)
 }

@@ -10,11 +10,11 @@ postgres = ["diesel/postgres", "rocket_contrib/diesel_postgres_pool"]
 sqlite = ["diesel/sqlite", "rocket_contrib/diesel_sqlite_pool"]
 
 [dependencies]
-namib_shared = { path = "../namib_shared" }
+namib_shared = { tag = "0.1.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "0.4"
 env_logger = "0.8"
 tokio = { version = "0.3", features = ["full"] }
-async-dnssd = { path = "../rust-async-dnssd" }
+async-dnssd = { tag = "0.5.0-rc.2", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git" }
 futures = "0.3"
 rustls = "0.18"
 tokio-rustls = "0.20"
