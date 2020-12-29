@@ -124,31 +124,36 @@ openwrt_package_bcm2711_snapshot: # raspberry v4
   only:
     - master
   before_script:
+    # setup https credentials
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
-  script:
+    # install rust
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
     - source $HOME/.cargo/env
-    - sudo apt-get update && sudo apt-get install -y clang libc6-dev-i386 --no-install-recommends # build dependency for bindgen
+    # install git-secret & build dependency for bindgen
+    - sudo apt-get update && sudo apt-get install -y clang libc6-dev-i386 git-secret --no-install-recommends
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
+    - cd ..
+    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
+    - git fetch origin && git reset --mixed origin/master
+    - git secret reveal
+    - cd certs
+    - ./gen_client_cert.sh namib-ca
+  script:
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
-    - cd /home/build/openwrt
     - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
-    - cd package/namib/src
-    - cp -r ${CI_PROJECT_DIR} namib_enforcer
-    - cd namib_shared/certs
-    - ./gen_ca.sh
-    - ./gen_client_cert.sh
-    - cd /home/build/openwrt
+    - cp -r ${CI_PROJECT_DIR} package/namib/src/namib_enforcer
     - make defconfig
     - make package/namib/compile -j8
   after_script:
     - mkdir ${CI_PROJECT_DIR}/output
     - cp -r /home/build/openwrt/logs/package/namib ${CI_PROJECT_DIR}/output/logs || true
-    - cp -r /home/build/openwrt/bin/packages/*/base/namib_0.1.0-*.ipk /home/build/openwrt/package/namib/src/namib_shared/certs ${CI_PROJECT_DIR}/output || true
+    - cp -r /home/build/openwrt/bin/packages/*/base/namib_0.1.0-*.ipk ${CI_PROJECT_DIR}/output || true
   artifacts:
     paths:
       - output
