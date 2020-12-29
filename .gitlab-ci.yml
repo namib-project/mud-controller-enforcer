@@ -136,7 +136,7 @@ openwrt_package_bcm2711_snapshot: # raspberry v4
     - gpg --import $GPG_PRIVATE_KEY
     - cd ..
     - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
-    - git fetch origin && git reset --mixed origin/master
+    - git fetch origin && git checkout origin/master -f
     - git secret reveal
     - cd certs
     - ./gen_client_cert.sh namib-ca
