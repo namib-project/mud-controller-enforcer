@@ -83,7 +83,7 @@ build-release:
   #  - master
   script:
     - cargo install --root ./install --path .
-    - apt-get install git-secret
+    - apt-get install git-secret -y
     # decrypt ca secret
     - gpg --import $GPG_PRIVATE_KEY
     - cd ..
