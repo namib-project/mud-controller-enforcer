@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use futures::{future, StreamExt, TryStreamExt};
 use rustls::RootCertStore;
@@ -93,7 +93,7 @@ pub async fn listen(pool: DbConnPool) -> Result<()> {
     let tls_cfg = {
         // Use client certificate authentication.
         let mut client_auth_roots = RootCertStore::empty();
-        open_file_with("../namib_shared/certs/ca.pem", |b| client_auth_roots.add_pem_file(b))?;
+        open_file_with(&env::var("NAMIB_CA_CERT").expect("NAMIB_CA_CERT env is missing"), |b| client_auth_roots.add_pem_file(b))?;
 
         // Load server cert
         let certs = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)?;
