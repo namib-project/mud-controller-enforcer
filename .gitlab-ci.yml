@@ -2,6 +2,7 @@ stages:
   - build
   - test
   - docs
+  - release
   - docker
 
 image: rust:latest
@@ -33,26 +34,6 @@ build:
   stage: build
   script:
     - cargo build
-
-build-release:
-  stage: build
-  #only:
-  #  - master
-  script:
-    - cargo build --release
-    - cargo install --root ./install --path .
-    - pushd ../namib_shared/certs/
-    - ./gen_ca.sh
-    - ./gen_server_cert.sh
-    - popd
-    - mkdir -p ./namib_shared/certs
-    - cp ../namib_shared/certs/ca.pem ./namib_shared/certs/
-  artifacts:
-    paths:
-      - install/bin
-      - certs
-      - Dockerfile
-      - namib_shared
 
 test:
   stage: test
@@ -94,18 +75,40 @@ pages:
       - public
     expire_in: 7 days
 
+build-release:
+  stage: release
+  needs:
+    - build
+  #only:
+  #  - master
+  script:
+    - cargo install --root ./install --path .
+    - sudo apt-get install git-secret
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
+    - cd ..
+    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
+    - git fetch origin && git checkout origin/master -f
+    - git secret reveal
+    - cd certs
+    - ./gen_server_cert.sh namib-ca
+  artifacts:
+    paths:
+      - install/bin
+      - certs
+
 create-docker:
   stage: docker
-  before_script:
-    - echo "Global before_script disabled"
-  dependencies:
+  needs:
     - build-release
+  cache: {}
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [ "" ]
+  before_script:
+    - echo "Global before_script disabled"
   script:
     - mkdir -p /kaniko/.docker
-    - ls -lashR
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
   #only:

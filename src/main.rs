@@ -72,11 +72,9 @@ fn run_server() {
         .launch();
 }
 
-fn main() -> Result<()> {
-    dotenv()?;
+fn main() {
+    dotenv().ok();
     env_logger::init();
 
     run_server();
-
-    Ok(())
 }
