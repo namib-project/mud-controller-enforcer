@@ -135,7 +135,7 @@ mod tests {
         mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
     };
     use chrono::Local;
-    use namib_shared::macaddr;
+    use namib_shared::mac;
 
     #[test]
     fn test_converting() -> Result<()> {
@@ -169,7 +169,7 @@ mod tests {
 
         let device = Device {
             id: 0,
-            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
+            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
             ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "".to_string(),
             vendor_class: "".to_string(),

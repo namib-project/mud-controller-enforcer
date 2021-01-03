@@ -23,8 +23,8 @@ before_script:
   - rustc --version
   - cargo --version
   - cargo install sqlx-cli
-  - sqlx db create
-  - sqlx migrate --source migrations/sqlite run
+  - ./.cargo/bin/sqlx db create
+  - ./.cargo/bin/sqlx migrate --source migrations/sqlite run
 
 default:
   tags:
