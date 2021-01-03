@@ -1,4 +1,3 @@
-#![feature(proc_macro_hygiene, decl_macro)]
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
 #![allow(
     dead_code,
