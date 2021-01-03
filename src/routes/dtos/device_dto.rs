@@ -1,5 +1,4 @@
-use crate::models::device_model::Device;
-use crate::models::mud_models::MUDData;
+use crate::models::{device_model::Device, mud_models::MUDData};
 use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 

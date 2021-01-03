@@ -2,8 +2,7 @@
 
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
-use crate::routes::dtos::device_dto::DeviceDto;
-use crate::{db::ConnectionType, error::Result, services::device_service};
+use crate::{db::ConnectionType, error::Result, routes::dtos::device_dto::DeviceDto, services::device_service};
 
 #[api_v2_operation]
 async fn get_all_devices(pool: web::Data<ConnectionType>) -> Result<Json<Vec<DeviceDto>>> {

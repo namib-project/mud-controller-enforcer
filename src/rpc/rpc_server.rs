@@ -73,7 +73,7 @@ impl RPC for RPCServer {
             Ok(device) => {
                 dhcp_device_data.id = device.id;
                 true
-            }
+            },
             Err(_) => false,
         };
         if update {

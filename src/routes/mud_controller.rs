@@ -1,8 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use crate::{db::ConnectionType, error::Result, models::mud_models::MUDData, services::mud_service};
-use paperclip::actix::web::Json;
-use paperclip::actix::{api_v2_operation, web};
+use paperclip::actix::{api_v2_operation, web, web::Json};
 
 #[api_v2_operation]
 pub async fn get_mud(pool: web::Data<ConnectionType>, url: web::Path<String>) -> Result<Json<MUDData>> {

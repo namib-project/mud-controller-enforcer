@@ -89,7 +89,7 @@ impl actix_web::ResponseError for Error {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
 
                 (HttpResponse::build(status.clone()), ErrorDto { error: message })
-            }
+            },
             _ => (
                 HttpResponse::InternalServerError(),
                 ErrorDto {

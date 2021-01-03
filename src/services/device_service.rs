@@ -1,7 +1,6 @@
-use crate::error::Error;
 use crate::{
     db::ConnectionType,
-    error::Result,
+    error::{Error, Result},
     models::device_model::{Device, DeviceDbo},
     services::mud_service::get_mud_from_url,
 };
@@ -33,7 +32,7 @@ pub async fn get_all_devices(pool: &ConnectionType) -> Result<Vec<Device>> {
                     let data = get_mud_from_url(url.clone(), pool).await;
                     debug!("Get all devices: mud url {:?}: {:?}", url, data);
                     data.ok()
-                }
+                },
                 None => None,
             };
 
