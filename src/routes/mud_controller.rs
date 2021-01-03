@@ -1,19 +1,16 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use rocket::Route;
-use rocket_contrib::json::Json;
-use rocket_okapi::{openapi, routes_with_openapi};
+use crate::{db::ConnectionType, error::Result, models::mud_models::MUDData, services::mud_service};
+use paperclip::actix::web::Json;
+use paperclip::actix::{api_v2_operation, web};
 
-use crate::{db::DbConn, error::Result, models::mud_models::MUDData, services::mud_service};
-
-#[openapi]
-#[get("/?<url>")]
-pub fn get_mud(conn: DbConn, url: String) -> Result<Json<MUDData>> {
-    let res = futures::executor::block_on(mud_service::get_mud_from_url(url, conn))?;
+#[api_v2_operation]
+pub async fn get_mud(pool: web::Data<ConnectionType>, url: web::Path<String>) -> Result<Json<MUDData>> {
+    let res = mud_service::get_mud_from_url(url.into_inner(), pool.get_ref()).await?;
     info!("{:?}", res);
     Ok(Json(res))
 }
 
-pub fn routes() -> Vec<Route> {
-    routes_with_openapi![get_mud]
+pub fn init(cfg: &mut web::ServiceConfig) {
+    cfg.route("/{url}", web::get().to(get_mud));
 }

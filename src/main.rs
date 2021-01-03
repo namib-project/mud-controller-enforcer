@@ -10,27 +10,17 @@
 )]
 
 #[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate diesel_migrations;
-#[macro_use]
 extern crate log;
-#[macro_use]
-extern crate rocket;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate validator;
 
-use std::thread;
-
 use dotenv::dotenv;
-use rocket::fairing::AdHoc;
-use rocket_contrib::serve::StaticFiles;
-use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig, UrlObject};
-use tokio::runtime;
 
-use crate::db::DbConnPool;
+use crate::error::Result;
+use actix_web::{middleware, App, HttpServer};
+use paperclip::actix::{web, OpenApiExt};
 
 mod auth;
 mod db;
@@ -38,43 +28,42 @@ mod error;
 mod models;
 mod routes;
 mod rpc;
-mod schema;
 mod services;
 
-fn run_server() {
-    rocket::ignite()
-        .attach(db::DbConn::fairing())
-        .attach(AdHoc::on_attach("Database Migrations", db::run_db_migrations))
-        .attach(AdHoc::on_attach("RPC Server", |rocket| {
-            info!("Launching RPC server");
-            let pool = rocket.state::<DbConnPool>().expect("could not get db connection pool").clone();
-            let td = thread::spawn(move || {
-                let rt = runtime::Builder::new_current_thread().enable_all().build().expect("could not construct tokio runtime");
-                rt.block_on(rpc::rpc_server::listen(pool)).expect("failed to run rpc server");
-            });
-            Ok(rocket.manage(td))
-        }))
-        .mount("/users", routes::users_controller::routes())
-        .mount("/devices", routes::device_controller::routes())
-        .mount("/mud", routes::mud_controller::routes())
-        .mount("/", StaticFiles::from("public"))
-        .mount(
-            "/swagger-ui/",
-            make_swagger_ui(&SwaggerUIConfig {
-                urls: vec![
-                    UrlObject::new("Users", "../users/openapi.json"),
-                    UrlObject::new("MUD", "../mud/openapi.json"),
-                    UrlObject::new("Devices", "../devices/openapi.json"),
-                ],
-                ..Default::default()
-            }),
-        )
-        .launch();
-}
-
-fn main() {
+#[actix_web::main]
+async fn main() -> Result<()> {
     dotenv().ok();
     env_logger::init();
 
-    run_server();
+    let conn = db::connect().await?;
+    let conn2 = conn.clone();
+    actix_rt::spawn(async move {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("could not construct tokio runtime")
+            .block_on(rpc::rpc_server::listen(conn2))
+            .expect("failed running rpc server");
+    });
+    HttpServer::new(move || {
+        App::new()
+            .data(conn.clone())
+            .wrap(middleware::Logger::default())
+            .wrap_api()
+            .service(web::scope("/users").configure(routes::users_controller::init))
+            .service(web::scope("/devices").configure(routes::device_controller::init))
+            .service(web::scope("/mud").configure(routes::mud_controller::init))
+            .with_json_spec_at("/api/spec")
+            .build()
+            .service(
+                actix_files::Files::new("/", "public")
+                    .index_file("index.html")
+                    .redirect_to_slash_directory(),
+            )
+    })
+    .bind("0.0.0.0:8000")?
+    .run()
+    .await?;
+
+    Ok(())
 }

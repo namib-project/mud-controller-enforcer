@@ -42,8 +42,18 @@ pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
         }
     }
     let mut acllist = Vec::new();
-    parse_device_policy(&mud_data.from_device_policy, &mud_json, &mut acllist, ACLDirection::FromDevice)?;
-    parse_device_policy(&mud_data.to_device_policy, &mud_json, &mut acllist, ACLDirection::ToDevice)?;
+    parse_device_policy(
+        &mud_data.from_device_policy,
+        &mud_json,
+        &mut acllist,
+        ACLDirection::FromDevice,
+    )?;
+    parse_device_policy(
+        &mud_data.to_device_policy,
+        &mud_json,
+        &mut acllist,
+        ACLDirection::ToDevice,
+    )?;
 
     let data = MUDData {
         url,
@@ -65,13 +75,22 @@ pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn parse_device_policy(policy: &json_models::Policy, mud_json: &json_models::MudJson, acllist: &mut Vec<ACL>, dir: ACLDirection) -> Result<()> {
+fn parse_device_policy(
+    policy: &json_models::Policy,
+    mud_json: &json_models::MudJson,
+    acllist: &mut Vec<ACL>,
+    dir: ACLDirection,
+) -> Result<()> {
     for access_list in &policy.access_lists.access_list {
         let mut found = false;
         for aclitem in &mud_json.acls.acl {
             if aclitem.name == access_list.name {
                 let mut ace: Vec<ACE> = Vec::new();
-                let acl_type = if aclitem.type_field == "ipv4-acl-type" { ACLType::IPV4 } else { ACLType::IPV6 };
+                let acl_type = if aclitem.type_field == "ipv4-acl-type" {
+                    ACLType::IPV4
+                } else {
+                    ACLType::IPV6
+                };
                 for aceitem in &aclitem.aces.ace {
                     let mut protocol = None;
                     let mut direction_initiated = None;
@@ -133,11 +152,15 @@ fn parse_device_policy(policy: &json_models::Policy, mud_json: &json_models::Mud
                     }
                     ace.push(ACE {
                         name: aceitem.name.clone(),
-                        action: if aceitem.actions.forwarding == "accept" { ACEAction::Accept } else { ACEAction::Deny },
+                        action: if aceitem.actions.forwarding == "accept" {
+                            ACEAction::Accept
+                        } else {
+                            ACEAction::Deny
+                        },
                         matches: ACEMatches {
                             protocol,
                             direction_initiated,
-                            address_mask,
+                            address_mask: address_mask.map(|a| a.to_string()),
                             dnsname,
                             source_port,
                             destination_port,
@@ -176,7 +199,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                 }
             );
             Ok(ACEPort::Single(*p))
-        },
+        }
         json_models::Port {
             upper_port: Some(upper_port),
             lower_port: Some(lower_port),
@@ -189,7 +212,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                 }
             );
             Ok(ACEPort::Range(*lower_port, *upper_port))
-        },
+        }
         _ => MudError {
             message: String::from("Invalid port definition"),
         }

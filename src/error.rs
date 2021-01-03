@@ -1,39 +1,69 @@
 #![allow(clippy::pub_enum_variant_names, clippy::module_name_repetitions)]
 
-use okapi::openapi3::Responses as OAResponses;
-use rocket::{http::Status, response::Responder, Request, Response};
-use rocket_contrib::json::Json;
-use rocket_okapi::{gen::OpenApiGenerator, response::OpenApiResponder, util::add_schema_response};
+use isahc::http::StatusCode;
+use paperclip::actix::{api_v2_errors, web::HttpResponse};
 use schemars::JsonSchema;
 use snafu::{Backtrace, Snafu};
 
+#[api_v2_errors(code = 401, code = 500)]
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("ArgonError: {}", source), context(false))]
-    ArgonError { source: argon2::Error, backtrace: Backtrace },
+    ArgonError {
+        source: argon2::Error,
+        backtrace: Backtrace,
+    },
     #[snafu(display("PasswordVerifyError"), visibility(pub))]
     PasswordVerifyError { backtrace: Backtrace },
     #[snafu(display("DatabaseError: {}", source), context(false))]
-    DatabaseError { source: diesel::result::Error, backtrace: Backtrace },
+    DatabaseError {
+        source: sqlx::error::Error,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("MigrateError: {}", source), context(false))]
+    MigrateError {
+        source: sqlx::migrate::MigrateError,
+        backtrace: Backtrace,
+    },
     #[snafu(display("IoError: {}", source), context(false))]
-    IoError { source: std::io::Error, backtrace: Backtrace },
+    IoError {
+        source: std::io::Error,
+        backtrace: Backtrace,
+    },
     #[snafu(display("TlsError: {}", source), context(false))]
-    TlsError { source: rustls::TLSError, backtrace: Backtrace },
+    TlsError {
+        source: rustls::TLSError,
+        backtrace: Backtrace,
+    },
     #[snafu(display("AddrParseError: {}", source), context(false))]
-    AddrParseError { source: std::net::AddrParseError, backtrace: Backtrace },
+    AddrParseError {
+        source: std::net::AddrParseError,
+        backtrace: Backtrace,
+    },
     #[snafu(display("DotEnvError: {}", source), context(false))]
-    DotEnvError { source: dotenv::Error, backtrace: Backtrace },
+    DotEnvError {
+        source: dotenv::Error,
+        backtrace: Backtrace,
+    },
     #[snafu(display("JoinError: {}", source), context(false))]
-    JoinError { source: tokio::task::JoinError, backtrace: Backtrace },
-    #[snafu(display("LaunchError: {}", source), context(false))]
-    LaunchError { source: rocket::error::LaunchError, backtrace: Backtrace },
+    JoinError {
+        source: tokio::task::JoinError,
+        backtrace: Backtrace,
+    },
     #[snafu(display("{:?}", message), visibility(pub))]
-    ResponseError { message: Option<String>, status: Status, backtrace: Backtrace },
+    ResponseError {
+        message: Option<String>,
+        status: StatusCode,
+        backtrace: Backtrace,
+    },
     #[snafu(display("MudError {}", message), visibility(pub))]
     MudError { message: String, backtrace: Backtrace },
-    #[snafu(display("SerdeError {}", source), visibility(pub), context(false))]
-    SerdeError { source: serde_json::Error, backtrace: Backtrace },
-    #[snafu(display("IsahcError {}", source), visibility(pub), context(false))]
+    #[snafu(display("SerdeError {}", source), context(false))]
+    SerdeError {
+        source: serde_json::Error,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("IsahcError {}", source), context(false))]
     IsahcError { source: isahc::Error, backtrace: Backtrace },
 }
 
@@ -44,27 +74,35 @@ pub struct ErrorDto {
     pub error: String,
 }
 
-impl<'r> Responder<'r> for Error {
-    fn respond_to(self, request: &Request) -> rocket::response::Result<'r> {
-        error!("Error during request: {}", self);
+impl actix_web::ResponseError for Error {
+    fn status_code(&self) -> StatusCode {
         match self {
-            Error::ResponseError { status, message, .. } => {
-                let message = message.unwrap_or_else(|| String::from("An error occurred"));
-
-                Response::build_from(Json(ErrorDto { error: message }).respond_to(&request)?).status(status).ok()
-            },
-            _ => Response::build_from(
-                Json(ErrorDto {
-                    error: String::from("An error occurred"),
-                })
-                .respond_to(&request)?,
-            )
-            .status(Status::InternalServerError)
-            .ok(),
+            Error::ResponseError { status, .. } => status.clone(),
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+
+    fn error_response(&self) -> HttpResponse {
+        error!("Error during request: {}", self);
+        let (mut rb, body) = match self {
+            Error::ResponseError { status, message, .. } => {
+                let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
+
+                (HttpResponse::build(status.clone()), ErrorDto { error: message })
+            }
+            _ => (
+                HttpResponse::InternalServerError(),
+                ErrorDto {
+                    error: String::from("An error occurred"),
+                },
+            ),
+        };
+        rb.content_type("application/json")
+            .body(serde_json::to_string(&body).unwrap())
     }
 }
 
+/*
 impl OpenApiResponder<'_> for Error {
     fn responses(gen: &mut OpenApiGenerator) -> rocket_okapi::Result<OAResponses> {
         let mut responses = OAResponses::default();
@@ -74,3 +112,4 @@ impl OpenApiResponder<'_> for Error {
         Ok(responses)
     }
 }
+*/
