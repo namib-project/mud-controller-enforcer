@@ -49,9 +49,9 @@ impl fmt::Display for EnNetwork {
 /// Struct for src and dest configs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkConfig {
-    typ: EnNetwork,
-    ip: Option<String>,
-    port: Option<String>,
+    pub typ: EnNetwork,
+    pub ip: Option<String>,
+    pub port: Option<String>,
 }
 
 impl NetworkConfig {
