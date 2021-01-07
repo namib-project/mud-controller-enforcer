@@ -1,0 +1,9 @@
+version: "3"
+
+services:
+  namib_mud_controller:
+    image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:latest
+    #image: controller
+    ports:
+      - 8000:8000
+      - 8734:8734

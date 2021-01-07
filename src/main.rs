@@ -30,7 +30,7 @@ use rocket_contrib::serve::StaticFiles;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig, UrlObject};
 use tokio::runtime;
 
-use crate::{db::DbConnPool, error::Result};
+use crate::db::DbConnPool;
 
 mod auth;
 mod db;
@@ -72,11 +72,9 @@ fn run_server() {
         .launch();
 }
 
-fn main() -> Result<()> {
-    dotenv()?;
+fn main() {
+    dotenv().ok();
     env_logger::init();
 
     run_server();
-
-    Ok(())
 }
