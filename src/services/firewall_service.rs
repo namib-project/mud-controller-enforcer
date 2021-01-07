@@ -98,9 +98,8 @@ fn delete_all_config(uci: &mut UCI) -> Result<()> {
 /// Return an Output.
 #[cfg(feature = "execute_uci_commands")]
 pub fn restart_firewall_command() -> std::process::Output {
-    std::process::Command::new("sh")
-        .arg("-c")
-        .arg("service firewall restart")
+    std::process::Command::new("/etc/init.d/firewall")
+        .arg("restart")
         .output()
         .expect("failed to execute process")
 }

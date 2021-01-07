@@ -5,8 +5,12 @@ use log::{debug, info};
 use snafu::Snafu;
 
 use namib_shared::{
-    mac_addr::MacAddr,
-    models::{DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, LeaseExpiryTime},
+    mac as macaddr,
+    models::{
+        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation,
+        DhcpV6LeaseVersionSpecificInformation, LeaseExpiryTime,
+    },
+    MacAddr,
 };
 
 enum EventType {
@@ -23,7 +27,9 @@ impl FromStr for EventType {
             "add" => Ok(EventType::Add),
             "del" => Ok(EventType::Del),
             "old" => Ok(EventType::Old),
-            _ => Err(DhcpDataExtractionError::UnsupportedEventType { supplied_type: s.to_owned() }),
+            _ => Err(DhcpDataExtractionError::UnsupportedEventType {
+                supplied_type: s.to_owned(),
+            }),
         }
     }
 }
@@ -33,21 +39,37 @@ impl FromStr for EventType {
 enum DhcpDataExtractionError {
     /// The IP address that was supplied was not properly formatted.
     #[snafu(display("Supplied IP Address \"{}\" is not valid: {}", "supplied_address", "source"))]
-    InvalidIpAddress { supplied_address: String, source: net::AddrParseError },
+    InvalidIpAddress {
+        supplied_address: String,
+        source: net::AddrParseError,
+    },
     /// A required argument for the script was missing.
     #[snafu(display("Not enough arguments supplied. Missing {} arguments.", "missing_arg_count"))]
     NotEnoughArguments { missing_arg_count: usize },
     #[snafu(display("Required argument \"{}\" is missing", "missing_arg_name"))]
     RequiredArgumentMissing { missing_arg_name: String },
     /// The supplied lease time is not a valid number.
-    #[snafu(display("Supplied lease time \"{}\" is not a valid number: {}", "supplied_lease_time", "source"))]
-    InvalidLeaseTime { supplied_lease_time: String, source: num::ParseIntError },
+    #[snafu(display(
+        "Supplied lease time \"{}\" is not a valid number: {}",
+        "supplied_lease_time",
+        "source"
+    ))]
+    InvalidLeaseTime {
+        supplied_lease_time: String,
+        source: num::ParseIntError,
+    },
     /// A required environment variable is missing.
     #[snafu(display("Required environment variable \"{}\" is missing", "missing_var_name"))]
-    RequiredEnvironmentVariableMissing { missing_arg_name: String, source: env::VarError },
+    RequiredEnvironmentVariableMissing {
+        missing_arg_name: String,
+        source: env::VarError,
+    },
     /// The supplied MAC-Address is not of the correct format.
     #[snafu(display("Supplied MAC address \"{}\" is not valid: {}", "supplied_mac", "source"))]
-    InvalidMacAddress { supplied_mac: String, source: macaddr::ParseError },
+    InvalidMacAddress {
+        supplied_mac: String,
+        source: macaddr::ParseError,
+    },
     /// The event type this script was called with is not supported.
     #[snafu(display("Supplied event type \"{}\" is not supported", "supplied_type"))]
     UnsupportedEventType { supplied_type: String },
@@ -102,11 +124,13 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
             source: e,
         })
         .and_then(|x| {
-            x.parse::<u64>().map(Duration::from_secs).map_err(|e| DhcpDataExtractionError::InvalidLeaseTime {
-                // We checked that this variable
-                supplied_lease_time: time_remaining.unwrap(),
-                source: e,
-            })
+            x.parse::<u64>()
+                .map(Duration::from_secs)
+                .map_err(|e| DhcpDataExtractionError::InvalidLeaseTime {
+                    // We checked that this variable
+                    supplied_lease_time: time_remaining.unwrap(),
+                    source: e,
+                })
         })?;
 
     let mut user_classes = Vec::new();
@@ -127,12 +151,12 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
         IpAddr::V4(ip_addr) => {
             mac_address = Some(args[2].clone());
             DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation { ip_addr })
-        },
+        }
         IpAddr::V6(ip_addr) => {
             mac_address = env::var("DNSMASQ_MAC").ok();
 
             DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation { ip_addr })
-        },
+        }
     };
     // Parse MAC Address from supplied string.
     // We use a match instead of the map function here to allow the decode_to_slice function to return
@@ -141,10 +165,13 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
         Some(mac_str) => {
             let mac_addr_array: MacAddr = mac_str
                 .parse::<macaddr::MacAddr>()
-                .map_err(|e| DhcpDataExtractionError::InvalidMacAddress { supplied_mac: mac_str, source: e })?
+                .map_err(|e| DhcpDataExtractionError::InvalidMacAddress {
+                    supplied_mac: mac_str,
+                    source: e,
+                })?
                 .into();
             Some(mac_addr_array)
-        },
+        }
         None => None,
     };
 
@@ -199,13 +226,13 @@ fn extract_lease_expiry_time() -> Result<LeaseExpiryTime> {
                         .expect("Lease expiry time cannot be represented as DateTime (overflow).")
                         .into(),
                 )
-            },
+            }
             Err(e) => {
                 return Result::Err(DhcpDataExtractionError::InvalidLeaseTime {
                     supplied_lease_time: lease_expire_timestamp,
                     source: e,
                 })
-            },
+            }
         }
     } else if let Ok(lease_length) = lease_length_var {
         match lease_length.parse::<u64>() {
@@ -215,7 +242,7 @@ fn extract_lease_expiry_time() -> Result<LeaseExpiryTime> {
                     supplied_lease_time: lease_length,
                     source: e,
                 })
-            },
+            }
         }
     } else if let Err(e) = lease_length_var {
         return Result::Err(DhcpDataExtractionError::RequiredEnvironmentVariableMissing {

@@ -4,7 +4,6 @@ use futures::{pin_mut, prelude::*};
 use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context, serde_transport};
 use tokio::{
-    prelude::*,
     sync::Mutex,
     time::{sleep, Duration},
 };
@@ -17,6 +16,7 @@ use crate::{
 };
 
 use super::controller_discovery::discover_controllers;
+use tokio::io::AsyncReadExt;
 use tokio::{fs::File, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
@@ -68,7 +68,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
-                },
+                }
                 Ok(None) => debug!("Heartbeat OK!"),
             }
 
