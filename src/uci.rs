@@ -15,8 +15,9 @@ mod unix {
     use snafu::ensure;
 
     use libuci_sys::{
-        uci_alloc_context, uci_commit, uci_context, uci_delete, uci_free_context, uci_get_errorstr, uci_lookup_ptr, uci_option_type_UCI_TYPE_STRING, uci_ptr,
-        uci_ptr_UCI_LOOKUP_COMPLETE, uci_revert, uci_save, uci_set, uci_set_confdir, uci_set_savedir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
+        uci_alloc_context, uci_commit, uci_context, uci_delete, uci_free_context, uci_get_errorstr, uci_lookup_ptr,
+        uci_option_type_UCI_TYPE_STRING, uci_ptr, uci_ptr_UCI_LOOKUP_COMPLETE, uci_revert, uci_save, uci_set,
+        uci_set_confdir, uci_set_savedir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
     };
 
     use crate::error::{Result, UCIError};
@@ -100,7 +101,11 @@ mod unix {
             ensure!(
                 result == UCI_OK,
                 UCIError {
-                    message: format!("Cannot set save dir: {}, {}", save_dir, self.get_last_error().unwrap_or_else(|_| String::from("Unknown")))
+                    message: format!(
+                        "Cannot set save dir: {}, {}",
+                        save_dir,
+                        self.get_last_error().unwrap_or_else(|_| String::from("Unknown"))
+                    )
                 }
             );
             info!("Set save dir to: {}", save_dir);
@@ -455,7 +460,9 @@ mod tests {
     use super::*;
 
     fn init() -> Result<UCI> {
-        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).is_test(true).try_init();
+        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
+            .is_test(true)
+            .try_init();
 
         let mut uci = UCI::new()?;
         uci.set_config_dir("tests/config")?;

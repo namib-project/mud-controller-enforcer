@@ -34,7 +34,10 @@ pub fn discover_controllers(reg_type: &str) -> Result<impl Stream<Item=Result<Sc
         })
         .try_flatten()
         .try_filter_map(|r| async move {
-            info!("Resolved on {:?}: {:?}:{}\t\t[{:?}]", r.interface, r.host_target, r.port, r);
+            info!(
+                "Resolved on {:?}: {:?}:{}\t\t[{:?}]",
+                r.interface, r.host_target, r.port, r
+            );
 
             Ok(Some(r.resolve_socket_address()?.timeout(ADDRESS_TIMEOUT)?))
         })

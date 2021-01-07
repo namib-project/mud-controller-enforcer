@@ -151,12 +151,12 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
         IpAddr::V4(ip_addr) => {
             mac_address = Some(args[2].clone());
             DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation { ip_addr })
-        }
+        },
         IpAddr::V6(ip_addr) => {
             mac_address = env::var("DNSMASQ_MAC").ok();
 
             DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation { ip_addr })
-        }
+        },
     };
     // Parse MAC Address from supplied string.
     // We use a match instead of the map function here to allow the decode_to_slice function to return
@@ -171,7 +171,7 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
                 })?
                 .into();
             Some(mac_addr_array)
-        }
+        },
         None => None,
     };
 
@@ -226,13 +226,13 @@ fn extract_lease_expiry_time() -> Result<LeaseExpiryTime> {
                         .expect("Lease expiry time cannot be represented as DateTime (overflow).")
                         .into(),
                 )
-            }
+            },
             Err(e) => {
                 return Result::Err(DhcpDataExtractionError::InvalidLeaseTime {
                     supplied_lease_time: lease_expire_timestamp,
                     source: e,
                 })
-            }
+            },
         }
     } else if let Ok(lease_length) = lease_length_var {
         match lease_length.parse::<u64>() {
@@ -242,7 +242,7 @@ fn extract_lease_expiry_time() -> Result<LeaseExpiryTime> {
                     supplied_lease_time: lease_length,
                     source: e,
                 })
-            }
+            },
         }
     } else if let Err(e) = lease_length_var {
         return Result::Err(DhcpDataExtractionError::RequiredEnvironmentVariableMissing {

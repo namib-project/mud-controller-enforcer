@@ -11,7 +11,6 @@ mod unix {
     use log::debug;
     use tarpc::context;
     use tokio::{
-        io::AsyncReadExt,
         net::{UnixListener, UnixStream},
         stream::StreamExt,
         sync::Mutex,
@@ -29,9 +28,10 @@ mod unix {
             },
         }
         .expect("Unable to get access to socket file");
-        let mut listener = UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
+        let mut listener =
+            UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
         let mut active_listeners = Vec::new();
-        while let Some(event_stream) = listener.next().await {
+        while let Some(event_stream) = listener.accept().await {
             if let Ok(event_stream) = event_stream {
                 let rpc_client_copy = rpc_client.clone();
                 active_listeners.push(tokio::spawn(async move {

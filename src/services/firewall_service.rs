@@ -80,7 +80,9 @@ fn delete_all_config(uci: &mut UCI) -> Result<()> {
     debug!("Deleting all namib configs");
     let mut index = 0;
     while uci.get(format!("firewall.@rule[{}]", index).as_str()).is_ok() {
-        let is_namib = uci.get(format!("firewall.@rule[{}].namib", index).as_str()).map_or(false, |s| s == "1");
+        let is_namib = uci
+            .get(format!("firewall.@rule[{}].namib", index).as_str())
+            .map_or(false, |s| s == "1");
 
         if is_namib {
             uci.delete(format!("firewall.@rule[{}]", index).as_str())?;
@@ -125,7 +127,14 @@ mod tests {
 
         let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
         let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
-        let cfg = FirewallRule::new(RuleName::new("Regel2".to_string()), src, dst, Protocol::tcp(), EnTarget::DROP, EnOptionalSettings::None);
+        let cfg = FirewallRule::new(
+            RuleName::new("Regel2".to_string()),
+            src,
+            dst,
+            Protocol::tcp(),
+            EnTarget::DROP,
+            EnOptionalSettings::None,
+        );
         apply_rule(&mut uci, &cfg)?;
         uci.commit("firewall")?;
 
@@ -149,7 +158,10 @@ mod tests {
     fn test_delete_config() -> Result<()> {
         init();
 
-        fs::copy("tests/config/test_delete_all_config/firewall_before", "tests/config/test_delete_all_config/firewall")?;
+        fs::copy(
+            "tests/config/test_delete_all_config/firewall_before",
+            "tests/config/test_delete_all_config/firewall",
+        )?;
 
         let mut uci = UCI::new()?;
         uci.set_save_dir("/tmp/.uci_delete_all_config")?;
@@ -178,7 +190,10 @@ mod tests {
     fn test_apply_and_delete_config() -> Result<()> {
         init();
 
-        fs::copy("tests/config/test_apply_and_delete/firewall_before", "tests/config/test_apply_and_delete/firewall")?;
+        fs::copy(
+            "tests/config/test_apply_and_delete/firewall_before",
+            "tests/config/test_apply_and_delete/firewall",
+        )?;
 
         let mut uci = UCI::new()?;
         uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
@@ -187,7 +202,14 @@ mod tests {
         let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
         let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
 
-        let cfg = FirewallRule::new(RuleName::new("Regel3".to_string()), src, dst, Protocol::tcp(), EnTarget::DROP, EnOptionalSettings::None);
+        let cfg = FirewallRule::new(
+            RuleName::new("Regel3".to_string()),
+            src,
+            dst,
+            Protocol::tcp(),
+            EnTarget::DROP,
+            EnOptionalSettings::None,
+        );
 
         // apply the config
         apply_rule(&mut uci, &cfg)?;
