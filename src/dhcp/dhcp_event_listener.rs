@@ -11,8 +11,8 @@ mod unix {
     use log::debug;
     use tarpc::context;
     use tokio::{
+        io::AsyncReadExt,
         net::{UnixListener, UnixStream},
-        stream::StreamExt,
         sync::Mutex,
     };
 
@@ -31,13 +31,11 @@ mod unix {
         let mut listener =
             UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
         let mut active_listeners = Vec::new();
-        while let Some(event_stream) = listener.accept().await {
-            if let Ok(event_stream) = event_stream {
-                let rpc_client_copy = rpc_client.clone();
-                active_listeners.push(tokio::spawn(async move {
-                    handle_dhcp_script_connection(rpc_client_copy, event_stream).await;
-                }));
-            }
+        while let Ok((event_stream, _)) = listener.accept().await {
+            let rpc_client_copy = rpc_client.clone();
+            active_listeners.push(tokio::spawn(async move {
+                handle_dhcp_script_connection(rpc_client_copy, event_stream).await;
+            }));
         }
         join_all(active_listeners).await;
     }
@@ -50,10 +48,10 @@ mod unix {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
                 let mut unlocked_rpc = rpc_client.lock().await;
                 unlocked_rpc.dhcp_request(context::current(), dhcp_event).await.unwrap();
-            },
+            }
             Err(e) => {
                 warn!("DHCP event was received, but could not be parsed: {}", e);
-            },
+            }
         }
     }
 }
