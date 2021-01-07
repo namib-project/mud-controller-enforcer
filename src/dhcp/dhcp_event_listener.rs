@@ -28,7 +28,7 @@ mod unix {
             },
         }
         .expect("Unable to get access to socket file");
-        let mut listener =
+        let listener =
             UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
         let mut active_listeners = Vec::new();
         while let Ok((event_stream, _)) = listener.accept().await {
@@ -48,10 +48,10 @@ mod unix {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
                 let mut unlocked_rpc = rpc_client.lock().await;
                 unlocked_rpc.dhcp_request(context::current(), dhcp_event).await.unwrap();
-            }
+            },
             Err(e) => {
                 warn!("DHCP event was received, but could not be parsed: {}", e);
-            }
+            },
         }
     }
 }
