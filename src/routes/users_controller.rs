@@ -13,6 +13,15 @@ use crate::{
 use isahc::http::StatusCode;
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
+pub fn init(cfg: &mut web::ServiceConfig) {
+    cfg.route("/signup", web::post().to(signup));
+    cfg.route("/login", web::post().to(login));
+    cfg.route("/me", web::get().to(get_me));
+    cfg.route("/me", web::post().to(update_me));
+    cfg.route("/password", web::post().to(update_password));
+    cfg.route("/roles", web::get().to(get_roles));
+}
+
 #[api_v2_operation(summary = "Register a new user")]
 pub async fn signup(pool: web::Data<ConnectionType>, signup_dto: Json<SignupDto>) -> Result<Json<SuccessDto>> {
     signup_dto.validate().or_else(|_| {
@@ -145,13 +154,4 @@ pub fn get_roles(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<Rol
     let permissions = user_service::get_permissions(&user, &pool).await.unwrap_or_default();
 
     Ok(Json(RolesDto { roles, permissions }))
-}
-
-pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.route("/signup", web::post().to(signup));
-    cfg.route("/login", web::post().to(login));
-    cfg.route("/me", web::get().to(get_me));
-    cfg.route("/me", web::post().to(update_me));
-    cfg.route("/password", web::post().to(update_password));
-    cfg.route("/roles", web::get().to(get_roles));
 }
