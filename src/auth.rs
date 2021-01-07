@@ -1,17 +1,16 @@
 use std::env;
 
+use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
+use futures::{future, future::Ready};
 use jsonwebtoken as jwt;
-use rocket::{
-    http::Status,
-    request::{self, FromRequest, Request},
-    Outcome,
-};
+use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
 
 static HEADER_PREFIX: &str = "Bearer ";
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Apiv2Security, Clone, Deserialize, Serialize)]
+#[openapi(apiKey, in = "header", name = "Authorization")]
 pub struct Auth {
     // Not before
     pub nbf: i64,
@@ -21,12 +20,12 @@ pub struct Auth {
     pub sub: String,
 
     // User stuff
-    pub id: i32,
+    pub id: i64,
     pub username: String,
 }
 
 impl Auth {
-    pub fn generate_auth(id: i32, username: String, sub: String) -> Auth {
+    pub fn generate_auth(id: i64, username: String, sub: String) -> Auth {
         let time_now = Utc::now().naive_utc();
         Auth {
             nbf: time_now.timestamp(),
@@ -64,10 +63,11 @@ impl Auth {
     }
 }
 
-fn extract_auth_from_request(request: &Request) -> Option<Auth> {
+fn extract_auth_from_request(request: &HttpRequest) -> Option<Auth> {
     request
         .headers()
-        .get_one("authorization")
+        .get("authorization")
+        .and_then(|header| header.to_str().ok())
         .and_then(extract_token_from_header)
         .and_then(|token| Auth::decode_token(token))
 }
@@ -76,18 +76,20 @@ fn extract_token_from_header(header: &str) -> Option<&str> {
     header.strip_prefix(HEADER_PREFIX)
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for Auth {
-    type Error = &'static str;
+impl FromRequest for Auth {
+    type Config = ();
+    type Error = actix_web::Error;
+    type Future = Ready<Result<Self, Self::Error>>;
 
     /// Middleware for Auth struct extraction from "Authorization: Bearer {}" header.
     /// (Header => Token => Auth)
     ///
     /// If valid => success
     /// if invalid => will fail request with Unauthorized
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Auth, Self::Error> {
-        match extract_auth_from_request(request) {
-            Some(auth) => Outcome::Success(auth),
-            None => Outcome::Failure((Status::Forbidden, "Unauthorized")),
+    fn from_request(req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
+        match extract_auth_from_request(req) {
+            Some(auth) => future::ok(auth),
+            None => future::err(ErrorUnauthorized("Unauthorized")),
         }
     }
 }

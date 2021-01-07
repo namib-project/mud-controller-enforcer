@@ -1,19 +1,16 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use rocket::{Route, State};
-use rocket_contrib::json::Json;
-use rocket_okapi::{openapi, routes_with_openapi};
+use paperclip::actix::{api_v2_operation, web, web::Json};
 
-use crate::{db::DbConnPool, error::Result, models::device_model::DeviceData, services::device_service};
+use crate::{db::ConnectionType, error::Result, routes::dtos::device_dto::DeviceDto, services::device_service};
 
-#[openapi]
-#[get("/")]
-pub fn get_all_devices(pool: State<DbConnPool>) -> Result<Json<Vec<DeviceData>>> {
-    let res = futures::executor::block_on(device_service::get_all_devices(pool.inner().clone()))?;
-    info!("{:?}", res);
-    Ok(Json(res))
+pub fn init(cfg: &mut web::ServiceConfig) {
+    cfg.route("/", web::get().to(get_all_devices));
 }
 
-pub fn routes() -> Vec<Route> {
-    routes_with_openapi![get_all_devices]
+#[api_v2_operation]
+async fn get_all_devices(pool: web::Data<ConnectionType>) -> Result<Json<Vec<DeviceDto>>> {
+    let res = device_service::get_all_devices(pool.get_ref()).await?;
+    info!("{:?}", res);
+    Ok(Json(res.into_iter().map(|d| DeviceDto::from(d)).collect()))
 }

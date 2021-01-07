@@ -91,7 +91,10 @@ where
                 let accepted: rustls::server::TlsStream<TcpStream> = ready!(conn.poll(cx)?);
                 this.pending_conn.set(None);
 
-                break Some(Ok(serde_transport::new(this.config.new_framed(accepted), (this.codec_fn)())));
+                break Some(Ok(serde_transport::new(
+                    this.config.new_framed(accepted),
+                    (this.codec_fn)(),
+                )));
             } else {
                 let conn: TcpStream = ready!(this.listener.as_mut().poll_accept(cx)?).0;
 

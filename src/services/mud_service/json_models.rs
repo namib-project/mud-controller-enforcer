@@ -2,7 +2,10 @@
 pub struct MudJson {
     #[serde(rename = "ietf-mud:mud")]
     pub mud: MudDefinition,
-    #[serde(alias = "ietf-access-control-list:acls", alias = "ietf-access-control-list:access-lists")]
+    #[serde(
+        alias = "ietf-access-control-list:acls",
+        alias = "ietf-access-control-list:access-lists"
+    )]
     pub acls: IetfAccessControlListAcls,
 }
 

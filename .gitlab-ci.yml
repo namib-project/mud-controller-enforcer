@@ -20,10 +20,11 @@ before_script:
   - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
   - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
   - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
-  - rustup toolchain install nightly --component rustfmt,clippy --no-self-update
-  - rustup default nightly
   - rustc --version
   - cargo --version
+  - cargo install sqlx-cli
+  - ./.cargo/bin/sqlx db create
+  - ./.cargo/bin/sqlx migrate --source migrations/sqlite run
 
 default:
   tags:
@@ -43,12 +44,14 @@ test:
 warnings:
   stage: test
   script:
+    - rustup toolchain install nightly --component clippy --no-self-update
     - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
 formatting:
   stage: test
   script:
+    - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
 docs:
