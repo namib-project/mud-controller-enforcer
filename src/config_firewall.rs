@@ -4,7 +4,9 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use chrono::{DateTime, Utc};
 use serde::{export::Formatter, Deserialize, Serialize};
+use std::net::IpAddr;
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -46,47 +48,76 @@ impl fmt::Display for EnNetwork {
         }
     }
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ResolvedIp {
+    pub ip: Option<IpAddr>,
+    pub refresh_at: DateTime<Utc>,
+}
+
+impl Default for ResolvedIp {
+    fn default() -> ResolvedIp {
+        ResolvedIp {
+            ip: None,
+            refresh_at: chrono::MIN_DATETIME,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum NetworkHost {
+    Ip(IpAddr),
+    Hostname { dns_name: String, resolved_ip: ResolvedIp },
+}
+
 /// Struct for src and dest configs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkConfig {
     pub typ: EnNetwork,
-    pub ip: Option<String>,
+    pub host: Option<NetworkHost>,
     pub port: Option<String>,
 }
 
 impl NetworkConfig {
-    pub fn new(typ: EnNetwork, ip: Option<String>, port: Option<String>) -> NetworkConfig {
-        NetworkConfig { typ, ip, port }
+    pub fn new(typ: EnNetwork, host: Option<NetworkHost>, port: Option<String>) -> NetworkConfig {
+        NetworkConfig { typ, host, port }
     }
 }
 
-/// Struct for protocol
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Protocol(u32);
-
-impl Protocol {
-    /// Returns the tcp value used from uci.
-    pub fn tcp() -> Self {
-        Protocol(6)
-    }
-
-    pub fn udp() -> Self {
-        Protocol(17)
-    }
-
-    pub fn from_number(nr: u32) -> Self {
-        Protocol(nr)
-    }
-
-    pub fn all() -> Self {
-        Protocol(0)
-    }
-
-    /// Return the key, value pair.
-    pub fn to_option(&self) -> (String, String) {
-        ("proto".to_string(), self.0.to_string())
-    }
+pub enum Protocol {
+    Tcp,
+    Udp,
+    All,
 }
+
+///// Struct for protocol
+//#[derive(Clone, Debug, Deserialize, Serialize)]
+//pub struct Protocol(u32);
+
+//impl Protocol {
+//    /// Returns the tcp value used from uci.
+//    pub fn tcp() -> Self {
+//        Protocol(6)
+//    }
+//
+//    pub fn udp() -> Self {
+//        Protocol(17)
+//    }
+
+//    pub fn from_number(nr: u32) -> Self {
+//        Protocol(nr)
+//    }
+
+//    pub fn all() -> Self {
+//        Protocol(0)
+//    }
+
+//    /// Return the key, value pair.
+//    pub fn to_option(&self) -> (String, String) {
+//        ("proto".to_string(), self.0.to_string())
+//    }
+//}
 
 /// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -113,12 +144,12 @@ pub type EnOptionalSettings = Option<Vec<(String, String)>>;
 /// This struct contains the main configuration which is needed for firewall rules.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
-    rule_name: RuleName,
-    src: NetworkConfig,
-    dst: NetworkConfig,
-    protocol: Protocol,
-    target: EnTarget,
-    optional_settings: EnOptionalSettings,
+    pub rule_name: RuleName,
+    pub src: NetworkConfig,
+    pub dst: NetworkConfig,
+    pub protocol: Protocol,
+    pub target: EnTarget,
+    pub optional_settings: EnOptionalSettings,
 }
 
 impl FirewallRule {
@@ -142,49 +173,30 @@ impl FirewallRule {
         hasher.finish().to_string()
     }
 
-    /// Returns this firewall rule as list of key, value pairs.
-    pub fn to_option(&self) -> Vec<(String, String)> {
-        let mut query: Vec<(String, String)> = Vec::new();
-        query.push(self.rule_name.to_option());
-        query.push(self.protocol.to_option());
-        query.push(self.target.to_option());
-        query.push(("src".to_string(), self.src.typ.to_string()));
-        if let Some(ip) = &self.src.ip {
-            query.push(("src_ip".to_string(), ip.clone()));
-        }
-        if let Some(port) = &self.src.port {
-            query.push(("src_port".to_string(), port.clone()));
-        }
-        query.push(("dest".to_string(), self.dst.typ.to_string()));
-        if let Some(ip) = &self.dst.ip {
-            query.push(("dest_ip".to_string(), ip.clone()));
-        }
-        if let Some(port) = &self.dst.port {
-            query.push(("dst_port".to_string(), port.clone()));
-        }
-        if let Some(v) = &self.optional_settings {
-            v.iter().for_each(|o| query.push(o.clone()));
-        }
-        query
-    }
-
     /// Returns this rule's name
     pub fn rule_name(&self) -> &RuleName {
         &self.rule_name
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct FirewallDevice {
+    pub id: i64,
+    pub ip: IpAddr,
+    pub rules: Vec<FirewallRule>,
+}
+
 /// Stores a set of firewall rules and a config version
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallConfig {
     version: String,
-    rules: Vec<FirewallRule>,
+    devices: Vec<FirewallDevice>,
 }
 
 impl FirewallConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, rules: Vec<FirewallRule>) -> Self {
-        FirewallConfig { version, rules }
+    pub fn new(version: String, devices: Vec<FirewallDevice>) -> Self {
+        FirewallConfig { version, devices }
     }
 
     /// Returns the version of this config
@@ -193,7 +205,12 @@ impl FirewallConfig {
     }
 
     /// Returns a reference to the firewall rules in this config
-    pub fn rules(&self) -> &Vec<FirewallRule> {
-        &self.rules
+    pub fn devices(&self) -> &Vec<FirewallDevice> {
+        &self.devices
+    }
+
+    /// Returns a reference to the firewall rules in this config
+    pub fn devices_mut(&mut self) -> &mut Vec<FirewallDevice> {
+        &mut self.devices
     }
 }
