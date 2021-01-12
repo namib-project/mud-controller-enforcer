@@ -14,6 +14,7 @@ use namib_shared::rpc::RPCClient;
 
 mod dhcp;
 mod error;
+mod models;
 mod rpc;
 mod services;
 mod uci;

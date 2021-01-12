@@ -1,6 +1,8 @@
-use namib_shared::config_firewall::{FirewallConfig, FirewallRule};
+use namib_shared::config_firewall::{EnTarget, FirewallConfig, FirewallRule, NetworkHost, Protocol};
 
-use crate::{error::Result, services::is_system_mode, uci::UCI};
+use crate::{error::Result, models::model_firewall::FirewallConfigState, services::is_system_mode, uci::UCI};
+use nftnl::{nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table};
+use std::{ffi::CString, net::IpAddr};
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -11,248 +13,156 @@ use crate::{error::Result, services::is_system_mode, uci::UCI};
 /// The folder where the configuration file should be stored.
 const CONFIG_DIR: &str = "config";
 const SAVE_DIR: &str = "/tmp/.uci_namib";
+const TABLE_NAME: &str = "namib";
+const BASE_CHAIN_NAME: &str = "base_chain";
 
-pub fn get_config_version() -> Result<String> {
-    debug!("Getting config version");
-    let mut uci = UCI::new()?;
-    if !is_system_mode() {
-        uci.set_config_dir(CONFIG_DIR)?;
-        uci.set_save_dir(SAVE_DIR)?;
-    }
-    uci.get("firewall.namib_config_version")
-}
+pub fn handle_new_config(firewall_state: &FirewallConfigState, config: FirewallConfig) -> Result<()> {
+    let mut batch = Batch::new();
+    add_old_config_deletion_instructions(&mut batch);
+    convert_config_to_nftnl_commands(&mut batch, &config)?;
+    let batch = batch.finalize();
+    // TODO proper error handling
+    send_and_process(&batch).unwrap();
 
-/// This function create new configuration that should be uploaded on the firewall.
-/// It use the function `apply_uci_config`.
-/// Return Result<()>.
-pub fn apply_config(cfg: &FirewallConfig) -> Result<()> {
-    debug!("Applying {} configs", cfg.rules().len());
-    let mut uci = UCI::new()?;
-    if !is_system_mode() {
-        uci.set_config_dir(CONFIG_DIR)?;
-        uci.set_save_dir(SAVE_DIR)?;
-    }
-
-    // if an error occurred roll back any changes
-    if let Err(e) = apply_uci_config(&mut uci, &cfg) {
-        uci.revert("firewall")?;
-        return Err(e);
-    }
-
-    #[cfg(feature = "execute_uci_commands")]
-    {
-        let output = restart_firewall_command();
-        debug!("restart firewall: {:?}", std::str::from_utf8(&output.stderr));
-    }
     Ok(())
 }
 
-/// This function takes an UCI context and a Vector of configurations that should be uploaded on firewall.
-/// and commit these changes. This function delete all previous changes from "Namib" and upload all
-/// new changes with "Namib".
-/// Return Result<()>.
-fn apply_uci_config(uci: &mut UCI, cfg: &FirewallConfig) -> Result<()> {
-    uci.set("firewall.namib_config_version", cfg.version())?;
-    delete_all_config(uci)?;
-    for c in cfg.rules() {
-        apply_rule(uci, c)?;
-    }
-    uci.commit("firewall")?;
+fn add_old_config_deletion_instructions(batch: &mut Batch) -> Result<()> {
+    // TODO
     Ok(())
 }
 
-/// This function takes a UCI context and a configuration that should be uploaded to the firewall.
-/// Return Result<()>.
-fn apply_rule(uci: &mut UCI, rule: &FirewallRule) -> Result<()> {
-    let cfg_n = format!("firewall.namibrule_{}", rule.hash());
-    debug!("Creating rule {}", cfg_n);
-    uci.set(cfg_n.as_str(), "rule")?;
-    for c in &rule.to_option() {
-        uci.set(format!("{}.{}", cfg_n, c.0).as_str(), c.1.as_str())?;
-    }
-    uci.set(format!("{}.namib", cfg_n).as_str(), "1")?;
-    Ok(())
-}
+fn convert_config_to_nftnl_commands(batch: &mut Batch, config: &FirewallConfig) -> Result<()> {
+    let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+    batch.add(&table, nftnl::MsgType::Add);
 
-/// This function delete all config changes with "Namib".
-/// Return Result<()>.
-fn delete_all_config(uci: &mut UCI) -> Result<()> {
-    debug!("Deleting all namib configs");
-    let mut index = 0;
-    while uci.get(format!("firewall.@rule[{}]", index).as_str()).is_ok() {
-        let is_namib = uci
-            .get(format!("firewall.@rule[{}].namib", index).as_str())
-            .map_or(false, |s| s == "1");
+    let mut base_chain = Chain::new(&CString::new(BASE_CHAIN_NAME).unwrap(), &table);
+    base_chain.set_hook(nftnl::Hook::In, 0);
+    base_chain.set_policy(nftnl::Policy::Accept);
+    batch.add(&base_chain, nftnl::MsgType::Add);
 
-        if is_namib {
-            uci.delete(format!("firewall.@rule[{}]", index).as_str())?;
-            debug!("Delete entry firewall.@rule[{}]", index);
-        } else {
-            index += 1;
+    for device in config.devices() {
+        let mut device_chain = Chain::new(&CString::new(device.id.to_string()).unwrap(), &table);
+        // Drop packets if they are not explicitly allowed for a device.
+        device_chain.set_policy(nftnl::Policy::Drop);
+        batch.add(&device_chain, nftnl::MsgType::Add);
+
+        let mut device_jump_rule_src = Rule::new(&base_chain);
+        device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+        let mut device_jump_rule_dst = Rule::new(&base_chain);
+        device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+        match device.ip {
+            IpAddr::V4(v4addr) => {
+                // TODO the following three lines are repeated multiple times with different variations in the function,
+                //      they should be moved to a separate function instead.
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
+            },
+            IpAddr::V6(v6addr) => {
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
+            },
+        }
+        device_jump_rule_src.add_expr(&nft_expr!(verdict jump CString::new(device.id.to_string()).unwrap()));
+        device_jump_rule_dst.add_expr(&nft_expr!(verdict jump CString::new(device.id.to_string()).unwrap()));
+        batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
+        batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+
+        for rule_spec in &device.rules {
+            let mut current_rule = Rule::new(&device_chain);
+            // TODO handling of DNS names.
+            if let Some(NetworkHost::Ip(ipaddr)) = rule_spec.src.host {
+                match ipaddr {
+                    IpAddr::V4(v4addr) => {
+                        current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                        current_rule.add_expr(&nft_expr!(payload ipv4 saddr));
+                        current_rule.add_expr(&nft_expr!(cmp == v4addr));
+                    },
+                    IpAddr::V6(v6addr) => {
+                        current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                        current_rule.add_expr(&nft_expr!(payload ipv6 saddr));
+                        current_rule.add_expr(&nft_expr!(cmp == v6addr));
+                    },
+                }
+            }
+            if let Some(NetworkHost::Ip(ipaddr)) = rule_spec.dst.host {
+                match ipaddr {
+                    IpAddr::V4(v4addr) => {
+                        current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                        current_rule.add_expr(&nft_expr!(payload ipv4 daddr));
+                        current_rule.add_expr(&nft_expr!(cmp == v4addr));
+                        match rule_spec.protocol {
+                            Protocol::Tcp => {
+                                current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
+                                current_rule.add_expr(&nft_expr!(cmp == "tcp"));
+                            },
+                            Protocol::Udp => {
+                                current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
+                                current_rule.add_expr(&nft_expr!(cmp == "udp"));
+                            },
+                            _ => {}, // TODO expand with further options (icmp, sctp)
+                        }
+                    },
+                    IpAddr::V6(v6addr) => {
+                        current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                        current_rule.add_expr(&nft_expr!(payload ipv6 daddr));
+                        current_rule.add_expr(&nft_expr!(cmp == v6addr));
+                        // TODO support for protocol match in IPv6 (needs to be added in nftnl library)
+                    },
+                }
+            }
+            match rule_spec.target {
+                EnTarget::ACCEPT => current_rule.add_expr(&nft_expr!(verdict accept)),
+                EnTarget::REJECT => {
+                    current_rule.add_expr(&nft_expr!(verdict drop))
+                    //current_rule.add_expr(&nft_expr!(verdict reject tcp-rst))
+                    // TODO use ICMP reject
+                },
+                EnTarget::DROP => current_rule.add_expr(&nft_expr!(verdict drop)),
+            }
+            batch.add(&current_rule, nftnl::MsgType::Add);
         }
     }
 
     Ok(())
 }
 
-/// This function restart the Firewall.
-/// It should be used after succeeded commit.
-/// Return an Output.
-#[cfg(feature = "execute_uci_commands")]
-pub fn restart_firewall_command() -> std::process::Output {
-    std::process::Command::new("/etc/init.d/firewall")
-        .arg("restart")
-        .output()
-        .expect("failed to execute process")
+/// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
+    // Create a netlink socket to netfilter.
+    let socket = mnl::Socket::new(mnl::Bus::Netfilter)?;
+    // Send all the bytes in the batch.
+    socket.send_all(batch)?;
+
+    // Try to parse the messages coming back from netfilter. This part is still very unclear.
+    let portid = socket.portid();
+    let mut buffer = vec![0; nftnl::nft_nlmsg_maxsize() as usize];
+    let very_unclear_what_this_is_for = 2;
+    while let Some(message) = socket_recv(&socket, &mut buffer[..])? {
+        match mnl::cb_run(message, very_unclear_what_this_is_for, portid)? {
+            mnl::CbResult::Stop => {
+                break;
+            },
+            mnl::CbResult::Ok => (),
+        }
+    }
+    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{fs, fs::File, io::Read};
-
-    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, NetworkConfig, Protocol, RuleName};
-
-    use super::*;
-
-    /// The test checks a single added rule on the firewall and compare two files.
-    #[test]
-    fn test_trivial_apply_config() -> Result<()> {
-        init();
-
-        File::create("tests/config/test_trivial_apply_config/firewall")?;
-
-        let mut uci = UCI::new()?;
-        uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
-        uci.set_config_dir("tests/config/test_trivial_apply_config")?;
-
-        let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
-        let cfg = FirewallRule::new(
-            RuleName::new("Regel2".to_string()),
-            src,
-            dst,
-            Protocol::tcp(),
-            EnTarget::DROP,
-            EnOptionalSettings::None,
-        );
-        apply_rule(&mut uci, &cfg)?;
-        uci.commit("firewall")?;
-
-        let mut expected_string = String::new();
-        let mut test_string = String::new();
-
-        {
-            let mut expected_file = File::open("tests/config/test_trivial_apply_config/expected_firewall")?;
-            let mut test_file = File::open("tests/config/test_trivial_apply_config/firewall")?;
-
-            expected_file.read_to_string(&mut expected_string)?;
-            test_file.read_to_string(&mut test_string)?;
-        }
-
-        assert_eq!(test_string, expected_string);
-        Ok(())
-    }
-
-    /// The test checks a delete all rules with "Namib" on the firewall and compare two files.
-    #[test]
-    fn test_delete_config() -> Result<()> {
-        init();
-
-        fs::copy(
-            "tests/config/test_delete_all_config/firewall_before",
-            "tests/config/test_delete_all_config/firewall",
-        )?;
-
-        let mut uci = UCI::new()?;
-        uci.set_save_dir("/tmp/.uci_delete_all_config")?;
-        uci.set_config_dir("tests/config/test_delete_all_config")?;
-
-        delete_all_config(&mut uci)?;
-
-        uci.commit("firewall")?;
-
-        let mut expected_firewall = File::open("tests/config/test_delete_all_config/expected_firewall")?;
-        let mut actual_firewall = File::open("tests/config/test_delete_all_config/firewall")?;
-
-        let mut expected_firewall_string = String::new();
-        let mut actual_firewall_string = String::new();
-
-        expected_firewall.read_to_string(&mut expected_firewall_string)?;
-        actual_firewall.read_to_string(&mut actual_firewall_string)?;
-
-        assert_eq!(expected_firewall_string, actual_firewall_string);
-
-        Ok(())
-    }
-
-    /// This test apply few config firewall changes with "Namib" and delete there again.
-    #[test]
-    fn test_apply_and_delete_config() -> Result<()> {
-        init();
-
-        fs::copy(
-            "tests/config/test_apply_and_delete/firewall_before",
-            "tests/config/test_apply_and_delete/firewall",
-        )?;
-
-        let mut uci = UCI::new()?;
-        uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
-        uci.set_config_dir("tests/config/test_apply_and_delete")?;
-
-        let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
-
-        let cfg = FirewallRule::new(
-            RuleName::new("Regel3".to_string()),
-            src,
-            dst,
-            Protocol::tcp(),
-            EnTarget::DROP,
-            EnOptionalSettings::None,
-        );
-
-        // apply the config
-        apply_rule(&mut uci, &cfg)?;
-        uci.commit("firewall")?;
-
-        let mut expected_firewall_string = String::new();
-        let mut firewall_string = String::new();
-
-        {
-            let mut expected_firewall = File::open("tests/config/test_apply_and_delete/expected_firewall")?;
-            let mut firewall = File::open("tests/config/test_apply_and_delete/firewall")?;
-
-            expected_firewall.read_to_string(&mut expected_firewall_string)?;
-            firewall.read_to_string(&mut firewall_string)?;
-        }
-
-        // check if applied config matches expected
-        assert_eq!(firewall_string, expected_firewall_string);
-
-        // now delete the applied config
-        delete_all_config(&mut uci)?;
-        uci.commit("firewall")?;
-
-        let mut firewall_before_string = String::new();
-        let mut firewall_string = String::new();
-
-        {
-            let mut firewall = File::open("tests/config/test_apply_and_delete/firewall")?;
-            let mut firewall_before = File::open("tests/config/test_apply_and_delete/firewall_before")?;
-
-            firewall_before.read_to_string(&mut firewall_before_string)?;
-            firewall.read_to_string(&mut firewall_string)?;
-        }
-
-        assert_eq!(firewall_string, firewall_before_string);
-
-        Ok(())
-    }
-
-    fn init() {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
-            .is_test(true)
-            .try_init()
-            .ok();
+/// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+fn socket_recv<'a>(socket: &mnl::Socket, buf: &'a mut [u8]) -> Result<Option<&'a [u8]>> {
+    let ret = socket.recv(buf)?;
+    if ret > 0 {
+        Ok(Some(&buf[..ret]))
+    } else {
+        Ok(None)
     }
 }

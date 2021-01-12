@@ -16,6 +16,7 @@ use crate::{
 };
 
 use super::controller_discovery::discover_controllers;
+use crate::models::model_firewall::FirewallConfigState;
 use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
@@ -56,17 +57,23 @@ pub async fn run() -> Result<RPCClient> {
 }
 
 pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
+    let mut firewall_state = FirewallConfigState::default();
     loop {
         {
             let mut instance = client.lock().await;
             let heartbeat: io::Result<Option<FirewallConfig>> = instance
-                .heartbeat(context::current(), firewall_service::get_config_version().ok())
+                .heartbeat(
+                    context::current(),
+                    (&(firewall_state.current_firewall_config))
+                        .as_ref()
+                        .and_then(|cfg| Some(cfg.version().to_string())),
+                )
                 .await;
             match heartbeat {
                 Err(error) => error!("Error during heartbeat: {:?}", error),
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
-                    if let Err(e) = firewall_service::apply_config(&config) {
+                    if let Err(e) = firewall_service::handle_new_config(&firewall_state, config) {
                         error!("Failed to apply config! {}", e)
                     }
                 },
