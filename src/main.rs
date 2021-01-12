@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
             .with_json_spec_at("/api/spec")
             .build()
             .service(
-                actix_files::Files::new("/", "public")
+                actix_files::Files::new("/", "static")
                     .index_file("index.html")
                     .redirect_to_slash_directory(),
             )

@@ -71,8 +71,8 @@ pages:
     - master
   script:
     - cargo doc --no-deps
-    - mv target/doc ../public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > ../public/index.html
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > public/index.html
   artifacts:
     paths:
       - public
