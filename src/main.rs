@@ -18,7 +18,9 @@ extern crate validator;
 use dotenv::dotenv;
 
 use crate::error::Result;
+use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
+/* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
 
 mod auth;
@@ -45,8 +47,15 @@ async fn main() -> Result<()> {
             .expect("failed running rpc server");
     });
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+
         App::new()
             .data(conn.clone())
+            .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap_api()
             .service(web::scope("/users").configure(routes::users_controller::init))
