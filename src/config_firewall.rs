@@ -4,7 +4,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use serde::{export::Formatter, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 
 /// This file represent the config for firewall on openwrt.
 ///
