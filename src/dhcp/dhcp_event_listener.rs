@@ -16,7 +16,10 @@ mod unix {
         sync::Mutex,
     };
 
-    use namib_shared::{models::DhcpEvent, rpc::RPCClient};
+    use namib_shared::{
+        models::DhcpEvent,
+        rpc::{current_rpc_context, RPCClient},
+    };
 
     /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
     pub async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
@@ -47,11 +50,14 @@ mod unix {
             Ok(dhcp_event) => {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
                 let mut unlocked_rpc = rpc_client.lock().await;
-                unlocked_rpc.dhcp_request(context::current(), dhcp_event).await.unwrap();
-            },
+                unlocked_rpc
+                    .dhcp_request(current_rpc_context(), dhcp_event)
+                    .await
+                    .unwrap();
+            }
             Err(e) => {
                 warn!("DHCP event was received, but could not be parsed: {}", e);
-            },
+            }
         }
     }
 }

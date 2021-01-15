@@ -2,7 +2,7 @@ use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
 use snafu::{Backtrace, GenerateBacktrace};
-use tarpc::{client, context, serde_transport};
+use tarpc::{client, context, rpc::context::Context, serde_transport, trace};
 use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
@@ -16,6 +16,7 @@ use crate::{
 };
 
 use super::controller_discovery::discover_controllers;
+use std::time::SystemTime;
 use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
@@ -60,7 +61,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
         {
             let mut instance = client.lock().await;
             let heartbeat: io::Result<Option<FirewallConfig>> = instance
-                .heartbeat(context::current(), firewall_service::get_config_version().ok())
+                .heartbeat(current_rpc_context(), firewall_service::get_config_version().ok())
                 .await;
             match heartbeat {
                 Err(error) => error!("Error during heartbeat: {:?}", error),
@@ -69,7 +70,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
-                },
+                }
                 Ok(None) => debug!("Heartbeat OK!"),
             }
 
@@ -107,4 +108,13 @@ async fn try_connect(
     let transport = serde_transport::new(framed_io, codec()());
 
     Ok(Some(RPCClient::new(client::Config::default(), transport).spawn()?))
+}
+
+/// Returns the context for the current request, or a default Context if no request is active.
+/// Copied and adapted based on tarpc/rpc/context.rs
+pub fn current_rpc_context() -> Context {
+    Context {
+        deadline: SystemTime::now() + Duration::from_secs(60), // The deadline is the timestamp, when the request should be dropped, if not already responded to
+        trace_context: trace::Context::new_root(),
+    }
 }
