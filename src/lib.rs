@@ -5,10 +5,10 @@ use std::{fs::File, io};
 
 use tokio_serde::formats::Bincode;
 
-pub use mac_addr::*;
+pub use crate::macaddr::*;
 
 pub mod config_firewall;
-pub mod mac_addr;
+mod macaddr;
 pub mod models;
 pub mod rpc;
 

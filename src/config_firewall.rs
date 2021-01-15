@@ -4,7 +4,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use serde::{export::Formatter, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -49,9 +50,9 @@ impl fmt::Display for EnNetwork {
 /// Struct for src and dest configs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkConfig {
-    typ: EnNetwork,
-    ip: Option<String>,
-    port: Option<String>,
+    pub typ: EnNetwork,
+    pub ip: Option<String>,
+    pub port: Option<String>,
 }
 
 impl NetworkConfig {
