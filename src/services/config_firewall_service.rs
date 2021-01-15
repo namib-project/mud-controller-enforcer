@@ -127,10 +127,7 @@ pub async fn update_config_version(_: &ConnectionType) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{
-        device_model::Device,
-        mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
-    };
+    use crate::models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, Device, MUDData, ACE, ACL};
     use chrono::Local;
     use namib_shared::mac;
 

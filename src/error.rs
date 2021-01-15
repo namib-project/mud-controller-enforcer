@@ -5,7 +5,7 @@ use paperclip::actix::{api_v2_errors, web::HttpResponse};
 use schemars::JsonSchema;
 use snafu::{Backtrace, Snafu};
 
-#[api_v2_errors(code = 401, code = 500)]
+#[api_v2_errors(code = 401, code = 403, code = 500)]
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("ArgonError: {}", source), context(false))]
@@ -94,7 +94,7 @@ impl actix_web::ResponseError for Error {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
 
                 (HttpResponse::build(*status), ErrorDto { error: message })
-            }
+            },
             _ => (
                 HttpResponse::InternalServerError(),
                 ErrorDto {
@@ -106,15 +106,3 @@ impl actix_web::ResponseError for Error {
             .body(serde_json::to_string(&body).unwrap())
     }
 }
-
-/*
-impl OpenApiResponder<'_> for Error {
-    fn responses(gen: &mut OpenApiGenerator) -> rocket_okapi::Result<OAResponses> {
-        let mut responses = OAResponses::default();
-        let schema = gen.json_schema_no_ref::<ErrorDto>();
-        add_schema_response(&mut responses, 401, "application/json", schema.clone())?;
-        add_schema_response(&mut responses, 500, "application/json", schema)?;
-        Ok(responses)
-    }
-}
-*/

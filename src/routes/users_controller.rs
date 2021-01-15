@@ -7,7 +7,7 @@ use crate::{
     db::ConnectionType,
     error::{ResponseError, Result},
     models::User,
-    routes::dtos::{LoginDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
+    routes::dtos::{LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
     services::user_service,
 };
 use isahc::http::StatusCode;
@@ -19,6 +19,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/me", web::get().to(get_me));
     cfg.route("/me", web::post().to(update_me));
     cfg.route("/password", web::post().to(update_password));
+    cfg.route("/roles", web::get().to(get_roles));
 }
 
 #[api_v2_operation(summary = "Register a new user")]
@@ -138,4 +139,21 @@ pub fn update_password(
     Ok(Json(SuccessDto {
         status: String::from("ok"),
     }))
+}
+
+#[api_v2_operation(summary = "Retrieve all roles")]
+pub fn get_roles(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<Vec<RoleDto>>> {
+    auth.require_permission("role/list")?;
+
+    let roles = user_service::get_all_roles(pool.get_ref()).await?;
+
+    Ok(Json(
+        roles
+            .into_iter()
+            .map(|r| RoleDto {
+                name: r.name,
+                permissions: r.permissions.split(',').map(ToOwned::to_owned).collect(),
+            })
+            .collect(),
+    ))
 }

@@ -101,3 +101,7 @@ pub async fn delete(id: i64, conn: &ConnectionType) -> Result<u64> {
 
     Ok(del_count.rows_affected())
 }
+
+pub async fn get_all_roles(conn: &ConnectionType) -> Result<Vec<RoleDbo>> {
+    Ok(sqlx::query_as!(RoleDbo, "select * from roles").fetch_all(conn).await?)
+}

@@ -43,7 +43,7 @@ pub struct SuccessDto {
 }
 
 #[derive(Serialize, Apiv2Schema)]
-pub struct RolesDto {
-    pub roles: Vec<String>,
+pub struct RoleDto {
+    pub name: String,
     pub permissions: Vec<String>,
 }

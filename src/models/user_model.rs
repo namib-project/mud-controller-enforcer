@@ -29,14 +29,14 @@ pub struct User {
     pub permissions: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
 pub struct UserRoleDbo {
     pub id: i64,
     pub user_id: i64,
     pub role_id: i64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug)]
 pub struct RoleDbo {
     pub id: i64,
     pub name: String,
