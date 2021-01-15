@@ -5,7 +5,7 @@ use snafu::ensure;
 
 use crate::{
     error::{MudError, Result},
-    models::mud_models::{ACEAction, ACEMatches, ACEPort, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
+    models::{ACEAction, ACEMatches, ACEPort, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
 };
 
 use super::json_models;

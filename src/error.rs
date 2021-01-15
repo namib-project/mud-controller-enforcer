@@ -65,6 +65,11 @@ pub enum Error {
     },
     #[snafu(display("IsahcError {}", source), context(false))]
     IsahcError { source: isahc::Error, backtrace: Backtrace },
+    #[snafu(display("PatternError {}", source), context(false))]
+    PatternError {
+        source: glob::PatternError,
+        backtrace: Backtrace,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -77,7 +82,7 @@ pub struct ErrorDto {
 impl actix_web::ResponseError for Error {
     fn status_code(&self) -> StatusCode {
         match self {
-            Error::ResponseError { status, .. } => status.clone(),
+            Error::ResponseError { status, .. } => *status,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -88,8 +93,8 @@ impl actix_web::ResponseError for Error {
             Error::ResponseError { status, message, .. } => {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
 
-                (HttpResponse::build(status.clone()), ErrorDto { error: message })
-            },
+                (HttpResponse::build(*status), ErrorDto { error: message })
+            }
             _ => (
                 HttpResponse::InternalServerError(),
                 ErrorDto {

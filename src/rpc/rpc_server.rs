@@ -19,7 +19,7 @@ use namib_shared::{
 use crate::{
     db::ConnectionType,
     error::Result,
-    models::device_model::Device,
+    models::Device,
     services::{config_firewall_service, device_service, mud_service},
 };
 

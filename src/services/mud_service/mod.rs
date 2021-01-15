@@ -4,7 +4,7 @@ use isahc::AsyncReadResponseExt;
 use crate::{
     db::ConnectionType,
     error::Result,
-    models::mud_models::{MUDData, MUD},
+    models::{MUDData, MUDDbo},
 };
 
 mod json_models;
@@ -12,7 +12,7 @@ mod parser;
 
 pub async fn get_mud_from_url(url: String, pool: &ConnectionType) -> Result<MUDData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
-    let existing_mud: Option<MUD> = sqlx::query_as!(MUD, "select * from mud_data where url = ?", url)
+    let existing_mud: Option<MUDDbo> = sqlx::query_as!(MUDDbo, "select * from mud_data where url = ?", url)
         .fetch_optional(pool)
         .await?;
     let mut exists = false;
@@ -32,7 +32,7 @@ pub async fn get_mud_from_url(url: String, pool: &ConnectionType) -> Result<MUDD
     let data = parser::parse_mud(url.clone(), mud_json.as_str())?;
 
     // speichern in db
-    let mud = MUD {
+    let mud = MUDDbo {
         url: url.clone(),
         data: serde_json::to_string(&data)?,
         created_at: Local::now().naive_local(),

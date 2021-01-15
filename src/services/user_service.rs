@@ -1,31 +1,72 @@
 use crate::{
     db::ConnectionType,
     error::Result,
-    models::user_model::{Role, User},
+    models::{RoleDbo, User, UserDbo},
 };
 use sqlx::Done;
 
 // Database methods
 pub async fn get_all(conn: &ConnectionType) -> Result<Vec<User>> {
-    let usrs = sqlx::query_as!(User, "select * from users").fetch_all(conn).await?;
+    let usrs: Vec<_> =
+        sqlx::query!("select user_id, username, password, salt, cast(group_concat(name) as text) as roles, cast(group_concat(permissions) as text) as permissions from users u, users_roles m, roles r where u.id = m.user_id and r.id = m.role_id")
+            .fetch_all(conn)
+            .await?;
 
-    Ok(usrs)
+    Ok(usrs
+        .into_iter()
+        .map(|usr| User {
+            id: usr.user_id,
+            username: usr.username,
+            password: usr.password,
+            salt: usr.salt,
+            roles: usr
+                .roles
+                .map(|r| r.split(',').map(ToOwned::to_owned).collect())
+                .unwrap_or_default(),
+            permissions: usr
+                .permissions
+                .map(|p| p.split(',').map(ToOwned::to_owned).collect())
+                .unwrap_or_default(),
+        })
+        .collect())
 }
 
 pub async fn find_by_id(id: i64, conn: &ConnectionType) -> Result<User> {
-    let usr = sqlx::query_as!(User, "select * from users where id = ?", id)
+    let usr = sqlx::query_as!(UserDbo, "select * from users where id = ?", id)
         .fetch_one(conn)
         .await?;
 
-    Ok(usr)
+    Ok(add_user_roles(usr, conn).await?)
 }
 
 pub async fn find_by_username(username: &str, conn: &ConnectionType) -> Result<User> {
-    let usr = sqlx::query_as!(User, "select * from users where username = ?", username)
+    let usr = sqlx::query_as!(UserDbo, "select * from users where username = ?", username)
         .fetch_one(conn)
         .await?;
 
-    Ok(usr)
+    Ok(add_user_roles(usr, conn).await?)
+}
+
+async fn add_user_roles(usr: UserDbo, conn: &ConnectionType) -> Result<User> {
+    let roles: Vec<RoleDbo> = sqlx::query_as!(
+        RoleDbo,
+        "select * from roles where id in (select role_id from users_roles where user_id = ?)",
+        usr.id
+    )
+    .fetch_all(conn)
+    .await?;
+
+    Ok(User {
+        id: usr.id,
+        username: usr.username,
+        password: usr.password,
+        salt: usr.salt,
+        permissions: roles
+            .iter()
+            .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
+            .collect(),
+        roles: roles.into_iter().map(|r| r.name).collect(),
+    })
 }
 
 pub async fn insert(user: User, conn: &ConnectionType) -> Result<u64> {
@@ -59,24 +100,4 @@ pub async fn delete(id: i64, conn: &ConnectionType) -> Result<u64> {
     let del_count = sqlx::query!("delete from users where id = ?", id).execute(conn).await?;
 
     Ok(del_count.rows_affected())
-}
-
-pub async fn get_roles(user: &User, conn: &ConnectionType) -> Result<Vec<Role>> {
-    let roles = sqlx::query_as!(
-        Role,
-        "select * from roles where id in (select role_id from users_roles where user_id = ?)",
-        user.id
-    )
-    .fetch_all(conn)
-    .await?;
-
-    Ok(roles)
-}
-
-pub async fn get_permissions(user: &User, conn: &ConnectionType) -> Result<Vec<String>> {
-    let roles = get_roles(user, conn).await?;
-
-    let permissions = roles.iter().flat_map(Role::permissions).map(String::from).collect();
-
-    Ok(permissions)
 }

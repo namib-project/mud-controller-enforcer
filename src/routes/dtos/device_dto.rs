@@ -1,4 +1,6 @@
-use crate::models::{device_model::Device, mud_models::MUDData};
+#![allow(clippy::field_reassign_with_default)]
+
+use crate::models::{Device, MUDData};
 use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 

@@ -3,8 +3,8 @@
 use chrono::{DateTime, Local, NaiveDateTime};
 use paperclip::actix::Apiv2Schema;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
-pub struct MUD {
+#[derive(Debug, Clone)]
+pub struct MUDDbo {
     pub url: String,
     pub data: String,
     pub created_at: NaiveDateTime,

@@ -5,7 +5,8 @@
     clippy::unseparated_literal_suffix,
     clippy::module_name_repetitions,
     clippy::default_trait_access,
-    clippy::similar_names
+    clippy::similar_names,
+    clippy::redundant_else
 )]
 
 #[macro_use]

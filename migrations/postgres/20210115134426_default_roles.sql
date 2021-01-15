@@ -1,0 +1,1 @@
+insert into roles (name, permissions) VALUES ('admin', '**'), ('reader', '**/list,**/read')

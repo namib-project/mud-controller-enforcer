@@ -3,7 +3,7 @@ CREATE TABLE roles
 (
     id          INTEGER      NOT NULL PRIMARY KEY AUTOINCREMENT,
     name        VARCHAR(128) NOT NULL UNIQUE,
-    permissions TEXT         NOT NULL DEFAULT '{}'
+    permissions TEXT         NOT NULL DEFAULT ''
 );
 
 CREATE TABLE users_roles

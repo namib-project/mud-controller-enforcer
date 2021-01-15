@@ -1,7 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use std::str::Split;
-
 use argon2::{self, Config};
 use paperclip::actix::Apiv2Schema;
 use rand::{rngs::OsRng, Rng};
@@ -11,6 +9,14 @@ use crate::error::{PasswordVerifyError, Result};
 
 const SALT_LENGTH: usize = 32;
 
+#[derive(Debug, Clone)]
+pub struct UserDbo {
+    pub id: i64,
+    pub username: String,
+    pub password: String,
+    pub salt: Vec<u8>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
 pub struct User {
     pub id: i64,
@@ -19,17 +25,19 @@ pub struct User {
     pub password: String,
     #[serde(skip_serializing)]
     pub salt: Vec<u8>,
+    pub roles: Vec<String>,
+    pub permissions: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct UserRole {
+pub struct UserRoleDbo {
     pub id: i64,
     pub user_id: i64,
     pub role_id: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Role {
+pub struct RoleDbo {
     pub id: i64,
     pub name: String,
     pub permissions: String,
@@ -46,6 +54,8 @@ impl User {
             username,
             password: User::hash_password(password, &salt)?,
             salt,
+            roles: Vec::new(),
+            permissions: Vec::new(),
         })
     }
 
@@ -59,11 +69,5 @@ impl User {
         let argon_config = Config::default();
 
         Ok(argon2::hash_encoded(password.as_bytes(), salt, &argon_config)?)
-    }
-}
-
-impl Role {
-    pub fn permissions(&self) -> Split<char> {
-        self.permissions.split(',')
     }
 }

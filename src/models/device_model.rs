@@ -3,7 +3,7 @@ use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
 use std::net::IpAddr;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct DeviceDbo {
     pub id: i64,
     pub ip_addr: String,

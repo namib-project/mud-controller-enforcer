@@ -1,7 +1,7 @@
 use crate::{
     db::ConnectionType,
     error::{Error, Result},
-    models::device_model::{Device, DeviceDbo},
+    models::{Device, DeviceDbo},
     services::mud_service::get_mud_from_url,
 };
 use futures::TryStreamExt;

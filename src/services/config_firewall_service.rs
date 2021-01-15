@@ -1,10 +1,7 @@
 use crate::{
     db::ConnectionType,
     error::Result,
-    models::{
-        device_model::Device,
-        mud_models::{ACEAction, ACEProtocol, ACLDirection, ACLType},
-    },
+    models::{ACEAction, ACEProtocol, ACLDirection, ACLType, Device},
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
 use std::{
