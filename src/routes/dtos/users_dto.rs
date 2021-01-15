@@ -1,9 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use rocket_okapi::JsonSchema;
+use paperclip::actix::Apiv2Schema;
 
-#[derive(Validate, Serialize, Deserialize, JsonSchema)]
-#[schemars(example = "signup_example")]
+#[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
 pub struct SignupDto {
     #[validate(length(min = 1, max = 128))]
     pub username: String,
@@ -11,8 +10,7 @@ pub struct SignupDto {
     pub password: String,
 }
 
-#[derive(Validate, Serialize, Deserialize, JsonSchema)]
-#[schemars(example = "login_example")]
+#[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
 pub struct LoginDto {
     #[validate(length(min = 1, max = 128))]
     pub username: String,
@@ -20,8 +18,7 @@ pub struct LoginDto {
     pub password: String,
 }
 
-#[derive(Validate, Serialize, Deserialize, JsonSchema)]
-#[schemars(example = "update_password_example")]
+#[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
 pub struct UpdatePasswordDto {
     #[validate(length(min = 6))]
     pub old_password: String,
@@ -29,65 +26,24 @@ pub struct UpdatePasswordDto {
     pub new_password: String,
 }
 
-#[derive(Validate, Serialize, Deserialize, JsonSchema)]
-#[schemars(example = "update_user_example")]
+#[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
 pub struct UpdateUserDto {
     #[validate(length(min = 1, max = 128))]
     pub username: Option<String>,
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Serialize, Apiv2Schema)]
 pub struct TokenDto {
     pub token: String,
 }
 
-#[derive(Serialize, JsonSchema)]
-#[schemars(example = "success_example")]
+#[derive(Serialize, Apiv2Schema)]
 pub struct SuccessDto {
     pub status: String,
 }
 
-#[derive(Serialize, JsonSchema)]
-#[schemars(example = "roles_example")]
+#[derive(Serialize, Apiv2Schema)]
 pub struct RolesDto {
     pub roles: Vec<String>,
     pub permissions: Vec<String>,
-}
-
-fn signup_example() -> SignupDto {
-    SignupDto {
-        username: String::from("manfred"),
-        password: String::from("password123"),
-    }
-}
-
-fn login_example() -> LoginDto {
-    LoginDto {
-        username: String::from("manfred"),
-        password: String::from("password123"),
-    }
-}
-
-fn update_password_example() -> UpdatePasswordDto {
-    UpdatePasswordDto {
-        old_password: String::from("password123"),
-        new_password: String::from("newpassword"),
-    }
-}
-
-fn update_user_example() -> UpdateUserDto {
-    UpdateUserDto {
-        username: Some(String::from("alfred")),
-    }
-}
-
-fn success_example() -> SuccessDto {
-    SuccessDto { status: String::from("ok") }
-}
-
-fn roles_example() -> RolesDto {
-    RolesDto {
-        roles: vec![String::from("admin")],
-        permissions: vec![String::from("create_device"), String::from("remove_device")],
-    }
 }

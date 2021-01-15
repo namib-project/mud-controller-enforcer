@@ -1,15 +1,9 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use std::net::IpAddr;
-
 use chrono::{DateTime, Local, NaiveDateTime};
-use schemars::JsonSchema;
+use paperclip::actix::Apiv2Schema;
 
-use crate::schema::mud_data;
-
-#[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Clone, JsonSchema)]
-#[table_name = "mud_data"]
-#[primary_key(url)]
+#[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
 pub struct MUD {
     pub url: String,
     pub data: String,
@@ -17,7 +11,7 @@ pub struct MUD {
     pub expiration: NaiveDateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct MUDData {
     pub url: String,
     pub masa_url: Option<String>,
@@ -30,7 +24,7 @@ pub struct MUDData {
     pub acllist: Vec<ACL>,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct ACL {
     pub name: String,
     pub packet_direction: ACLDirection,
@@ -38,49 +32,49 @@ pub struct ACL {
     pub ace: Vec<ACE>,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct ACE {
     pub name: String,
     pub action: ACEAction,
     pub matches: ACEMatches,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct ACEMatches {
     pub protocol: Option<ACEProtocol>,
     pub direction_initiated: Option<ACLDirection>,
-    pub address_mask: Option<IpAddr>,
+    pub address_mask: Option<String>,
     pub dnsname: Option<String>,
     pub source_port: Option<ACEPort>,
     pub destination_port: Option<ACEPort>,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub enum ACEPort {
     Single(u32),
     Range(u32, u32),
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub enum ACEProtocol {
     TCP,
     UDP,
     Protocol(u32),
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub enum ACEAction {
     Accept,
     Deny,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Apiv2Schema)]
 pub enum ACLType {
     IPV6,
     IPV4,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Apiv2Schema)]
 pub enum ACLDirection {
     FromDevice,
     ToDevice,

@@ -3,21 +3,17 @@
 use std::str::Split;
 
 use argon2::{self, Config};
+use paperclip::actix::Apiv2Schema;
 use rand::{rngs::OsRng, Rng};
-use schemars::JsonSchema;
 use snafu::ensure;
 
-use crate::{
-    error::{PasswordVerifyError, Result},
-    schema::{roles, users, users_roles},
-};
+use crate::error::{PasswordVerifyError, Result};
 
 const SALT_LENGTH: usize = 32;
 
-#[derive(Debug, Queryable, Identifiable, AsChangeset, Serialize, Deserialize, Clone, JsonSchema)]
-#[table_name = "users"]
+#[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
 pub struct User {
-    pub id: i32,
+    pub id: i64,
     pub username: String,
     #[serde(skip_serializing)]
     pub password: String,
@@ -25,20 +21,16 @@ pub struct User {
     pub salt: Vec<u8>,
 }
 
-#[derive(Identifiable, Queryable, Associations, Serialize, Deserialize, Clone)]
-#[belongs_to(User)]
-#[belongs_to(Role)]
-#[table_name = "users_roles"]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct UserRole {
-    pub id: i32,
-    pub user_id: i32,
-    pub role_id: i32,
+    pub id: i64,
+    pub user_id: i64,
+    pub role_id: i64,
 }
 
-#[derive(Identifiable, Queryable, Serialize, Deserialize, Clone)]
-#[table_name = "roles"]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Role {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub permissions: String,
 }

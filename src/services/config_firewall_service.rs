@@ -1,8 +1,8 @@
 use crate::{
-    db::DbConnPool,
+    db::ConnectionType,
     error::Result,
     models::{
-        device_model::DeviceData,
+        device_model::Device,
         mud_models::{ACEAction, ACEProtocol, ACLDirection, ACLType},
     },
     services::config_service::{get_config_value, set_config_value},
@@ -10,7 +10,7 @@ use crate::{
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
 use std::net::{IpAddr, ToSocketAddrs};
 
-pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRule>> {
+pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
@@ -58,7 +58,14 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
                         ACLDirection::FromDevice => (route_network_lan, route_network_wan),
                         ACLDirection::ToDevice => (route_network_wan, route_network_lan),
                     };
-                    let config_firewall = FirewallRule::new(rule_name.clone(), route_network_src, route_network_dest, protocol.clone(), target.clone(), None);
+                    let config_firewall = FirewallRule::new(
+                        rule_name.clone(),
+                        route_network_src,
+                        route_network_dest,
+                        protocol.clone(),
+                        target.clone(),
+                        None,
+                    );
                     result.push(config_firewall);
                 }
             } else {
@@ -108,14 +115,16 @@ pub fn convert_device_to_fw_rules(device: &DeviceData) -> Result<Vec<FirewallRul
     Ok(result)
 }
 
-pub async fn get_config_version(pool: DbConnPool) -> String {
-    get_config_value("version".to_string(), pool).await.unwrap_or_else(|_| "0".to_string())
+pub async fn get_config_version(pool: &ConnectionType) -> String {
+    get_config_value("version".to_string(), pool)
+        .await
+        .unwrap_or_else(|_| "0".to_string())
 }
 
-pub async fn update_config_version(pool: DbConnPool) {
+pub async fn update_config_version(pool: &ConnectionType) {
     set_config_value(
         "version".to_string(),
-        (get_config_value("version".to_string(), pool.clone())
+        (get_config_value("version".to_string(), pool)
             .await
             .unwrap_or_else(|_| "0".to_string())
             .parse::<u32>()
@@ -132,11 +141,11 @@ pub async fn update_config_version(pool: DbConnPool) {
 mod tests {
     use super::*;
     use crate::models::{
-        device_model::DeviceData,
+        device_model::Device,
         mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
     };
     use chrono::Local;
-    use namib_shared::macaddr;
+    use namib_shared::mac;
 
     #[test]
     fn test_converting() -> Result<()> {
@@ -168,9 +177,9 @@ mod tests {
             }],
         };
 
-        let device = DeviceData {
+        let device = Device {
             id: 0,
-            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
+            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
             ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "".to_string(),
             vendor_class: "".to_string(),

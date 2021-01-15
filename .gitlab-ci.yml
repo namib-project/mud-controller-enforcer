@@ -2,6 +2,8 @@ stages:
   - build
   - test
   - docs
+  - release
+  - docker
 
 image: rust:latest
 
@@ -18,10 +20,11 @@ before_script:
   - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
   - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
   - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
-  - rustup toolchain install nightly --component rustfmt,clippy --no-self-update
-  - rustup default nightly
   - rustc --version
   - cargo --version
+  - cargo install sqlx-cli
+  - ./.cargo/bin/sqlx db create
+  - ./.cargo/bin/sqlx migrate --source migrations/sqlite run
 
 default:
   tags:
@@ -41,12 +44,14 @@ test:
 warnings:
   stage: test
   script:
+    - rustup toolchain install nightly --component clippy --no-self-update
     - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
 formatting:
   stage: test
   script:
+    - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
 docs:
@@ -66,9 +71,48 @@ pages:
     - master
   script:
     - cargo doc --no-deps
-    - mv target/doc ../public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > ../public/index.html
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > public/index.html
   artifacts:
     paths:
       - public
     expire_in: 7 days
+
+build-release:
+  stage: release
+  needs:
+    - build
+  #only:
+  #  - master
+  script:
+    - cargo install --root ./install --path .
+    - apt-get install git-secret -y
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
+    - cd ..
+    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
+    - git fetch origin && git checkout origin/master -f
+    - git secret reveal
+    - cd certs
+    - ./gen_server_cert.sh namib-ca
+  artifacts:
+    paths:
+      - install/bin
+      - certs
+
+create-docker:
+  stage: docker
+  needs:
+    - build-release
+  cache: {}
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  before_script:
+    - echo "Global before_script disabled"
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
+  #only:
+  #  - master

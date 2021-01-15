@@ -1,31 +1,22 @@
-use chrono::{Local, NaiveDateTime};
-use diesel::{QueryDsl, QueryResult, RunQueryDsl};
-use isahc::ResponseExt;
+use chrono::Local;
+use isahc::AsyncReadResponseExt;
 
 use crate::{
-    db::DbConn,
+    db::ConnectionType,
     error::Result,
     models::mud_models::{MUDData, MUD},
-    schema::mud_data,
 };
 
 mod json_models;
 mod parser;
 
-#[derive(Debug, Insertable, AsChangeset)]
-#[table_name = "mud_data"]
-pub struct InsertableMUD {
-    pub url: String,
-    pub data: String,
-    pub created_at: NaiveDateTime,
-    pub expiration: NaiveDateTime,
-}
-
-pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
+pub async fn get_mud_from_url(url: String, pool: &ConnectionType) -> Result<MUDData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
-    let existing_mud: QueryResult<MUD> = mud_data::table.find(&url).get_result::<MUD>(&*conn);
+    let existing_mud: Option<MUD> = sqlx::query_as!(MUD, "select * from mud_data where url = ?", url)
+        .fetch_optional(pool)
+        .await?;
     let mut exists = false;
-    if let Ok(mud) = existing_mud {
+    if let Some(mud) = existing_mud {
         if mud.expiration > Local::now().naive_local() {
             if let Ok(mud) = serde_json::from_str::<MUDData>(mud.data.as_str()) {
                 return Ok(mud);
@@ -41,7 +32,7 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
     let data = parser::parse_mud(url.clone(), mud_json.as_str())?;
 
     // speichern in db
-    let mud = InsertableMUD {
+    let mud = MUD {
         url: url.clone(),
         data: serde_json::to_string(&data)?,
         created_at: Local::now().naive_local(),
@@ -51,9 +42,25 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
     debug!("save mud file (exists: {:?}): {:?}", exists, mud);
 
     if exists {
-        diesel::update(mud_data::table.find(url)).set(mud).execute(&*conn)?;
+        sqlx::query!(
+            "update mud_data set data = ?, created_at = ?, expiration = ? where url = ? ",
+            mud.data,
+            mud.created_at,
+            mud.expiration,
+            mud.url,
+        )
+        .execute(pool)
+        .await?;
     } else {
-        diesel::insert_into(mud_data::table).values(mud).execute(&*conn)?;
+        sqlx::query!(
+            "insert into mud_data (url, data, created_at, expiration) values (?, ?, ?, ?)",
+            mud.url,
+            mud.data,
+            mud.created_at,
+            mud.expiration,
+        )
+        .execute(pool)
+        .await?;
     }
 
     // return muddata
@@ -61,5 +68,5 @@ pub async fn get_mud_from_url(url: String, conn: DbConn) -> Result<MUDData> {
 }
 
 async fn fetch_mud(url: &str) -> Result<String> {
-    Ok(isahc::get_async(url).await?.text_async().await?)
+    Ok(isahc::get_async(url).await?.text().await?)
 }

@@ -6,38 +6,37 @@ edition = "2018"
 
 [features]
 default = ["sqlite"]
-postgres = ["diesel/postgres", "rocket_contrib/diesel_postgres_pool"]
-sqlite = ["diesel/sqlite", "rocket_contrib/diesel_sqlite_pool"]
+postgres = ["sqlx/postgres"]
+sqlite = ["sqlx/sqlite"]
 
 [dependencies]
-namib_shared = { tag = "0.1.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+actix-web = "3.3"
+actix-rt = "1.1"
+actix-files = "0.5"
+sqlx = { version = "0.4", features = ["runtime-actix-rustls", "chrono"] }
+namib_shared = { tag = "0.2.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "0.4"
 env_logger = "0.8"
-tokio = { version = "0.3", features = ["full"] }
-async-dnssd = { tag = "0.5.0-rc.2", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git" }
+tokio = { version = "1", features = ["full"] }
+async-dnssd = { tag = "0.5.0-rc.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git" }
 futures = "0.3"
-rustls = "0.18"
-tokio-rustls = "0.20"
-tokio-util = "0.4"
-tokio-serde = { version = "0.6" }
-tarpc = { version = "0.23", features = ["full"] }
+rustls = "0.19"
+tokio-rustls = "0.22"
+tokio-util = "0.6"
+tokio-serde = "0.8"
+tarpc = { version = "0.24", features = ["full"] }
 pin-project = "1.0"
-rand = "0.7"
+rand = "0.8"
 rust-argon2 = "0.8"
-diesel = { version = "1.4", features = ["r2d2", "chrono"] }
-diesel_migrations = "1.4"
-rocket = "0.4"
-rocket_contrib = { version = "0.4", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_derive = "1.0"
 dotenv = "0.15"
 dotenv_codegen = "0.15"
-rocket_okapi = "0.6.0-alpha-1"
 schemars = { version = "0.8", features = ["chrono"] }
-okapi = { version = "0.5.0-alpha-1", features = ["derive_json_schema"] }
 jsonwebtoken = "7.2"
 chrono = { version = "0.4", features = ["serde"] }
-validator = { version = "0.11", features = ["derive"] }
+validator = { version = "0.12", features = ["derive"] }
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces", "futures"] }
-isahc = "0.9"
+isahc = "1.0"
+paperclip = { version = "0.5", features = ["actix", "chrono"] }

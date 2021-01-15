@@ -1,52 +1,57 @@
-use diesel::prelude::*;
 use dotenv::dotenv;
-use log::{debug, info};
-use namib_mud_controller::db::{run_db_migrations, ConnectionType, DbConnPool};
-use rocket_contrib::databases::{DatabaseConfig, Poolable};
-use std::{borrow::Borrow, env, fs};
+use log::info;
+use namib_mud_controller::db::ConnectionType;
+use sqlx::migrate;
+
+#[cfg(feature = "postgres")]
+use std::env;
 
 pub struct IntegrationTestContext {
     pub db_url: String,
     pub db_name: String,
-    pub db_pool: Option<DbConnPool>,
+    pub db_pool: Option<ConnectionType>,
 }
 
 impl IntegrationTestContext {
     /// Creates a new DB context, so you can access the database.
     /// Added a db_name option, so tests can run parallel and independent
     /// When using SQLite, TESTING_DATABASE_URL is a path where the sqlite files are created
-    pub fn new(db_name: &str) -> Self {
+    pub async fn new(db_name: &str) -> Self {
         dotenv().ok();
         env_logger::try_init().ok();
 
-        let base_url = env::var("TESTING_POSTGRES_URL").expect("Failed to load DB URL from .env");
-
         #[cfg(feature = "sqlite")]
-        let db_url = ":memory:".to_string();
+        let db_url = "sqlite::memory:".to_string();
 
         #[cfg(feature = "postgres")]
-        let db_url = format!("{}/{}", base_url, db_name);
+        let db_url = format!(
+            "{}/{}",
+            env::var("DATABASE_URL").expect("Failed to load DB URL from .env"),
+            db_name
+        );
 
         info!("Using DB {:?}", db_url);
 
-        let pool = DbConnPool::new(
-            ConnectionType::pool(DatabaseConfig {
-                url: db_url.as_ref(),
-                pool_size: 10,
-                extras: Default::default(),
-            })
-            .expect("Couldn't establish connection pool for database"),
-        );
+        let conn = ConnectionType::connect(&db_url)
+            .await
+            .expect("Couldn't establish connection pool for database");
 
-        // pool::get_one().expect("Couldn't establish connection to database")
-        let migration_conn = pool.get_one().expect("Couldn't establish connection to database");
-        run_db_migrations(&migration_conn).expect("Database migrations failed");
-        drop(migration_conn);
+        #[cfg(feature = "sqlite")]
+        migrate!("migrations/sqlite")
+            .run(&conn)
+            .await
+            .expect("Database migrations failed");
+
+        #[cfg(feature = "postgres")]
+        migrate!("migrations/postgres")
+            .run(&conn)
+            .await
+            .expect("Database migrations failed");
 
         Self {
             db_url,
             db_name: db_name.to_string(),
-            db_pool: Some(pool),
+            db_pool: Some(conn),
         }
     }
 }
