@@ -1,4 +1,4 @@
-#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::field_reassign_with_default)]
 
 use validator::Validate;
 
@@ -6,8 +6,8 @@ use crate::{
     auth::Auth,
     db::ConnectionType,
     error::{ResponseError, Result},
-    models::user_model::User,
-    routes::dtos::users_dto::{LoginDto, RolesDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
+    models::User,
+    routes::dtos::{LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
     services::user_service,
 };
 use isahc::http::StatusCode;
@@ -70,13 +70,13 @@ pub async fn login(pool: web::Data<ConnectionType>, login_dto: Json<LoginDto>) -
     })?;
 
     Ok(Json(TokenDto {
-        token: Auth::encode_token(&Auth::generate_auth(user.id, user.username, "api".to_string())),
+        token: Auth::encode_token(&Auth::generate_auth(user.id, user.username, user.permissions)),
     }))
 }
 
 #[api_v2_operation(summary = "Retrieve information about the logged-in user")]
 pub async fn get_me(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<User>> {
-    let user = user_service::find_by_id(auth.id, pool.get_ref()).await?;
+    let user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
 
     Ok(Json(user))
 }
@@ -95,7 +95,7 @@ pub fn update_me(
         .fail()
     })?;
 
-    let mut user = user_service::find_by_id(auth.id, pool.get_ref()).await?;
+    let mut user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
 
     if let Some(username) = &update_user_dto.username {
         user.username = username.clone();
@@ -122,7 +122,7 @@ pub fn update_password(
         .fail()
     })?;
 
-    let mut user = user_service::find_by_id(auth.id, pool.get_ref()).await?;
+    let mut user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
 
     User::verify_password(&user, &update_password_dto.old_password).or_else(|_| {
         ResponseError {
@@ -141,17 +141,19 @@ pub fn update_password(
     }))
 }
 
-#[api_v2_operation(summary = "Retrieve the user's roles")]
-pub fn get_roles(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<RolesDto>> {
-    let user = user_service::find_by_id(auth.id, &pool).await?;
+#[api_v2_operation(summary = "Retrieve all roles")]
+pub fn get_roles(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<Vec<RoleDto>>> {
+    auth.require_permission("role/list")?;
 
-    let roles: Vec<String> = user_service::get_roles(&user, &pool)
-        .await?
-        .iter()
-        .map(|r| r.name.clone())
-        .collect();
+    let roles = user_service::get_all_roles(pool.get_ref()).await?;
 
-    let permissions = user_service::get_permissions(&user, &pool).await.unwrap_or_default();
-
-    Ok(Json(RolesDto { roles, permissions }))
+    Ok(Json(
+        roles
+            .into_iter()
+            .map(|r| RoleDto {
+                name: r.name,
+                permissions: r.permissions.split(',').map(ToOwned::to_owned).collect(),
+            })
+            .collect(),
+    ))
 }

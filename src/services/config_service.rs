@@ -1,4 +1,4 @@
-use crate::{db::ConnectionType, error::Result, models::config_model::Config};
+use crate::{db::ConnectionType, error::Result, models::Config};
 
 /// Gets the config value by key from the database.
 pub async fn get_config_value(key: String, pool: &ConnectionType) -> Result<String> {

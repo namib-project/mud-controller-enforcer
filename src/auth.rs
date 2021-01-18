@@ -1,8 +1,11 @@
 use std::env;
 
+use crate::error::{ResponseError, Result};
 use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
+use glob::Pattern;
+use isahc::http::StatusCode;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
@@ -16,24 +19,37 @@ pub struct Auth {
     pub nbf: i64,
     // Expiration time
     pub exp: i64,
-    // Subject
-    pub sub: String,
+    // User Id
+    pub sub: i64,
 
     // User stuff
-    pub id: i64,
     pub username: String,
+    pub permissions: Vec<String>,
 }
 
 impl Auth {
-    pub fn generate_auth(id: i64, username: String, sub: String) -> Auth {
+    pub fn generate_auth(id: i64, username: String, permissions: Vec<String>) -> Auth {
         let time_now = Utc::now().naive_utc();
         Auth {
             nbf: time_now.timestamp(),
             exp: (time_now + Duration::days(7)).timestamp(),
-            sub,
-            id,
+            sub: id,
             username,
+            permissions,
         }
+    }
+
+    pub fn require_permission(&self, permission: &str) -> Result<()> {
+        for perm in &self.permissions {
+            if Pattern::new(perm)?.matches(permission) {
+                return Ok(());
+            }
+        }
+        ResponseError {
+            status: StatusCode::FORBIDDEN,
+            message: Some("Forbidden".to_string()),
+        }
+        .fail()?
     }
 
     /// Encodes "Auth" struct to JWT token
@@ -79,7 +95,7 @@ fn extract_token_from_header(header: &str) -> Option<&str> {
 impl FromRequest for Auth {
     type Config = ();
     type Error = actix_web::Error;
-    type Future = Ready<Result<Self, Self::Error>>;
+    type Future = Ready<std::result::Result<Self, Self::Error>>;
 
     /// Middleware for Auth struct extraction from "Authorization: Bearer {}" header.
     /// (Header => Token => Auth)

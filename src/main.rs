@@ -6,6 +6,7 @@
     clippy::module_name_repetitions,
     clippy::default_trait_access,
     clippy::similar_names,
+    clippy::redundant_else,
     clippy::missing_errors_doc,
     clippy::must_use_candidate
 )]

@@ -5,7 +5,7 @@ use paperclip::actix::{api_v2_errors, web::HttpResponse};
 use schemars::JsonSchema;
 use snafu::{Backtrace, Snafu};
 
-#[api_v2_errors(code = 401, code = 500)]
+#[api_v2_errors(code = 401, code = 403, code = 500)]
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("ArgonError: {}", source), context(false))]
@@ -65,6 +65,11 @@ pub enum Error {
     },
     #[snafu(display("IsahcError {}", source), context(false))]
     IsahcError { source: isahc::Error, backtrace: Backtrace },
+    #[snafu(display("PatternError {}", source), context(false))]
+    PatternError {
+        source: glob::PatternError,
+        backtrace: Backtrace,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -77,7 +82,7 @@ pub struct ErrorDto {
 impl actix_web::ResponseError for Error {
     fn status_code(&self) -> StatusCode {
         match self {
-            Error::ResponseError { status, .. } => status.clone(),
+            Error::ResponseError { status, .. } => *status,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -88,7 +93,7 @@ impl actix_web::ResponseError for Error {
             Error::ResponseError { status, message, .. } => {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
 
-                (HttpResponse::build(status.clone()), ErrorDto { error: message })
+                (HttpResponse::build(*status), ErrorDto { error: message })
             },
             _ => (
                 HttpResponse::InternalServerError(),
@@ -101,15 +106,3 @@ impl actix_web::ResponseError for Error {
             .body(serde_json::to_string(&body).unwrap())
     }
 }
-
-/*
-impl OpenApiResponder<'_> for Error {
-    fn responses(gen: &mut OpenApiGenerator) -> rocket_okapi::Result<OAResponses> {
-        let mut responses = OAResponses::default();
-        let schema = gen.json_schema_no_ref::<ErrorDto>();
-        add_schema_response(&mut responses, 401, "application/json", schema.clone())?;
-        add_schema_response(&mut responses, 500, "application/json", schema)?;
-        Ok(responses)
-    }
-}
-*/
