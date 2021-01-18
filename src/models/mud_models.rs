@@ -4,7 +4,7 @@ use chrono::{DateTime, Local, NaiveDateTime};
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Clone)]
-pub struct MUDDbo {
+pub struct MudDbo {
     pub url: String,
     pub data: String,
     pub created_at: NaiveDateTime,
@@ -12,7 +12,7 @@ pub struct MUDDbo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub struct MUDData {
+pub struct MudData {
     pub url: String,
     pub masa_url: Option<String>,
     pub last_update: String,
@@ -21,61 +21,61 @@ pub struct MUDData {
     pub model_name: Option<String>,
     pub documentation: Option<String>,
     pub expiration: DateTime<Local>,
-    pub acllist: Vec<ACL>,
+    pub acllist: Vec<Acl>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub struct ACL {
+pub struct Acl {
     pub name: String,
-    pub packet_direction: ACLDirection,
-    pub acl_type: ACLType,
-    pub ace: Vec<ACE>,
+    pub packet_direction: AclDirection,
+    pub acl_type: AclType,
+    pub ace: Vec<Ace>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub struct ACE {
+pub struct Ace {
     pub name: String,
-    pub action: ACEAction,
-    pub matches: ACEMatches,
+    pub action: AceAction,
+    pub matches: AceMatches,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub struct ACEMatches {
-    pub protocol: Option<ACEProtocol>,
-    pub direction_initiated: Option<ACLDirection>,
+pub struct AceMatches {
+    pub protocol: Option<AceProtocol>,
+    pub direction_initiated: Option<AclDirection>,
     pub address_mask: Option<String>,
     pub dnsname: Option<String>,
-    pub source_port: Option<ACEPort>,
-    pub destination_port: Option<ACEPort>,
+    pub source_port: Option<AcePort>,
+    pub destination_port: Option<AcePort>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub enum ACEPort {
+pub enum AcePort {
     Single(u32),
     Range(u32, u32),
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub enum ACEProtocol {
+pub enum AceProtocol {
     TCP,
     UDP,
     Protocol(u32),
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
-pub enum ACEAction {
+pub enum AceAction {
     Accept,
     Deny,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Apiv2Schema)]
-pub enum ACLType {
+pub enum AclType {
     IPV6,
     IPV4,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Apiv2Schema)]
-pub enum ACLDirection {
+pub enum AclDirection {
     FromDevice,
     ToDevice,
 }

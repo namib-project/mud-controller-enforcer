@@ -30,13 +30,6 @@ pub struct User {
 }
 
 #[derive(Debug)]
-pub struct UserRoleDbo {
-    pub id: i64,
-    pub user_id: i64,
-    pub role_id: i64,
-}
-
-#[derive(Debug)]
 pub struct RoleDbo {
     pub id: i64,
     pub name: String,
