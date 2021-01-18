@@ -5,31 +5,17 @@
     clippy::unseparated_literal_suffix,
     clippy::module_name_repetitions,
     clippy::default_trait_access,
-    clippy::similar_names
+    clippy::similar_names,
+    clippy::missing_errors_doc,
+    clippy::must_use_candidate
 )]
 
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate validator;
-
 use dotenv::dotenv;
-
-use crate::error::Result;
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
+use namib_mud_controller::{db, error::Result, routes, rpc};
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
-
-mod auth;
-mod db;
-mod error;
-mod models;
-mod routes;
-mod rpc;
-mod services;
 
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -48,7 +34,9 @@ async fn main() -> Result<()> {
     });
     HttpServer::new(move || {
         let cors = Cors::default()
-            .allow_any_origin()
+            .allowed_origin_fn(|origin, _req_head| {
+                origin.as_bytes().starts_with(b"https://localhost:") || origin.as_bytes().starts_with(b"http://localhost:")
+            })
             .allow_any_method()
             .allow_any_header()
             .max_age(3600);

@@ -5,14 +5,10 @@ use crate::{
         device_model::Device,
         mud_models::{ACEAction, ACEProtocol, ACLDirection, ACLType},
     },
+    services::config_service::{get_config_value, set_config_value},
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
-use std::{
-    net::{IpAddr, ToSocketAddrs},
-    sync::atomic::{AtomicU32, Ordering},
-};
-
-static VERSION: AtomicU32 = AtomicU32::new(0);
+use std::net::{IpAddr, ToSocketAddrs};
 
 pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
@@ -119,12 +115,26 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
     Ok(result)
 }
 
-pub async fn get_config_version(_: &ConnectionType) -> String {
-    VERSION.load(Ordering::SeqCst).to_string()
+pub async fn get_config_version(pool: &ConnectionType) -> String {
+    get_config_value("version".to_string(), pool)
+        .await
+        .unwrap_or_else(|_| "0".to_string())
 }
 
-pub async fn update_config_version(_: &ConnectionType) {
-    VERSION.fetch_add(1, Ordering::SeqCst);
+pub async fn update_config_version(pool: &ConnectionType) {
+    set_config_value(
+        "version".to_string(),
+        (get_config_value("version".to_string(), pool)
+            .await
+            .unwrap_or_else(|_| "0".to_string())
+            .parse::<u32>()
+            .unwrap_or(1)
+            + 1)
+        .to_string(),
+        pool,
+    )
+    .await
+    .expect("failed to write config");
 }
 
 #[cfg(test)]
