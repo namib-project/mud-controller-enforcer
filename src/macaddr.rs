@@ -19,6 +19,9 @@ impl From<mac::MacAddr> for MacAddr {
     }
 }
 
+// We need to implement Into over From here, because we have neither implemented the Into trait
+// nor the mac::MacAddr struct.
+#[allow(clippy::from_over_into)]
 impl Into<mac::MacAddr> for MacAddr {
     fn into(self) -> mac::MacAddr {
         match self {
