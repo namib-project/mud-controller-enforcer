@@ -10,9 +10,9 @@
     clippy::must_use_candidate
 )]
 
-use dotenv::dotenv;
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
+use dotenv::dotenv;
 use namib_mud_controller::{db, error::Result, routes, rpc};
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
@@ -35,7 +35,8 @@ async fn main() -> Result<()> {
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|origin, _req_head| {
-                origin.as_bytes().starts_with(b"https://localhost:") || origin.as_bytes().starts_with(b"http://localhost:")
+                origin.as_bytes().starts_with(b"https://localhost:")
+                    || origin.as_bytes().starts_with(b"http://localhost:")
             })
             .allow_any_method()
             .allow_any_header()
