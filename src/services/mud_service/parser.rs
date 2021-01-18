@@ -199,7 +199,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                 }
             );
             Ok(ACEPort::Single(*p))
-        },
+        }
         json_models::Port {
             upper_port: Some(upper_port),
             lower_port: Some(lower_port),
@@ -212,10 +212,95 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                 }
             );
             Ok(ACEPort::Range(*lower_port, *upper_port))
-        },
+        }
         _ => MudError {
             message: String::from("Invalid port definition"),
         }
         .fail()?,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::Read};
+
+    use super::*;
+
+    const PATH: &str = "tests/mud_tests/MUD-Profile-example";
+    const URL: &str = "https://lighting.example.com/lightbulb2000";
+
+    #[test]
+    fn test_apply_and_delete_config() -> Result<()> {
+        let mut mud_data = String::new();
+        let mut mud_profile = File::open(PATH)?;
+        mud_profile.read_to_string(&mut mud_data)?;
+
+        let mud = parse_mud(URL.to_string().clone(), mud_data.as_str())?;
+
+        let matches = ACEMatches {
+            protocol: None,
+            direction_initiated: None,
+            address_mask: None,
+            dnsname: None,
+            source_port: None,
+            destination_port: None,
+        };
+
+        let mut ace_list_f: Vec<ACE> = Vec::new();
+        let mut ace = ACE {
+            name: "myman0-frdev".to_string(),
+            action: ACEAction::Accept,
+            matches: matches.clone(),
+        };
+
+        ace_list_f.push(ace.clone());
+        ace.name = "myman1-frdev".to_string();
+        ace_list_f.push(ace.clone());
+        ace_list_f.push(ace.clone());
+        ace.name = "myman2-frdev".to_string();
+        ace_list_f.push(ace.clone());
+
+        let mut ace_list_t: Vec<ACE> = Vec::new();
+        let mut ace = ACE {
+            name: "myman0-todev".to_string(),
+            action: ACEAction::Accept,
+            matches: matches.clone(),
+        };
+
+        ace_list_t.push(ace.clone());
+        ace.name = "myman1-todev".to_string();
+        ace_list_t.push(ace.clone());
+        ace_list_t.push(ace.clone());
+        ace.name = "myman2-todev".to_string();
+        ace_list_t.push(ace.clone());
+
+        let mut acl_list = Vec::new();
+        let mut acl = ACL {
+            name: "mud-52892-v4fr".to_string(),
+            packet_direction: ACLDirection::FromDevice,
+            acl_type: ACLType::IPV6,
+            ace: ace_list_f,
+        };
+
+        acl_list.push(acl.clone());
+        acl.name = "mud-52892-v4to".to_string();
+        acl.packet_direction = ACLDirection::ToDevice;
+        acl.ace = ace_list_t;
+
+        acl_list.push(acl);
+        let example = MUDData {
+            url: URL.to_string().clone(),
+            masa_url: None,
+            last_update: "2019-07-23T19:54:24".to_string(),
+            systeminfo: Some("The BMS Example Light Bulb".to_string()),
+            mfg_name: None,
+            model_name: None,
+            documentation: Some("https://lighting.example.com/lightbulb2000/documentation".to_string()),
+            expiration: mud.expiration.clone(),
+            acllist: acl_list,
+        };
+
+        assert_eq!(mud, example);
+        Ok(())
     }
 }
