@@ -17,7 +17,7 @@ use namib_shared::{
 };
 
 use crate::{
-    db::ConnectionType,
+    db::DbConnection,
     error::Result,
     models::Device,
     services::{config_firewall_service, device_service, mud_service},
@@ -26,7 +26,7 @@ use crate::{
 use super::tls_serde_transport;
 
 #[derive(Clone)]
-pub struct RPCServer(SocketAddr, ConnectionType);
+pub struct RPCServer(SocketAddr, DbConnection);
 
 #[server]
 impl RPC for RPCServer {
@@ -93,7 +93,7 @@ impl RPC for RPCServer {
     }
 }
 
-pub async fn listen(pool: ConnectionType) -> Result<()> {
+pub async fn listen(pool: DbConnection) -> Result<()> {
     debug!("Registering in dnssd");
     let (_registration, result) = async_dnssd::register("_namib_controller._tcp", 8734)?.await?;
     info!("Registered: {:?}", result);
@@ -107,8 +107,11 @@ pub async fn listen(pool: ConnectionType) -> Result<()> {
         })?;
 
         // Load server cert
-        let certs = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)?;
-        let key = open_file_with("certs/server-key.pem", rustls::internal::pemfile::rsa_private_keys)?[0].clone();
+        let certs = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)
+            .expect("Could not find certs/server.pem");
+        let key = open_file_with("certs/server-key.pem", rustls::internal::pemfile::rsa_private_keys)
+            .expect("Could not find certs/server-key.pem")[0]
+            .clone();
 
         let mut cfg = rustls::ServerConfig::new(rustls::AllowAnyAuthenticatedClient::new(client_auth_roots));
         cfg.set_single_cert(certs, key)?;

@@ -4,7 +4,7 @@ use validator::Validate;
 
 use crate::{
     auth::Auth,
-    db::ConnectionType,
+    db::DbConnection,
     error::{ResponseError, Result},
     models::User,
     routes::dtos::{LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
@@ -23,7 +23,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 }
 
 #[api_v2_operation(summary = "Register a new user")]
-pub async fn signup(pool: web::Data<ConnectionType>, signup_dto: Json<SignupDto>) -> Result<Json<SuccessDto>> {
+pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) -> Result<Json<SuccessDto>> {
     signup_dto.validate().or_else(|_| {
         ResponseError {
             status: StatusCode::BAD_REQUEST,
@@ -42,7 +42,7 @@ pub async fn signup(pool: web::Data<ConnectionType>, signup_dto: Json<SignupDto>
 }
 
 #[api_v2_operation(summary = "Login with username and password")]
-pub async fn login(pool: web::Data<ConnectionType>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
+pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
     login_dto.validate().or_else(|_| {
         ResponseError {
             status: StatusCode::BAD_REQUEST,
@@ -75,7 +75,7 @@ pub async fn login(pool: web::Data<ConnectionType>, login_dto: Json<LoginDto>) -
 }
 
 #[api_v2_operation(summary = "Retrieve information about the logged-in user")]
-pub async fn get_me(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<User>> {
+pub async fn get_me(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<User>> {
     let user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
 
     Ok(Json(user))
@@ -83,7 +83,7 @@ pub async fn get_me(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<
 
 #[api_v2_operation(summary = "Update the current user")]
 pub fn update_me(
-    pool: web::Data<ConnectionType>,
+    pool: web::Data<DbConnection>,
     auth: Auth,
     update_user_dto: Json<UpdateUserDto>,
 ) -> Result<Json<SuccessDto>> {
@@ -110,7 +110,7 @@ pub fn update_me(
 
 #[api_v2_operation(summary = "Update the user's password")]
 pub fn update_password(
-    pool: web::Data<ConnectionType>,
+    pool: web::Data<DbConnection>,
     auth: Auth,
     update_password_dto: Json<UpdatePasswordDto>,
 ) -> Result<Json<SuccessDto>> {
@@ -142,7 +142,7 @@ pub fn update_password(
 }
 
 #[api_v2_operation(summary = "Retrieve all roles")]
-pub fn get_roles(pool: web::Data<ConnectionType>, auth: Auth) -> Result<Json<Vec<RoleDto>>> {
+pub fn get_roles(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<RoleDto>>> {
     auth.require_permission("role/list")?;
 
     let roles = user_service::get_all_roles(pool.get_ref()).await?;

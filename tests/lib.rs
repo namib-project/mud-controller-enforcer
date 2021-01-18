@@ -1,6 +1,6 @@
 use dotenv::dotenv;
 use log::info;
-use namib_mud_controller::db::ConnectionType;
+use namib_mud_controller::db::DbConnection;
 use sqlx::migrate;
 
 #[cfg(feature = "postgres")]
@@ -8,15 +8,15 @@ use std::env;
 
 pub struct IntegrationTestContext {
     pub db_url: String,
-    pub db_name: String,
-    pub db_pool: Option<ConnectionType>,
+    pub db_name: &'static str,
+    pub db_conn: DbConnection,
 }
 
 impl IntegrationTestContext {
     /// Creates a new DB context, so you can access the database.
     /// Added a db_name option, so tests can run parallel and independent
     /// When using SQLite, TESTING_DATABASE_URL is a path where the sqlite files are created
-    pub async fn new(db_name: &str) -> Self {
+    pub async fn new(db_name: &'static str) -> Self {
         dotenv().ok();
         env_logger::try_init().ok();
 
@@ -32,39 +32,35 @@ impl IntegrationTestContext {
 
         info!("Using DB {:?}", db_url);
 
-        let conn = ConnectionType::connect(&db_url)
+        let db_conn = DbConnection::connect(&db_url)
             .await
             .expect("Couldn't establish connection pool for database");
 
         #[cfg(feature = "sqlite")]
         migrate!("migrations/sqlite")
-            .run(&conn)
+            .run(&db_conn)
             .await
             .expect("Database migrations failed");
 
         #[cfg(feature = "postgres")]
         migrate!("migrations/postgres")
-            .run(&conn)
+            .run(&db_conn)
             .await
             .expect("Database migrations failed");
 
         Self {
             db_url,
-            db_name: db_name.to_string(),
-            db_pool: Some(conn),
+            db_name,
+            db_conn,
         }
     }
 }
 
+#[cfg(feature = "postgres")]
 impl Drop for IntegrationTestContext {
     /// Removes/cleans the DB context
-    /// When using SQLite, the database is just getting deleted
-    /// TODO: Postgres destruction
-    fn drop(&mut self) {
-        // let conn = ConnectionType::establish(self.db_url.as_ref()).expect("Couldn't establish connection to database");
-
-        // Closing all connections by destructing db_pool implicitly, so we can delete the db
-        self.db_pool = None;
+    fn drop(&self) {
+        sqlx::query("DROP DATABASE " + self.db_name);
 
         info!("Cleaned up database context");
     }

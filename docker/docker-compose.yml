@@ -7,3 +7,11 @@ services:
     ports:
       - 8000:8000
       - 8734:8734
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_USER: namib
+      POSTGRES_PASSWORD: namib
+    ports:
+      - 5432:5432

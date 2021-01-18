@@ -2,7 +2,7 @@ use chrono::Local;
 use isahc::AsyncReadResponseExt;
 
 use crate::{
-    db::ConnectionType,
+    db::DbConnection,
     error::Result,
     models::{MudData, MudDbo},
 };
@@ -10,7 +10,7 @@ use crate::{
 mod json_models;
 mod parser;
 
-pub async fn get_mud_from_url(url: String, pool: &ConnectionType) -> Result<MudData> {
+pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
     let existing_mud: Option<MudDbo> = sqlx::query_as!(MudDbo, "select * from mud_data where url = ?", url)
         .fetch_optional(pool)

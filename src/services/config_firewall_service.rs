@@ -1,5 +1,5 @@
 use crate::{
-    db::ConnectionType,
+    db::DbConnection,
     error::Result,
     models::{AceAction, AceProtocol, AclDirection, AclType, Device},
     services::config_service::{get_config_value, set_config_value},
@@ -112,13 +112,13 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
     Ok(result)
 }
 
-pub async fn get_config_version(pool: &ConnectionType) -> String {
+pub async fn get_config_version(pool: &DbConnection) -> String {
     get_config_value("version".to_string(), pool)
         .await
         .unwrap_or_else(|_| "0".to_string())
 }
 
-pub async fn update_config_version(pool: &ConnectionType) {
+pub async fn update_config_version(pool: &DbConnection) {
     set_config_value(
         "version".to_string(),
         (get_config_value("version".to_string(), pool)

@@ -2,7 +2,7 @@
 CREATE TABLE devices
 (
     id                  SERIAL NOT NULL PRIMARY KEY,
-    ip_addr             TEXT NOT NULL PRIMARY KEY,
+    ip_addr             TEXT NOT NULL,
     mac_addr            TEXT,
     hostname            TEXT NOT NULL DEFAULT '',
     vendor_class        TEXT NOT NULL DEFAULT '',
