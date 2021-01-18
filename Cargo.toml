@@ -11,21 +11,21 @@ execute_uci_commands = ["libuci-sys", "libc"]
 dnsmasq_hook  = []
 
 [dependencies]
-namib_shared = { path = "../namib_shared" }
-tokio = { version = "0.3", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
+namib_shared = { tag = "0.2.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+tokio = { version = "1.0", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
 log = "0.4"
 env_logger = "0.8"
-async-dnssd = { path = "../rust-async-dnssd" }
+async-dnssd = { tag = "0.5.0-rc.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git" }
 futures = "0.3"
-tokio-native-tls = "0.2"
-tokio-util = "0.4"
-tarpc = { version = "0.23", features = ["full"] }
+tokio-native-tls = "0.3"
+tokio-util = "0.6"
+tarpc = { version = "0.24", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 pin-project = "1.0"
-tokio-serde = { version = "0.6" }
+tokio-serde = "0.8"
 snafu = { version = "0.6", default-features = false, features = ["std", "backtraces-impl-backtrace-crate", "futures"] }
 dotenv = "0.15"
-chrono = {version = "0.4", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
 serde_json = "1.0"
 macaddr = { version = "1.0.1", features = ["serde_std"] }
@@ -35,7 +35,7 @@ regex = "1.4.2"
 serial_test = "0.5.1"
 
 [target.'cfg(unix)'.dependencies]
-libuci-sys = { path = "../libuci-sys", optional = true}
+libuci-sys = { tag = "1.0.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git", optional = true }
 libc = { version = "0.2", optional = true }
 
 [[bin]]

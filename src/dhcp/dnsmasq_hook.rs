@@ -5,13 +5,13 @@ use log::{debug, info};
 use snafu::Snafu;
 
 use namib_shared::{
-    mac_addr::MacAddr,
+    mac as macaddr,
     models::{
-        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
+        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation,
+        DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
     },
+    MacAddr,
 };
-use regex::Regex;
-use std::convert::TryInto;
 
 enum EventType {
     Add,
@@ -27,7 +27,9 @@ impl FromStr for EventType {
             "add" => Ok(EventType::Add),
             "del" => Ok(EventType::Del),
             "old" => Ok(EventType::Old),
-            _ => Err(DnsmasqHookError::UnsupportedEventType { supplied_type: s.to_owned() }),
+            _ => Err(DnsmasqHookError::UnsupportedEventType {
+                supplied_type: s.to_owned(),
+            }),
         }
     }
 }
@@ -59,22 +61,37 @@ impl From<DnsmasqHookError> for DnsmasqHookReturn {
 enum DnsmasqHookError {
     /// The IP address that was supplied was not properly formatted.
     #[snafu(display("Supplied IP Address \"{}\" is not valid: {}", "supplied_address", "source"))]
-    InvalidIpAddress { supplied_address: String, source: net::AddrParseError },
+    InvalidIpAddress {
+        supplied_address: String,
+        source: net::AddrParseError,
+    },
     /// A required argument for the script was missing.
     #[snafu(display("Not enough arguments supplied. Missing {} arguments.", "missing_arg_count"))]
     NotEnoughArguments { missing_arg_count: usize },
+    #[snafu(display("Required argument \"{}\" is missing", "missing_arg_name"))]
+    RequiredArgumentMissing { missing_arg_name: String },
     /// The supplied lease time is not a valid number.
-    #[snafu(display("Supplied lease time \"{}\" is not a valid number: {}", "supplied_lease_time", "source"))]
-    InvalidLeaseTime { supplied_lease_time: String, source: num::ParseIntError },
+    #[snafu(display(
+        "Supplied lease time \"{}\" is not a valid number: {}",
+        "supplied_lease_time",
+        "source"
+    ))]
+    InvalidLeaseTime {
+        supplied_lease_time: String,
+        source: num::ParseIntError,
+    },
     /// A required environment variable is missing.
     #[snafu(display("Required environment variable \"{}\" is missing", "missing_var_name"))]
-    RequiredEnvironmentVariableMissing { missing_arg_name: String, source: env::VarError },
+    RequiredEnvironmentVariableMissing {
+        missing_arg_name: String,
+        source: env::VarError,
+    },
     /// The supplied MAC-Address is not of the correct format.
     #[snafu(display("Supplied MAC address \"{}\" is not valid: {}", "supplied_mac", "source"))]
-    InvalidMacAddress { supplied_mac: String, source: macaddr::ParseError },
-    /// The supplied DUID is not of the correct format.
-    #[snafu(display("Supplied DUID \"{}\" is not valid", "supplied_duid"))]
-    InvalidDuid { supplied_duid: String },
+    InvalidMacAddress {
+        supplied_mac: String,
+        source: macaddr::ParseError,
+    },
     /// The event type this script was called with is not supported.
     #[snafu(display("Supplied event type \"{}\" is not supported", "supplied_type"))]
     UnsupportedEventType { supplied_type: String },
@@ -83,7 +100,10 @@ enum DnsmasqHookError {
     EnforcerConnectionError { source: std::io::Error },
     /// Error while serializing event.
     #[snafu(display("Could not serialize Event {}: {}", "event", "source"))]
-    EventSerializationError { event: DhcpEvent, source: serde_json::Error },
+    EventSerializationError {
+        event: DhcpEvent,
+        source: serde_json::Error,
+    },
 }
 
 type Result<T> = std::result::Result<T, DnsmasqHookError>;
@@ -114,8 +134,12 @@ fn main() {
 fn run_dnsmasq_hook() -> Result<()> {
     let dhcp_event = extract_dhcp_hook_data()?;
     debug!("Constructed DHCP Event: {:?}", &dhcp_event);
-    let socket = UnixStream::connect("/tmp/namib_dhcp.sock").map_err(|e| DnsmasqHookError::EnforcerConnectionError { source: e })?;
-    serde_json::to_writer(socket, &dhcp_event).map_err(|e| DnsmasqHookError::EventSerializationError { event: dhcp_event, source: e })?;
+    let socket = UnixStream::connect("/tmp/namib_dhcp.sock")
+        .map_err(|e| DnsmasqHookError::EnforcerConnectionError { source: e })?;
+    serde_json::to_writer(socket, &dhcp_event).map_err(|e| DnsmasqHookError::EventSerializationError {
+        event: dhcp_event,
+        source: e,
+    })?;
     info!("DHCP Event successfully transferred to enforcer");
     Ok(())
 }
@@ -147,7 +171,9 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
     let old_hostname = env::var("DNSMASQ_OLD_HOSTNAME").ok();
     let receiver_interface = env::var("DNSMASQ_INTERFACE").ok();
     let mud_url = env::var("DNSMASQ_MUD_URL").ok();
-    let tags = env::var("DNSMASQ_TAGS").map_or(Vec::new(), |t| t.split(' ').filter(|v| v != &"").map(|v| v.to_string()).collect());
+    let tags = env::var("DNSMASQ_TAGS").map_or(Vec::new(), |t| {
+        t.split(' ').filter(|v| v != &"").map(|v| v.to_string()).collect()
+    });
     let time_remaining = env::var("DNSMASQ_TIME_REMAINING");
     let time_remaining: Duration = time_remaining
         .clone()
@@ -156,10 +182,12 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
             source: e,
         })
         .and_then(|x| {
-            x.parse::<u64>().map(Duration::from_secs).map_err(|e| DnsmasqHookError::InvalidLeaseTime {
-                supplied_lease_time: time_remaining.unwrap(),
-                source: e,
-            })
+            x.parse::<u64>()
+                .map(Duration::from_secs)
+                .map_err(|e| DnsmasqHookError::InvalidLeaseTime {
+                    supplied_lease_time: time_remaining.unwrap(),
+                    source: e,
+                })
         })?;
 
     let mut user_classes = Vec::new();
@@ -188,9 +216,12 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
             // RFC8415 specifies that the DHCPv6 DUID contains of a two-octet long type code followed by
             // between 1 and 128 octets which make up the actual identifier (see Section 11.1).
             // We can unwrap here because this regex is valid and should always compile.
-            let validation_regex = Regex::new(r"^(?:[A-Fa-f0-9]{2}):(?:[A-Fa-f0-9]{2})(?::(?:[A-Fa-f0-9]{2})){1,128}$").unwrap();
+            let validation_regex =
+                Regex::new(r"^(?:[A-Fa-f0-9]{2}):(?:[A-Fa-f0-9]{2})(?::(?:[A-Fa-f0-9]{2})){1,128}$").unwrap();
             if !validation_regex.is_match(&duid_str) {
-                return Err(DnsmasqHookError::InvalidDuid { supplied_duid: duid_str });
+                return Err(DnsmasqHookError::InvalidDuid {
+                    supplied_duid: duid_str,
+                });
             }
             // We can unwrap here, because we already checked that the input string is a valid input for hex::decode().
             let duid = hex::decode(duid_str.replace(":", "")).unwrap();
@@ -212,7 +243,10 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
         Some(mac_str) => {
             let mac_addr_array: MacAddr = mac_str
                 .parse::<macaddr::MacAddr>()
-                .map_err(|e| DnsmasqHookError::InvalidMacAddress { supplied_mac: mac_str, source: e })?
+                .map_err(|e| DnsmasqHookError::InvalidMacAddress {
+                    supplied_mac: mac_str,
+                    source: e,
+                })?
                 .into();
             Some(mac_addr_array)
         },

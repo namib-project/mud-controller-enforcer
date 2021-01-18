@@ -73,7 +73,7 @@ define Package/namib/install
 	$(INSTALL_BIN) ./files/namib.hook $(1)/etc/hotplug.d/dhcp/namib
 	$(INSTALL_DIR) $(1)/etc/namib
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/namib_enforcer/certs/identity.pfx $(1)/etc/namib/identity.pfx
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/namib_shared/certs/ca.pem $(1)/etc/namib/ca.pem
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/namib_enforcer/certs/namib-ca.pem $(1)/etc/namib/ca.pem
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/namib.init $(1)/etc/init.d/namib
 endef

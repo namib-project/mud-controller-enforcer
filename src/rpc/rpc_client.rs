@@ -4,7 +4,6 @@ use futures::{pin_mut, prelude::*};
 use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context, serde_transport};
 use tokio::{
-    prelude::*,
     sync::Mutex,
     time::{sleep, Duration},
 };
@@ -17,7 +16,7 @@ use crate::{
 };
 
 use super::controller_discovery::discover_controllers;
-use tokio::{fs::File, net::TcpStream};
+use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
     native_tls::{Certificate, Identity},
@@ -60,7 +59,9 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
     loop {
         {
             let mut instance = client.lock().await;
-            let heartbeat: io::Result<Option<FirewallConfig>> = instance.heartbeat(context::current(), firewall_service::get_config_version().ok()).await;
+            let heartbeat: io::Result<Option<FirewallConfig>> = instance
+                .heartbeat(context::current(), firewall_service::get_config_version().ok())
+                .await;
             match heartbeat {
                 Err(error) => error!("Error during heartbeat: {:?}", error),
                 Ok(Some(config)) => {
@@ -79,7 +80,12 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
     }
 }
 
-async fn try_connect(addr: SocketAddr, dns_name: &'static str, identity: Identity, ca: Certificate) -> Result<Option<RPCClient>> {
+async fn try_connect(
+    addr: SocketAddr,
+    dns_name: &'static str,
+    identity: Identity,
+    ca: Certificate,
+) -> Result<Option<RPCClient>> {
     debug!("trying to connect to address {:?}", addr);
 
     // ip6 geht anscheinend nicht

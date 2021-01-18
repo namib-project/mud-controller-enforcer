@@ -23,10 +23,17 @@ async fn main() -> Result<()> {
     dotenv().ok();
     env_logger::init();
 
-    info!("Starting in {} mode", if services::is_system_mode() { "SYSTEM" } else { "USER" });
+    info!(
+        "Starting in {} mode",
+        if services::is_system_mode() { "SYSTEM" } else { "USER" }
+    );
     if !services::is_system_mode() {
         fs::create_dir_all("config").await?;
-        OpenOptions::new().write(true).create(true).open("config/firewall").await?;
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open("config/firewall")
+            .await?;
     }
 
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));

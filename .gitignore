@@ -1,5 +1,6 @@
 *.pem
 *.pfx
+!certs/namib-ca.pem
 
 config
 
