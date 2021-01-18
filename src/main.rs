@@ -7,28 +7,16 @@
     clippy::default_trait_access,
     clippy::similar_names,
     clippy::redundant_else
+    clippy::similar_names,
+    clippy::missing_errors_doc,
+    clippy::must_use_candidate
 )]
-
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate validator;
 
 use dotenv::dotenv;
 
-use crate::error::Result;
 use actix_web::{middleware, App, HttpServer};
+use namib_mud_controller::{db, error::Result, routes, rpc};
 use paperclip::actix::{web, OpenApiExt};
-
-mod auth;
-mod db;
-mod error;
-mod models;
-mod routes;
-mod rpc;
-mod services;
 
 #[actix_web::main]
 async fn main() -> Result<()> {
