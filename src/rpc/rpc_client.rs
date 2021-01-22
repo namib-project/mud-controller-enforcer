@@ -1,8 +1,7 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use snafu::{Backtrace, GenerateBacktrace};
-use tarpc::{client, context, rpc::context::Context, serde_transport, trace};
+use tarpc::{client, rpc::context::*, serde_transport};
 use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
@@ -10,10 +9,7 @@ use tokio::{
 
 use namib_shared::{codec, config_firewall::FirewallConfig, rpc::RPCClient};
 
-use crate::{
-    error::{Error, Result},
-    services::firewall_service,
-};
+use crate::{error::Result, services::firewall_service};
 
 use super::controller_discovery::discover_controllers;
 use std::time::SystemTime;
@@ -41,19 +37,23 @@ pub async fn run() -> Result<RPCClient> {
         Certificate::from_pem(&vec)?
     };
 
-    let addr_stream = discover_controllers("_namib_controller._tcp")?
-        .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
-        .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
-        .filter_map(|r| future::ready(r.ok()));
-    pin_mut!(addr_stream);
+    let client = loop {
+        let addr_stream = discover_controllers("_namib_controller._tcp")?
+            .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
+            .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
+            .filter_map(|r| future::ready(r.ok()));
+        pin_mut!(addr_stream);
 
-    match addr_stream.next().await {
-        Some(client) => Ok(client),
-        None => Err(Error::ConnectionError {
-            message: "No Client",
-            backtrace: Backtrace::generate(),
-        }),
-    }
+        match addr_stream.next().await {
+            Some(client) => break client,
+            None => {
+                warn!("No controller found, retrying in 5 secs");
+                sleep(Duration::from_secs(5)).await;
+            }
+        }
+    };
+
+    Ok(client)
 }
 
 pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
@@ -113,8 +113,12 @@ async fn try_connect(
 /// Returns the context for the current request, or a default Context if no request is active.
 /// Copied and adapted based on tarpc/rpc/context.rs
 pub fn current_rpc_context() -> Context {
-    Context {
-        deadline: SystemTime::now() + Duration::from_secs(60), // The deadline is the timestamp, when the request should be dropped, if not already responded to
-        trace_context: trace::Context::new_root(),
-    }
+    let mut rpc_context = current();
+    rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
+    rpc_context
 }
+
+/*Context {
+    deadline: SystemTime::now() + Duration::from_secs(60),
+    trace_context: trace::Context::new_root(),
+}*/
