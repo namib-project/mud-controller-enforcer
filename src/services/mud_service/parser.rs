@@ -225,14 +225,13 @@ mod tests {
     use std::{fs::File, io::Read};
 
     use super::*;
-
-    const PATH: &str = "tests/mud_tests/MUD-Profile-example";
-    const URL: &str = "https://lighting.example.com/lightbulb2000";
+    use chrono::{offset::TimeZone, Local, NaiveDateTime};
 
     #[test]
-    fn test_apply_and_delete_config() -> Result<()> {
+    fn test_trivial_example() -> Result<()> {
+        const URL: &str = "https://lighting.example.com/lightbulb2000";
         let mut mud_data = String::new();
-        let mut mud_profile = File::open(PATH)?;
+        let mut mud_profile = File::open("tests/mud_tests/MUD-Profile-example")?;
         mud_profile.read_to_string(&mut mud_data)?;
 
         let mud = parse_mud(URL.to_string().clone(), mud_data.as_str())?;
@@ -301,6 +300,91 @@ mod tests {
         };
 
         assert_eq!(mud, example);
+        Ok(())
+    }
+
+    #[test]
+    fn test_example_amazon_echo() -> Result<()> {
+        compare_mud_accept(
+            "tests/mud_tests/Amazon-Echo",
+            "https://amazonecho.com/amazonecho",
+            "tests/mud_tests/Amazon-Echo-Test",
+        )
+    }
+
+    #[test]
+    fn test_example_amazon_echo_wrong_expired() -> Result<()> {
+        compare_mud_fail(
+            "tests/mud_tests/Amazon-Echo",
+            "https://amazonecho.com/amazonecho",
+            "tests/mud_tests/Amazon-Echo-Test",
+        )
+    }
+
+    #[test]
+    fn test_example_ring_doorbell() -> Result<()> {
+        compare_mud_accept(
+            "tests/mud_tests/Ring-Doorbell",
+            "https://ringdoorbell.com/ringdoorbell",
+            "tests/mud_tests/Ring-Doorbell-Test",
+        )
+    }
+
+    #[test]
+    fn test_example_ring_doorbell_wrong_expired() -> Result<()> {
+        compare_mud_fail(
+            "tests/mud_tests/Ring-Doorbell",
+            "https://ringdoorbell.com/ringdoorbell",
+            "tests/mud_tests/Ring-Doorbell-Test",
+        )
+    }
+
+    #[test]
+    fn test_example_august_doorbell() -> Result<()> {
+        compare_mud_accept(
+            "tests/mud_tests/August-Doorbell",
+            "https://augustdoorbellcam.com/augustdoorbellcam",
+            "tests/mud_tests/August-Doorbell-Test",
+        )
+    }
+
+    #[test]
+    fn test_example_august_doorbell_wrong_expired() -> Result<()> {
+        compare_mud_fail(
+            "tests/mud_tests/August-Doorbell",
+            "https://augustdoorbellcam.com/augustdoorbellcam",
+            "tests/mud_tests/August-Doorbell-Test",
+        )
+    }
+
+    fn compare_mud(
+        mud_profile_path: &str,
+        mud_profile_url: &str,
+        mud_profile_example_path: &str,
+    ) -> Result<(MUDData, String)> {
+        let mut mud_data = String::new();
+        let mut mud_data_test = String::new();
+
+        let mut mud_profile = File::open(mud_profile_path)?;
+        let mut mud_profile_test = File::open(mud_profile_example_path)?;
+
+        mud_profile.read_to_string(&mut mud_data)?;
+        mud_profile_test.read_to_string(&mut mud_data_test)?;
+
+        let mud = parse_mud(mud_profile_url.to_string().clone(), mud_data.as_str())?;
+        Ok((mud, mud_data_test))
+    }
+    fn compare_mud_fail(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
+        let mud_data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
+        assert_ne!(serde_json::to_string(&mud_data.0).unwrap(), mud_data.1);
+        Ok(())
+    }
+
+    fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
+        let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
+        let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
+        data.0.expiration = Local.from_local_datetime(&naive).unwrap();
+        assert_eq!(serde_json::to_string(&data.0).unwrap(), data.1);
         Ok(())
     }
 }
