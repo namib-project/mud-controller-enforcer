@@ -305,56 +305,68 @@ mod tests {
 
     #[test]
     fn test_example_amazon_echo() -> Result<()> {
-        compare_mud_accept(
+        let mud_data = compare_mud_accept(
             "tests/mud_tests/Amazon-Echo",
             "https://amazonecho.com/amazonecho",
             "tests/mud_tests/Amazon-Echo-Test",
-        )
+        )?;
+        assert_eq!(mud_data.0, mud_data.1);
+        Ok(())
     }
 
     #[test]
     fn test_example_amazon_echo_wrong_expired() -> Result<()> {
-        compare_mud_fail(
+        let mud_data = compare_mud_fail(
             "tests/mud_tests/Amazon-Echo",
             "https://amazonecho.com/amazonecho",
             "tests/mud_tests/Amazon-Echo-Test",
-        )
+        )?;
+        assert_ne!(mud_data.0, mud_data.1);
+        Ok(())
     }
 
     #[test]
     fn test_example_ring_doorbell() -> Result<()> {
-        compare_mud_accept(
+        let mud_data = compare_mud_accept(
             "tests/mud_tests/Ring-Doorbell",
             "https://ringdoorbell.com/ringdoorbell",
             "tests/mud_tests/Ring-Doorbell-Test",
-        )
+        )?;
+        assert_eq!(mud_data.0, mud_data.1);
+        Ok(())
     }
 
     #[test]
     fn test_example_ring_doorbell_wrong_expired() -> Result<()> {
-        compare_mud_fail(
+        let mud_data = compare_mud_fail(
             "tests/mud_tests/Ring-Doorbell",
             "https://ringdoorbell.com/ringdoorbell",
             "tests/mud_tests/Ring-Doorbell-Test",
-        )
+        )?;
+        assert_ne!(mud_data.0, mud_data.1);
+        Ok(())
     }
 
     #[test]
     fn test_example_august_doorbell() -> Result<()> {
-        compare_mud_accept(
+        let mud_data = compare_mud_accept(
             "tests/mud_tests/August-Doorbell",
             "https://augustdoorbellcam.com/augustdoorbellcam",
             "tests/mud_tests/August-Doorbell-Test",
-        )
+        )?;
+        assert_eq!(mud_data.0, mud_data.1);
+        Ok(())
     }
 
     #[test]
     fn test_example_august_doorbell_wrong_expired() -> Result<()> {
-        compare_mud_fail(
+        let mud_data = compare_mud_fail(
             "tests/mud_tests/August-Doorbell",
             "https://augustdoorbellcam.com/augustdoorbellcam",
             "tests/mud_tests/August-Doorbell-Test",
-        )
+        )?;
+        assert_ne!(mud_data.0, mud_data.1);
+        Ok(())
     }
 
     fn compare_mud(
@@ -374,17 +386,23 @@ mod tests {
         let mud = parse_mud(mud_profile_url.to_string().clone(), mud_data.as_str())?;
         Ok((mud, mud_data_test))
     }
-    fn compare_mud_fail(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
+    fn compare_mud_fail(
+        mud_profile_path: &str,
+        mud_profile_url: &str,
+        mud_profile_example_path: &str,
+    ) -> Result<(String, String)> {
         let mud_data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        assert_ne!(serde_json::to_string(&mud_data.0).unwrap(), mud_data.1);
-        Ok(())
+        Ok((serde_json::to_string(&mud_data.0).unwrap(), mud_data.1))
     }
 
-    fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
+    fn compare_mud_accept(
+        mud_profile_path: &str,
+        mud_profile_url: &str,
+        mud_profile_example_path: &str,
+    ) -> Result<(String, String)> {
         let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
         let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
         data.0.expiration = Local.from_local_datetime(&naive).unwrap();
-        assert_eq!(serde_json::to_string(&data.0).unwrap(), data.1);
-        Ok(())
+        Ok((serde_json::to_string(&data.0).unwrap(), data.1))
     }
 }
