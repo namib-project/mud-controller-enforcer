@@ -1,6 +1,6 @@
 use std::{clone::Clone, net::IpAddr, str::FromStr};
 
-use chrono::{Duration, Local, Utc};
+use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use crate::{
@@ -224,8 +224,9 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
 mod tests {
     use std::{fs::File, io::Read};
 
+    use chrono::{offset::TimeZone, NaiveDateTime, Utc};
+
     use super::*;
-    use chrono::{offset::TimeZone, DateTime, Local, NaiveDateTime, Offset, Utc};
 
     #[test]
     fn test_trivial_example() -> Result<()> {
@@ -383,7 +384,6 @@ mod tests {
     fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
         let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
         let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
-        let a: DateTime<Local> = DateTime::from(Utc.from_local_datetime(&naive).unwrap());
         data.0.expiration = Utc.from_local_datetime(&naive).unwrap();
         assert_eq!(serde_json::to_string(&data.0).unwrap(), data.1);
         Ok(())

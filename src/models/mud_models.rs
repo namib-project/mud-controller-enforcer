@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use chrono::{DateTime, Local, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]

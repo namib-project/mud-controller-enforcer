@@ -1,3 +1,7 @@
+use std::net::{IpAddr, ToSocketAddrs};
+
+use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
+
 use crate::{
     db::ConnectionType,
     error::Result,
@@ -7,8 +11,6 @@ use crate::{
     },
     services::config_service::{get_config_value, set_config_value},
 };
-use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
-use std::net::{IpAddr, ToSocketAddrs};
 
 pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
@@ -139,13 +141,16 @@ pub async fn update_config_version(pool: &ConnectionType) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use chrono::{Local, Utc};
+
+    use namib_shared::mac;
+
     use crate::models::{
         device_model::Device,
         mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
     };
-    use chrono::{Local, Utc};
-    use namib_shared::mac;
+
+    use super::*;
 
     #[test]
     fn test_converting() -> Result<()> {
