@@ -1,6 +1,6 @@
 use std::{clone::Clone, net::IpAddr, str::FromStr};
 
-use chrono::{Duration, Local};
+use chrono::{Duration, Local, Utc};
 use snafu::ensure;
 
 use crate::{
@@ -28,7 +28,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
             message: String::from("MUD-File has invalid 'cache-validity'")
         }
     );
-    let exptime = Local::now() + Duration::hours(cachevalidity);
+    let exptime = Utc::now() + Duration::hours(cachevalidity);
 
     // parse masa
     let mut masa_uri = None;
@@ -225,7 +225,7 @@ mod tests {
     use std::{fs::File, io::Read};
 
     use super::*;
-    use chrono::{offset::TimeZone, Local, NaiveDateTime};
+    use chrono::{offset::TimeZone, DateTime, Local, NaiveDateTime, Offset, Utc};
 
     #[test]
     fn test_trivial_example() -> Result<()> {
@@ -383,7 +383,8 @@ mod tests {
     fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
         let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
         let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
-        data.0.expiration = Local.from_local_datetime(&naive).unwrap();
+        let a: DateTime<Local> = DateTime::from(Utc.from_local_datetime(&naive).unwrap());
+        data.0.expiration = Utc.from_local_datetime(&naive).unwrap();
         assert_eq!(serde_json::to_string(&data.0).unwrap(), data.1);
         Ok(())
     }

@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use chrono::{DateTime, Local, NaiveDateTime};
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -20,7 +20,7 @@ pub struct MUDData {
     pub mfg_name: Option<String>,
     pub model_name: Option<String>,
     pub documentation: Option<String>,
-    pub expiration: DateTime<Local>,
+    pub expiration: DateTime<Utc>,
     pub acllist: Vec<ACL>,
 }
 

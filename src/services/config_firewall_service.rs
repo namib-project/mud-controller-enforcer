@@ -45,12 +45,12 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                             if acl.acl_type == ACLType::IPV6 {
                                 continue;
                             }
-                        },
+                        }
                         IpAddr::V6(_) => {
                             if acl.acl_type == ACLType::IPV4 {
                                 continue;
                             }
-                        },
+                        }
                     };
                     let route_network_lan = NetworkConfig::new(EnNetwork::LAN, Some(device.ip_addr.to_string()), None);
                     let route_network_wan = NetworkConfig::new(EnNetwork::WAN, Some(addr.ip().to_string()), None);
@@ -144,7 +144,7 @@ mod tests {
         device_model::Device,
         mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
     };
-    use chrono::Local;
+    use chrono::{Local, Utc};
     use namib_shared::mac;
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
             mfg_name: Some("some_mfg_name".to_string()),
             model_name: Some("some_model_name".to_string()),
             documentation: Some("some_documentation".to_string()),
-            expiration: Local::now(),
+            expiration: Utc::now(),
             acllist: vec![ACL {
                 name: "some_acl_name".to_string(),
                 packet_direction: ACLDirection::ToDevice,
