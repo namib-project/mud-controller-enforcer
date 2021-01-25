@@ -34,7 +34,6 @@ serde_json = "1.0"
 serde_derive = "1.0"
 dotenv = "0.15"
 dotenv_codegen = "0.15"
-schemars = { version = "0.8", features = ["chrono"] }
 jsonwebtoken = "7.2"
 chrono = { version = "0.4", features = ["serde"] }
 validator = { version = "0.12", features = ["derive"] }
