@@ -2,7 +2,6 @@
 
 use isahc::http::StatusCode;
 use paperclip::actix::{api_v2_errors, web::HttpResponse};
-use schemars::JsonSchema;
 use snafu::{Backtrace, Snafu};
 
 #[api_v2_errors(code = 401, code = 403, code = 500)]
@@ -74,7 +73,7 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize)]
 pub struct ErrorDto {
     pub error: String,
 }

@@ -5,7 +5,7 @@ use paperclip::actix::{api_v2_operation, web, web::Json};
 use crate::{auth::Auth, db::DbConnection, error::Result, routes::dtos::DeviceDto, services::device_service};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.route("/", web::get().to(get_all_devices));
+    cfg.route("", web::get().to(get_all_devices));
 }
 
 #[api_v2_operation]

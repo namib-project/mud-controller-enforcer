@@ -15,6 +15,9 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate validator;
+#[cfg(not(debug_assertions))]
+#[macro_use]
+extern crate dotenv_codegen;
 
 pub mod auth;
 pub mod db;
@@ -23,3 +26,9 @@ pub mod models;
 pub mod routes;
 pub mod rpc;
 pub mod services;
+
+#[cfg(not(debug_assertions))]
+pub const VERSION: &str = format!("{}_{}", dotenv!("CI_COMMIT_REF_SLUG"), dotenv!("CI_COMMIT_SHORT_SHA"));
+
+#[cfg(debug_assertions)]
+pub const VERSION: &str = "development";
