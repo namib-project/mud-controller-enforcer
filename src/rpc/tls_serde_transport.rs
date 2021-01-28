@@ -26,7 +26,7 @@ pub async fn listen<Item, SinkItem, Codec, CodecFn>(
 ) -> io::Result<Incoming<Item, SinkItem, Codec, CodecFn>>
 where
     Item: for<'de> Deserialize<'de>,
-    Codec: Serializer<SinkItem> + Deserializer<Item>,
+    Codec: Serializer<SinkItem>+Deserializer<Item>,
     CodecFn: Fn() -> Codec,
 {
     let acceptor = TlsAcceptor::from(config);
@@ -78,7 +78,7 @@ impl<Item, SinkItem, Codec, CodecFn> Stream for Incoming<Item, SinkItem, Codec, 
 where
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
-    Codec: Serializer<SinkItem> + Deserializer<Item>,
+    Codec: Serializer<SinkItem>+Deserializer<Item>,
     CodecFn: Fn() -> Codec,
 {
     type Item = io::Result<Transport<rustls::server::TlsStream<TcpStream>, Item, SinkItem, Codec>>;
