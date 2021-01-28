@@ -32,7 +32,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
                     let data = get_mud_from_url(url.clone(), pool).await;
                     debug!("Get all devices: mud url {:?}: {:?}", url, data);
                     data.ok()
-                },
+                }
                 None => None,
             };
 

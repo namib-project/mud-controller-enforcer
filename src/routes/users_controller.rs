@@ -7,7 +7,10 @@ use crate::{
     db::DbConnection,
     error::{ResponseError, Result},
     models::User,
-    routes::dtos::{LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
+    routes::dtos::{
+        LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
+        UserConfigRequestDto, UserConfigsDto,
+    },
     services::user_service,
 };
 use isahc::http::StatusCode;
@@ -20,6 +23,10 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/me", web::post().to(update_me));
     cfg.route("/password", web::post().to(update_password));
     cfg.route("/roles", web::get().to(get_roles));
+    cfg.route("/configs", web::get().to(get_users_configs));
+    cfg.route("/config", web::get().to(get_users_config));
+    cfg.route("/config", web::post().to(set_users_config));
+    cfg.route("/config", web::delete().to(delete_users_config));
 }
 
 #[api_v2_operation(summary = "Register a new user")]
@@ -156,4 +163,86 @@ pub fn get_roles(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<R
             })
             .collect(),
     ))
+}
+
+#[api_v2_operation(summary = "Gets the config variables of the user")]
+pub fn get_users_configs(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<UserConfigsDto>> {
+    let user_configs = user_service::get_all_configs_for_user(auth.sub, pool.get_ref()).await?;
+
+    let mut user_configs_dto = UserConfigsDto {
+        activated_theme: "Light".to_string(),
+    };
+
+    for uc in user_configs.into_iter() {
+        if uc.key == "activated_theme" {
+            user_configs_dto.activated_theme = uc.value;
+        }
+    }
+
+    Ok(Json(user_configs_dto))
+}
+
+#[api_v2_operation(summary = "Gets a config variable of the user")]
+pub fn get_users_config(
+    pool: web::Data<DbConnection>,
+    config: Json<UserConfigRequestDto>,
+    auth: Auth,
+) -> Result<Json<UserConfigDto>> {
+    config.validate().or_else(|_| {
+        ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    let user_config_db = user_service::get_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
+
+    Ok(Json(UserConfigDto {
+        key: user_config_db.key,
+        value: user_config_db.value,
+    }))
+}
+
+#[api_v2_operation(summary = "Sets a config variables of the user")]
+pub fn set_users_config(
+    pool: web::Data<DbConnection>,
+    auth: Auth,
+    user_config_dto: Json<UserConfigDto>,
+) -> Result<Json<SuccessDto>> {
+    user_config_dto.validate().or_else(|_| {
+        ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    user_service::upsert_config_for_user(auth.sub, &user_config_dto.key, &user_config_dto.value, pool.get_ref())
+        .await?;
+
+    Ok(Json(SuccessDto {
+        status: String::from("ok"),
+    }))
+}
+
+#[api_v2_operation(summary = "Deletes a config variables of the user")]
+pub fn delete_users_config(
+    pool: web::Data<DbConnection>,
+    auth: Auth,
+    config: Json<UserConfigRequestDto>,
+) -> Result<Json<SuccessDto>> {
+    config.validate().or_else(|_| {
+        ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    user_service::delete_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
+    debug!("sdfsdf");
+    Ok(Json(SuccessDto {
+        status: String::from("ok"),
+    }))
 }
