@@ -7,19 +7,16 @@ pub use unix::*;
 mod unix {
     use std::sync::Arc;
 
+    use crate::rpc::rpc_client::current_rpc_context;
     use futures::future::join_all;
     use log::debug;
-    use tarpc::context;
     use tokio::{
         io::AsyncReadExt,
         net::{UnixListener, UnixStream},
         sync::Mutex,
     };
 
-    use namib_shared::{
-        models::DhcpEvent,
-        rpc::{current_rpc_context, RPCClient},
-    };
+    use namib_shared::{models::DhcpEvent, rpc::RPCClient};
 
     /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
     pub async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
