@@ -17,7 +17,11 @@ use crate::{error::Result, services::firewall_service};
 
 use super::controller_discovery::discover_controllers;
 use std::time::SystemTime;
-use tokio::{fs::File, io::AsyncReadExt, io::ErrorKind, net::TcpStream};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, ErrorKind},
+    net::TcpStream,
+};
 use tokio_native_tls::{
     native_tls,
     native_tls::{Certificate, Identity},
@@ -73,17 +77,17 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                         if let Ok(new_client) = run().await {
                             *instance = new_client;
                         }
-                    }
+                    },
                     _ => {
                         error!("Error during heartbeat: {:?}", error);
-                    }
+                    },
                 },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
-                }
+                },
                 Ok(None) => debug!("Heartbeat OK!"),
             }
 

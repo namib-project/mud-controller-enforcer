@@ -51,10 +51,10 @@ mod unix {
                     .dhcp_request(current_rpc_context(), dhcp_event)
                     .await
                     .unwrap();
-            }
+            },
             Err(e) => {
                 warn!("DHCP event was received, but could not be parsed: {}", e);
-            }
+            },
         }
     }
 }
