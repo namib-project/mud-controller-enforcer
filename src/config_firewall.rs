@@ -186,6 +186,12 @@ pub struct FirewallDevice {
     pub rules: Vec<FirewallRule>,
 }
 
+impl FirewallDevice {
+    pub fn new(id: i64, ip: IpAddr, rules: Vec<FirewallRule>) -> FirewallDevice {
+        FirewallDevice { id, ip, rules }
+    }
+}
+
 /// Stores a set of firewall rules and a config version
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallConfig {
