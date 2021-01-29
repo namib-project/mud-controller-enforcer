@@ -16,7 +16,12 @@ use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
 use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
+use namib_mud_controller::models::ActixDataWrapper;
 use paperclip::actix::{web, OpenApiExt};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -27,6 +32,11 @@ async fn main() -> Result<()> {
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
+    let data_wrapper = ActixDataWrapper {
+        pool: conn.clone(),
+        refresh_tokens: Arc::new(Mutex::new(HashMap::new())),
+    };
+
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -47,6 +57,7 @@ async fn main() -> Result<()> {
 
         App::new()
             .data(conn.clone())
+            .data(data_wrapper.clone())
             .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap_api()
