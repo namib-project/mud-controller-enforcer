@@ -1,7 +1,11 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use tarpc::{client, rpc::context::*, serde_transport};
+use tarpc::{
+    client,
+    rpc::context::{current, Context},
+    serde_transport,
+};
 use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
@@ -13,7 +17,7 @@ use crate::{error::Result, services::firewall_service};
 
 use super::controller_discovery::discover_controllers;
 use std::time::SystemTime;
-use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
+use tokio::{fs::File, io::AsyncReadExt, io::ErrorKind, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
     native_tls::{Certificate, Identity},
@@ -44,13 +48,12 @@ pub async fn run() -> Result<RPCClient> {
             .filter_map(|r| future::ready(r.ok()));
         pin_mut!(addr_stream);
 
-        match addr_stream.next().await {
-            Some(client) => break client,
-            None => {
-                warn!("No controller found, retrying in 5 secs");
-                sleep(Duration::from_secs(5)).await;
-            }
+        if let Some(client) = addr_stream.next().await {
+            break client;
         }
+
+        warn!("No controller found, retrying in 5 secs");
+        sleep(Duration::from_secs(5)).await;
     };
 
     Ok(client)
@@ -64,7 +67,17 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                 .heartbeat(current_rpc_context(), firewall_service::get_config_version().ok())
                 .await;
             match heartbeat {
-                Err(error) => error!("Error during heartbeat: {:?}", error),
+                Err(error) => match error.kind() {
+                    ErrorKind::ConnectionReset => {
+                        error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
+                        if let Ok(new_client) = run().await {
+                            *instance = new_client;
+                        }
+                    }
+                    _ => {
+                        error!("Error during heartbeat: {:?}", error);
+                    }
+                },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     if let Err(e) = firewall_service::apply_config(&config) {
@@ -117,8 +130,3 @@ pub fn current_rpc_context() -> Context {
     rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
     rpc_context
 }
-
-/*Context {
-    deadline: SystemTime::now() + Duration::from_secs(60),
-    trace_context: trace::Context::new_root(),
-}*/
