@@ -7,7 +7,8 @@ use std::collections::HashMap;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_configs));
-    cfg.route("", web::post().to(set_configs));
+    cfg.route("", web::patch().to(set_configs));
+    cfg.route("", web::delete().to(delete_config));
 }
 
 #[api_v2_operation]
@@ -43,12 +44,7 @@ async fn set_configs(
         config_service::set_config_value(key, value, pool.as_ref()).await?;
     }
 
-    let keys = config_set_dto
-        .0
-        .clone()
-        .keys()
-        .map(|key| key.clone())
-        .collect::<Vec<String>>();
+    let keys = config_set_dto.0.keys().cloned().collect::<Vec<String>>();
 
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();
     for key in keys {
@@ -59,4 +55,19 @@ async fn set_configs(
     }
 
     Ok(Json(config_map))
+}
+
+#[api_v2_operation]
+async fn delete_config(
+    pool: web::Data<DbConnection>,
+    auth: Auth,
+    config_delete_dto: Json<Vec<String>>,
+) -> Result<Json<Vec<String>>> {
+    auth.require_permission("config/delete")?;
+
+    for key in &config_delete_dto.0 {
+        config_service::delete_config_key(key.clone(), pool.as_ref()).await?
+    }
+
+    Ok(Json(config_delete_dto.0))
 }

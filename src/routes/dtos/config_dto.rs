@@ -19,5 +19,5 @@ where
     }
 
     let strings = raw.split(',');
-    Ok(strings.map(|x| x.to_string()).collect())
+    Ok(strings.map(std::string::ToString::to_string).collect())
 }
