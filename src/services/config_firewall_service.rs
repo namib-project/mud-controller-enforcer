@@ -47,12 +47,12 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                             if acl.acl_type == ACLType::IPV6 {
                                 continue;
                             }
-                        }
+                        },
                         IpAddr::V6(_) => {
                             if acl.acl_type == ACLType::IPV4 {
                                 continue;
                             }
-                        }
+                        },
                     };
                     let route_network_lan = NetworkConfig::new(EnNetwork::LAN, Some(device.ip_addr.to_string()), None);
                     let route_network_wan = NetworkConfig::new(EnNetwork::WAN, Some(addr.ip().to_string()), None);
