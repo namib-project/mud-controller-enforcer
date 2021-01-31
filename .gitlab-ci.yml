@@ -82,8 +82,8 @@ build-release:
   stage: release
   needs:
     - build
-  #only:
-  #  - master
+  only:
+    - master
   script:
     - cargo install --root ./install --path .
     - apt-get install git-secret -y
@@ -108,11 +108,12 @@ create-docker:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [ "" ]
+  only:
+    - master
   before_script:
     - echo "Global before_script disabled"
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
-  #only:
-  #  - master
+

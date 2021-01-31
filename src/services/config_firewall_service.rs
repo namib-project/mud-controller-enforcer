@@ -1,16 +1,11 @@
-use std::net::{IpAddr, ToSocketAddrs};
-
-use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
-
 use crate::{
-    db::ConnectionType,
+    db::DbConnection,
     error::Result,
-    models::{
-        device_model::Device,
-        mud_models::{ACEAction, ACEProtocol, ACLDirection, ACLType},
-    },
+    models::{device_model::Device, AceAction, AceProtocol, AclDirection, AclType, Device},
     services::config_service::{get_config_value, set_config_value},
 };
+use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
+use std::net::{IpAddr, ToSocketAddrs};
 
 pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
     let mut index = 0;
@@ -26,14 +21,14 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
             let protocol = match &ace.matches.protocol {
                 None => Protocol::all(),
                 Some(proto) => match proto {
-                    ACEProtocol::TCP => Protocol::tcp(),
-                    ACEProtocol::UDP => Protocol::udp(),
-                    ACEProtocol::Protocol(proto_nr) => Protocol::from_number(proto_nr.to_owned()),
+                    AceProtocol::TCP => Protocol::tcp(),
+                    AceProtocol::UDP => Protocol::udp(),
+                    AceProtocol::Protocol(proto_nr) => Protocol::from_number(proto_nr.to_owned()),
                 },
             };
             let target = match ace.action {
-                ACEAction::Accept => EnTarget::ACCEPT,
-                ACEAction::Deny => EnTarget::REJECT,
+                AceAction::Accept => EnTarget::ACCEPT,
+                AceAction::Deny => EnTarget::REJECT,
             };
 
             if let Some(dnsname) = &ace.matches.dnsname {
@@ -44,12 +39,12 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                 for addr in socket_addresses {
                     match addr.ip() {
                         IpAddr::V4(_) => {
-                            if acl.acl_type == ACLType::IPV6 {
+                            if acl.acl_type == AclType::IPV6 {
                                 continue;
                             }
                         },
                         IpAddr::V6(_) => {
-                            if acl.acl_type == ACLType::IPV4 {
+                            if acl.acl_type == AclType::IPV4 {
                                 continue;
                             }
                         },
@@ -57,8 +52,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                     let route_network_lan = NetworkConfig::new(EnNetwork::LAN, Some(device.ip_addr.to_string()), None);
                     let route_network_wan = NetworkConfig::new(EnNetwork::WAN, Some(addr.ip().to_string()), None);
                     let (route_network_src, route_network_dest) = match acl.packet_direction {
-                        ACLDirection::FromDevice => (route_network_lan, route_network_wan),
-                        ACLDirection::ToDevice => (route_network_wan, route_network_lan),
+                        AclDirection::FromDevice => (route_network_lan, route_network_wan),
+                        AclDirection::ToDevice => (route_network_wan, route_network_lan),
                     };
                     let config_firewall = FirewallRule::new(
                         rule_name.clone(),
@@ -74,8 +69,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                 let route_network_lan = NetworkConfig::new(EnNetwork::LAN, None, None);
                 let route_network_wan = NetworkConfig::new(EnNetwork::WAN, None, None);
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
-                    ACLDirection::FromDevice => (route_network_lan, route_network_wan),
-                    ACLDirection::ToDevice => (route_network_wan, route_network_lan),
+                    AclDirection::FromDevice => (route_network_lan, route_network_wan),
+                    AclDirection::ToDevice => (route_network_wan, route_network_lan),
                 };
                 let config_firewall = FirewallRule::new(
                     rule_name,
@@ -85,8 +80,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                     target,
                     Some(vec![(
                         match acl.packet_direction {
-                            ACLDirection::FromDevice => "src_ip".to_string(),
-                            ACLDirection::ToDevice => "dest_ip".to_string(),
+                            AclDirection::FromDevice => "src_ip".to_string(),
+                            AclDirection::ToDevice => "dest_ip".to_string(),
                         },
                         device.ip_addr.to_string(),
                     )]),
@@ -117,13 +112,13 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
     Ok(result)
 }
 
-pub async fn get_config_version(pool: &ConnectionType) -> String {
+pub async fn get_config_version(pool: &DbConnection) -> String {
     get_config_value("version".to_string(), pool)
         .await
         .unwrap_or_else(|_| "0".to_string())
 }
 
-pub async fn update_config_version(pool: &ConnectionType) {
+pub async fn update_config_version(pool: &DbConnection) {
     set_config_value(
         "version".to_string(),
         (get_config_value("version".to_string(), pool)
@@ -145,16 +140,13 @@ mod tests {
 
     use namib_shared::mac;
 
-    use crate::models::{
-        device_model::Device,
-        mud_models::{ACEAction, ACEMatches, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
-    };
+    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
 
     use super::*;
 
     #[test]
     fn test_converting() -> Result<()> {
-        let mud_data = MUDData {
+        let mud_data = MudData {
             url: "example.com/.well-known/mud".to_string(),
             masa_url: None,
             last_update: "some_last_update".to_string(),
@@ -163,15 +155,15 @@ mod tests {
             model_name: Some("some_model_name".to_string()),
             documentation: Some("some_documentation".to_string()),
             expiration: Utc::now(),
-            acllist: vec![ACL {
+            acllist: vec![Acl {
                 name: "some_acl_name".to_string(),
-                packet_direction: ACLDirection::ToDevice,
-                acl_type: ACLType::IPV6,
-                ace: vec![ACE {
+                packet_direction: AclDirection::ToDevice,
+                acl_type: AclType::IPV6,
+                ace: vec![Ace {
                     name: "some_ace_name".to_string(),
-                    action: ACEAction::Accept,
-                    matches: ACEMatches {
-                        protocol: Some(ACEProtocol::TCP),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::TCP),
                         direction_initiated: None,
                         address_mask: None,
                         dnsname: None,

@@ -1,9 +1,9 @@
-use crate::models::mud_models::MUDData;
+use crate::models::mud_models::MudData;
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
 use std::net::IpAddr;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct DeviceDbo {
     pub id: i64,
     pub ip_addr: String,
@@ -23,7 +23,7 @@ pub struct Device {
     pub vendor_class: String,
     pub mud_url: Option<String>,
     pub last_interaction: NaiveDateTime,
-    pub mud_data: Option<MUDData>,
+    pub mud_data: Option<MudData>,
 }
 
 impl From<DeviceDbo> for Device {

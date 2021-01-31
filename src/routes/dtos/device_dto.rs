@@ -1,4 +1,6 @@
-use crate::models::{device_model::Device, mud_models::MUDData};
+#![allow(clippy::field_reassign_with_default)]
+
+use crate::models::{Device, MudData};
 use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 
@@ -11,7 +13,7 @@ pub struct DeviceDto {
     pub vendor_class: String,
     pub mud_url: Option<String>,
     pub last_interaction: NaiveDateTime,
-    pub mud_data: Option<MUDData>,
+    pub mud_data: Option<MudData>,
 }
 
 impl From<Device> for DeviceDto {

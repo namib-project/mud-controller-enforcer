@@ -5,13 +5,13 @@ use snafu::ensure;
 
 use crate::{
     error::{MudError, Result},
-    models::mud_models::{ACEAction, ACEMatches, ACEPort, ACEProtocol, ACLDirection, ACLType, MUDData, ACE, ACL},
+    models::{Ace, AceAction, AceMatches, AcePort, AceProtocol, Acl, AclDirection, AclType, MudData},
 };
 
 use super::json_models;
 
 // inspired by https://github.com/CiscoDevNet/MUD-Manager by Cisco
-pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
+pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
     let mud_json: json_models::MudJson = serde_json::from_str(json)?;
 
     let mud_data = &mud_json.mud;
@@ -46,16 +46,16 @@ pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
         &mud_data.from_device_policy,
         &mud_json,
         &mut acllist,
-        ACLDirection::FromDevice,
+        AclDirection::FromDevice,
     )?;
     parse_device_policy(
         &mud_data.to_device_policy,
         &mud_json,
         &mut acllist,
-        ACLDirection::ToDevice,
+        AclDirection::ToDevice,
     )?;
 
-    let data = MUDData {
+    let data = MudData {
         url,
         masa_url: masa_uri,
         last_update: mud_data.last_update.clone(),
@@ -78,18 +78,18 @@ pub fn parse_mud(url: String, json: &str) -> Result<MUDData> {
 fn parse_device_policy(
     policy: &json_models::Policy,
     mud_json: &json_models::MudJson,
-    acllist: &mut Vec<ACL>,
-    dir: ACLDirection,
+    acllist: &mut Vec<Acl>,
+    dir: AclDirection,
 ) -> Result<()> {
     for access_list in &policy.access_lists.access_list {
         let mut found = false;
         for aclitem in &mud_json.acls.acl {
             if aclitem.name == access_list.name {
-                let mut ace: Vec<ACE> = Vec::new();
+                let mut ace: Vec<Ace> = Vec::new();
                 let acl_type = if aclitem.type_field == "ipv4-acl-type" {
-                    ACLType::IPV4
+                    AclType::IPV4
                 } else {
-                    ACLType::IPV6
+                    AclType::IPV6
                 };
                 for aceitem in &aclitem.aces.ace {
                     let mut protocol = None;
@@ -99,15 +99,15 @@ fn parse_device_policy(
                     let mut source_port = None;
                     let mut destination_port = None;
                     if let Some(udp) = &aceitem.matches.udp {
-                        protocol = Some(ACEProtocol::UDP);
+                        protocol = Some(AceProtocol::UDP);
                         source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                         destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     } else if let Some(tcp) = &aceitem.matches.tcp {
-                        protocol = Some(ACEProtocol::TCP);
+                        protocol = Some(AceProtocol::TCP);
                         if let Some(dir) = &tcp.direction_initiated {
                             direction_initiated = Some(match dir.as_str() {
-                                "from-device" => ACLDirection::FromDevice,
-                                "to-device" => ACLDirection::ToDevice,
+                                "from-device" => AclDirection::FromDevice,
+                                "to-device" => AclDirection::ToDevice,
                                 _ => MudError {
                                     message: String::from("Invalid direction"),
                                 }
@@ -119,13 +119,13 @@ fn parse_device_policy(
                         destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     }
                     if let Some(ipv6) = &aceitem.matches.ipv6 {
-                        if acl_type != ACLType::IPV6 {
+                        if acl_type != AclType::IPV6 {
                             MudError {
                                 message: String::from("IPv6 ACE in IPv4 ACL"),
                             }
                             .fail()?
                         }
-                        protocol = ipv6.protocol.map(ACEProtocol::Protocol);
+                        protocol = ipv6.protocol.map(AceProtocol::Protocol);
                         address_mask = ipv6
                             .source_ipv6_network
                             .as_ref()
@@ -133,13 +133,13 @@ fn parse_device_policy(
                             .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
                         dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
                     } else if let Some(ipv4) = &aceitem.matches.ipv4 {
-                        if acl_type != ACLType::IPV4 {
+                        if acl_type != AclType::IPV4 {
                             MudError {
                                 message: String::from("IPv4 ACE in IPv6 ACL"),
                             }
                             .fail()?
                         }
-                        protocol = ipv4.protocol.map(ACEProtocol::Protocol);
+                        protocol = ipv4.protocol.map(AceProtocol::Protocol);
                         address_mask = ipv4
                             .source_ipv4_network
                             .as_ref()
@@ -150,14 +150,14 @@ fn parse_device_policy(
                     if let Some(_mud) = &aceitem.matches.mud {
                         // see https://github.com/CiscoDevNet/MUD-Manager/blob/master/src/mud_manager.c#L1472
                     }
-                    ace.push(ACE {
+                    ace.push(Ace {
                         name: aceitem.name.clone(),
                         action: if aceitem.actions.forwarding == "accept" {
-                            ACEAction::Accept
+                            AceAction::Accept
                         } else {
-                            ACEAction::Deny
+                            AceAction::Deny
                         },
-                        matches: ACEMatches {
+                        matches: AceMatches {
                             protocol,
                             direction_initiated,
                             address_mask: address_mask.map(|a| a.to_string()),
@@ -168,7 +168,7 @@ fn parse_device_policy(
                     })
                 }
 
-                acllist.push(ACL {
+                acllist.push(Acl {
                     name: access_list.name.clone(),
                     packet_direction: dir,
                     acl_type,
@@ -189,7 +189,7 @@ fn parse_device_policy(
     Ok(())
 }
 
-fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
+fn parse_mud_port(port: &json_models::Port) -> Result<AcePort> {
     match port {
         json_models::Port { port: Some(p), .. } => {
             ensure!(
@@ -198,7 +198,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                     message: String::from("Only 'eq' operator is supported")
                 }
             );
-            Ok(ACEPort::Single(*p))
+            Ok(AcePort::Single(*p))
         },
         json_models::Port {
             upper_port: Some(upper_port),
@@ -211,7 +211,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                     message: String::from("No operator for port range")
                 }
             );
-            Ok(ACEPort::Range(*lower_port, *upper_port))
+            Ok(AcePort::Range(*lower_port, *upper_port))
         },
         _ => MudError {
             message: String::from("Invalid port definition"),

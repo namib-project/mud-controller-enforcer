@@ -6,20 +6,24 @@
     clippy::module_name_repetitions,
     clippy::default_trait_access,
     clippy::similar_names,
+    clippy::redundant_else,
     clippy::missing_errors_doc,
     clippy::must_use_candidate
 )]
 
-use dotenv::dotenv;
-
+use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
-use namib_mud_controller::{db, error::Result, routes, rpc};
+use dotenv::dotenv;
+use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
+/* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
 
 #[actix_web::main]
 async fn main() -> Result<()> {
     dotenv().ok();
     env_logger::init();
+
+    log::info!("Starting mud_controller {}", VERSION);
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
@@ -32,10 +36,21 @@ async fn main() -> Result<()> {
             .expect("failed running rpc server");
     });
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin_fn(|origin, _req_head| {
+                origin.as_bytes().starts_with(b"https://localhost:")
+                    || origin.as_bytes().starts_with(b"http://localhost:")
+            })
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+
         App::new()
             .data(conn.clone())
+            .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap_api()
+            .service(web::scope("/status").configure(routes::status_controller::init))
             .service(web::scope("/users").configure(routes::users_controller::init))
             .service(web::scope("/devices").configure(routes::device_controller::init))
             .service(web::scope("/mud").configure(routes::mud_controller::init))

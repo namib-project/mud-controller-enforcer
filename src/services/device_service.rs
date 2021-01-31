@@ -1,14 +1,14 @@
 use crate::{
-    db::ConnectionType,
+    db::DbConnection,
     error::{Error, Result},
-    models::device_model::{Device, DeviceDbo},
+    models::{Device, DeviceDbo},
     services::mud_service::get_mud_from_url,
 };
 use futures::TryStreamExt;
 use namib_shared::mac;
 use sqlx::Done;
 
-pub async fn get_all_devices(pool: &ConnectionType) -> Result<Vec<Device>> {
+pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     let devices = sqlx::query_as!(DeviceDbo, "select * from devices").fetch(pool);
 
     let devices_data = devices
@@ -44,7 +44,7 @@ pub async fn get_all_devices(pool: &ConnectionType) -> Result<Vec<Device>> {
     Ok(devices_data)
 }
 
-pub async fn find_by_id(id: i32, pool: &ConnectionType) -> Result<Device> {
+pub async fn find_by_id(id: i32, pool: &DbConnection) -> Result<Device> {
     let device = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
         .fetch_one(pool)
         .await?;
@@ -52,7 +52,7 @@ pub async fn find_by_id(id: i32, pool: &ConnectionType) -> Result<Device> {
     Ok(Device::from(device))
 }
 
-pub async fn find_by_ip(ip_addr: std::net::IpAddr, pool: &ConnectionType) -> Result<Device> {
+pub async fn find_by_ip(ip_addr: std::net::IpAddr, pool: &DbConnection) -> Result<Device> {
     let ip_addr = ip_addr.to_string();
     let device = sqlx::query_as!(DeviceDbo, "select * from devices where ip_addr = ?", ip_addr)
         .fetch_one(pool)
@@ -61,7 +61,7 @@ pub async fn find_by_ip(ip_addr: std::net::IpAddr, pool: &ConnectionType) -> Res
     Ok(Device::from(device))
 }
 
-pub async fn insert_device(device_data: &Device, pool: &ConnectionType) -> Result<u64> {
+pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<u64> {
     let ip_addr = device_data.ip_addr.to_string();
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
     let ins_count = sqlx::query!(
@@ -79,7 +79,7 @@ pub async fn insert_device(device_data: &Device, pool: &ConnectionType) -> Resul
     Ok(ins_count.rows_affected())
 }
 
-pub async fn update_device(device_data: &Device, pool: &ConnectionType) -> Result<u64> {
+pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<u64> {
     let ip_addr = device_data.ip_addr.to_string();
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
     let upd_count = sqlx::query!(
@@ -98,7 +98,7 @@ pub async fn update_device(device_data: &Device, pool: &ConnectionType) -> Resul
     Ok(upd_count.rows_affected())
 }
 
-pub async fn delete_device(id: i32, pool: &ConnectionType) -> Result<u64> {
+pub async fn delete_device(id: i32, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("delete from devices where id = ?", id)
         .execute(pool)
         .await?;

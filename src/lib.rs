@@ -23,3 +23,13 @@ pub mod models;
 pub mod routes;
 pub mod rpc;
 pub mod services;
+
+#[cfg(not(debug_assertions))]
+const GIT_BRANCH: &str = env!("CI_COMMIT_REF_SLUG");
+#[cfg(not(debug_assertions))]
+const GIT_COMMIT: &str = env!("CI_COMMIT_SHORT_SHA");
+#[cfg(not(debug_assertions))]
+pub const VERSION: &str = const_format::concatcp!(GIT_BRANCH, "-", GIT_COMMIT);
+
+#[cfg(debug_assertions)]
+pub const VERSION: &str = "development";
