@@ -199,7 +199,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                 }
             );
             Ok(ACEPort::Single(*p))
-        }
+        },
         json_models::Port {
             upper_port: Some(upper_port),
             lower_port: Some(lower_port),
@@ -212,7 +212,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<ACEPort> {
                 }
             );
             Ok(ACEPort::Range(*lower_port, *upper_port))
-        }
+        },
         _ => MudError {
             message: String::from("Invalid port definition"),
         }
