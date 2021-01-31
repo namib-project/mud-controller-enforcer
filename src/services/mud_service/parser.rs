@@ -237,7 +237,7 @@ mod tests {
 
         let mud = parse_mud(URL.to_string().clone(), mud_data.as_str())?;
 
-        let matches = ACEMatches {
+        let matches = AceMatches {
             protocol: None,
             direction_initiated: None,
             address_mask: None,
@@ -246,10 +246,10 @@ mod tests {
             destination_port: None,
         };
 
-        let mut ace_list_f: Vec<ACE> = Vec::new();
-        let mut ace = ACE {
+        let mut ace_list_f: Vec<Ace> = Vec::new();
+        let mut ace = Ace {
             name: "myman0-frdev".to_string(),
-            action: ACEAction::Accept,
+            action: AceAction::Accept,
             matches: matches.clone(),
         };
 
@@ -260,10 +260,10 @@ mod tests {
         ace.name = "myman2-frdev".to_string();
         ace_list_f.push(ace.clone());
 
-        let mut ace_list_t: Vec<ACE> = Vec::new();
-        let mut ace = ACE {
+        let mut ace_list_t: Vec<Ace> = Vec::new();
+        let mut ace = Ace {
             name: "myman0-todev".to_string(),
-            action: ACEAction::Accept,
+            action: AceAction::Accept,
             matches: matches.clone(),
         };
 
@@ -275,20 +275,20 @@ mod tests {
         ace_list_t.push(ace.clone());
 
         let mut acl_list = Vec::new();
-        let mut acl = ACL {
+        let mut acl = Acl {
             name: "mud-52892-v4fr".to_string(),
-            packet_direction: ACLDirection::FromDevice,
-            acl_type: ACLType::IPV6,
+            packet_direction: AclDirection::FromDevice,
+            acl_type: AclType::IPV6,
             ace: ace_list_f,
         };
 
         acl_list.push(acl.clone());
         acl.name = "mud-52892-v4to".to_string();
-        acl.packet_direction = ACLDirection::ToDevice;
+        acl.packet_direction = AclDirection::ToDevice;
         acl.ace = ace_list_t;
 
         acl_list.push(acl);
-        let example = MUDData {
+        let example = MudData {
             url: URL.to_string().clone(),
             masa_url: None,
             last_update: "2019-07-23T19:54:24".to_string(),
@@ -362,7 +362,7 @@ mod tests {
         mud_profile_path: &str,
         mud_profile_url: &str,
         mud_profile_example_path: &str,
-    ) -> Result<(MUDData, String)> {
+    ) -> Result<(MudData, String)> {
         let mut mud_data = String::new();
         let mut mud_data_test = String::new();
 

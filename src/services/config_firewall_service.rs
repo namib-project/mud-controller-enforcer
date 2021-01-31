@@ -1,7 +1,7 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{device_model::Device, AceAction, AceProtocol, AclDirection, AclType, Device},
+    models::{AceAction, AceProtocol, AclDirection, AclType, Device},
     services::config_service::{get_config_value, set_config_value},
 };
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
