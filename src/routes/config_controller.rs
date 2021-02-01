@@ -21,11 +21,16 @@ async fn get_configs(
 
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();
 
-    for key in &config_query_dto.keys {
-        config_map.insert(
-            key.clone(),
-            config_service::get_config_value(key.clone(), pool.as_ref()).await.ok(),
-        );
+    if config_query_dto.keys.is_empty() {
+        auth.require_permission("config/list")?;
+        let data = config_service::get_all_config_data(&pool).await?;
+        for config in data {
+            config_map.insert(config.key, Some(config.value));
+        }
+    } else {
+        for key in &config_query_dto.keys {
+            config_map.insert(key.clone(), config_service::get_config_value(key, &pool).await.ok());
+        }
     }
 
     info!("{:?}", config_map);
@@ -40,18 +45,15 @@ async fn set_configs(
 ) -> Result<Json<HashMap<String, Option<String>>>> {
     auth.require_permission("config/write")?;
 
-    for (key, value) in config_set_dto.0.clone() {
-        config_service::set_config_value(key, value, pool.as_ref()).await?;
+    for (key, value) in &config_set_dto.0 {
+        config_service::set_config_value(&key, value, &pool).await?;
     }
 
-    let keys = config_set_dto.0.keys().cloned().collect::<Vec<String>>();
+    let keys = config_set_dto.0.keys().collect::<Vec<&String>>();
 
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();
-    for key in keys {
-        config_map.insert(
-            key.clone(),
-            config_service::get_config_value(key.clone(), pool.as_ref()).await.ok(),
-        );
+    for key in &keys {
+        config_map.insert((*key).clone(), config_service::get_config_value(key, &pool).await.ok());
     }
 
     Ok(Json(config_map))
@@ -62,12 +64,13 @@ async fn delete_config(
     pool: web::Data<DbConnection>,
     auth: Auth,
     config_delete_dto: Json<Vec<String>>,
-) -> Result<Json<Vec<String>>> {
+) -> Result<Json<HashMap<String, bool>>> {
     auth.require_permission("config/delete")?;
 
+    let mut deletion_map: HashMap<String, bool> = HashMap::new();
     for key in &config_delete_dto.0 {
-        config_service::delete_config_key(key.clone(), pool.as_ref()).await?
+        deletion_map.insert(key.clone(), config_service::delete_config_key(key, &pool).await? != 0);
     }
 
-    Ok(Json(config_delete_dto.0))
+    Ok(Json(deletion_map))
 }

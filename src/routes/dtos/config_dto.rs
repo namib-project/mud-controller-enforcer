@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Apiv2Schema)]
 pub struct ConfigQueryDto {
-    #[serde(deserialize_with = "comma_seperated")]
+    #[serde(default, deserialize_with = "comma_seperated")]
     pub keys: Vec<String>,
 }
 
@@ -14,6 +14,7 @@ where
     let raw = String::deserialize(deserializer)?
         .split_whitespace()
         .collect::<String>();
+
     if raw.is_empty() {
         return Ok(vec![]);
     }
