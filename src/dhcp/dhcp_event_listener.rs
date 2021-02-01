@@ -7,9 +7,9 @@ pub use unix::*;
 mod unix {
     use std::sync::Arc;
 
+    use crate::rpc::rpc_client::current_rpc_context;
     use futures::future::join_all;
     use log::debug;
-    use tarpc::context;
     use tokio::{
         io::AsyncReadExt,
         net::{UnixListener, UnixStream},
@@ -47,7 +47,10 @@ mod unix {
             Ok(dhcp_event) => {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
                 let mut unlocked_rpc = rpc_client.lock().await;
-                unlocked_rpc.dhcp_request(context::current(), dhcp_event).await.unwrap();
+                unlocked_rpc
+                    .dhcp_request(current_rpc_context(), dhcp_event)
+                    .await
+                    .unwrap();
             },
             Err(e) => {
                 warn!("DHCP event was received, but could not be parsed: {}", e);

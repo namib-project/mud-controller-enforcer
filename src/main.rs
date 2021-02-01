@@ -36,8 +36,9 @@ async fn main() -> Result<()> {
             .await?;
     }
 
+    info!("Trying to find & connect to NAMIB Controller");
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));
-    info!("Connected to RPC server");
+    info!("Connected to NAMIB Controller RPC server");
 
     let heartbeat_task = rpc::rpc_client::heartbeat(client.clone());
 
