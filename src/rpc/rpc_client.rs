@@ -1,11 +1,7 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use tarpc::{
-    client,
-    rpc::context::{current, Context},
-    serde_transport,
-};
+use tarpc::{client, rpc, serde_transport};
 use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
@@ -129,8 +125,8 @@ async fn try_connect(
 
 /// Returns the context for the current request, or a default Context if no request is active.
 /// Copied and adapted based on tarpc/rpc/context.rs
-pub fn current_rpc_context() -> Context {
-    let mut rpc_context = current();
+pub fn current_rpc_context() -> rpc::context::Context {
+    let mut rpc_context = rpc::context::current();
     rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
     rpc_context
 }
