@@ -31,24 +31,6 @@ impl RuleName {
     }
 }
 
-/// Enum for the source or destination
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum EnNetwork {
-    LAN,
-    WAN,
-    VPN,
-}
-
-impl fmt::Display for EnNetwork {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LAN => f.write_str("lan"),
-            Self::WAN => f.write_str("wan"),
-            Self::VPN => f.write_str("vpn"),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResolvedIp {
     pub ip: Option<IpAddr>,
@@ -68,19 +50,19 @@ impl Default for ResolvedIp {
 pub enum NetworkHost {
     Ip(IpAddr),
     Hostname { dns_name: String, resolved_ip: ResolvedIp },
+    FirewallDevice,
 }
 
 /// Struct for src and dest configs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkConfig {
-    pub typ: EnNetwork,
     pub host: Option<NetworkHost>,
     pub port: Option<String>,
 }
 
 impl NetworkConfig {
-    pub fn new(typ: EnNetwork, host: Option<NetworkHost>, port: Option<String>) -> NetworkConfig {
-        NetworkConfig { typ, host, port }
+    pub fn new(host: Option<NetworkHost>, port: Option<String>) -> NetworkConfig {
+        NetworkConfig { host, port }
     }
 }
 
@@ -90,34 +72,6 @@ pub enum Protocol {
     Udp,
     All,
 }
-
-///// Struct for protocol
-//#[derive(Clone, Debug, Deserialize, Serialize)]
-//pub struct Protocol(u32);
-
-//impl Protocol {
-//    /// Returns the tcp value used from uci.
-//    pub fn tcp() -> Self {
-//        Protocol(6)
-//    }
-//
-//    pub fn udp() -> Self {
-//        Protocol(17)
-//    }
-
-//    pub fn from_number(nr: u32) -> Self {
-//        Protocol(nr)
-//    }
-
-//    pub fn all() -> Self {
-//        Protocol(0)
-//    }
-
-//    /// Return the key, value pair.
-//    pub fn to_option(&self) -> (String, String) {
-//        ("proto".to_string(), self.0.to_string())
-//    }
-//}
 
 /// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -138,9 +92,6 @@ impl EnTarget {
     }
 }
 
-/// Enum for optional settings. Here can be added some specified rules in key, value format.
-pub type EnOptionalSettings = Option<Vec<(String, String)>>;
-
 /// This struct contains the main configuration which is needed for firewall rules.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
@@ -149,20 +100,18 @@ pub struct FirewallRule {
     pub dst: NetworkConfig,
     pub protocol: Protocol,
     pub target: EnTarget,
-    pub optional_settings: EnOptionalSettings,
 }
 
 impl FirewallRule {
     /// Create a new `ConfigFirewall`.
     /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: EnTarget, optional_settings: EnOptionalSettings) -> FirewallRule {
+    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: EnTarget) -> FirewallRule {
         FirewallRule {
             rule_name,
             src,
             dst,
             protocol,
             target,
-            optional_settings,
         }
     }
 
