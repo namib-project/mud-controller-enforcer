@@ -8,19 +8,12 @@ use tarpc::{
     server,
 };
 
-use namib_shared::{
-    codec,
-    config_firewall::{FirewallConfig, FirewallRule},
-    models::DhcpEvent,
-    open_file_with,
-    rpc::RPC,
-};
+use namib_shared::{codec, firewall_config::FirewallConfig, models::DhcpEvent, open_file_with, rpc::RPC};
 
 use crate::{
     db::DbConnection,
     error::Result,
-    models::Device,
-    services::{config_firewall_service, device_service, mud_service},
+    services::{device_service, firewall_configuration_service},
 };
 
 use super::tls_serde_transport;
@@ -31,29 +24,17 @@ pub struct RPCServer(SocketAddr, DbConnection);
 #[server]
 impl RPC for RPCServer {
     async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<FirewallConfig> {
-        let current_config_version = config_firewall_service::get_config_version(&self.1).await;
+        let current_config_version = firewall_configuration_service::get_config_version(&self.1).await;
         debug!(
             "Received a heartbeat from client {:?} with version {:?}, current version {:?}",
             self.0, version, current_config_version
         );
         if Some(&current_config_version) != version.as_ref() {
-            debug!(
-                "Client has outdated version \"{}\". Starting update...",
-                current_config_version
-            );
+            debug!("Client has outdated version. Starting update...");
             let devices = device_service::get_all_devices(&self.1).await.unwrap_or_default();
-            debug!("heartbeat all devices {:?}", devices);
-            let rules: Vec<FirewallRule> = devices
-                .iter()
-                .flat_map(move |d| {
-                    config_firewall_service::convert_device_to_fw_rules(d)
-                        .map_err(|err| error!("Flat Map Error {:#?}", err))
-                        .unwrap_or_default()
-                })
-                .collect();
-
-            debug!("Returning Heartbeat to client with config: {:?}", rules);
-            return Some(FirewallConfig::new(current_config_version, rules));
+            let new_config = firewall_configuration_service::create_configuration(current_config_version, devices);
+            debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
+            return Some(new_config);
         }
 
         None
@@ -68,28 +49,9 @@ impl RPC for RPCServer {
             _ => return,
         };
 
-        let mut dhcp_device_data = Device::from(lease_info);
-        let update = match device_service::find_by_ip(dhcp_device_data.ip_addr, &self.1).await {
-            Ok(device) => {
-                dhcp_device_data.id = device.id;
-                true
-            },
-            Err(_) => false,
-        };
-        if update {
-            device_service::update_device(&dhcp_device_data, &self.1).await.unwrap();
-        } else {
-            device_service::insert_device(&dhcp_device_data, &self.1).await.unwrap();
+        if let Err(e) = device_service::upsert_device_from_dhcp_lease(lease_info, &self.1).await {
+            error!("Failed to upsert device from dhcp lease {}", e)
         }
-
-        debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
-
-        match dhcp_device_data.mud_url {
-            Some(url) => mud_service::get_mud_from_url(url, &self.1).await.ok(),
-            None => None,
-        };
-
-        config_firewall_service::update_config_version(&self.1).await;
     }
 }
 

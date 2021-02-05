@@ -69,6 +69,8 @@ pub enum Error {
         source: glob::PatternError,
         backtrace: Backtrace,
     },
+    #[snafu(display("FromStrError"), visibility(pub))]
+    FromStrError { backtrace: Backtrace },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
