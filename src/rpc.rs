@@ -1,6 +1,6 @@
 #![allow(clippy::large_enum_variant)]
 
-use crate::{config_firewall::FirewallConfig, models::DhcpEvent};
+use crate::{firewall_config::FirewallConfig, models::DhcpEvent};
 
 #[tarpc::service]
 pub trait RPC {

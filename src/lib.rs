@@ -7,7 +7,7 @@ use tokio_serde::formats::Bincode;
 
 pub use crate::macaddr::*;
 
-pub mod config_firewall;
+pub mod firewall_config;
 mod macaddr;
 pub mod models;
 pub mod rpc;
