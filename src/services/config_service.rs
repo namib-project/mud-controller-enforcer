@@ -2,7 +2,7 @@ use crate::{db::DbConnection, error::Result, models::Config};
 use sqlx::Done;
 
 /// Gets the config value by key from the database.
-pub async fn get_config_value(key: &String, pool: &DbConnection) -> Result<String> {
+pub async fn get_config_value(key: &str, pool: &DbConnection) -> Result<String> {
     let entry = sqlx::query_as!(Config, "SELECT * FROM config WHERE key = ?", key)
         .fetch_one(pool)
         .await?;
@@ -19,7 +19,7 @@ pub async fn get_all_config_data(pool: &DbConnection) -> Result<Vec<Config>> {
 
 /// Writes the config value by key to the database.
 /// Upserts the value by key
-pub async fn set_config_value(key: &String, value: &String, pool: &DbConnection) -> Result<()> {
+pub async fn set_config_value(key: &str, value: &str, pool: &DbConnection) -> Result<()> {
     let _ins_count = sqlx::query!(
         "INSERT INTO config VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         key,

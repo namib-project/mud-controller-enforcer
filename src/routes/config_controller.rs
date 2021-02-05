@@ -49,10 +49,10 @@ async fn set_configs(
         config_service::set_config_value(&key, value, &pool).await?;
     }
 
-    let keys = config_set_dto.0.keys().collect::<Vec<&String>>();
+    let keyrefs = config_set_dto.0.keys().collect::<Vec<&String>>();
 
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();
-    for key in &keys {
+    for key in keyrefs {
         config_map.insert((*key).clone(), config_service::get_config_value(key, &pool).await.ok());
     }
 
