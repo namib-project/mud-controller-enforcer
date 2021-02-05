@@ -5,8 +5,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use std::fmt::Formatter;
-use std::net::IpAddr;
+use std::{fmt::Formatter, net::IpAddr};
 
 /// This file represent the config for firewall on openwrt.
 ///
