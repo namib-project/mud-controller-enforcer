@@ -3,23 +3,22 @@
 use validator::Validate;
 
 use crate::{
-    auth::{AuthAccess, AuthRefresh},
+    auth::AuthAccess,
     db::DbConnection,
     error::{ResponseError, Result},
-    models::{ActixDataWrapper, User},
+    models::User,
     routes::dtos::{
-        LoginDto, LoginResponseDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto,
+        LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto,
     },
     services::user_service,
 };
 use isahc::http::StatusCode;
 use paperclip::actix::{api_v2_operation, web, web::Json};
-use std::sync::Arc;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/signup", web::post().to(signup));
     cfg.route("/login", web::post().to(login));
-    cfg.route("/refresh_access_token", web::get().to(refresh_access_token));
+    cfg.route("/refresh_token", web::get().to(refresh_token));
     cfg.route("/me", web::get().to(get_me));
     cfg.route("/me", web::post().to(update_me));
     cfg.route("/password", web::post().to(update_password));
@@ -46,7 +45,7 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
 }
 
 #[api_v2_operation(summary = "Login with username and password")]
-pub async fn login(data: web::Data<ActixDataWrapper>, login_dto: Json<LoginDto>) -> Result<Json<LoginResponseDto>> {
+pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
     login_dto.validate().or_else(|_| {
         ResponseError {
             status: StatusCode::BAD_REQUEST,
@@ -55,7 +54,7 @@ pub async fn login(data: web::Data<ActixDataWrapper>, login_dto: Json<LoginDto>)
         .fail()
     })?;
 
-    let user = user_service::find_by_username(login_dto.username.as_ref(), &data.get_ref().pool)
+    let user = user_service::find_by_username(login_dto.username.as_ref(), pool.get_ref())
         .await
         .or_else(|_| {
             ResponseError {
@@ -73,74 +72,22 @@ pub async fn login(data: web::Data<ActixDataWrapper>, login_dto: Json<LoginDto>)
         .fail()
     })?;
 
-    let data_mutex_clone = Arc::clone(&data.get_ref().refresh_tokens);
-    let mut hashmap = data_mutex_clone.lock().unwrap();
-    let random_refresh_token = generate_random_key();
-    let _random_refresh_token_copy = random_refresh_token.clone();
-
-    if let Some(user_refresh_tokens) = hashmap.get_mut(&user.id) {
-        user_refresh_tokens.push(random_refresh_token);
-    } else {
-        let mut user_refresh_tokens: Vec<String> = Vec::new();
-        user_refresh_tokens.push(random_refresh_token);
-        hashmap.insert(user.id, user_refresh_tokens);
-    }
-
-    Ok(Json(LoginResponseDto {
-        access_token: TokenDto {
-            token: AuthAccess::encode_token(&AuthAccess::generate_access_token(
-                user.id,
-                user.username,
-                user.permissions,
-            )),
-        },
-        refresh_token: TokenDto {
-            token: AuthRefresh::encode_token(&AuthRefresh::generate_refresh_token(
-                user.id,
-                _random_refresh_token_copy,
-            )),
-        },
-    }))
-}
-
-#[api_v2_operation(summary = "Refresh the access token with the refresh token as the requests bearer token")]
-pub async fn refresh_access_token(data: web::Data<ActixDataWrapper>, auth: AuthRefresh) -> Result<Json<TokenDto>> {
-    let data_mutex_clone = Arc::clone(&data.get_ref().refresh_tokens);
-    let mut hashmap = data_mutex_clone.lock().unwrap();
-    let _random_refresh_token = generate_random_key();
-    let mut refresh_failure = false;
-
-    if let Some(user_refresh_tokens) = hashmap.get_mut(&auth.sub) {
-        if !user_refresh_tokens.contains(&auth.refresh_token) {
-            refresh_failure = true;
-        }
-    } else {
-        refresh_failure = true;
-    }
-
-    if refresh_failure {
-        return ResponseError {
-            status: StatusCode::UNAUTHORIZED,
-            message: None,
-        }
-        .fail();
-    }
-
-    let user = user_service::find_by_id(auth.sub, &data.get_ref().pool)
-        .await
-        .or_else(|_| {
-            ResponseError {
-                status: StatusCode::UNAUTHORIZED,
-                message: None,
-            }
-            .fail()
-        })?;
-
     Ok(Json(TokenDto {
         token: AuthAccess::encode_token(&AuthAccess::generate_access_token(
             user.id,
             user.username,
             user.permissions,
+        )),
+    }))
+}
+
+#[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.")]
+pub async fn refresh_token(auth: AuthAccess) -> Result<Json<TokenDto>> {
+    Ok(Json(TokenDto {
+        token: AuthAccess::encode_token(&AuthAccess::generate_access_token(
+            auth.sub,
+            auth.username,
+            auth.permissions,
         )),
     }))
 }
@@ -227,20 +174,4 @@ pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthAccess) -> Result<Json
             })
             .collect(),
     ))
-}
-
-fn generate_random_key() -> String {
-    use rand::Rng;
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-                            abcdefghijklmnopqrstuvwxyz\
-                            0123456789-_)(*&^%$#@!~";
-    const PASSWORD_LEN: usize = 256;
-    let mut rng = rand::thread_rng();
-
-    return (0..PASSWORD_LEN)
-        .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect();
 }

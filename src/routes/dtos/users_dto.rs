@@ -38,12 +38,6 @@ pub struct TokenDto {
 }
 
 #[derive(Serialize, Apiv2Schema)]
-pub struct LoginResponseDto {
-    pub access_token: TokenDto,
-    pub refresh_token: TokenDto,
-}
-
-#[derive(Serialize, Apiv2Schema)]
 pub struct SuccessDto {
     pub status: String,
 }
