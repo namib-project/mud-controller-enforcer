@@ -7,7 +7,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use namib_shared::{codec, config_firewall::FirewallConfig, rpc::RPCClient};
+use namib_shared::{codec, firewall_config::FirewallConfig, rpc::RPCClient};
 
 use crate::{error::Result, services::firewall_service};
 
@@ -17,6 +17,7 @@ use tokio::{
     fs::File,
     io::{AsyncReadExt, ErrorKind},
     net::TcpStream,
+    sync::RwLock,
 };
 use tokio_native_tls::{
     native_tls,
@@ -59,7 +60,7 @@ pub async fn run() -> Result<RPCClient> {
     Ok(client)
 }
 
-pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
+pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Option<FirewallConfig>>>) {
     loop {
         {
             let mut instance = client.lock().await;
@@ -83,6 +84,9 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
+                    let mut known_devices = last_config.write().await;
+                    *known_devices = Some(config);
+                    drop(known_devices);
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }

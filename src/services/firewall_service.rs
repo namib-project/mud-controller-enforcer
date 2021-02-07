@@ -1,4 +1,4 @@
-use namib_shared::config_firewall::{FirewallConfig, FirewallRule};
+use namib_shared::firewall_config::{FirewallConfig, FirewallRule};
 
 use crate::{error::Result, services::is_system_mode, uci::UCI};
 
@@ -110,7 +110,7 @@ pub fn restart_firewall_command() -> std::process::Output {
 mod tests {
     use std::{fs, fs::File, io::Read};
 
-    use namib_shared::config_firewall::{EnNetwork, EnOptionalSettings, EnTarget, NetworkConfig, Protocol, RuleName};
+    use namib_shared::firewall_config::{Network, NetworkConfig, OptionalSettings, Protocol, RuleName, Target};
 
     use super::*;
 
@@ -125,15 +125,15 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
         uci.set_config_dir("tests/config/test_trivial_apply_config")?;
 
-        let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
+        let src = NetworkConfig::new(Network::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
+        let dst = NetworkConfig::new(Network::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
         let cfg = FirewallRule::new(
             RuleName::new("Regel2".to_string()),
             src,
             dst,
             Protocol::tcp(),
-            EnTarget::DROP,
-            EnOptionalSettings::None,
+            Target::DROP,
+            OptionalSettings::None,
         );
         apply_rule(&mut uci, &cfg)?;
         uci.commit("firewall")?;
@@ -199,16 +199,16 @@ mod tests {
         uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
         uci.set_config_dir("tests/config/test_apply_and_delete")?;
 
-        let src = NetworkConfig::new(EnNetwork::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(EnNetwork::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
+        let src = NetworkConfig::new(Network::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
+        let dst = NetworkConfig::new(Network::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
 
         let cfg = FirewallRule::new(
             RuleName::new("Regel3".to_string()),
             src,
             dst,
             Protocol::tcp(),
-            EnTarget::DROP,
-            EnOptionalSettings::None,
+            Target::DROP,
+            OptionalSettings::None,
         );
 
         // apply the config

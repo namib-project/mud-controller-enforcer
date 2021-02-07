@@ -415,37 +415,37 @@ mod mock {
         }
 
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {
-            info!("set_config_dir {}", config_dir);
+            debug!("set_config_dir {}", config_dir);
             Ok(())
         }
 
         pub fn set_save_dir(&mut self, save_dir: &str) -> Result<()> {
-            info!("set_save_dir {}", save_dir);
+            debug!("set_save_dir {}", save_dir);
             Ok(())
         }
 
         pub fn revert(&mut self, package: &str) -> Result<()> {
-            info!("revert {}", package);
+            debug!("revert {}", package);
             Ok(())
         }
 
         pub fn delete(&mut self, key: &str) -> Result<()> {
-            info!("delete {}", key);
+            debug!("delete {}", key);
             Ok(())
         }
 
         pub fn get(&mut self, key: &str) -> Result<String> {
-            info!("get {}", key);
+            debug!("get {}", key);
             NoneError {}.fail()
         }
 
         pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
-            info!("set {}={}", key, value);
+            debug!("set {}={}", key, value);
             Ok(())
         }
 
         pub fn commit(&mut self, package: &str) -> Result<()> {
-            info!("commit {}", package);
+            debug!("commit {}", package);
             Ok(())
         }
     }

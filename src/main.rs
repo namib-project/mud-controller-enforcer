@@ -10,7 +10,9 @@ use dotenv::dotenv;
 use tokio::{fs, fs::OpenOptions, sync::Mutex};
 
 use error::Result;
-use namib_shared::rpc::RPCClient;
+use namib_shared::{firewall_config::FirewallConfig, rpc::RPCClient};
+use std::thread;
+use tokio::sync::RwLock;
 
 mod dhcp;
 mod error;
@@ -40,9 +42,13 @@ async fn main() -> Result<()> {
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));
     info!("Connected to NAMIB Controller RPC server");
 
-    let heartbeat_task = rpc::rpc_client::heartbeat(client.clone());
+    let config: Arc<RwLock<Option<FirewallConfig>>> = Arc::new(RwLock::new(None));
 
-    let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events(client);
+    let heartbeat_task = rpc::rpc_client::heartbeat(client.clone(), config.clone());
+
+    let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events(client.clone());
+
+    let _log_watcher = thread::spawn(move || services::log_watcher::watch(&client, &config));
 
     tokio::join!(heartbeat_task, dhcp_event_task);
     Ok(())
