@@ -177,8 +177,8 @@ impl FirewallRule {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct KnownDevice {
-    ip: IpAddr,
-    collect_data: bool,
+    pub ip: IpAddr,
+    pub collect_data: bool,
 }
 
 impl KnownDevice {

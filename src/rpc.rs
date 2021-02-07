@@ -6,4 +6,5 @@ use crate::{firewall_config::FirewallConfig, models::DhcpEvent};
 pub trait RPC {
     async fn heartbeat(version: Option<String>) -> Option<FirewallConfig>;
     async fn dhcp_request(event: DhcpEvent);
+    async fn send_logs(logs: Vec<String>);
 }
