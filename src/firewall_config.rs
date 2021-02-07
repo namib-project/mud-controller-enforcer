@@ -145,11 +145,12 @@ impl FirewallRule {
 
     /// Returns this firewall rule as list of key, value pairs.
     pub fn to_option(&self) -> Vec<(String, String)> {
-        let mut query: Vec<(String, String)> = Vec::new();
-        query.push(self.rule_name.to_option());
-        query.push(self.protocol.to_option());
-        query.push(self.target.to_option());
-        query.push(("src".to_string(), self.src.typ.to_string()));
+        let mut query: Vec<(String, String)> = vec![
+            self.rule_name.to_option(),
+            self.protocol.to_option(),
+            self.target.to_option(),
+            ("src".to_string(), self.src.typ.to_string()),
+        ];
         if let Some(ip) = &self.src.ip {
             query.push(("src_ip".to_string(), ip.clone()));
         }
@@ -189,16 +190,20 @@ impl KnownDevice {
 
 /// Stores a set of firewall rules and a config version
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct FirewallConfig {
+pub struct EnforcerConfig {
     version: String,
-    rules: Vec<FirewallRule>,
+    firewall_rules: Vec<FirewallRule>,
     known_devices: Vec<KnownDevice>,
 }
 
-impl FirewallConfig {
+impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, rules: Vec<FirewallRule>, known_devices: Vec<KnownDevice>) -> Self {
-        FirewallConfig { version, rules, known_devices }
+    pub fn new(version: String, firewall_rules: Vec<FirewallRule>, known_devices: Vec<KnownDevice>) -> Self {
+        EnforcerConfig {
+            version,
+            firewall_rules,
+            known_devices,
+        }
     }
 
     /// Returns the version of this config
@@ -207,8 +212,8 @@ impl FirewallConfig {
     }
 
     /// Returns a reference to the firewall rules in this config
-    pub fn rules(&self) -> &Vec<FirewallRule> {
-        &self.rules
+    pub fn firewall_rules(&self) -> &Vec<FirewallRule> {
+        &self.firewall_rules
     }
 
     pub fn known_devices(&self) -> &Vec<KnownDevice> {
