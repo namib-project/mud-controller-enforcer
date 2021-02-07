@@ -10,7 +10,7 @@ use dotenv::dotenv;
 use tokio::{fs, fs::OpenOptions, sync::Mutex};
 
 use error::Result;
-use namib_shared::{firewall_config::FirewallConfig, rpc::RPCClient};
+use namib_shared::{firewall_config::EnforcerConfig, rpc::RPCClient};
 use std::thread;
 use tokio::sync::RwLock;
 
@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));
     info!("Connected to NAMIB Controller RPC server");
 
-    let config: Arc<RwLock<Option<FirewallConfig>>> = Arc::new(RwLock::new(None));
+    let config: Arc<RwLock<Option<EnforcerConfig>>> = Arc::new(RwLock::new(None));
 
     let heartbeat_task = rpc::rpc_client::heartbeat(client.clone(), config.clone());
 

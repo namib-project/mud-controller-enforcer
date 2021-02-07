@@ -15,11 +15,11 @@ use tokio::{runtime::Runtime, sync::Mutex, time};
 use namib_shared::rpc::RPCClient;
 
 use crate::{error::Result, rpc::rpc_client, services};
-use namib_shared::firewall_config::FirewallConfig;
+use namib_shared::firewall_config::EnforcerConfig;
 
 use tokio::sync::RwLock;
 
-pub fn watch(client: &Arc<Mutex<RPCClient>>, config: &Arc<RwLock<Option<FirewallConfig>>>) {
+pub fn watch(client: &Arc<Mutex<RPCClient>>, config: &Arc<RwLock<Option<EnforcerConfig>>>) {
     debug!("Starting dnsmasq.log watcher");
     let (tx, rx) = channel();
     let mut watcher = notify::watcher(tx, Duration::from_secs(10)).unwrap();
@@ -64,7 +64,7 @@ pub fn watch(client: &Arc<Mutex<RPCClient>>, config: &Arc<RwLock<Option<Firewall
 
 fn read_log_file(
     client: &Arc<Mutex<RPCClient>>,
-    config: &Arc<RwLock<Option<FirewallConfig>>>,
+    config: &Arc<RwLock<Option<EnforcerConfig>>>,
     path: &Path,
     tmp_path: &Path,
 ) -> Result<()> {

@@ -7,7 +7,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use namib_shared::{codec, firewall_config::FirewallConfig, rpc::RPCClient};
+use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
 use crate::{error::Result, services::firewall_service};
 
@@ -60,11 +60,11 @@ pub async fn run() -> Result<RPCClient> {
     Ok(client)
 }
 
-pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Option<FirewallConfig>>>) {
+pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Option<EnforcerConfig>>>) {
     loop {
         {
             let mut instance = client.lock().await;
-            let heartbeat: io::Result<Option<FirewallConfig>> = instance
+            let heartbeat: io::Result<Option<EnforcerConfig>> = instance
                 .heartbeat(current_rpc_context(), firewall_service::get_config_version().ok())
                 .await;
             match heartbeat {
@@ -84,9 +84,9 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Op
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
-                    let mut known_devices = last_config.write().await;
-                    *known_devices = Some(config);
-                    drop(known_devices);
+                    let mut last_config = last_config.write().await;
+                    *last_config = Some(config);
+                    drop(last_config);
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }

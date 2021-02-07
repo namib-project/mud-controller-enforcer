@@ -1,4 +1,4 @@
-use namib_shared::firewall_config::{FirewallConfig, FirewallRule};
+use namib_shared::firewall_config::{EnforcerConfig, FirewallRule};
 
 use crate::{error::Result, services::is_system_mode, uci::UCI};
 
@@ -25,8 +25,8 @@ pub fn get_config_version() -> Result<String> {
 /// This function create new configuration that should be uploaded on the firewall.
 /// It use the function `apply_uci_config`.
 /// Return Result<()>.
-pub fn apply_config(cfg: &FirewallConfig) -> Result<()> {
-    debug!("Applying {} configs", cfg.rules().len());
+pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
+    debug!("Applying {} configs", cfg.firewall_rules().len());
     let mut uci = UCI::new()?;
     if !is_system_mode() {
         uci.set_config_dir(CONFIG_DIR)?;
@@ -51,10 +51,10 @@ pub fn apply_config(cfg: &FirewallConfig) -> Result<()> {
 /// and commit these changes. This function delete all previous changes from "Namib" and upload all
 /// new changes with "Namib".
 /// Return Result<()>.
-fn apply_uci_config(uci: &mut UCI, cfg: &FirewallConfig) -> Result<()> {
+fn apply_uci_config(uci: &mut UCI, cfg: &EnforcerConfig) -> Result<()> {
     uci.set("firewall.namib_config_version", cfg.version())?;
     delete_all_config(uci)?;
-    for c in cfg.rules() {
+    for c in cfg.firewall_rules() {
         apply_rule(uci, c)?;
     }
     uci.commit("firewall")?;
