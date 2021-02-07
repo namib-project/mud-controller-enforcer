@@ -7,9 +7,7 @@ use crate::{
     db::DbConnection,
     error::{ResponseError, Result},
     models::User,
-    routes::dtos::{
-        LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto,
-    },
+    routes::dtos::{LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
     services::user_service,
 };
 use isahc::http::StatusCode;

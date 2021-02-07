@@ -57,11 +57,7 @@ impl AuthAccess {
         jwt::encode(
             &jwt::Header::default(),
             self,
-            &jwt::EncodingKey::from_secret(
-                env::var("JWT_SECRET")
-                    .expect("JWT_SECRET must be set")
-                    .as_ref(),
-            ),
+            &jwt::EncodingKey::from_secret(env::var("JWT_SECRET").expect("JWT_SECRET must be set").as_ref()),
         )
         .expect("jwt")
     }
@@ -72,11 +68,7 @@ impl AuthAccess {
 
         jwt::decode(
             token,
-            &jwt::DecodingKey::from_secret(
-                env::var("JWT_SECRET")
-                    .expect("JWT_SECRET must be set")
-                    .as_ref(),
-            ),
+            &jwt::DecodingKey::from_secret(env::var("JWT_SECRET").expect("JWT_SECRET must be set").as_ref()),
             &Validation::new(Algorithm::HS256),
         )
         .map_err(|err| {
