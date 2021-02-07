@@ -11,13 +11,18 @@
     clippy::must_use_candidate
 )]
 
+use std::{thread, time::Duration};
+
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
+use clokwerk::{Scheduler, TimeUnits};
 use dotenv::dotenv;
-use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
-/* Used for OpenApi/Swagger generation under the /swagger-ui url */
+//use namib_mud_controller::services::config_firewall_service::update_config_version;
 use paperclip::actix::{web, OpenApiExt};
 
+use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
+
+/* Used for OpenApi/Swagger generation under the /swagger-ui url */
 #[actix_web::main]
 async fn main() -> Result<()> {
     dotenv().ok();
@@ -27,6 +32,7 @@ async fn main() -> Result<()> {
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
+    let conn3 = conn.clone();
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -35,6 +41,17 @@ async fn main() -> Result<()> {
             .block_on(rpc::rpc_server::listen(conn2))
             .expect("failed running rpc server");
     });
+    let computation = thread::spawn(move || {
+        let mut scheduler = Scheduler::new();
+        log::info!("Start scheduler");
+        scheduler.every(1.hours()).run(move || {
+            log::info!("Start scheduler every {:?}", 1.hours());
+            namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles(conn3.clone());
+        });
+        scheduler.watch_thread(Duration::from_millis(1000))
+    });
+    let _result = computation.join().unwrap();
+
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|origin, _req_head| {

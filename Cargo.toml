@@ -41,3 +41,4 @@ isahc = "1.0"
 paperclip = { version = "0.5", features = ["actix", "chrono"] }
 glob = "0.3"
 const_format = "0.2"
+clokwerk = "0.3.4"

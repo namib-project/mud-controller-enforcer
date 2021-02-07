@@ -8,6 +8,7 @@ use crate::{
 };
 
 mod json_models;
+pub mod mud_profile_service;
 mod parser;
 
 pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudData> {
