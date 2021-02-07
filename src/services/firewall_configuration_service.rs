@@ -5,11 +5,11 @@ use crate::{
     services::config_service::{get_config_value, set_config_value, ConfigKeys},
 };
 use namib_shared::firewall_config::{
-    FirewallConfig, FirewallRule, KnownDevice, Network, NetworkConfig, Protocol, RuleName, Target,
+    EnforcerConfig, FirewallRule, KnownDevice, Network, NetworkConfig, Protocol, RuleName, Target,
 };
 use std::net::{IpAddr, ToSocketAddrs};
 
-pub fn create_configuration(version: String, devices: Vec<Device>) -> FirewallConfig {
+pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
     let rules: Vec<FirewallRule> = devices
         .iter()
         .flat_map(move |d| {
@@ -18,7 +18,7 @@ pub fn create_configuration(version: String, devices: Vec<Device>) -> FirewallCo
                 .unwrap_or_default()
         })
         .collect();
-    FirewallConfig::new(
+    EnforcerConfig::new(
         version,
         rules,
         devices

@@ -9,7 +9,7 @@ use tarpc::{
     server,
 };
 
-use namib_shared::{codec, firewall_config::FirewallConfig, models::DhcpEvent, open_file_with, rpc::RPC};
+use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::RPC};
 
 use crate::{
     db::DbConnection,
@@ -29,7 +29,7 @@ pub struct RPCServer {
 
 #[server]
 impl RPC for RPCServer {
-    async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<FirewallConfig> {
+    async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<EnforcerConfig> {
         let current_config_version = firewall_configuration_service::get_config_version(&self.db_connection).await;
         debug!(
             "heartbeat from {:?} ({}): version {:?}, current version {:?}",
