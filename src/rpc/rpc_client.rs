@@ -2,14 +2,11 @@ use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
 use tarpc::{client, rpc, serde_transport};
-use tokio::{
-    sync::Mutex,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 
 use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
-use crate::{error::Result, services::firewall_service};
+use crate::{error::Result, services::firewall_service, Enforcer};
 
 use super::controller_discovery::discover_controllers;
 use std::time::SystemTime;
@@ -60,11 +57,12 @@ pub async fn run() -> Result<RPCClient> {
     Ok(client)
 }
 
-pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Option<EnforcerConfig>>>) {
+pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
     loop {
         {
-            let mut instance = client.lock().await;
-            let heartbeat: io::Result<Option<EnforcerConfig>> = instance
+            let mut enforcer = enforcer.write().await;
+            let heartbeat: io::Result<Option<EnforcerConfig>> = enforcer
+                .client
                 .heartbeat(current_rpc_context(), firewall_service::get_config_version().ok())
                 .await;
             match heartbeat {
@@ -72,7 +70,7 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Op
                     ErrorKind::ConnectionReset => {
                         error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
                         if let Ok(new_client) = run().await {
-                            *instance = new_client;
+                            enforcer.client = new_client;
                         }
                     },
                     _ => {
@@ -84,14 +82,12 @@ pub async fn heartbeat(client: Arc<Mutex<RPCClient>>, last_config: Arc<RwLock<Op
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
-                    let mut last_config = last_config.write().await;
-                    *last_config = Some(config);
-                    drop(last_config);
+                    enforcer.config = config;
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }
 
-            drop(instance);
+            drop(enforcer)
         }
 
         sleep(Duration::from_secs(5)).await;
