@@ -32,7 +32,7 @@ pub async fn set_config_value(key: &str, value: &str, pool: &DbConnection) -> Re
     Ok(())
 }
 
-pub async fn delete_config_key(key: &String, pool: &DbConnection) -> Result<u64> {
+pub async fn delete_config_key(key: &str, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("DELETE FROM config WHERE key = ?", key)
         .execute(pool)
         .await?;
