@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use validator::Validate;
+use validator::{Validate, ValidationErrors};
 
 use crate::{
     auth::Auth,
@@ -218,12 +218,29 @@ pub fn set_users_config(
         .fail()
     })?;
 
+    is_field_of_user_configs_dto(&user_config_dto.key.to_string()).or_else(|_| {
+        ResponseError {
+            status: StatusCode::NOT_IMPLEMENTED,
+            message: None,
+        }
+        .fail()
+    })?;
+
     user_service::upsert_config_for_user(auth.sub, &user_config_dto.key, &user_config_dto.value, pool.get_ref())
         .await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
     }))
+}
+
+fn is_field_of_user_configs_dto(name: &String) -> actix_web::Result<(), ValidationErrors> {
+    let fields = UserConfigsDto::get_fields();
+    if fields.contains(name) {
+        Ok(())
+    } else {
+        Err(ValidationErrors::new())
+    }
 }
 
 #[api_v2_operation(summary = "Deletes a config variables of the user")]
@@ -241,7 +258,7 @@ pub fn delete_users_config(
     })?;
 
     user_service::delete_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
-    debug!("sdfsdf");
+
     Ok(Json(SuccessDto {
         status: String::from("ok"),
     }))
