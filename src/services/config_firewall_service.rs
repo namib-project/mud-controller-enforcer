@@ -136,7 +136,7 @@ pub async fn update_config_version(pool: &DbConnection) {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Local, Utc};
+    use chrono::Utc;
 
     use namib_shared::mac;
 
@@ -182,7 +182,7 @@ mod tests {
             vendor_class: "".to_string(),
             mud_url: Some("http://example.com/mud_url.json".to_string()),
             mud_data: Some(mud_data),
-            last_interaction: Local::now().naive_local(),
+            last_interaction: Utc::now().naive_local(),
         };
 
         let x = convert_device_to_fw_rules(&device)?;
