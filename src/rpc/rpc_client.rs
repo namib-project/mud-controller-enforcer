@@ -16,7 +16,10 @@ use crate::{
 };
 
 use super::controller_discovery::discover_controllers;
-use crate::models::model_firewall::FirewallConfigState;
+use crate::{
+    models::model_firewall::FirewallConfigState,
+    services::{firewall_service::FirewallService, state::EnforcerState},
+};
 use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
@@ -56,26 +59,30 @@ pub async fn run() -> Result<RPCClient> {
     }
 }
 
-pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
-    let mut firewall_state = FirewallConfigState::default();
+pub(crate) async fn heartbeat(
+    enforcer_state: Arc<EnforcerState>,
+    client: Arc<Mutex<RPCClient>>,
+    fw_service: Arc<FirewallService>,
+) {
     loop {
         {
             let mut instance = client.lock().await;
             let heartbeat: io::Result<Option<FirewallConfig>> = instance
                 .heartbeat(
                     context::current(),
-                    (&(firewall_state.current_firewall_config))
+                    enforcer_state
+                        .firewall_cfg
+                        .read()
+                        .await
                         .as_ref()
-                        .and_then(|cfg| Some(cfg.version().to_string())),
+                        .map(|c| c.version().into()),
                 )
                 .await;
             match heartbeat {
                 Err(error) => error!("Error during heartbeat: {:?}", error),
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
-                    if let Err(e) = firewall_service::handle_new_config(&firewall_state, config).await {
-                        error!("Failed to apply config! {}", e)
-                    }
+                    fw_service.apply_new_config(config).await;
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }

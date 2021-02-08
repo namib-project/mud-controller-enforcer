@@ -9,6 +9,7 @@ use std::sync::Arc;
 use dotenv::dotenv;
 use tokio::{fs, fs::OpenOptions, sync::Mutex};
 
+use crate::services::firewall_service::FirewallService;
 use error::Result;
 use namib_shared::rpc::RPCClient;
 
@@ -37,13 +38,28 @@ async fn main() -> Result<()> {
             .await?;
     }
 
+    let enforcer_state = Arc::new(services::state::EnforcerState::new());
+
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));
     info!("Connected to RPC server");
 
-    let heartbeat_task = rpc::rpc_client::heartbeat(client.clone());
+    let mut dns_service = services::dns::DnsService::new().unwrap();
+
+    let watcher = dns_service.create_watcher();
+    let fw_service = Arc::new(FirewallService::new(enforcer_state.clone(), watcher));
+
+    let heartbeat_task = rpc::rpc_client::heartbeat(enforcer_state.clone(), client.clone(), fw_service.clone());
 
     let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events(client);
 
-    tokio::join!(heartbeat_task, dhcp_event_task);
+    let dns_task = tokio::spawn(async move {
+        dns_service.auto_refresher_task().await;
+    });
+
+    let firewall_task = tokio::spawn(async move {
+        fw_service.firewall_change_watcher().await;
+    });
+
+    tokio::join!(heartbeat_task, dhcp_event_task, dns_task, firewall_task);
     Ok(())
 }
