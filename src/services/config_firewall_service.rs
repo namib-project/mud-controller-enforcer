@@ -113,15 +113,15 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
-    get_config_value("version".to_string(), pool)
+    get_config_value("version", pool)
         .await
         .unwrap_or_else(|_| "0".to_string())
 }
 
 pub async fn update_config_version(pool: &DbConnection) {
     set_config_value(
-        "version".to_string(),
-        (get_config_value("version".to_string(), pool)
+        "version",
+        &(get_config_value("version", pool)
             .await
             .unwrap_or_else(|_| "0".to_string())
             .parse::<u32>()
