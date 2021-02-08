@@ -136,10 +136,13 @@ pub async fn update_config_version(pool: &DbConnection) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
-    use chrono::Local;
+    use chrono::Utc;
+
     use namib_shared::mac;
+
+    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
+
+    use super::*;
 
     #[test]
     fn test_converting() -> Result<()> {
@@ -151,7 +154,7 @@ mod tests {
             mfg_name: Some("some_mfg_name".to_string()),
             model_name: Some("some_model_name".to_string()),
             documentation: Some("some_documentation".to_string()),
-            expiration: Local::now(),
+            expiration: Utc::now(),
             acllist: vec![Acl {
                 name: "some_acl_name".to_string(),
                 packet_direction: AclDirection::ToDevice,
@@ -179,7 +182,7 @@ mod tests {
             vendor_class: "".to_string(),
             mud_url: Some("http://example.com/mud_url.json".to_string()),
             mud_data: Some(mud_data),
-            last_interaction: Local::now().naive_local(),
+            last_interaction: Utc::now().naive_local(),
         };
 
         let x = convert_device_to_fw_rules(&device)?;
