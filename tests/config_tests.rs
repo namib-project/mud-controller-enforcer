@@ -12,7 +12,7 @@ mod config_integration {
         let ctx = lib::IntegrationTestContext::new("get_nothing").await;
 
         assert!(
-            config_service::get_config_value(&"should-be-nothing".to_string(), &ctx.db_conn)
+            config_service::get_config_value("should-be-nothing", &ctx.db_conn)
                 .await
                 .is_err(),
             "Non-existing config value was existing!"
@@ -23,13 +23,11 @@ mod config_integration {
     async fn set_get_something() {
         let ctx = lib::IntegrationTestContext::new("set_get_something").await;
 
-        config_service::set_config_value(&"some".to_string(), &"thing".to_string(), &ctx.db_conn)
+        config_service::set_config_value("some", "thing", &ctx.db_conn)
             .await
             .unwrap();
         assert_eq!(
-            config_service::get_config_value(&"some".to_string(), &ctx.db_conn)
-                .await
-                .unwrap(),
+            config_service::get_config_value("some", &ctx.db_conn).await.unwrap(),
             "thing"
         );
     }
@@ -38,26 +36,20 @@ mod config_integration {
     async fn delete_something() {
         let ctx = lib::IntegrationTestContext::new("delete_something").await;
 
-        config_service::set_config_value(&"some".to_string(), &"thing".to_string(), &ctx.db_conn)
+        config_service::set_config_value("some", &"thing", &ctx.db_conn)
             .await
             .unwrap();
         assert_eq!(
-            config_service::get_config_value(&"some".to_string(), &ctx.db_conn)
-                .await
-                .unwrap(),
+            config_service::get_config_value("some", &ctx.db_conn).await.unwrap(),
             "thing"
         );
 
         assert_eq!(
-            config_service::delete_config_key(&"some".to_string(), &ctx.db_conn)
-                .await
-                .unwrap(),
+            config_service::delete_config_key("some", &ctx.db_conn).await.unwrap(),
             1
         );
         assert!(
-            config_service::get_config_value(&"some".to_string(), &ctx.db_conn)
-                .await
-                .is_err(),
+            config_service::get_config_value("some", &ctx.db_conn).await.is_err(),
             "Non-existing config value was existing!"
         );
     }
@@ -66,25 +58,21 @@ mod config_integration {
     async fn get_all() {
         let ctx = lib::IntegrationTestContext::new("get_all").await;
 
-        config_service::set_config_value(&"some".to_string(), &"thing".to_string(), &ctx.db_conn)
+        config_service::set_config_value("some", "thing", &ctx.db_conn)
+            .await
+            .unwrap();
+
+        config_service::set_config_value("stackoverflow", "saves lives & our sanity", &ctx.db_conn)
+            .await
+            .unwrap();
+
+        config_service::set_config_value("actix_with", "sqlx", &ctx.db_conn)
             .await
             .unwrap();
 
         config_service::set_config_value(
-            &"stackoverflow".to_string(),
-            &"saves lives & our sanity".to_string(),
-            &ctx.db_conn,
-        )
-        .await
-        .unwrap();
-
-        config_service::set_config_value(&"actix_with".to_string(), &"sqlx".to_string(), &ctx.db_conn)
-            .await
-            .unwrap();
-
-        config_service::set_config_value(
-            &"longest_german_word".to_string(),
-            &"Rinderkennzeichnungsfleischetikettierungsüberwachungsaufgabenübertragungsgesetz".to_string(),
+            "longest_german_word",
+            "Rinderkennzeichnungsfleischetikettierungsüberwachungsaufgabenübertragungsgesetz",
             &ctx.db_conn,
         )
         .await
