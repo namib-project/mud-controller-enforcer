@@ -1,4 +1,4 @@
-use chrono::Local;
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
 use isahc::AsyncReadResponseExt;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -6,8 +6,9 @@ use regex::Regex;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{MudData, MudDbo},
+    models::{Acl, MudData, MudDbo},
 };
+use sqlx::Done;
 
 mod json_models;
 mod parser;
@@ -27,6 +28,21 @@ pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()>
         .await?;
 
     // Ok(ins_count.rows_affected())
+    Ok(())
+}
+
+pub async fn create_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
+    let _ins_count = sqlx::query!(
+        "INSERT INTO mud_data (url, data, created_at, expiration, acl_override) VALUES (?, ?, ?, ?, ?)",
+        mud_profile.url,
+        mud_profile.data,
+        mud_profile.created_at,
+        mud_profile.expiration,
+        mud_profile.acl_override,
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 
@@ -89,4 +105,23 @@ pub fn is_url(url: &str) -> bool {
         static ref RE: Regex = Regex::new(r"https?://(-\.)?([^\s/?\.#-]+\.?)+(/[^\s]*)?$").unwrap();
     }
     RE.is_match(url)
+}
+
+pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl>>) -> MudData {
+    MudData {
+        url: url.to_string(),
+        masa_url: None,
+        last_update: Local::now().naive_local().to_string(),
+        systeminfo: None,
+        mfg_name: None,
+        model_name: None,
+        documentation: None,
+        expiration: get_custom_mud_expiration(),
+        acllist: vec![],
+        acl_override,
+    }
+}
+
+pub fn get_custom_mud_expiration() -> DateTime<Utc> {
+    chrono::Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 01, 31).and_hms(0, 0, 0))
 }
