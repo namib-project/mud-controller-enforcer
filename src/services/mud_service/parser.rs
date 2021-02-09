@@ -65,6 +65,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
         documentation: mud_data.documentation.clone(),
         expiration: exptime,
         acllist,
+        acl_override: None,
     };
     info!(
         "MUD URI <{}> Last Update <{}> System Info <{:?}> Cache-Validity <{}> MASA <{:?}> Expiration <{}>",
@@ -298,6 +299,7 @@ mod tests {
             documentation: Some("https://lighting.example.com/lightbulb2000/documentation".to_string()),
             expiration: mud.expiration.clone(),
             acllist: acl_list,
+            acl_override: None,
         };
 
         assert_eq!(mud, example);

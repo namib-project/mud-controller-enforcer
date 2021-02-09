@@ -13,6 +13,7 @@ use paperclip::{
 pub struct MudDbo {
     pub url: String,
     pub data: String,
+    pub acl_override: Option<String>,
     pub created_at: NaiveDateTime,
     pub expiration: NaiveDateTime,
 }
@@ -28,6 +29,7 @@ pub struct MudData {
     pub documentation: Option<String>,
     pub expiration: DateTime<Utc>,
     pub acllist: Vec<Acl>,
+    pub acl_override: Option<Vec<Acl>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
