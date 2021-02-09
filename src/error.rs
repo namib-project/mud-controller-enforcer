@@ -69,11 +69,6 @@ pub enum Error {
         source: glob::PatternError,
         backtrace: Backtrace,
     },
-    #[snafu(display("ActixWebError {}", source), context(false))]
-    ActixWebError {
-        source: actix_web::Error,
-        backtrace: Backtrace,
-    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

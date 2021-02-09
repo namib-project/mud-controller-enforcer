@@ -3,16 +3,21 @@
 use crate::{
     auth::Auth,
     db::DbConnection,
-    error::Result,
+    error,
+    error::{ResponseError, Result},
     models::{MudData, MudDbo},
     routes::dtos::{MudCreationDto, MudUpdateDto},
     services::{mud_service, mud_service::is_url},
 };
-use actix_web::HttpResponse;
+use actix_web::http::StatusCode;
 use chrono::Utc;
-use paperclip::actix::{api_v2_operation, web, web::Json};
+use paperclip::actix::{
+    api_v2_operation, web,
+    web::{HttpResponse, Json},
+};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
+    cfg.route("/", web::get().to(get_all_muds));
     cfg.route("/{url}", web::get().to(get_mud));
     cfg.route("/{url}", web::put().to(update_mud));
     cfg.route("/{url}", web::delete().to(delete_mud));
@@ -20,21 +25,36 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 }
 
 #[api_v2_operation]
+pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<MudData>>> {
+    auth.require_permission("mud/list")?;
+    auth.require_permission("mud/read")?;
+    let mud_dbos = mud_service::get_all_muds(&pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("Couldn't find MUD-Profile".to_string()),
+        }
+        .fail()
+    })?;
+    Ok(Json(
+        mud_dbos
+            .iter()
+            .map(|mud_dbo| serde_json::from_str::<MudData>(mud_dbo.data.as_str()))
+            .filter_map(serde_json::Result::ok) // TODO: remove this, fix it & don't ignore failures
+            .collect(),
+    ))
+}
+
+#[api_v2_operation]
 pub async fn get_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<String>) -> Result<Json<MudData>> {
-    if url.into_inner().is_empty() {
-        auth.require_permission("mud/list")?;
-        auth.require_permission("mud/read")?;
-        match mud_service::get_mud(&url.into_inner(), &pool).await {
-            None => Err(actix_web::error::ErrorNotFound("Couldn't find MUD-Profile")),
-            Some(mud_dbo) => Ok(Json(serde_json::from_str::<MudData>(mud_dbo.data.as_str())?)),
+    auth.require_permission("mud/read")?;
+    let mud_dbo = mud_service::get_mud(&url, &pool).await.ok_or("").or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("Couldn't find MUD-Profile".to_string()),
         }
-    } else {
-        auth.require_permission("mud/read")?;
-        match mud_service::get_mud(&url.into_inner(), &pool).await {
-            None => Err(actix_web::error::ErrorNotFound("Couldn't find MUD-Profile")),
-            Some(mud_dbo) => Ok(Json(serde_json::from_str::<MudData>(mud_dbo.data.as_str())?)),
-        }
-    }
+        .fail()
+    })?;
+    Ok(Json(serde_json::from_str::<MudData>(mud_dbo.data.as_str())?))
 }
 
 #[api_v2_operation]
@@ -46,10 +66,16 @@ pub async fn update_mud(
 ) -> Result<Json<MudData>> {
     auth.require_permission("mud/write")?;
 
-    let mut mud_dbo = match mud_service::get_mud(&url.into_inner(), &pool).await {
-        None => return Err(actix_web::error::ErrorNotFound("MUD-Profile not found")),
-        Some(mud_dbo) => mud_dbo,
-    };
+    let mut mud_dbo = mud_service::get_mud(&url.into_inner(), &pool)
+        .await
+        .ok_or("")
+        .or_else(|_| {
+            error::ResponseError {
+                status: StatusCode::NOT_FOUND,
+                message: Some("Couldn't find MUD-Profile".to_string()),
+            }
+            .fail()
+        })?;
 
     let mut mud_data = serde_json::from_str::<MudData>(mud_dbo.data.as_str())?;
     mud_data.acl_override = mud_update_dto.acl_override.clone();
@@ -61,20 +87,28 @@ pub async fn update_mud(
 }
 
 #[api_v2_operation]
-pub async fn delete_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<String>) -> Result<()> {
+pub async fn delete_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<String>) -> Result<HttpResponse> {
     auth.require_permission("mud/delete")?;
 
-    if mud_service::get_mud(&url.into_inner(), &pool).await.is_none() {
-        return Err(actix_web::error::ErrorNotFound("No MUD-Profile with this URL"));
+    let url = url.into_inner();
+
+    if mud_service::get_mud(&url, &pool).await.is_none() {
+        ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("No MUD-Profile with this URL".to_string()),
+        }
+        .fail::<error::Error>()?;
     }
 
-    if mud_service::delete_mud(&url.into_inner(), &pool).await? == 1 {
-        Ok(HttpResponse::NoContent().finish())
-    } else {
-        Err(actix_web::error::ErrorInternalServerError(
-            "Couldn't delete MUD, is it being used elsewhere?",
-        ))
+    if mud_service::delete_mud(&url, &pool).await? != 1 {
+        ResponseError {
+            status: StatusCode::CONFLICT,
+            message: Some("Couldn't delete MUD, is it being used elsewhere?".to_string()),
+        }
+        .fail::<error::Error>()?;
     }
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 #[api_v2_operation]
@@ -86,7 +120,11 @@ pub async fn create_mud(
     auth.require_permission("mud/create")?;
 
     if mud_service::get_mud(&mud_creation_dto.mud_url, &pool).await.is_some() {
-        return Err(actix_web::error::ErrorConflict("MUD-URL key already exists"));
+        ResponseError {
+            status: StatusCode::CONFLICT,
+            message: Some("MUD-URL key already exists".to_string()),
+        }
+        .fail::<error::Error>()?;
     }
 
     // Check if the mud_url is actually an url. It might be a custom user mud-profile

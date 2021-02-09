@@ -53,6 +53,14 @@ pub async fn get_mud(url: &str, pool: &DbConnection) -> Option<MudDbo> {
         .ok()?
 }
 
+pub async fn get_all_muds(pool: &DbConnection) -> Result<Vec<MudDbo>> {
+    let data = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data")
+        .fetch_all(pool)
+        .await?;
+
+    Ok(data)
+}
+
 pub async fn delete_mud(url: &str, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("DELETE FROM mud_data WHERE url = ?", url)
         .execute(pool)
