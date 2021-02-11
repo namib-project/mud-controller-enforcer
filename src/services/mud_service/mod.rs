@@ -13,8 +13,8 @@ use sqlx::Done;
 mod json_models;
 mod parser;
 
-/// Writes the MudDbo to the database.
-/// Upserts data by MudDBO::url
+/// Writes the `MudDbo` to the database.
+/// Upserts data by `MudDbo::url`
 pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
     let _ins_count = sqlx::query!(
         "INSERT INTO mud_data (url, data, created_at, expiration, acl_override) VALUES (?, ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET data = excluded.data, created_at = excluded.created_at, expiration = excluded.expiration, acl_override = excluded.acl_override",
@@ -31,6 +31,7 @@ pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()>
     Ok(())
 }
 
+/// Creates MUD Profile using `MudDbo` Data
 pub async fn create_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
     let _ins_count = sqlx::query!(
         "INSERT INTO mud_data (url, data, created_at, expiration, acl_override) VALUES (?, ?, ?, ?, ?)",
@@ -46,6 +47,7 @@ pub async fn create_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()>
     Ok(())
 }
 
+/// Returns the MUD-Profile if it exists
 pub async fn get_mud(url: &str, pool: &DbConnection) -> Option<MudDbo> {
     sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = ?", url)
         .fetch_optional(pool)
@@ -53,6 +55,7 @@ pub async fn get_mud(url: &str, pool: &DbConnection) -> Option<MudDbo> {
         .ok()?
 }
 
+/// Returns all existing MUD-Profiles
 pub async fn get_all_muds(pool: &DbConnection) -> Result<Vec<MudDbo>> {
     let data = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data")
         .fetch_all(pool)
@@ -61,6 +64,7 @@ pub async fn get_all_muds(pool: &DbConnection) -> Result<Vec<MudDbo>> {
     Ok(data)
 }
 
+/// Deletes a MUD-Profile using the MUD-URL/-Name
 pub async fn delete_mud(url: &str, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("DELETE FROM mud_data WHERE url = ?", url)
         .execute(pool)
@@ -69,6 +73,20 @@ pub async fn delete_mud(url: &str, pool: &DbConnection) -> Result<u64> {
     Ok(del_count.rows_affected())
 }
 
+/// Checks if a Device is using the MUD-Profile
+pub async fn is_mud_used(url: &str, pool: &DbConnection) -> Result<bool> {
+    let device_using_mud = sqlx::query!("SELECT * FROM devices WHERE mud_url = ?", url)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(device_using_mud.is_some())
+}
+
+/// Returns a MUD-Profile Data using the MUD-URL
+/// Creates the MUD-Profile if it doesn't exist
+/// If it exists, uses existing data from DB
+/// This function is mainly used in the `RPCServer`, where it's used to save Device's MUD-URLs which are being sent via DHCP
+/// Local MUD-Profiles can be loaded *BUT NOT CREATED* through this function, since they have an expiration far far in the future
 pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
     let existing_mud = get_mud(&url, pool).await;
@@ -104,10 +122,12 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
     Ok(data)
 }
 
+/// Basic HTTP(S)-GET wrapper to fetch MUD-URL Data
 async fn fetch_mud(url: &str) -> Result<String> {
     Ok(isahc::get_async(url).await?.text().await?)
 }
 
+/// Checks if the given string is an URL. Used to check if the MUD-Profile being created is local or needs to be fetched.
 pub fn is_url(url: &str) -> bool {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"https?://(-\.)?([^\s/?\.#-]+\.?)+(/[^\s]*)?$").unwrap();
@@ -115,6 +135,7 @@ pub fn is_url(url: &str) -> bool {
     RE.is_match(url)
 }
 
+/// Generates an empty MUD-Profile for custom local usage
 pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl>>) -> MudData {
     MudData {
         url: url.to_string(),
@@ -130,6 +151,7 @@ pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl
     }
 }
 
+/// Generates an expiration date, which is far in the future. Mainly used for custom local MUD-Profiles
 pub fn get_custom_mud_expiration() -> DateTime<Utc> {
-    chrono::Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 01, 31).and_hms(0, 0, 0))
+    chrono::Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 1, 31).and_hms(0, 0, 0))
 }

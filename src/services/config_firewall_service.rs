@@ -7,7 +7,7 @@ use crate::{
 use namib_shared::config_firewall::{EnNetwork, EnTarget, FirewallRule, NetworkConfig, Protocol, RuleName};
 use std::net::{IpAddr, ToSocketAddrs};
 
-pub fn merge_acls<'a>(original: &'a Vec<Acl>, override_with: &'a Vec<Acl>) -> Vec<&'a Acl> {
+pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
     let mut merged_acls: Vec<&Acl> = override_with.iter().collect();
     let mut filtered_original_acls = original

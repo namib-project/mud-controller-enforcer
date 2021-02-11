@@ -4,7 +4,7 @@ use crate::{
     auth::Auth,
     db::DbConnection,
     error,
-    error::{ResponseError, Result},
+    error::Result,
     models::{MudData, MudDbo},
     routes::dtos::{MudCreationDto, MudUpdateDto},
     services::{mud_service, mud_service::is_url},
@@ -28,6 +28,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<MudData>>> {
     auth.require_permission("mud/list")?;
     auth.require_permission("mud/read")?;
+
     let mud_dbos = mud_service::get_all_muds(&pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
@@ -39,20 +40,21 @@ pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: Auth) -> Result<J
         mud_dbos
             .iter()
             .map(|mud_dbo| serde_json::from_str::<MudData>(mud_dbo.data.as_str()))
-            .filter_map(serde_json::Result::ok) // TODO: remove this, fix it & don't ignore failures
-            .collect(),
+            // .filter_map(serde_json::Result::ok) // TODO: remove this, fix it & don't ignore failures
+            .collect::<std::result::Result<Vec<MudData>, serde_json::Error>>()?,
     ))
 }
 
 #[api_v2_operation]
 pub async fn get_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<String>) -> Result<Json<MudData>> {
     auth.require_permission("mud/read")?;
-    let mud_dbo = mud_service::get_mud(&url, &pool).await.ok_or("").or_else(|_| {
+
+    let mud_dbo = mud_service::get_mud(&url, &pool).await.ok_or_else(|| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some("Couldn't find MUD-Profile".to_string()),
         }
-        .fail()
+        .build()
     })?;
     Ok(Json(serde_json::from_str::<MudData>(mud_dbo.data.as_str())?))
 }
@@ -66,20 +68,19 @@ pub async fn update_mud(
 ) -> Result<Json<MudData>> {
     auth.require_permission("mud/write")?;
 
-    let mut mud_dbo = mud_service::get_mud(&url.into_inner(), &pool)
-        .await
-        .ok_or("")
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::NOT_FOUND,
-                message: Some("Couldn't find MUD-Profile".to_string()),
-            }
-            .fail()
-        })?;
+    let mut mud_dbo = mud_service::get_mud(&url.into_inner(), &pool).await.ok_or_else(|| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("Couldn't find MUD-Profile".to_string()),
+        }
+        .build()
+    })?;
 
+    // update the acl_override in mud_data
     let mut mud_data = serde_json::from_str::<MudData>(mud_dbo.data.as_str())?;
     mud_data.acl_override = mud_update_dto.acl_override.clone();
 
+    // use the new mud_data in the existing mud_dbo
     mud_dbo.data = serde_json::to_string(&mud_data)?;
 
     mud_service::upsert_mud(&mud_dbo, &pool).await?;
@@ -93,21 +94,22 @@ pub async fn delete_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Pat
     let url = url.into_inner();
 
     if mud_service::get_mud(&url, &pool).await.is_none() {
-        ResponseError {
+        error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some("No MUD-Profile with this URL".to_string()),
         }
-        .fail::<error::Error>()?;
+        .fail()?;
     }
 
-    if mud_service::delete_mud(&url, &pool).await? != 1 {
-        ResponseError {
+    if mud_service::is_mud_used(&url, &pool).await? {
+        error::ResponseError {
             status: StatusCode::CONFLICT,
-            message: Some("Couldn't delete MUD, is it being used elsewhere?".to_string()),
+            message: Some("MUD is being used elsewhere, can't delete it.".to_string()),
         }
-        .fail::<error::Error>()?;
+        .fail()?;
     }
 
+    mud_service::delete_mud(&url, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -120,15 +122,19 @@ pub async fn create_mud(
     auth.require_permission("mud/create")?;
 
     if mud_service::get_mud(&mud_creation_dto.mud_url, &pool).await.is_some() {
-        ResponseError {
+        error::ResponseError {
             status: StatusCode::CONFLICT,
             message: Some("MUD-URL key already exists".to_string()),
         }
-        .fail::<error::Error>()?;
+        .fail()?;
     }
 
     // Check if the mud_url is actually an url. It might be a custom user mud-profile
     if is_url(&mud_creation_dto.mud_url) {
+        let created_mud = mud_service::get_mud_from_url(mud_creation_dto.mud_url.clone(), &pool).await?;
+
+        Ok(Json(created_mud))
+    } else {
         let empty_mud = mud_service::generate_empty_custom_mud_profile(
             &mud_creation_dto.mud_url,
             mud_creation_dto.acl_override.clone(),
@@ -147,9 +153,5 @@ pub async fn create_mud(
         mud_service::create_mud(&mud_dbo, &pool).await?;
 
         Ok(Json(empty_mud))
-    } else {
-        let created_mud = mud_service::get_mud_from_url(mud_creation_dto.mud_url.clone(), &pool).await?;
-
-        Ok(Json(created_mud))
     }
 }
