@@ -99,6 +99,8 @@ build-release:
     paths:
       - install/bin
       - certs
+      - static
+      - db.sqlite
 
 create-docker:
   stage: docker
