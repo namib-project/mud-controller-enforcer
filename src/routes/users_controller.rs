@@ -3,7 +3,7 @@
 use validator::Validate;
 
 use crate::{
-    auth::AuthAccess,
+    auth::AuthToken,
     db::DbConnection,
     error::{ResponseError, Result},
     models::User,
@@ -71,7 +71,7 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
     })?;
 
     Ok(Json(TokenDto {
-        token: AuthAccess::encode_token(&AuthAccess::generate_access_token(
+        token: AuthToken::encode_token(&AuthToken::generate_access_token(
             user.id,
             user.username,
             user.permissions,
@@ -80,9 +80,9 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 }
 
 #[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.")]
-pub async fn refresh_token(auth: AuthAccess) -> Result<Json<TokenDto>> {
+pub async fn refresh_token(auth: AuthToken) -> Result<Json<TokenDto>> {
     Ok(Json(TokenDto {
-        token: AuthAccess::encode_token(&AuthAccess::generate_access_token(
+        token: AuthToken::encode_token(&AuthToken::generate_access_token(
             auth.sub,
             auth.username,
             auth.permissions,
@@ -91,7 +91,7 @@ pub async fn refresh_token(auth: AuthAccess) -> Result<Json<TokenDto>> {
 }
 
 #[api_v2_operation(summary = "Retrieve information about the logged-in user")]
-pub async fn get_me(pool: web::Data<DbConnection>, auth: AuthAccess) -> Result<Json<User>> {
+pub async fn get_me(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<User>> {
     let user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
 
     Ok(Json(user))
@@ -100,7 +100,7 @@ pub async fn get_me(pool: web::Data<DbConnection>, auth: AuthAccess) -> Result<J
 #[api_v2_operation(summary = "Update the current user")]
 pub fn update_me(
     pool: web::Data<DbConnection>,
-    auth: AuthAccess,
+    auth: AuthToken,
     update_user_dto: Json<UpdateUserDto>,
 ) -> Result<Json<SuccessDto>> {
     update_user_dto.validate().or_else(|_| {
@@ -127,7 +127,7 @@ pub fn update_me(
 #[api_v2_operation(summary = "Update the user's password")]
 pub fn update_password(
     pool: web::Data<DbConnection>,
-    auth: AuthAccess,
+    auth: AuthToken,
     update_password_dto: Json<UpdatePasswordDto>,
 ) -> Result<Json<SuccessDto>> {
     update_password_dto.validate().or_else(|_| {
@@ -158,7 +158,7 @@ pub fn update_password(
 }
 
 #[api_v2_operation(summary = "Retrieve all roles")]
-pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthAccess) -> Result<Json<Vec<RoleDto>>> {
+pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
     auth.require_permission("role/list")?;
 
     let roles = user_service::get_all_roles(pool.get_ref()).await?;

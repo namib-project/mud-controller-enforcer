@@ -14,7 +14,7 @@ static HEADER_PREFIX: &str = "Bearer ";
 
 #[derive(Apiv2Security, Clone, Deserialize, Serialize)]
 #[openapi(apiKey, in = "header", name = "Authorization")]
-pub struct AuthAccess {
+pub struct AuthToken {
     // Not before
     pub nbf: i64,
     // Expiration time
@@ -27,10 +27,10 @@ pub struct AuthAccess {
     pub permissions: Vec<String>,
 }
 
-impl AuthAccess {
-    pub fn generate_access_token(id: i64, username: String, permissions: Vec<String>) -> AuthAccess {
+impl AuthToken {
+    pub fn generate_access_token(id: i64, username: String, permissions: Vec<String>) -> AuthToken {
         let time_now = Utc::now().naive_utc();
-        AuthAccess {
+        AuthToken {
             nbf: time_now.timestamp(),
             exp: (time_now + Duration::minutes(15)).timestamp(),
             sub: id,
@@ -63,7 +63,7 @@ impl AuthAccess {
     }
 
     /// Decode token into "Auth" struct.
-    pub fn decode_token(token: &str) -> Option<AuthAccess> {
+    pub fn decode_token(token: &str) -> Option<AuthToken> {
         use jwt::{Algorithm, Validation};
 
         jwt::decode(
@@ -83,16 +83,16 @@ fn extract_token_from_header(header: &str) -> Option<&str> {
     header.strip_prefix(HEADER_PREFIX)
 }
 
-fn extract_auth_from_request(request: &HttpRequest) -> Option<AuthAccess> {
+fn extract_auth_from_request(request: &HttpRequest) -> Option<AuthToken> {
     request
         .headers()
         .get("authorization")
         .and_then(|header| header.to_str().ok())
         .and_then(extract_token_from_header)
-        .and_then(|token| AuthAccess::decode_token(token))
+        .and_then(|token| AuthToken::decode_token(token))
 }
 
-impl FromRequest for AuthAccess {
+impl FromRequest for AuthToken {
     type Config = ();
     type Error = actix_web::Error;
     type Future = Ready<std::result::Result<Self, Self::Error>>;
