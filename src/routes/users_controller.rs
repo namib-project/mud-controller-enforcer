@@ -1,6 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use validator::{Validate, ValidationErrors};
+use isahc::http::StatusCode;
+use paperclip::actix::{api_v2_operation, web, web::Json};
+use validator::Validate;
 
 use crate::{
     auth::Auth,
@@ -9,12 +11,10 @@ use crate::{
     models::User,
     routes::dtos::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
-        UserConfigRequestDto, UserConfigsDto,
+        UserConfigRequestDto,
     },
-    services::user_service,
+    services::{user_config_service, user_service},
 };
-use isahc::http::StatusCode;
-use paperclip::actix::{api_v2_operation, web, web::Json};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/signup", web::post().to(signup));
@@ -166,17 +166,16 @@ pub fn get_roles(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<R
 }
 
 #[api_v2_operation(summary = "Gets the config variables of the user")]
-pub fn get_users_configs(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<UserConfigsDto>> {
-    let user_configs = user_service::get_all_configs_for_user(auth.sub, pool.get_ref()).await?;
+pub fn get_users_configs(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<UserConfigDto>>> {
+    let user_configs = user_config_service::get_all_configs_for_user(auth.sub, pool.get_ref()).await?;
 
-    let mut user_configs_dto = UserConfigsDto {
-        activated_theme: "Light".to_string(),
-    };
+    let mut user_configs_dto = vec![];
 
     for uc in user_configs.into_iter() {
-        if uc.key == "activated_theme" {
-            user_configs_dto.activated_theme = uc.value;
-        }
+        user_configs_dto.push(UserConfigDto {
+            key: uc.key,
+            value: uc.value,
+        });
     }
 
     Ok(Json(user_configs_dto))
@@ -196,7 +195,7 @@ pub fn get_users_config(
         .fail()
     })?;
 
-    let user_config_db = user_service::get_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
+    let user_config_db = user_config_service::get_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
 
     Ok(Json(UserConfigDto {
         key: user_config_db.key,
@@ -218,29 +217,12 @@ pub fn set_users_config(
         .fail()
     })?;
 
-    is_field_of_user_configs_dto(&user_config_dto.key.to_string()).or_else(|_| {
-        ResponseError {
-            status: StatusCode::NOT_IMPLEMENTED,
-            message: None,
-        }
-        .fail()
-    })?;
-
-    user_service::upsert_config_for_user(auth.sub, &user_config_dto.key, &user_config_dto.value, pool.get_ref())
+    user_config_service::upsert_config_for_user(auth.sub, &user_config_dto.key, &user_config_dto.value, pool.get_ref())
         .await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
     }))
-}
-
-fn is_field_of_user_configs_dto(name: &String) -> actix_web::Result<(), ValidationErrors> {
-    let fields = UserConfigsDto::get_fields();
-    if fields.contains(name) {
-        Ok(())
-    } else {
-        Err(ValidationErrors::new())
-    }
 }
 
 #[api_v2_operation(summary = "Deletes a config variables of the user")]
@@ -257,7 +239,7 @@ pub fn delete_users_config(
         .fail()
     })?;
 
-    user_service::delete_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
+    user_config_service::delete_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
