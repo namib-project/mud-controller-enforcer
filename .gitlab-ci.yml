@@ -5,7 +5,7 @@ stages:
   - release
   - docker
 
-image: rust:latest
+image: rust:14.9.0
 
 cache:
   paths:
