@@ -55,6 +55,7 @@ async fn main() -> Result<()> {
             .service(web::scope("/users").configure(routes::users_controller::init))
             .service(web::scope("/devices").configure(routes::device_controller::init))
             .service(web::scope("/mud").configure(routes::mud_controller::init))
+            .service(web::scope("/config").configure(routes::config_controller::init))
             .with_json_spec_at("/api/spec")
             .build()
             .service(

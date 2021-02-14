@@ -13,7 +13,12 @@ use serde::{Deserialize, Serialize};
 static HEADER_PREFIX: &str = "Bearer ";
 
 #[derive(Apiv2Security, Clone, Deserialize, Serialize)]
-#[openapi(apiKey, in = "header", name = "Authorization")]
+#[openapi(
+    apiKey,
+    in = "header",
+    name = "Authorization",
+    description = "Use format 'Bearer TOKEN'"
+)]
 pub struct AuthToken {
     // Not before
     pub nbf: i64,

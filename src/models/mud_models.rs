@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use chrono::{DateTime, Local, NaiveDateTime};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use paperclip::{
     actix::Apiv2Schema,
     v2::{
@@ -17,7 +17,7 @@ pub struct MudDbo {
     pub expiration: NaiveDateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct MudData {
     pub url: String,
     pub masa_url: Option<String>,
@@ -26,11 +26,11 @@ pub struct MudData {
     pub mfg_name: Option<String>,
     pub model_name: Option<String>,
     pub documentation: Option<String>,
-    pub expiration: DateTime<Local>,
+    pub expiration: DateTime<Utc>,
     pub acllist: Vec<Acl>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct Acl {
     pub name: String,
     pub packet_direction: AclDirection,
@@ -38,14 +38,14 @@ pub struct Acl {
     pub ace: Vec<Ace>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct Ace {
     pub name: String,
     pub action: AceAction,
     pub matches: AceMatches,
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct AceMatches {
     pub protocol: Option<AceProtocol>,
     pub direction_initiated: Option<AclDirection>,
@@ -55,7 +55,7 @@ pub struct AceMatches {
     pub destination_port: Option<AcePort>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub enum AcePort {
     #[serde(rename = "single")]
     Single(u32),
@@ -77,7 +77,7 @@ impl Apiv2Schema for AcePort {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(tag = "name", content = "num")]
 pub enum AceProtocol {
     TCP,
@@ -104,19 +104,19 @@ impl Apiv2Schema for AceProtocol {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub enum AceAction {
     Accept,
     Deny,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Apiv2Schema, Eq)]
 pub enum AclType {
     IPV6,
     IPV4,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Apiv2Schema, Eq, PartialEq)]
 pub enum AclDirection {
     FromDevice,
     ToDevice,
