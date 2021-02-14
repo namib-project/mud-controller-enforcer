@@ -15,6 +15,7 @@ use crate::{
     },
     services::{user_config_service, user_service},
 };
+use actix_web::HttpResponse;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/signup", web::post().to(signup));
@@ -195,7 +196,18 @@ pub fn get_users_config(
         .fail()
     })?;
 
-    let user_config_db = user_config_service::get_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
+    let user_config_db = user_config_service::get_config_for_user(auth.sub, &config.key, pool.get_ref()).await;
+
+    let user_config_db = match user_config_db {
+        Ok(user_config) => user_config,
+        Err(_) => {
+            return ResponseError {
+                status: StatusCode::NOT_FOUND,
+                message: "Key not found".to_string(),
+            }
+            .fail()
+        },
+    };
 
     Ok(Json(UserConfigDto {
         key: user_config_db.key,
@@ -208,7 +220,7 @@ pub fn set_users_config(
     pool: web::Data<DbConnection>,
     auth: Auth,
     user_config_dto: Json<UserConfigDto>,
-) -> Result<Json<SuccessDto>> {
+) -> Result<HttpResponse> {
     user_config_dto.validate().or_else(|_| {
         ResponseError {
             status: StatusCode::BAD_REQUEST,
@@ -217,12 +229,26 @@ pub fn set_users_config(
         .fail()
     })?;
 
-    user_config_service::upsert_config_for_user(auth.sub, &user_config_dto.key, &user_config_dto.value, pool.get_ref())
-        .await?;
+    let _insert_result = user_config_service::upsert_config_for_user(
+        auth.sub,
+        &user_config_dto.key,
+        &user_config_dto.value,
+        pool.get_ref(),
+    )
+    .await;
 
-    Ok(Json(SuccessDto {
-        status: String::from("ok"),
-    }))
+    let _insert_result = match _insert_result {
+        Ok(_) => (),
+        Err(_) => {
+            return ResponseError {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                message: None,
+            }
+            .fail()
+        },
+    };
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 #[api_v2_operation(summary = "Deletes a config variables of the user")]
@@ -230,7 +256,7 @@ pub fn delete_users_config(
     pool: web::Data<DbConnection>,
     auth: Auth,
     config: Json<UserConfigRequestDto>,
-) -> Result<Json<SuccessDto>> {
+) -> Result<HttpResponse> {
     config.validate().or_else(|_| {
         ResponseError {
             status: StatusCode::BAD_REQUEST,
@@ -241,7 +267,5 @@ pub fn delete_users_config(
 
     user_config_service::delete_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
 
-    Ok(Json(SuccessDto {
-        status: String::from("ok"),
-    }))
+    Ok(HttpResponse::NoContent().finish())
 }
