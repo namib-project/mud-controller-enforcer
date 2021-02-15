@@ -1,7 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use crate::{
-    auth::Auth,
+    auth::AuthToken,
     db::DbConnection,
     error,
     error::Result,
@@ -25,7 +25,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 }
 
 #[api_v2_operation]
-pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: Auth) -> Result<Json<Vec<MudData>>> {
+pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<MudData>>> {
     auth.require_permission("mud/list")?;
     auth.require_permission("mud/read")?;
 
@@ -46,7 +46,7 @@ pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: Auth) -> Result<J
 }
 
 #[api_v2_operation]
-pub async fn get_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<String>) -> Result<Json<MudData>> {
+pub async fn get_mud(pool: web::Data<DbConnection>, auth: AuthToken, url: web::Path<String>) -> Result<Json<MudData>> {
     auth.require_permission("mud/read")?;
 
     let mud_dbo = mud_service::get_mud(&url, &pool).await.ok_or_else(|| {
@@ -62,7 +62,7 @@ pub async fn get_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<S
 #[api_v2_operation]
 pub async fn update_mud(
     pool: web::Data<DbConnection>,
-    auth: Auth,
+    auth: AuthToken,
     url: web::Path<String>,
     mud_update_dto: Json<MudUpdateDto>,
 ) -> Result<Json<MudData>> {
@@ -88,7 +88,11 @@ pub async fn update_mud(
 }
 
 #[api_v2_operation]
-pub async fn delete_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Path<String>) -> Result<HttpResponse> {
+pub async fn delete_mud(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    url: web::Path<String>,
+) -> Result<HttpResponse> {
     auth.require_permission("mud/delete")?;
 
     let url = url.into_inner();
@@ -116,7 +120,7 @@ pub async fn delete_mud(pool: web::Data<DbConnection>, auth: Auth, url: web::Pat
 #[api_v2_operation]
 pub async fn create_mud(
     pool: web::Data<DbConnection>,
-    auth: Auth,
+    auth: AuthToken,
     mud_creation_dto: Json<MudCreationDto>,
 ) -> Result<Json<MudData>> {
     auth.require_permission("mud/create")?;
