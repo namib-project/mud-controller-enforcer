@@ -11,16 +11,14 @@
     clippy::must_use_candidate
 )]
 
-use std::{thread, time::Duration};
+use std::time::Duration;
 
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
 use clokwerk::{Scheduler, TimeUnits};
 use dotenv::dotenv;
 //use namib_mud_controller::services::config_firewall_service::update_config_version;
-use futures::executor::block_on;
 use paperclip::actix::{web, OpenApiExt};
-use tokio::{macros::support::Future, task};
 
 use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
 
@@ -35,6 +33,7 @@ async fn main() -> Result<()> {
     let conn = db::connect().await?;
     let conn2 = conn.clone();
     let conn3 = conn.clone();
+    let mut scheduler = Scheduler::new();
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -43,7 +42,6 @@ async fn main() -> Result<()> {
             .block_on(rpc::rpc_server::listen(conn2))
             .expect("failed running rpc server");
 
-        let mut scheduler = Scheduler::new();
         log::info!("Start scheduler");
         scheduler.every(1.hours()).run(move || {
             log::info!("Start scheduler every {:?}", 1.hours());

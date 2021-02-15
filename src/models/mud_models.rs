@@ -8,7 +8,6 @@ use paperclip::{
         schema::Apiv2Schema,
     },
 };
-use std::iter::FromIterator;
 
 #[derive(Debug, Clone)]
 pub struct MudDboRefresh {
@@ -35,6 +34,54 @@ pub struct MudData {
     pub documentation: Option<String>,
     pub expiration: DateTime<Utc>,
     pub acllist: Vec<Acl>,
+}
+
+impl Default for MudData {
+    fn default() -> Self {
+        let matches = AceMatches {
+            protocol: None,
+            direction_initiated: None,
+            address_mask: None,
+            dnsname: None,
+            source_port: None,
+            destination_port: None,
+        };
+
+        let mut ace_list_f: Vec<Ace> = Vec::new();
+        let mut ace = Ace {
+            name: "default-frdev".to_string(),
+            action: AceAction::Deny,
+            matches: matches.clone(),
+        };
+        ace_list_f.push(ace.clone());
+        let mut ace_list_t: Vec<Ace> = Vec::new();
+        ace.name = "default-todev".to_string();
+        ace_list_t.push(ace);
+        let mut acl_list = Vec::new();
+        let mut acl = Acl {
+            name: "default_acl_fr".to_string(),
+            packet_direction: AclDirection::FromDevice,
+            acl_type: AclType::IPV6,
+            ace: ace_list_f,
+        };
+        acl_list.push(acl.clone());
+        acl.name = "default_acl_to".to_string();
+        acl.packet_direction = AclDirection::ToDevice;
+        acl.ace = ace_list_t;
+        acl_list.push(acl);
+
+        MudData {
+            url: format!("https://default/{}", Utc::now().to_string()),
+            masa_url: None,
+            last_update: "2019-07-23T19:54:24".to_string(),
+            systeminfo: Some("Default_profile".to_string()),
+            mfg_name: None,
+            model_name: None,
+            documentation: Some("https://default/documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: acl_list,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
