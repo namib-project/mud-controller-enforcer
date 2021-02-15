@@ -18,7 +18,9 @@ use actix_web::{middleware, App, HttpServer};
 use clokwerk::{Scheduler, TimeUnits};
 use dotenv::dotenv;
 //use namib_mud_controller::services::config_firewall_service::update_config_version;
+use futures::executor::block_on;
 use paperclip::actix::{web, OpenApiExt};
+use tokio::{macros::support::Future, task};
 
 use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
 
@@ -40,17 +42,24 @@ async fn main() -> Result<()> {
             .expect("could not construct tokio runtime")
             .block_on(rpc::rpc_server::listen(conn2))
             .expect("failed running rpc server");
-    });
-    let computation = thread::spawn(move || {
+
         let mut scheduler = Scheduler::new();
         log::info!("Start scheduler");
         scheduler.every(1.hours()).run(move || {
             log::info!("Start scheduler every {:?}", 1.hours());
-            namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles(conn3.clone());
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("could not construct tokio runtime")
+                .block_on(
+                    namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles(
+                        conn3.clone(),
+                    ),
+                )
+                .expect("failed running scheduler for namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles");
         });
-        scheduler.watch_thread(Duration::from_millis(1000))
+        scheduler.watch_thread(Duration::from_millis(10));
     });
-    let _result = computation.join().unwrap();
 
     HttpServer::new(move || {
         let cors = Cors::default()

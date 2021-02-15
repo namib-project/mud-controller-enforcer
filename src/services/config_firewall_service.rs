@@ -138,7 +138,7 @@ pub async fn update_config_version(pool: &DbConnection) {
 mod tests {
     use super::*;
     use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
-    use chrono::Local;
+    use chrono::{Local, Utc};
     use namib_shared::mac;
 
     #[test]
@@ -151,7 +151,7 @@ mod tests {
             mfg_name: Some("some_mfg_name".to_string()),
             model_name: Some("some_model_name".to_string()),
             documentation: Some("some_documentation".to_string()),
-            expiration: Local::now(),
+            expiration: Utc::now(),
             acllist: vec![Acl {
                 name: "some_acl_name".to_string(),
                 packet_direction: AclDirection::ToDevice,

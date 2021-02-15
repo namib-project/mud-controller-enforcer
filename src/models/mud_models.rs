@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use chrono::{DateTime, Local, NaiveDateTime};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use paperclip::{
     actix::Apiv2Schema,
     v2::{
@@ -8,6 +8,13 @@ use paperclip::{
         schema::Apiv2Schema,
     },
 };
+use std::iter::FromIterator;
+
+#[derive(Debug, Clone)]
+pub struct MudDboRefresh {
+    pub url: String,
+    pub expiration: NaiveDateTime,
+}
 
 #[derive(Debug, Clone)]
 pub struct MudDbo {
@@ -26,7 +33,7 @@ pub struct MudData {
     pub mfg_name: Option<String>,
     pub model_name: Option<String>,
     pub documentation: Option<String>,
-    pub expiration: DateTime<Local>,
+    pub expiration: DateTime<Utc>,
     pub acllist: Vec<Acl>,
 }
 

@@ -1,6 +1,6 @@
 use std::{clone::Clone, net::IpAddr, str::FromStr};
 
-use chrono::{Duration, Local};
+use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use crate::{
@@ -28,7 +28,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
             message: String::from("MUD-File has invalid 'cache-validity'")
         }
     );
-    let exptime = Local::now() + Duration::hours(cachevalidity);
+    let exptime = Utc::now() + Duration::hours(cachevalidity);
 
     // parse masa
     let mut masa_uri = None;
