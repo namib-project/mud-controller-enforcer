@@ -11,7 +11,7 @@ use crate::{
     models::User,
     routes::dtos::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
-        UserConfigRequestDto,
+        UserConfigValueDto,
     },
     services::{user_config_service, user_service},
 };
@@ -25,9 +25,9 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/password", web::post().to(update_password));
     cfg.route("/roles", web::get().to(get_roles));
     cfg.route("/configs", web::get().to(get_users_configs));
-    cfg.route("/config", web::get().to(get_users_config));
-    cfg.route("/config", web::post().to(set_users_config));
-    cfg.route("/config", web::delete().to(delete_users_config));
+    cfg.route("/configs/{key}", web::get().to(get_users_config));
+    cfg.route("/configs/{key}", web::post().to(set_users_config));
+    cfg.route("/configs/{key}", web::delete().to(delete_users_config));
 }
 
 #[api_v2_operation(summary = "Register a new user")]
@@ -185,18 +185,10 @@ pub fn get_users_configs(pool: web::Data<DbConnection>, auth: Auth) -> Result<Js
 #[api_v2_operation(summary = "Gets a config variable of the user")]
 pub fn get_users_config(
     pool: web::Data<DbConnection>,
-    config: Json<UserConfigRequestDto>,
+    key: web::Path<String>,
     auth: Auth,
 ) -> Result<Json<UserConfigDto>> {
-    config.validate().or_else(|_| {
-        ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
-
-    let user_config_db = user_config_service::get_config_for_user(auth.sub, &config.key, pool.get_ref()).await;
+    let user_config_db = user_config_service::get_config_for_user(auth.sub, &key, pool.get_ref()).await;
 
     let user_config_db = match user_config_db {
         Ok(user_config) => user_config,
@@ -215,13 +207,14 @@ pub fn get_users_config(
     }))
 }
 
-#[api_v2_operation(summary = "Sets a config variables of the user")]
+#[api_v2_operation(summary = "Sets a config variables of the user. Returns status code 402 on success.")]
 pub fn set_users_config(
     pool: web::Data<DbConnection>,
     auth: Auth,
-    user_config_dto: Json<UserConfigDto>,
+    key: web::Path<String>,
+    user_config_value_dto: Json<UserConfigValueDto>,
 ) -> Result<HttpResponse> {
-    user_config_dto.validate().or_else(|_| {
+    user_config_value_dto.validate().or_else(|_| {
         ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: None,
@@ -229,13 +222,8 @@ pub fn set_users_config(
         .fail()
     })?;
 
-    let _insert_result = user_config_service::upsert_config_for_user(
-        auth.sub,
-        &user_config_dto.key,
-        &user_config_dto.value,
-        pool.get_ref(),
-    )
-    .await;
+    let _insert_result =
+        user_config_service::upsert_config_for_user(auth.sub, &key, &user_config_value_dto.value, pool.get_ref()).await;
 
     let _insert_result = match _insert_result {
         Ok(_) => (),
@@ -251,21 +239,9 @@ pub fn set_users_config(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Deletes a config variables of the user")]
-pub fn delete_users_config(
-    pool: web::Data<DbConnection>,
-    auth: Auth,
-    config: Json<UserConfigRequestDto>,
-) -> Result<HttpResponse> {
-    config.validate().or_else(|_| {
-        ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
-
-    user_config_service::delete_config_for_user(auth.sub, &config.key, pool.get_ref()).await?;
+#[api_v2_operation(summary = "Deletes a config variables of the user. Returns status code 402 on success.")]
+pub fn delete_users_config(pool: web::Data<DbConnection>, auth: Auth, key: web::Path<String>) -> Result<HttpResponse> {
+    user_config_service::delete_config_for_user(auth.sub, &key, pool.get_ref()).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
