@@ -19,7 +19,7 @@ static HEADER_PREFIX: &str = "Bearer ";
     name = "Authorization",
     description = "Use format 'Bearer TOKEN'"
 )]
-pub struct Auth {
+pub struct AuthToken {
     // Not before
     pub nbf: i64,
     // Expiration time
@@ -32,12 +32,12 @@ pub struct Auth {
     pub permissions: Vec<String>,
 }
 
-impl Auth {
-    pub fn generate_auth(id: i64, username: String, permissions: Vec<String>) -> Auth {
+impl AuthToken {
+    pub fn generate_access_token(id: i64, username: String, permissions: Vec<String>) -> AuthToken {
         let time_now = Utc::now().naive_utc();
-        Auth {
+        AuthToken {
             nbf: time_now.timestamp(),
-            exp: (time_now + Duration::days(7)).timestamp(),
+            exp: (time_now + Duration::minutes(15)).timestamp(),
             sub: id,
             username,
             permissions,
@@ -68,7 +68,7 @@ impl Auth {
     }
 
     /// Decode token into "Auth" struct.
-    pub fn decode_token(token: &str) -> Option<Auth> {
+    pub fn decode_token(token: &str) -> Option<AuthToken> {
         use jwt::{Algorithm, Validation};
 
         jwt::decode(
@@ -84,20 +84,20 @@ impl Auth {
     }
 }
 
-fn extract_auth_from_request(request: &HttpRequest) -> Option<Auth> {
+fn extract_token_from_header(header: &str) -> Option<&str> {
+    header.strip_prefix(HEADER_PREFIX)
+}
+
+fn extract_auth_from_request(request: &HttpRequest) -> Option<AuthToken> {
     request
         .headers()
         .get("authorization")
         .and_then(|header| header.to_str().ok())
         .and_then(extract_token_from_header)
-        .and_then(|token| Auth::decode_token(token))
+        .and_then(|token| AuthToken::decode_token(token))
 }
 
-fn extract_token_from_header(header: &str) -> Option<&str> {
-    header.strip_prefix(HEADER_PREFIX)
-}
-
-impl FromRequest for Auth {
+impl FromRequest for AuthToken {
     type Config = ();
     type Error = actix_web::Error;
     type Future = Ready<std::result::Result<Self, Self::Error>>;
