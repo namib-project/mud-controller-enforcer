@@ -1,3 +1,4 @@
+pub mod config_controller;
 pub mod device_controller;
 mod dtos;
 pub mod mud_controller;

@@ -113,15 +113,15 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
-    get_config_value("version".to_string(), pool)
+    get_config_value("version", pool)
         .await
         .unwrap_or_else(|_| "0".to_string())
 }
 
 pub async fn update_config_version(pool: &DbConnection) {
     set_config_value(
-        "version".to_string(),
-        (get_config_value("version".to_string(), pool)
+        "version",
+        &(get_config_value("version", pool)
             .await
             .unwrap_or_else(|_| "0".to_string())
             .parse::<u32>()
@@ -136,10 +136,13 @@ pub async fn update_config_version(pool: &DbConnection) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
-    use chrono::{Local, Utc};
+    use chrono::Utc;
+
     use namib_shared::mac;
+
+    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
+
+    use super::*;
 
     #[test]
     fn test_converting() -> Result<()> {
@@ -179,7 +182,7 @@ mod tests {
             vendor_class: "".to_string(),
             mud_url: Some("http://example.com/mud_url.json".to_string()),
             mud_data: Some(mud_data),
-            last_interaction: Local::now().naive_local(),
+            last_interaction: Utc::now().naive_local(),
         };
 
         let x = convert_device_to_fw_rules(&device)?;
