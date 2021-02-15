@@ -207,7 +207,7 @@ pub fn get_users_config(
     }))
 }
 
-#[api_v2_operation(summary = "Sets a config variables of the user. Returns status code 402 on success.")]
+#[api_v2_operation(summary = "Sets a config variables of the user. Returns status code 204 on success.")]
 pub fn set_users_config(
     pool: web::Data<DbConnection>,
     auth: Auth,
@@ -239,7 +239,7 @@ pub fn set_users_config(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Deletes a config variables of the user. Returns status code 402 on success.")]
+#[api_v2_operation(summary = "Deletes a config variables of the user. Returns status code 204 on success.")]
 pub fn delete_users_config(pool: web::Data<DbConnection>, auth: Auth, key: web::Path<String>) -> Result<HttpResponse> {
     user_config_service::delete_config_for_user(auth.sub, &key, pool.get_ref()).await?;
 
