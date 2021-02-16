@@ -10,11 +10,10 @@ use std::{
 };
 
 use notify::{DebouncedEvent, RecursiveMode, Watcher};
-use tokio::runtime::Runtime;
 
 use crate::{error::Result, rpc::rpc_client, services, Enforcer};
 
-use tokio::sync::RwLock;
+use tokio::{runtime::Builder, sync::RwLock};
 
 pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
     debug!("Starting dnsmasq.log watcher");
@@ -64,7 +63,7 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
     fs::rename(path, tmp_path)?;
     let lines = io::BufReader::new(File::open(tmp_path)?).lines();
     // create async runtime to run rpc client
-    Runtime::new()?.block_on(async {
+    Builder::new_current_thread().build()?.block_on(async {
         let mut enforcer = enforcer.write().await;
         debug!("acquired known devices");
         let lines = lines

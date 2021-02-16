@@ -7,7 +7,7 @@ pub use unix::*;
 mod unix {
     use std::sync::Arc;
 
-    use crate::rpc::rpc_client::current_rpc_context;
+    use crate::{rpc::rpc_client::current_rpc_context, Enforcer};
     use futures::future::join_all;
     use log::debug;
     use tokio::{
@@ -16,7 +16,7 @@ mod unix {
         sync::RwLock,
     };
 
-    use namib_shared::{models::DhcpEvent, Enforcer};
+    use namib_shared::models::DhcpEvent;
 
     /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
     pub async fn listen_for_dhcp_events(enforcer: Arc<RwLock<Enforcer>>) {
@@ -46,7 +46,7 @@ mod unix {
         match serde_json::from_slice::<DhcpEvent>(inc_data.as_slice()) {
             Ok(dhcp_event) => {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
-                let mut enforcer = enforcer.lock().await;
+                let mut enforcer = enforcer.write().await;
                 enforcer
                     .client
                     .dhcp_request(current_rpc_context(), dhcp_event)
