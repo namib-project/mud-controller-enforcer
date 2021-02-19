@@ -1,4 +1,5 @@
 #![feature(async_closure)]
+use core::pin::Pin;
 use futures::{future::err, TryFutureExt};
 use std::{
     cmp::{max, Ordering},
@@ -12,10 +13,13 @@ use std::{
 use tokio::sync::{Mutex, Notify, RwLock};
 use trust_dns_resolver::{error::ResolveError, lookup_ip::LookupIp, AsyncResolver, TokioAsyncResolver};
 
-const MIN_TIME_BEFORE_REFRESH: std::time::Duration = std::time::Duration::from_secs(10);
+/// The minimum time that is waited before refreshing the dns cache even though there are entries with a TTL of 0.
+const MIN_TIME_BEFORE_REFRESH: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// Represents an entry in the DNS refresh queue. Entries define a custom ordering based on the TTLs of their corresponding DNS cache entries.
 #[derive(Debug, Clone)]
 struct DnsRefreshQueueEntry {
+    /// A copy of the DNS cache entry that should be refreshed (with shared references to the lookup result and watchers).
     cache_entry: DnsCacheEntry,
 }
 
@@ -46,17 +50,25 @@ impl PartialOrd for DnsRefreshQueueEntry {
     }
 }
 
+/// Represents an entry in the DNS cache.
 #[derive(Debug, Clone)]
 struct DnsCacheEntry {
+    /// The (host-)name for which this entry is a cached result.
     name: String,
+    /// A reference to the cached lookup result.
     lookup_result: Arc<LookupIp>,
-    watchers: Arc<RwLock<HashSet<Arc<DnsWatcherSender>>>>,
+    /// A shared mutable reference to a set of watcher senders for the watchers that want to be notified of changes to this entry.
+    watchers: Arc<RwLock<HashSet<Arc<Pin<Box<DnsWatcherSender>>>>>>,
 }
 
+/// DNS resolution cache for the DNS service.
 #[derive(Debug, Clone)]
 struct DnsServiceCache {
+    /// Resolver instance used to resolve DNS entries.
     resolver: TokioAsyncResolver,
+    /// Refresh queue to refresh expiring DNS entries (using the DnsServices auto_refresher_task()).
     refresh_queue: BinaryHeap<DnsRefreshQueueEntry>,
+    /// Cache entries for the DNS cache.
     cache_data: HashMap<String, DnsCacheEntry>,
 }
 
@@ -69,10 +81,12 @@ impl DnsServiceCache {
         })
     }
 
+    /// Returns a DNS resolution result if it is cached, None otherwise.
     fn resolve_if_cached(&self, name: &str) -> Option<DnsCacheEntry> {
         self.cache_data.get(name).map(|v| v.deref().clone())
     }
 
+    /// Resolves a supplied name and adds it to the DNS cache.
     async fn lookup_and_cache(&mut self, name: &str) -> Result<DnsCacheEntry, ResolveError> {
         let mut lookup_result = DnsCacheEntry {
             name: String::from(name),
@@ -86,6 +100,7 @@ impl DnsServiceCache {
         Ok(self.cache_data.get(name.into()).unwrap().clone())
     }
 
+    /// Resolves the supplied DNS name. If the name is already in the DNS cache, returns the cached result instead.
     async fn resolve(&mut self, name: &str) -> Result<DnsCacheEntry, ResolveError> {
         match self.cache_data.get(name) {
             Some(v) => Ok(v.clone()),
@@ -94,7 +109,8 @@ impl DnsServiceCache {
     }
 }
 
-#[derive(Clone, Debug)]
+/// Helper struct used to notify DNS watchers of changes to watched cache entries.
+#[derive(Debug)]
 struct DnsWatcherSender {
     updated_names: Arc<Mutex<HashSet<String>>>,
     notify: Arc<Notify>,
@@ -119,6 +135,7 @@ impl Hash for DnsWatcherSender {
     }
 }
 
+/// DNS Service which provides methods to query a DNS cache for entries and
 pub(crate) struct DnsService {
     cache: Arc<RwLock<DnsServiceCache>>,
 }
@@ -130,6 +147,7 @@ impl DnsService {
         })
     }
 
+    /// Asynchronous task to automatically refresh dns cache entries as they expire.
     pub async fn auto_refresher_task(&mut self) {
         let mut next_expiry_time = None;
         loop {
@@ -196,25 +214,31 @@ impl DnsService {
         }
     }
 
+    /// Create a DnsWatcher instance which can be used to keep track of dns entry changes.
     pub fn create_watcher(&self) -> DnsWatcher {
         DnsWatcher {
             cache: self.cache.clone(),
-            sender: Arc::new(DnsWatcherSender {
+            sender: Arc::new(Pin::new(Box::new(DnsWatcherSender {
                 updated_names: Default::default(),
                 notify: Default::default(),
-            }),
+            }))),
             current_watched_entries: Default::default(),
         }
     }
 }
 
+/// Struct which can be used to keep track of dns entry changes.
 pub(crate) struct DnsWatcher {
+    /// Reference to the DNS cache of the DnsService.
     cache: Arc<RwLock<DnsServiceCache>>,
-    sender: Arc<DnsWatcherSender>,
+    /// Reference to a sender instance which is added to cache entries if the watches wishes to be notified of changes.
+    sender: Arc<Pin<Box<DnsWatcherSender>>>,
+    /// Set of currently watched DNS entries.
     current_watched_entries: Mutex<HashSet<String>>,
 }
 
 impl DnsWatcher {
+    /// Resolves the given DNS name and adds the name to the list of watched DNS entries.
     pub async fn resolve_and_watch(&self, name: &str) -> Result<LookupIp, ResolveError> {
         let mut cache = self.cache.write().await;
         let resolved_value = cache.resolve(name).await?;
@@ -223,6 +247,7 @@ impl DnsWatcher {
         Ok(resolved_value.lookup_result.deref().clone())
     }
 
+    /// Removes a name from the list of watched DNS entries.
     pub async fn remove_watched_name(&self, name: &str) {
         let mut cache = self.cache.read().await;
         let cache_entry = cache.resolve_if_cached(name).unwrap();
@@ -230,12 +255,15 @@ impl DnsWatcher {
         self.current_watched_entries.lock().await.remove(name.into());
     }
 
+    /// Clears the list of watched DNS entries.
     pub async fn clear_watched_names(&self) {
         for name in self.current_watched_entries.lock().await.clone() {
             self.remove_watched_name(name.as_str()).await;
         }
     }
 
+    /// Yield until a change to any of the watched DNS entries of this watcher occurs.
+    /// Returns immediately in case a change has already happened but was not waited for.
     pub async fn address_changed(&self) -> () {
         self.sender.notify.notified().await
     }
