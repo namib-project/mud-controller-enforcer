@@ -2,25 +2,26 @@ use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
 use snafu::{Backtrace, GenerateBacktrace};
-use tarpc::{client, context, serde_transport};
+use tarpc::{client, context, rpc, serde_transport};
 use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
 };
 
-use namib_shared::{codec, config_firewall::FirewallConfig, rpc::RPCClient};
+use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
 use crate::{
     error::{Error, Result},
-    services::firewall_service,
+    services::{firewall_service::FirewallService, state::EnforcerState},
 };
 
 use super::controller_discovery::discover_controllers;
-use crate::{
-    models::model_firewall::FirewallConfigState,
-    services::{firewall_service::FirewallService, state::EnforcerState},
+use std::time::SystemTime;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, ErrorKind},
+    net::TcpStream,
 };
-use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
 use tokio_native_tls::{
     native_tls,
     native_tls::{Certificate, Identity},
@@ -44,19 +45,22 @@ pub async fn run() -> Result<RPCClient> {
         Certificate::from_pem(&vec)?
     };
 
-    let addr_stream = discover_controllers("_namib_controller._tcp")?
-        .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
-        .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
-        .filter_map(|r| future::ready(r.ok()));
-    pin_mut!(addr_stream);
+    let client = loop {
+        let addr_stream = discover_controllers("_namib_controller._tcp")?
+            .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
+            .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
+            .filter_map(|r| future::ready(r.ok()));
+        pin_mut!(addr_stream);
 
-    match addr_stream.next().await {
-        Some(client) => Ok(client),
-        None => Err(Error::ConnectionError {
-            message: "No Client",
-            backtrace: Backtrace::generate(),
-        }),
-    }
+        if let Some(client) = addr_stream.next().await {
+            break client;
+        }
+
+        warn!("No controller found, retrying in 5 secs");
+        sleep(Duration::from_secs(5)).await;
+    };
+
+    Ok(client)
 }
 
 pub(crate) async fn heartbeat(
@@ -67,7 +71,7 @@ pub(crate) async fn heartbeat(
     loop {
         {
             let mut instance = client.lock().await;
-            let heartbeat: io::Result<Option<FirewallConfig>> = instance
+            let heartbeat: io::Result<Option<EnforcerConfig>> = instance
                 .heartbeat(
                     context::current(),
                     enforcer_state
@@ -79,7 +83,17 @@ pub(crate) async fn heartbeat(
                 )
                 .await;
             match heartbeat {
-                Err(error) => error!("Error during heartbeat: {:?}", error),
+                Err(error) => match error.kind() {
+                    ErrorKind::ConnectionReset => {
+                        error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
+                        if let Ok(new_client) = run().await {
+                            *instance = new_client;
+                        }
+                    },
+                    _ => {
+                        error!("Error during heartbeat: {:?}", error);
+                    },
+                },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     fw_service.apply_new_config(config).await;
@@ -121,4 +135,12 @@ async fn try_connect(
     let transport = serde_transport::new(framed_io, codec()());
 
     Ok(Some(RPCClient::new(client::Config::default(), transport).spawn()?))
+}
+
+/// Returns the context for the current request, or a default Context if no request is active.
+/// Copied and adapted based on tarpc/rpc/context.rs
+pub fn current_rpc_context() -> rpc::context::Context {
+    let mut rpc_context = rpc::context::current();
+    rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
+    rpc_context
 }

@@ -1,8 +1,8 @@
-use namib_shared::config_firewall::FirewallConfig;
+use namib_shared::firewall_config::EnforcerConfig;
 use tokio::sync::RwLock;
 
 pub(crate) struct EnforcerState {
-    pub firewall_cfg: RwLock<Option<FirewallConfig>>,
+    pub firewall_cfg: RwLock<Option<EnforcerConfig>>,
 }
 
 impl EnforcerState {

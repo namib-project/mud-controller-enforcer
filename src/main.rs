@@ -15,7 +15,6 @@ use namib_shared::rpc::RPCClient;
 
 mod dhcp;
 mod error;
-mod models;
 mod rpc;
 mod services;
 mod uci;
@@ -39,9 +38,10 @@ async fn main() -> Result<()> {
     }
 
     let enforcer_state = Arc::new(services::state::EnforcerState::new());
+    info!("Trying to find & connect to NAMIB Controller");
 
     let client: Arc<Mutex<RPCClient>> = Arc::new(Mutex::new(rpc::rpc_client::run().await?));
-    info!("Connected to RPC server");
+    info!("Connected to NAMIB Controller RPC server");
 
     let mut dns_service = services::dns::DnsService::new().unwrap();
 

@@ -1,8 +1,7 @@
-use namib_shared::config_firewall::{EnTarget, FirewallConfig, FirewallRule, NetworkHost, Protocol};
+use namib_shared::firewall_config::{EnforcerConfig, FirewallRule, NetworkHost, Protocol, Target};
 
 use crate::{
     error::Result,
-    models::model_firewall::FirewallConfigState,
     services::{dns::DnsWatcher, is_system_mode, state::EnforcerState},
     uci::UCI,
 };
@@ -60,7 +59,7 @@ impl FirewallService {
     }
 
     /// Updates the current firewall config with a new value and notifies the firewall change watcher to update the firewall config.
-    pub async fn apply_new_config(&self, mut config: FirewallConfig) {
+    pub async fn apply_new_config(&self, mut config: EnforcerConfig) {
         *self.enforcer_state.firewall_cfg.write().await = Some(config);
         self.change_notify.notify_one();
     }
@@ -106,7 +105,7 @@ impl FirewallService {
     }
 
     /// Converts the given firewall config into nftnl expressions and applies them to the supplied batch.
-    async fn convert_config_to_nftnl_commands(&self, batch: &mut Batch, config: &FirewallConfig) -> Result<()> {
+    async fn convert_config_to_nftnl_commands(&self, batch: &mut Batch, config: &EnforcerConfig) -> Result<()> {
         // Create new firewall table.
         let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
         batch.add(&table, nftnl::MsgType::Add);
@@ -308,11 +307,11 @@ impl FirewallService {
 
                         // Set verdict if current rule matches.
                         match rule_spec.target {
-                            EnTarget::ACCEPT => current_rule.add_expr(&nft_expr!(verdict accept)),
-                            EnTarget::REJECT => {
+                            Target::ACCEPT => current_rule.add_expr(&nft_expr!(verdict accept)),
+                            Target::REJECT => {
                                 current_rule.add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
                             },
-                            EnTarget::DROP => current_rule.add_expr(&nft_expr!(verdict drop)),
+                            Target::DROP => current_rule.add_expr(&nft_expr!(verdict drop)),
                         }
                         batch.add(&current_rule, nftnl::MsgType::Add);
                     }
