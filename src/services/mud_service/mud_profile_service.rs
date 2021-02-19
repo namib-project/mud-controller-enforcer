@@ -1,11 +1,17 @@
-use crate::{db::DbConnection, error::Result, models::MudDboRefresh, services::mud_service::*};
+use crate::{
+    db::DbConnection,
+    error::Result,
+    models::MudDboRefresh,
+    services::{config_firewall_service::update_config_version, mud_service::*},
+};
 use chrono::Utc;
 
 pub async fn update_outdated_profiles(db_pool: DbConnection) -> Result<()> {
     log::debug!("Update outdated profiles");
     let mud_data = get_all_mud_expiration(&db_pool).await?;
     let mud_vec: Vec<String> = get_filtered_mud_urls(mud_data);
-    update_mud_urls(mud_vec, db_pool).await?;
+    update_mud_urls(mud_vec, &db_pool).await?;
+    update_config_version(&db_pool).await;
     Ok(())
 
     // config firewall service update_config_version aufrufen.
@@ -27,10 +33,10 @@ fn get_filtered_mud_urls(mut mud_vec: Vec<MudDboRefresh>) -> Vec<String> {
     result
 }
 
-async fn update_mud_urls(vec_url: Vec<String>, db_pool: DbConnection) -> Result<()> {
+async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
     for mud in vec_url.iter() {
         log::debug!("Try to update url: {}", mud);
-        let updated_mud = get_mud_from_url(mud.to_owned(), &db_pool).await?;
+        let updated_mud = get_mud_from_url(mud.to_owned(), db_pool).await?;
         log::debug!("Updated mud profile: {:#?}", updated_mud);
     }
     Ok(())
@@ -62,8 +68,13 @@ mod tests {
 
         let mud_data = get_all_mud_expiration(&db_conn).await?;
         let vec_mud: Vec<String> = get_filtered_mud_urls(mud_data);
-        let opt_mud = vec_mud.iter().find(|&url| url == "test_url");
-        assert_eq!(opt_mud, Some(&"test_url".to_string()));
+        let url = "test_url".to_string();
+        let opt_mud = vec_mud.iter().find(|&u| u == &url);
+        assert_eq!(opt_mud, Some(&url));
+        sqlx::query!("DELETE FROM mud_data WHERE url = ?", url)
+            .execute(&db_conn)
+            .await?;
+
         Ok(())
     }
 
