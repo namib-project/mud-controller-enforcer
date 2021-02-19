@@ -206,7 +206,7 @@ impl FirewallService {
                         // Do not create rules which mix IPv4 and IPV6 addresses. Also, save at least one specified IP to match for protocol later on.
                         if let &RuleAddrEntry::AddrEntry(saddr) = source_ip {
                             if let RuleAddrEntry::AddrEntry(daddr) = dest_ip {
-                                if (saddr.is_ipv4() && daddr.is_ipv4()) || (daddr.is_ipv6() && saddr.is_ipv6()) {
+                                if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
                                     continue;
                                 }
                             }
