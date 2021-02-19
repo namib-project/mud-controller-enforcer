@@ -8,7 +8,6 @@ edition = "2018"
 default = ["sqlite"]
 postgres = ["sqlx/postgres"]
 sqlite = ["sqlx/sqlite"]
-no_test = []
 
 [dependencies]
 funty = "=1.1.0" # Temporary fix for building bitvec (https://github.com/bitvecto-rs/bitvec/issues/105#issuecomment-778570981)
