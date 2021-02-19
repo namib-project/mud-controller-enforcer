@@ -1,8 +1,4 @@
-use crate::{
-    db::DbConnection,
-    error::{self, Result},
-    models::Config,
-};
+use crate::{db::DbConnection, error, error::Result, models::Config};
 use sqlx::Done;
 use std::str::FromStr;
 

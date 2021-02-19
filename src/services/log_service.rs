@@ -1,4 +1,4 @@
-use crate::error::{NoneError, Result};
+use crate::{error, error::Result};
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -12,15 +12,15 @@ fn parse_log_line(line: &str) -> Result<()> {
         static ref LOG_FORMAT: Regex =
             Regex::new(r#"(\w{3})  ?(\d{1,2}) (\d\d:\d\d:\d\d) .* query\[A] (\S+) from (\S+)"#).unwrap();
     }
-    let m = LOG_FORMAT.captures(line).context(NoneError {})?;
-    let month = MONTHS.find(&m[1]).context(NoneError {})? / 3 + 1;
+    let m = LOG_FORMAT.captures(line).context(error::NoneError {})?;
+    let month = MONTHS.find(&m[1]).context(error::NoneError {})? / 3 + 1;
     let day_of_month: u32 = m[2].parse()?;
     // dnsmasq logs don't contain the year, so assume the current year
     let today = Local::today().naive_local();
-    let mut date = NaiveDate::from_ymd_opt(today.year(), month as u32, day_of_month).context(NoneError {})?;
+    let mut date = NaiveDate::from_ymd_opt(today.year(), month as u32, day_of_month).context(error::NoneError {})?;
     // if the date is after today, it is likely to be from last year
     if date > today {
-        date = date.with_year(today.year() - 1).context(NoneError {})?;
+        date = date.with_year(today.year() - 1).context(error::NoneError {})?;
     }
     let time: NaiveTime = m[3].parse()?;
     let date_time = NaiveDateTime::new(date, time);
