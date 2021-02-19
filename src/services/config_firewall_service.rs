@@ -69,15 +69,15 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<FirewallDevice> {
                 );
                 result.push(config_firewall);
             } else {
-                let route_network_lan = NetworkConfig::new(None, None);
-                let route_network_wan = NetworkConfig::new(None, None);
-                let (route_network_src, route_network_dest) = match acl.packet_direction {
-                    AclDirection::FromDevice => (route_network_lan, route_network_wan),
-                    AclDirection::ToDevice => (route_network_wan, route_network_lan),
-                };
-                let config_firewall =
-                    FirewallRule::new(rule_name, route_network_src, route_network_dest, protocol, target);
-                result.push(config_firewall);
+                //let route_network_lan = NetworkConfig::new(None, None);
+                //let route_network_wan = NetworkConfig::new(None, None);
+                //let (route_network_src, route_network_dest) = match acl.packet_direction {
+                //    AclDirection::FromDevice => (route_network_lan, route_network_wan),
+                //    AclDirection::ToDevice => (route_network_wan, route_network_lan),
+                //};
+                //let config_firewall =
+                //    FirewallRule::new(rule_name, route_network_src, route_network_dest, protocol, target);
+                //result.push(config_firewall);
             }
             index += 1;
         }
