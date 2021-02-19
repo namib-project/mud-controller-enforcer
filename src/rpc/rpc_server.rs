@@ -24,6 +24,7 @@ use crate::{
 };
 
 use super::tls_serde_transport;
+use namib_shared::config_firewall::FirewallDevice;
 
 #[derive(Clone)]
 pub struct RPCServer(SocketAddr, DbConnection);
@@ -43,17 +44,17 @@ impl RPC for RPCServer {
             );
             let devices = device_service::get_all_devices(&self.1).await.unwrap_or_default();
             debug!("heartbeat all devices {:?}", devices);
-            let rules: Vec<FirewallRule> = devices
+            let device_configs: Vec<FirewallDevice> = devices
                 .iter()
                 .flat_map(move |d| {
                     config_firewall_service::convert_device_to_fw_rules(d)
                         .map_err(|err| error!("Flat Map Error {:#?}", err))
-                        .unwrap_or_default()
+                        .ok()
                 })
                 .collect();
 
-            debug!("Returning Heartbeat to client with config: {:?}", rules);
-            return Some(FirewallConfig::new(current_config_version, rules));
+            debug!("Returning Heartbeat to client with config: {:?}", device_configs);
+            return Some(FirewallConfig::new(current_config_version, device_configs));
         }
 
         None
@@ -76,18 +77,25 @@ impl RPC for RPCServer {
             },
             Err(_) => false,
         };
+
+        debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
+
+        match &dhcp_device_data.mud_url {
+            Some(url) => match mud_service::get_mud_from_url(url.clone(), &self.1).await {
+                Ok(mud_data) => Some(mud_data),
+                Err(err) => {
+                    info!("Error parsing mud file from URL {}: {:?}", url, err);
+                    None
+                },
+            },
+            None => None,
+        };
+
         if update {
             device_service::update_device(&dhcp_device_data, &self.1).await.unwrap();
         } else {
             device_service::insert_device(&dhcp_device_data, &self.1).await.unwrap();
         }
-
-        debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
-
-        match dhcp_device_data.mud_url {
-            Some(url) => mud_service::get_mud_from_url(url, &self.1).await.ok(),
-            None => None,
-        };
 
         config_firewall_service::update_config_version(&self.1).await;
     }
