@@ -5,20 +5,38 @@ use crate::{
     services::{config_firewall_service::update_config_version, mud_service::*},
 };
 use chrono::Utc;
+use clokwerk::Scheduler;
+use std::{thread, time::Duration};
 
-pub async fn update_outdated_profiles(db_pool: DbConnection) -> Result<()> {
+pub fn job_scheduler(conn: DbConnection, interval: clokwerk::Interval, sleep_duration: Duration) {
+    log::info!("Start scheduler");
+    let mut scheduler = Scheduler::new();
+    scheduler.every(interval).run(move || {
+        log::info!("Start scheduler every {:?}", interval);
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("could not construct tokio runtime")
+            .block_on(
+                update_outdated_profiles(
+                    conn.clone(),
+                ),
+            )
+            .expect("failed running scheduler for namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles");
+    });
+    loop {
+        scheduler.run_pending();
+        thread::sleep(sleep_duration);
+    }
+}
+
+async fn update_outdated_profiles(db_pool: DbConnection) -> Result<()> {
     log::debug!("Update outdated profiles");
     let mud_data = get_all_mud_expiration(&db_pool).await?;
     let mud_vec: Vec<String> = get_filtered_mud_urls(mud_data);
     update_mud_urls(mud_vec, &db_pool).await?;
     update_config_version(&db_pool).await;
     Ok(())
-
-    // config firewall service update_config_version aufrufen.
-    // fetchen exire updaten und dann get_mud_from_url
-    // config key in enum bei ben noch nciht in master.
-    // wenn ein neues Gerät hinzugefügt wird
-    // funktion, die ein default MUD-Profil erzeugt.
 }
 
 fn get_filtered_mud_urls(mut mud_vec: Vec<MudDboRefresh>) -> Vec<String> {

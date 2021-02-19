@@ -20,7 +20,9 @@ use dotenv::dotenv;
 //use namib_mud_controller::services::config_firewall_service::update_config_version;
 use paperclip::actix::{web, OpenApiExt};
 
-use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
+use namib_mud_controller::{
+    db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_scheduler, VERSION,
+};
 
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
 #[actix_web::main]
@@ -43,26 +45,7 @@ async fn main() -> Result<()> {
     });
 
     let _computation = thread::spawn(move || {
-        log::info!("Start scheduler");
-        let mut scheduler = Scheduler::new();
-        scheduler.every(1.seconds()).run(move || {
-            let conn4 = conn3.clone();
-            log::info!("Start scheduler every {:?}", 1.seconds());
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("could not construct tokio runtime")
-                .block_on(
-                    namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles(
-                        conn4.clone(),
-                    ),
-                )
-                .expect("failed running scheduler for namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles");
-        });
-        loop {
-            scheduler.run_pending();
-            thread::sleep(Duration::from_secs(10));
-        }
+        job_scheduler(conn3, 1.seconds(), Duration::from_secs(10));
     });
 
     HttpServer::new(move || {
