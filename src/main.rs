@@ -27,6 +27,7 @@ async fn main() -> Result<()> {
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
+
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -54,6 +55,7 @@ async fn main() -> Result<()> {
             .service(web::scope("/users").configure(routes::users_controller::init))
             .service(web::scope("/devices").configure(routes::device_controller::init))
             .service(web::scope("/mud").configure(routes::mud_controller::init))
+            .service(web::scope("/config").configure(routes::config_controller::init))
             .with_json_spec_at("/api/spec")
             .build()
             .service(

@@ -1,0 +1,137 @@
+{
+  "ietf-mud:mud": {
+    "mud-version": 1,
+    "mud-url": "https://lighting.example.com/lightbulb2000",
+    "last-update": "2019-07-23T19:54:24",
+    "cache-validity": 48,
+    "is-supported": true,
+    "systeminfo": "The BMS Example Light Bulb",
+    "documentation": "https://lighting.example.com/lightbulb2000/documentation",
+    "to-device-policy": {
+      "access-lists": {
+        "access-list": [
+          {
+            "name": "mud-52892-v4to"
+          }
+        ]
+      }
+    },
+    "from-device-policy": {
+      "access-lists": {
+        "access-list": [
+          {
+            "name": "mud-52892-v4fr"
+          }
+        ]
+      }
+    }
+  },
+  "ietf-access-control-list:acls": {
+    "acl": [
+      {
+        "name": "mud-52892-v4to",
+        "type": "ipv4",
+        "aces": {
+          "ace": [
+            {
+              "name": "myman0-todev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            },
+            {
+              "name": "myman1-todev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            },
+            {
+              "name": "myman1-todev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            },
+            {
+              "name": "myman2-todev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "mud-52892-v4fr",
+        "type": "ipv4",
+        "aces": {
+          "ace": [
+            {
+              "name": "myman0-frdev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            },
+            {
+              "name": "myman1-frdev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            },
+            {
+              "name": "myman1-frdev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            },
+            {
+              "name": "myman2-frdev",
+              "matches": {
+                "ietf-mud:mud": {
+                  "same-manufacturer": []
+                }
+              },
+              "actions": {
+                "forwarding": "accept"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

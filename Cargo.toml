@@ -10,12 +10,13 @@ postgres = ["sqlx/postgres"]
 sqlite = ["sqlx/sqlite"]
 
 [dependencies]
+funty = "=1.1.0" # Temporary fix for building bitvec (https://github.com/bitvecto-rs/bitvec/issues/105#issuecomment-778570981)
 actix-web = "3.3"
 actix-rt = "1.1"
 actix-files = "0.5"
 actix-cors = "0.5.4"
 sqlx = { version = "0.4", features = ["runtime-actix-rustls", "chrono"] }
-namib_shared = { branch = "feature/#42_Device_collect_info_speichern", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+namib_shared = { tag = "0.3.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "0.4"
 env_logger = "0.8"
 tokio = { version = "1", features = ["full"] }

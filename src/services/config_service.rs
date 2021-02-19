@@ -1,8 +1,9 @@
 use crate::{
     db::DbConnection,
-    error::{FromStrError, Result},
+    error::{self, Result},
     models::Config,
 };
+use sqlx::Done;
 use std::str::FromStr;
 
 #[derive(strum::AsRefStr)]
@@ -17,7 +18,14 @@ pub async fn get_config_value<T: FromStr>(key: &str, pool: &DbConnection) -> Res
         .fetch_one(pool)
         .await?;
 
-    Ok(T::from_str(&entry.value).map_err(|_| FromStrError {}.build())?)
+    Ok(T::from_str(&entry.value).map_err(|_| error::FromStrError {}.build())?)
+}
+
+/// Returns all config key-value pairs from database
+pub async fn get_all_config_data(pool: &DbConnection) -> Result<Vec<Config>> {
+    let data = sqlx::query_as!(Config, "SELECT * FROM config").fetch_all(pool).await?;
+
+    Ok(data)
 }
 
 /// Writes the config value by key to the database.
@@ -35,10 +43,10 @@ pub async fn set_config_value<T: ToString>(key: &str, value: T, pool: &DbConnect
     Ok(())
 }
 
-pub async fn delete_config_key(key: &str, pool: &DbConnection) -> Result<()> {
-    let _del_count = sqlx::query!("DELETE FROM config WHERE key = ?", key)
+pub async fn delete_config_key(key: &str, pool: &DbConnection) -> Result<u64> {
+    let del_count = sqlx::query!("DELETE FROM config WHERE key = ?", key)
         .execute(pool)
         .await?;
 
-    Ok(())
+    Ok(del_count.rows_affected())
 }
