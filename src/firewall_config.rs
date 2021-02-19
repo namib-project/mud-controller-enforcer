@@ -5,8 +5,8 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use serde::{export::Formatter, Deserialize, Serialize};
-use std::net::IpAddr;
+use serde::{Deserialize, Serialize};
+use std::{fmt::Formatter, net::IpAddr};
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -75,13 +75,13 @@ pub enum Protocol {
 
 /// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub enum EnTarget {
+pub enum Target {
     ACCEPT,
     REJECT,
     DROP,
 }
 
-impl EnTarget {
+impl Target {
     /// Return the key, value pair of target.
     pub fn to_option(&self) -> (String, String) {
         match self {
@@ -99,13 +99,13 @@ pub struct FirewallRule {
     pub src: NetworkConfig,
     pub dst: NetworkConfig,
     pub protocol: Protocol,
-    pub target: EnTarget,
+    pub target: Target,
 }
 
 impl FirewallRule {
     /// Create a new `ConfigFirewall`.
     /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: EnTarget) -> FirewallRule {
+    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: Target) -> FirewallRule {
         FirewallRule {
             rule_name,
             src,
@@ -141,17 +141,30 @@ impl FirewallDevice {
     }
 }
 
-/// Stores a set of firewall rules and a config version
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct FirewallConfig {
-    version: String,
-    devices: Vec<FirewallDevice>,
+pub struct KnownDevice {
+    pub ip: IpAddr,
+    pub collect_data: bool,
 }
 
-impl FirewallConfig {
+impl KnownDevice {
+    pub fn new(ip: IpAddr, collect_data: bool) -> Self {
+        Self { ip, collect_data }
+    }
+}
+
+/// Stores a set of firewall rules and a config version
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EnforcerConfig {
+    version: String,
+    devices: Vec<FirewallDevice>,
+    known_devices: Vec<KnownDevice>,
+}
+
+impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, devices: Vec<FirewallDevice>) -> Self {
-        FirewallConfig { version, devices }
+    pub fn new(version: String, devices: Vec<FirewallDevice>, known_devices: Vec<KnownDevice>) -> Self {
+        EnforcerConfig { version, devices, known_devices }
     }
 
     /// Returns the version of this config
@@ -167,5 +180,9 @@ impl FirewallConfig {
     /// Returns a reference to the firewall rules in this config
     pub fn devices_mut(&mut self) -> &mut Vec<FirewallDevice> {
         &mut self.devices
+    }
+
+    pub fn known_devices(&self) -> &Vec<KnownDevice> {
+        &self.known_devices
     }
 }
