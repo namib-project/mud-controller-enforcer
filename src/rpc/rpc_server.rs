@@ -10,7 +10,7 @@ use tarpc::{
 
 use namib_shared::{
     codec,
-    config_firewall::{FirewallConfig, FirewallRule},
+    firewall_config::{EnforcerConfig, FirewallRule},
     models::DhcpEvent,
     open_file_with,
     rpc::RPC,
@@ -24,14 +24,14 @@ use crate::{
 };
 
 use super::tls_serde_transport;
-use namib_shared::config_firewall::FirewallDevice;
+use namib_shared::firewall_config::FirewallDevice;
 
 #[derive(Clone)]
 pub struct RPCServer(SocketAddr, DbConnection);
 
 #[server]
 impl RPC for RPCServer {
-    async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<FirewallConfig> {
+    async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<EnforcerConfig> {
         let current_config_version = config_firewall_service::get_config_version(&self.1).await;
         debug!(
             "Received a heartbeat from client {:?} with version {:?}, current version {:?}",
@@ -54,7 +54,7 @@ impl RPC for RPCServer {
                 .collect();
 
             debug!("Returning Heartbeat to client with config: {:?}", device_configs);
-            return Some(FirewallConfig::new(current_config_version, device_configs));
+            return Some(EnforcerConfig::new(current_config_version, device_configs));
         }
 
         None
