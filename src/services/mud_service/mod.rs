@@ -88,17 +88,3 @@ async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh
     println!("{:?}", mud_profiles);
     Ok(mud_profiles)
 }
-
-/// This Function only updating expiration to reduce payload.
-async fn refresh_mud_expiration(mud_dbo_vec: Vec<MudDboRefresh>, pool: &DbConnection) -> Result<()> {
-    for mud in &mud_dbo_vec {
-        sqlx::query!(
-            "update mud_data set expiration = ? where url = ? ",
-            mud.expiration,
-            mud.url,
-        )
-        .execute(pool)
-        .await?;
-    }
-    Ok(())
-}

@@ -11,7 +11,7 @@
     clippy::must_use_candidate
 )]
 
-use std::time::Duration;
+use std::{thread, time::Duration};
 
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
@@ -33,7 +33,6 @@ async fn main() -> Result<()> {
     let conn = db::connect().await?;
     let conn2 = conn.clone();
     let conn3 = conn.clone();
-    let mut scheduler = Scheduler::new();
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -41,22 +40,29 @@ async fn main() -> Result<()> {
             .expect("could not construct tokio runtime")
             .block_on(rpc::rpc_server::listen(conn2))
             .expect("failed running rpc server");
+    });
 
+    let _computation = thread::spawn(move || {
         log::info!("Start scheduler");
-        scheduler.every(1.hours()).run(move || {
-            log::info!("Start scheduler every {:?}", 1.hours());
+        let mut scheduler = Scheduler::new();
+        scheduler.every(1.seconds()).run(move || {
+            let conn4 = conn3.clone();
+            log::info!("Start scheduler every {:?}", 1.seconds());
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .expect("could not construct tokio runtime")
                 .block_on(
                     namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles(
-                        conn3.clone(),
+                        conn4.clone(),
                     ),
                 )
                 .expect("failed running scheduler for namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles");
         });
-        scheduler.watch_thread(Duration::from_millis(10));
+        loop {
+            scheduler.run_pending();
+            thread::sleep(Duration::from_secs(10));
+        }
     });
 
     HttpServer::new(move || {
