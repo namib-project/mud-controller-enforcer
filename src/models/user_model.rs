@@ -5,7 +5,7 @@ use paperclip::actix::Apiv2Schema;
 use rand::{rngs::OsRng, Rng};
 use snafu::ensure;
 
-use crate::error::{PasswordVerifyError, Result};
+use crate::{error, error::Result};
 
 const SALT_LENGTH: usize = 32;
 
@@ -54,7 +54,7 @@ impl User {
 
     pub fn verify_password(&self, password: &str) -> Result<()> {
         let result = argon2::verify_encoded(self.password.as_ref(), password.as_ref())?;
-        ensure!(result, PasswordVerifyError {});
+        ensure!(result, error::PasswordVerifyError {});
         Ok(())
     }
 

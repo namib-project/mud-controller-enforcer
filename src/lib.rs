@@ -5,6 +5,8 @@
     clippy::unseparated_literal_suffix,
     clippy::module_name_repetitions,
     clippy::default_trait_access,
+    clippy::similar_names,
+    clippy::redundant_else,
     clippy::missing_errors_doc,
     clippy::must_use_candidate
 )]
@@ -23,3 +25,13 @@ pub mod models;
 pub mod routes;
 pub mod rpc;
 pub mod services;
+
+#[cfg(not(debug_assertions))]
+const GIT_BRANCH: &str = env!("CI_COMMIT_REF_SLUG");
+#[cfg(not(debug_assertions))]
+const GIT_COMMIT: &str = env!("CI_COMMIT_SHORT_SHA");
+#[cfg(not(debug_assertions))]
+pub const VERSION: &str = const_format::concatcp!(GIT_BRANCH, "-", GIT_COMMIT);
+
+#[cfg(debug_assertions)]
+pub const VERSION: &str = "development";

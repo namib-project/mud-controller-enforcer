@@ -14,7 +14,7 @@
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
-use namib_mud_controller::{db, error::Result, routes, rpc};
+use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
 
@@ -23,8 +23,11 @@ async fn main() -> Result<()> {
     dotenv().ok();
     env_logger::init();
 
+    log::info!("Starting mud_controller {}", VERSION);
+
     let conn = db::connect().await?;
     let conn2 = conn.clone();
+
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -48,9 +51,11 @@ async fn main() -> Result<()> {
             .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap_api()
+            .service(web::scope("/status").configure(routes::status_controller::init))
             .service(web::scope("/users").configure(routes::users_controller::init))
             .service(web::scope("/devices").configure(routes::device_controller::init))
             .service(web::scope("/mud").configure(routes::mud_controller::init))
+            .service(web::scope("/config").configure(routes::config_controller::init))
             .with_json_spec_at("/api/spec")
             .build()
             .service(

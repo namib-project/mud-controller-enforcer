@@ -32,6 +32,14 @@ pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
         .collect())
 }
 
+pub async fn has_any_users(conn: &DbConnection) -> Result<bool> {
+    let usr_count = sqlx::query!("select count(*) as count from users")
+        .fetch_one(conn)
+        .await?
+        .count;
+    Ok(usr_count > 0)
+}
+
 pub async fn find_by_id(id: i64, conn: &DbConnection) -> Result<User> {
     let usr = sqlx::query_as!(UserDbo, "select * from users where id = ?", id)
         .fetch_one(conn)
