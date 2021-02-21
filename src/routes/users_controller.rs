@@ -257,7 +257,11 @@ pub fn set_users_config(
 }
 
 #[api_v2_operation(summary = "Deletes a config variables of the user. Returns status code 204 on success.")]
-pub fn delete_users_config(pool: web::Data<DbConnection>, auth: AuthToken, key: web::Path<String>) -> Result<HttpResponse> {
+pub fn delete_users_config(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    key: web::Path<String>,
+) -> Result<HttpResponse> {
     user_config_service::delete_config_for_user(auth.sub, &key, pool.get_ref()).await?;
 
     Ok(HttpResponse::NoContent().finish())
