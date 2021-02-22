@@ -15,15 +15,12 @@ use std::{thread, time::Duration};
 
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
-use clokwerk::{Scheduler, TimeUnits};
 use dotenv::dotenv;
-use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
+use namib_mud_controller::{
+    db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_update_outdated_profiles, VERSION,
+};
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
-
-use namib_mud_controller::{
-    db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_scheduler, VERSION,
-};
 
 /* Used for OpenApi/Swagger generation under the /swagger-ui url */
 #[actix_web::main]
@@ -35,7 +32,6 @@ async fn main() -> Result<()> {
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
-    let conn3 = conn.clone();
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -45,8 +41,9 @@ async fn main() -> Result<()> {
             .expect("failed running rpc server");
     });
 
+    let conn3 = conn.clone();
     let _computation = thread::spawn(move || {
-        job_scheduler(conn3, 1.seconds(), Duration::from_secs(10));
+        job_update_outdated_profiles(conn3, clokwerk::TimeUnits::seconds(1), Duration::from_secs(10));
     });
 
     HttpServer::new(move || {

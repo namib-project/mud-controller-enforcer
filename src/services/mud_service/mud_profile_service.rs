@@ -2,13 +2,13 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::MudDboRefresh,
-    services::{config_firewall_service::update_config_version, mud_service::*},
+    services::{firewall_configuration_service::update_config_version, mud_service::*},
 };
 use chrono::Utc;
 use clokwerk::Scheduler;
 use std::{thread, time::Duration};
 
-pub fn job_scheduler(conn: DbConnection, interval: clokwerk::Interval, sleep_duration: Duration) {
+pub fn job_update_outdated_profiles(conn: DbConnection, interval: clokwerk::Interval, sleep_duration: Duration) {
     log::info!("Start scheduler");
     let mut scheduler = Scheduler::new();
     scheduler.every(interval).run(move || {
@@ -17,12 +17,8 @@ pub fn job_scheduler(conn: DbConnection, interval: clokwerk::Interval, sleep_dur
             .enable_all()
             .build()
             .expect("could not construct tokio runtime")
-            .block_on(
-                update_outdated_profiles(
-                    conn.clone(),
-                ),
-            )
-            .expect("failed running scheduler for namib_mud_controller::services::mud_service::mud_profile_service::update_outdated_profiles");
+            .block_on(update_outdated_profiles(&conn))
+            .expect("failed running scheduler for update_outdated_profiles");
     });
     loop {
         scheduler.run_pending();
@@ -30,13 +26,12 @@ pub fn job_scheduler(conn: DbConnection, interval: clokwerk::Interval, sleep_dur
     }
 }
 
-async fn update_outdated_profiles(db_pool: DbConnection) -> Result<()> {
+async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
     log::debug!("Update outdated profiles");
     let mud_data = get_all_mud_expiration(&db_pool).await?;
     let mud_vec: Vec<String> = get_filtered_mud_urls(mud_data);
     update_mud_urls(mud_vec, &db_pool).await?;
-    update_config_version(&db_pool).await;
-    Ok(())
+    update_config_version(&db_pool).await
 }
 
 fn get_filtered_mud_urls(mut mud_vec: Vec<MudDboRefresh>) -> Vec<String> {
