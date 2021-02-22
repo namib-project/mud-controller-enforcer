@@ -14,7 +14,7 @@ define Package/namib
   TITLE:=NAMIB Enforcer
   URL:=https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_enforcer
   MAINTAINER:=Benjamin Ludewig <ludewigb@uni-bremen.de>
-  DEPENDS:=@IPV6 +libavahi-compat-libdnssd +libuci
+  DEPENDS:=@IPV6 +libavahi-compat-libdnssd +libuci +libnftnl +libmnl
   PKG_BUILD_DEPENDS:=openssl
 endef
 

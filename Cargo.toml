@@ -33,7 +33,7 @@ notify = "4"
 
 [target.'cfg(unix)'.dependencies]
 libuci-sys = { tag = "1.0.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git", optional = true }
-libc = { version = "0.2", optional = true }
+libc = { version = "0.2.86", optional = true }
 nftnl = "0.6.0"
 mnl = "0.2.0"
 
@@ -45,3 +45,6 @@ name = "namib_enforcer"
 name = "namib_dnsmasq_hook"
 path = "src/dhcp/dnsmasq_hook.rs"
 required-features = ["dnsmasq_hook"]
+
+[patch.crates-io]
+libc = { version = "0.2.86", package = "libc" }
