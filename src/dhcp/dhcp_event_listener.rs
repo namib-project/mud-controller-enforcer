@@ -7,19 +7,19 @@ pub use unix::*;
 mod unix {
     use std::sync::Arc;
 
+    use crate::{rpc::rpc_client::current_rpc_context, Enforcer};
     use futures::future::join_all;
     use log::debug;
-    use tarpc::context;
     use tokio::{
         io::AsyncReadExt,
         net::{UnixListener, UnixStream},
-        sync::Mutex,
+        sync::RwLock,
     };
 
-    use namib_shared::{models::DhcpEvent, rpc::RPCClient};
+    use namib_shared::models::DhcpEvent;
 
     /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
-    pub async fn listen_for_dhcp_events(rpc_client: Arc<Mutex<RPCClient>>) {
+    pub async fn listen_for_dhcp_events(enforcer: Arc<RwLock<Enforcer>>) {
         match std::fs::remove_file("/tmp/namib_dhcp.sock") {
             Ok(_) => Ok(()),
             Err(e) => match e.kind() {
@@ -32,22 +32,26 @@ mod unix {
             UnixListener::bind("/tmp/namib_dhcp.sock").expect("Could not open socket for DHCP event listener.");
         let mut active_listeners = Vec::new();
         while let Ok((event_stream, _)) = listener.accept().await {
-            let rpc_client_copy = rpc_client.clone();
+            let enforcer = enforcer.clone();
             active_listeners.push(tokio::spawn(async move {
-                handle_dhcp_script_connection(rpc_client_copy, event_stream).await;
+                handle_dhcp_script_connection(enforcer, event_stream).await;
             }));
         }
         join_all(active_listeners).await;
     }
 
-    async fn handle_dhcp_script_connection(rpc_client: Arc<Mutex<RPCClient>>, mut stream: UnixStream) {
+    async fn handle_dhcp_script_connection(enforcer: Arc<RwLock<Enforcer>>, mut stream: UnixStream) {
         let mut inc_data = Vec::new();
         stream.read_to_end(&mut inc_data).await.unwrap();
         match serde_json::from_slice::<DhcpEvent>(inc_data.as_slice()) {
             Ok(dhcp_event) => {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
-                let mut unlocked_rpc = rpc_client.lock().await;
-                unlocked_rpc.dhcp_request(context::current(), dhcp_event).await.unwrap();
+                let mut enforcer = enforcer.write().await;
+                enforcer
+                    .client
+                    .dhcp_request(current_rpc_context(), dhcp_event)
+                    .await
+                    .unwrap();
             },
             Err(e) => {
                 warn!("DHCP event was received, but could not be parsed: {}", e);
@@ -60,9 +64,9 @@ mod unix {
 mod mock {
     use std::sync::Arc;
 
-    use tokio::sync::Mutex;
+    use tokio::sync::RwLock;
 
-    use namib_shared::rpc::RPCClient;
+    use crate::Enforcer;
 
-    pub async fn listen_for_dhcp_events(_: Arc<Mutex<RPCClient>>) {}
+    pub async fn listen_for_dhcp_events(_: Arc<RwLock<Enforcer>>) {}
 }

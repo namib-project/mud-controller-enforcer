@@ -1,22 +1,21 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use snafu::{Backtrace, GenerateBacktrace};
-use tarpc::{client, context, serde_transport};
-use tokio::{
-    sync::Mutex,
-    time::{sleep, Duration},
-};
+use tarpc::{client, rpc, serde_transport};
+use tokio::time::{sleep, Duration};
 
-use namib_shared::{codec, config_firewall::FirewallConfig, rpc::RPCClient};
+use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
-use crate::{
-    error::{Error, Result},
-    services::firewall_service,
-};
+use crate::{error::Result, services::firewall_service, Enforcer};
 
 use super::controller_discovery::discover_controllers;
-use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
+use std::time::SystemTime;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, ErrorKind},
+    net::TcpStream,
+    sync::RwLock,
+};
 use tokio_native_tls::{
     native_tls,
     native_tls::{Certificate, Identity},
@@ -40,40 +39,55 @@ pub async fn run() -> Result<RPCClient> {
         Certificate::from_pem(&vec)?
     };
 
-    let addr_stream = discover_controllers("_namib_controller._tcp")?
-        .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
-        .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
-        .filter_map(|r| future::ready(r.ok()));
-    pin_mut!(addr_stream);
+    let client = loop {
+        let addr_stream = discover_controllers("_namib_controller._tcp")?
+            .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
+            .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
+            .filter_map(|r| future::ready(r.ok()));
+        pin_mut!(addr_stream);
 
-    match addr_stream.next().await {
-        Some(client) => Ok(client),
-        None => Err(Error::ConnectionError {
-            message: "No Client",
-            backtrace: Backtrace::generate(),
-        }),
-    }
+        if let Some(client) = addr_stream.next().await {
+            break client;
+        }
+
+        warn!("No controller found, retrying in 5 secs");
+        sleep(Duration::from_secs(5)).await;
+    };
+
+    Ok(client)
 }
 
-pub async fn heartbeat(client: Arc<Mutex<RPCClient>>) {
+pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
     loop {
         {
-            let mut instance = client.lock().await;
-            let heartbeat: io::Result<Option<FirewallConfig>> = instance
-                .heartbeat(context::current(), firewall_service::get_config_version().ok())
+            let mut enforcer = enforcer.write().await;
+            let heartbeat: io::Result<Option<EnforcerConfig>> = enforcer
+                .client
+                .heartbeat(current_rpc_context(), firewall_service::get_config_version().ok())
                 .await;
             match heartbeat {
-                Err(error) => error!("Error during heartbeat: {:?}", error),
+                Err(error) => match error.kind() {
+                    ErrorKind::ConnectionReset => {
+                        error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
+                        if let Ok(new_client) = run().await {
+                            enforcer.client = new_client;
+                        }
+                    },
+                    _ => {
+                        error!("Error during heartbeat: {:?}", error);
+                    },
+                },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     if let Err(e) = firewall_service::apply_config(&config) {
                         error!("Failed to apply config! {}", e)
                     }
+                    enforcer.config = config;
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }
 
-            drop(instance);
+            drop(enforcer)
         }
 
         sleep(Duration::from_secs(5)).await;
@@ -107,4 +121,12 @@ async fn try_connect(
     let transport = serde_transport::new(framed_io, codec()());
 
     Ok(Some(RPCClient::new(client::Config::default(), transport).spawn()?))
+}
+
+/// Returns the context for the current request, or a default Context if no request is active.
+/// Copied and adapted based on tarpc/rpc/context.rs
+pub fn current_rpc_context() -> rpc::context::Context {
+    let mut rpc_context = rpc::context::current();
+    rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
+    rpc_context
 }

@@ -20,7 +20,7 @@ mod unix {
         uci_set_confdir, uci_set_savedir, uci_type_UCI_TYPE_OPTION, uci_type_UCI_TYPE_SECTION, uci_unload,
     };
 
-    use crate::error::{Result, UCIError};
+    use crate::error::{self, Result};
 
     #[allow(clippy::cast_possible_wrap)]
     const UCI_OK: i32 = libuci_sys::UCI_OK as i32;
@@ -65,7 +65,7 @@ mod unix {
             let ctx = unsafe { uci_alloc_context() };
             ensure!(
                 !ctx.is_null(),
-                UCIError {
+                error::UCIError {
                     message: String::from("Could not alloc uci context"),
                 }
             );
@@ -76,11 +76,11 @@ mod unix {
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {
             let result = unsafe {
                 let raw = CString::new(config_dir)?;
-                uci_set_confdir(self.0, raw.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char)
+                uci_set_confdir(self.0, raw.as_bytes_with_nul().as_ptr().cast::<std::os::raw::c_char>())
             };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Cannot set config dir: {}, {}",
                         config_dir,
@@ -96,11 +96,11 @@ mod unix {
         pub fn set_save_dir(&mut self, save_dir: &str) -> Result<()> {
             let result = unsafe {
                 let raw = CString::new(save_dir)?;
-                uci_set_savedir(self.0, raw.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char)
+                uci_set_savedir(self.0, raw.as_bytes_with_nul().as_ptr().cast::<std::os::raw::c_char>())
             };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Cannot set save dir: {}, {}",
                         save_dir,
@@ -123,7 +123,7 @@ mod unix {
             let result = unsafe { uci_delete(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not delete uci key: {}, {}, {}",
                         identifier,
@@ -135,7 +135,7 @@ mod unix {
             let result = unsafe { uci_save(self.0, ptr.p) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not save uci key: {}, {}, {}",
                         identifier,
@@ -157,7 +157,7 @@ mod unix {
             let result = unsafe { uci_revert(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not revert uci key: {}, {}, {}",
                         identifier,
@@ -169,7 +169,7 @@ mod unix {
             let result = unsafe { uci_save(self.0, ptr.p) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not save uci key: {}, {}, {}",
                         identifier,
@@ -190,21 +190,21 @@ mod unix {
         pub fn set(&mut self, identifier: &str, val: &str) -> Result<()> {
             ensure!(
                 !val.contains('\''),
-                UCIError {
+                error::UCIError {
                     message: format!("Values may not contain quotes: {}={}", identifier, val)
                 }
             );
             let mut ptr = self.get_ptr(format!("{}={}", identifier, val).as_ref())?;
             ensure!(
                 !ptr.value.is_null(),
-                UCIError {
+                error::UCIError {
                     message: format!("parsed value is null: {}={}", identifier, val)
                 }
             );
             let result = unsafe { uci_set(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not set uci key: {}={}, {}, {}",
                         identifier,
@@ -217,7 +217,7 @@ mod unix {
             let result = unsafe { uci_save(self.0, ptr.p) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not save uci key: {}={}, {}, {}",
                         identifier,
@@ -237,7 +237,7 @@ mod unix {
             let result = unsafe { uci_commit(self.0, &mut ptr.p, false) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not set commit uci package: {}, {}, {}",
                         package,
@@ -264,7 +264,7 @@ mod unix {
             let ptr = self.get_ptr(key)?;
             ensure!(
                 ptr.flags & uci_ptr_UCI_LOOKUP_COMPLETE != 0,
-                UCIError {
+                error::UCIError {
                     message: format!("Lookup failed: {}", key),
                 }
             );
@@ -275,20 +275,20 @@ mod unix {
                     let opt = unsafe { *ptr.o };
                     ensure!(
                         opt.type_ == uci_option_type_UCI_TYPE_STRING,
-                        UCIError {
+                        error::UCIError {
                             message: format!("Cannot get string value of non-string: {} {}", key, opt.type_),
                         }
                     );
                     ensure!(
                         !opt.section.is_null(),
-                        UCIError {
+                        error::UCIError {
                             message: format!("uci section was null: {}", key)
                         }
                     );
                     let sect = unsafe { *opt.section };
                     ensure!(
                         !sect.package.is_null(),
-                        UCIError {
+                        error::UCIError {
                             message: format!("uci package was null: {}", key)
                         }
                     );
@@ -308,7 +308,7 @@ mod unix {
                     let sect = unsafe { *ptr.s };
                     ensure!(
                         !sect.package.is_null(),
-                        UCIError {
+                        error::UCIError {
                             message: format!("uci package was null: {}", key)
                         }
                     );
@@ -323,7 +323,7 @@ mod unix {
                     );
                     Ok(String::from(typ))
                 },
-                _ => UCIError {
+                _ => error::UCIError {
                     message: format!("unsupported type: {}", last.type_),
                 }
                 .fail()?,
@@ -356,7 +356,7 @@ mod unix {
             let result = unsafe { uci_lookup_ptr(self.0, &mut ptr, raw, true) };
             ensure!(
                 result == UCI_OK,
-                UCIError {
+                error::UCIError {
                     message: format!(
                         "Could not parse uci key: {}, {}, {}",
                         identifier,
@@ -368,7 +368,7 @@ mod unix {
             debug!("{:?}", ptr);
             ensure!(
                 !ptr.last.is_null(),
-                UCIError {
+                error::UCIError {
                     message: format!("Cannot access null value: {}", identifier),
                 }
             );
@@ -382,18 +382,18 @@ mod unix {
             unsafe { uci_get_errorstr(self.0, &mut raw, ptr::null()) };
             ensure!(
                 !raw.is_null(),
-                UCIError {
+                error::UCIError {
                     message: String::from("last_error was null"),
                 }
             );
             match unsafe { CStr::from_ptr(raw) }.to_str() {
                 Ok(o) => {
                     let s = String::from(o);
-                    unsafe { libc::free(raw as *mut std::os::raw::c_void) };
+                    unsafe { libc::free(raw.cast::<std::os::raw::c_void>()) };
                     Ok(s)
                 },
                 Err(e) => {
-                    unsafe { libc::free(raw as *mut std::os::raw::c_void) };
+                    unsafe { libc::free(raw.cast::<std::os::raw::c_void>()) };
                     Err(e.into())
                 },
             }
@@ -405,7 +405,7 @@ mod unix {
 #[allow(clippy::unused_self)]
 mod mock {
 
-    use crate::error::{NoneError, Result};
+    use crate::error::{self, Result};
 
     pub struct UCI {}
 
@@ -415,37 +415,37 @@ mod mock {
         }
 
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {
-            info!("set_config_dir {}", config_dir);
+            debug!("set_config_dir {}", config_dir);
             Ok(())
         }
 
         pub fn set_save_dir(&mut self, save_dir: &str) -> Result<()> {
-            info!("set_save_dir {}", save_dir);
+            debug!("set_save_dir {}", save_dir);
             Ok(())
         }
 
         pub fn revert(&mut self, package: &str) -> Result<()> {
-            info!("revert {}", package);
+            debug!("revert {}", package);
             Ok(())
         }
 
         pub fn delete(&mut self, key: &str) -> Result<()> {
-            info!("delete {}", key);
+            debug!("delete {}", key);
             Ok(())
         }
 
         pub fn get(&mut self, key: &str) -> Result<String> {
-            info!("get {}", key);
-            NoneError {}.fail()
+            debug!("get {}", key);
+            error::NoneError {}.fail()
         }
 
         pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
-            info!("set {}={}", key, value);
+            debug!("set {}={}", key, value);
             Ok(())
         }
 
         pub fn commit(&mut self, package: &str) -> Result<()> {
-            info!("commit {}", package);
+            debug!("commit {}", package);
             Ok(())
         }
     }

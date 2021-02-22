@@ -16,9 +16,10 @@ before_script:
   - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev cmake clang
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-  - tar -xzf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-0.2.13-x86_64-unknown-linux-musl/sccache
+  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
+  - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
+  - chmod +x sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
+  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
   - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
   - rustc --version
   - cargo --version
@@ -89,19 +90,19 @@ binary:
 
 openwrt_package_x86_64:
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:x86_64-19.07.4
+  image: openwrtorg/sdk:x86_64-19.07.6
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
 
 openwrt_package_bcm2708: # raspberry v1
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:brcm2708-bcm2708-19.07.4
+  image: openwrtorg/sdk:brcm2708-bcm2708-19.07.6
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
 
 openwrt_package_bcm2710: # raspberry v3
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:brcm2708-bcm2710-19.07.4
+  image: openwrtorg/sdk:brcm2708-bcm2710-19.07.6
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
