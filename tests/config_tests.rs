@@ -12,7 +12,7 @@ mod config_integration {
         let ctx = lib::IntegrationTestContext::new("get_nothing").await;
 
         assert!(
-            config_service::get_config_value("should-be-nothing", &ctx.db_conn)
+            config_service::get_config_value::<String>("should-be-nothing", &ctx.db_conn)
                 .await
                 .is_err(),
             "Non-existing config value was existing!"
@@ -27,7 +27,9 @@ mod config_integration {
             .await
             .unwrap();
         assert_eq!(
-            config_service::get_config_value("some", &ctx.db_conn).await.unwrap(),
+            config_service::get_config_value::<String>("some", &ctx.db_conn)
+                .await
+                .unwrap(),
             "thing"
         );
     }
@@ -40,7 +42,9 @@ mod config_integration {
             .await
             .unwrap();
         assert_eq!(
-            config_service::get_config_value("some", &ctx.db_conn).await.unwrap(),
+            config_service::get_config_value::<String>("some", &ctx.db_conn)
+                .await
+                .unwrap(),
             "thing"
         );
 
@@ -49,7 +53,9 @@ mod config_integration {
             1
         );
         assert!(
-            config_service::get_config_value("some", &ctx.db_conn).await.is_err(),
+            config_service::get_config_value::<String>("some", &ctx.db_conn)
+                .await
+                .is_err(),
             "Non-existing config value was existing!"
         );
     }

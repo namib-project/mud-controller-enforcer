@@ -2,24 +2,35 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{AceAction, AceProtocol, AclDirection, AclType, Device},
-    services::config_service::{get_config_value, set_config_value},
+    services::config_service::{get_config_value, set_config_value, ConfigKeys},
 };
 use namib_shared::firewall_config::{
-    FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, ResolvedIp, RuleName, Target,
+    EnforcerConfig, FirewallDevice, FirewallRule, KnownDevice, NetworkConfig, NetworkHost, Protocol, ResolvedIp,
+    RuleName, Target,
 };
 use std::{
     net::{IpAddr, ToSocketAddrs},
     sync::atomic::{AtomicU32, Ordering},
 };
 
-static VERSION: AtomicU32 = AtomicU32::new(0);
+pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
+    let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
+    EnforcerConfig::new(
+        version,
+        rules,
+        devices
+            .into_iter()
+            .map(|d| KnownDevice::new(d.ip_addr, d.collect_info))
+            .collect(),
+    )
+}
 
-pub fn convert_device_to_fw_rules(device: &Device) -> Result<FirewallDevice> {
+pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
     let mut index = 0;
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
-        None => return Ok(FirewallDevice::new(device.id, device.ip_addr, result)),
+        None => return FirewallDevice::new(device.id, device.ip_addr, result),
     };
 
     for acl in &mud_data.acllist {
@@ -98,29 +109,19 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<FirewallDevice> {
         Target::REJECT,
     ));
 
-    Ok(FirewallDevice::new(device.id, device.ip_addr, result))
+    FirewallDevice::new(device.id, device.ip_addr, result)
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
-    get_config_value("version", pool)
+    get_config_value(ConfigKeys::Version.as_ref(), pool)
         .await
         .unwrap_or_else(|_| "0".to_string())
 }
 
-pub async fn update_config_version(pool: &DbConnection) {
-    set_config_value(
-        "version",
-        &(get_config_value("version", pool)
-            .await
-            .unwrap_or_else(|_| "0".to_string())
-            .parse::<u32>()
-            .unwrap_or(1)
-            + 1)
-        .to_string(),
-        pool,
-    )
-    .await
-    .expect("failed to write config");
+pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
+    let old_config_version = get_config_value(ConfigKeys::Version.as_ref(), pool).await.unwrap_or(0);
+    set_config_value(ConfigKeys::Version.as_ref(), old_config_version + 1, pool).await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -170,6 +171,7 @@ mod tests {
             hostname: "".to_string(),
             vendor_class: "".to_string(),
             mud_url: Some("http://example.com/mud_url.json".to_string()),
+            collect_info: true,
             mud_data: Some(mud_data),
             last_interaction: Utc::now().naive_local(),
         };

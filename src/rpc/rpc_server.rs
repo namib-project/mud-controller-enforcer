@@ -1,7 +1,8 @@
 use std::{env, net::SocketAddr, sync::Arc};
 
 use futures::{future, StreamExt, TryStreamExt};
-use rustls::RootCertStore;
+use rustls::{RootCertStore, Session};
+use sha1::{Digest, Sha1};
 use tarpc::{
     context,
     rpc::server::{BaseChannel, Channel, Handler},
@@ -19,49 +20,42 @@ use namib_shared::{
 use crate::{
     db::DbConnection,
     error::Result,
-    models::Device,
-    services::{config_firewall_service, device_service, mud_service},
+    services::{device_service, firewall_configuration_service},
 };
 
 use super::tls_serde_transport;
-use namib_shared::firewall_config::FirewallDevice;
+use crate::services::log_service;
 
 #[derive(Clone)]
-pub struct RPCServer(SocketAddr, DbConnection);
+pub struct RPCServer {
+    pub client_ip: SocketAddr,
+    pub client_id: String,
+    pub db_connection: DbConnection,
+}
 
 #[server]
 impl RPC for RPCServer {
     async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<EnforcerConfig> {
-        let current_config_version = config_firewall_service::get_config_version(&self.1).await;
+        let current_config_version = firewall_configuration_service::get_config_version(&self.db_connection).await;
         debug!(
-            "Received a heartbeat from client {:?} with version {:?}, current version {:?}",
-            self.0, version, current_config_version
+            "heartbeat from {:?} ({}): version {:?}, current version {:?}",
+            self.client_ip, self.client_id, version, current_config_version
         );
         if Some(&current_config_version) != version.as_ref() {
-            debug!(
-                "Client has outdated version \"{}\". Starting update...",
-                current_config_version
-            );
-            let devices = device_service::get_all_devices(&self.1).await.unwrap_or_default();
-            debug!("heartbeat all devices {:?}", devices);
-            let device_configs: Vec<FirewallDevice> = devices
-                .iter()
-                .flat_map(move |d| {
-                    config_firewall_service::convert_device_to_fw_rules(d)
-                        .map_err(|err| error!("Flat Map Error {:#?}", err))
-                        .ok()
-                })
-                .collect();
-
-            debug!("Returning Heartbeat to client with config: {:?}", device_configs);
-            return Some(EnforcerConfig::new(current_config_version, device_configs));
+            debug!("Client has outdated version. Starting update...");
+            let devices = device_service::get_all_devices(&self.db_connection)
+                .await
+                .unwrap_or_default();
+            let new_config = firewall_configuration_service::create_configuration(current_config_version, devices);
+            debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
+            return Some(new_config);
         }
 
         None
     }
 
     async fn dhcp_request(self, _: context::Context, dhcp_event: DhcpEvent) {
-        debug!("dhcp_request from: {:?}. Data: {:?}", self.0, dhcp_event);
+        debug!("dhcp_request from: {:?}. Data: {:?}", self.client_ip, dhcp_event);
 
         // TODO: Handle different dhcp event lease types (currently handles everything as "add")
         let lease_info = match dhcp_event {
@@ -69,35 +63,19 @@ impl RPC for RPCServer {
             _ => return,
         };
 
-        let mut dhcp_device_data = Device::from(lease_info);
-        let update = match device_service::find_by_ip(dhcp_device_data.ip_addr, &self.1).await {
-            Ok(device) => {
-                dhcp_device_data.id = device.id;
-                true
-            },
-            Err(_) => false,
-        };
-
-        debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
-
-        match &dhcp_device_data.mud_url {
-            Some(url) => match mud_service::get_mud_from_url(url.clone(), &self.1).await {
-                Ok(mud_data) => Some(mud_data),
-                Err(err) => {
-                    info!("Error parsing mud file from URL {}: {:?}", url, err);
-                    None
-                },
-            },
-            None => None,
-        };
-
-        if update {
-            device_service::update_device(&dhcp_device_data, &self.1).await.unwrap();
-        } else {
-            device_service::insert_device(&dhcp_device_data, &self.1).await.unwrap();
+        if let Err(e) = device_service::upsert_device_from_dhcp_lease(lease_info, &self.db_connection).await {
+            error!("Failed to upsert device from dhcp lease {}", e)
         }
+    }
 
-        config_firewall_service::update_config_version(&self.1).await;
+    async fn send_logs(self, _: context::Context, logs: Vec<String>) {
+        debug!(
+            "send_logs from {:?} ({}): logs {:?}",
+            self.client_ip,
+            self.client_id,
+            logs.len(),
+        );
+        log_service::add_new_logs(self.client_id, logs).await
     }
 }
 
@@ -143,10 +121,22 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
         // serve is generated by the service attribute. It takes as input any type implementing
         // the generated World trait.
         .map(|channel| {
-            let server = RPCServer(
-                channel.get_ref().get_ref().get_ref().get_ref().0.peer_addr().unwrap(),
-                pool.clone(),
-            );
+            let server = RPCServer {
+                client_ip: channel.get_ref().get_ref().get_ref().get_ref().0.peer_addr().unwrap(),
+                // the fingerprint of a certificate is the sha1 of its entire bytes encoded in DER
+                client_id: base64::encode(Sha1::digest(
+                    channel
+                        .get_ref() // BaseChannel
+                        .get_ref() // Transport
+                        .get_ref() // TlsStream
+                        .get_ref() // (TcpStream, TlsSession)
+                        .1 // TlsSession
+                        .get_peer_certificates()
+                        .unwrap()[0]
+                        .as_ref(),
+                )),
+                db_connection: pool.clone(),
+            };
             channel.respond_with(server.serve()).execute()
         })
         // Max 10 channels.
