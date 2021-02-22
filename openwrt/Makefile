@@ -76,6 +76,8 @@ define Package/namib/install
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/namib_enforcer/certs/namib-ca.pem $(1)/etc/namib/ca.pem
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/namib.init $(1)/etc/init.d/namib
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/60-dnsmasq-enable-query-logs.sh $(1)/etc/uci-defaults/60-dnsmasq-enable-query-logs.sh
 endef
 
 $(eval $(call BuildPackage,namib))

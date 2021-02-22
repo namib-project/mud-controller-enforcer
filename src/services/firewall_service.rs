@@ -4,6 +4,7 @@ use crate::{
     error::Result,
     services::{dns::DnsWatcher, is_system_mode, state::EnforcerState},
     uci::UCI,
+    Enforcer,
 };
 use nftnl::{
     expr::{IcmpCode, RejectionType, Verdict},
@@ -14,7 +15,7 @@ use nftnl::{
 use std::{ffi::CString, net::IpAddr, sync::Arc};
 use tokio::{
     select,
-    sync::{Mutex, Notify},
+    sync::{Mutex, Notify, RwLock},
 };
 use trust_dns_resolver::AsyncResolver;
 
@@ -32,7 +33,7 @@ const BASE_CHAIN_NAME: &str = "base_chain";
 
 pub struct FirewallService {
     dns_watcher: Arc<DnsWatcher>,
-    enforcer_state: Arc<EnforcerState>,
+    enforcer_state: Arc<RwLock<Enforcer>>,
     change_notify: Notify,
 }
 
@@ -50,7 +51,7 @@ impl From<IpAddr> for RuleAddrEntry {
 
 impl FirewallService {
     /// Creates a new FirewallService instance with the given enforcer state and dns watcher (generated from the dns service).
-    pub(crate) fn new(enforcer_state: Arc<EnforcerState>, mut watcher: DnsWatcher) -> FirewallService {
+    pub(crate) fn new(enforcer_state: Arc<RwLock<Enforcer>>, mut watcher: DnsWatcher) -> FirewallService {
         FirewallService {
             enforcer_state,
             dns_watcher: Arc::new(watcher),
@@ -60,7 +61,7 @@ impl FirewallService {
 
     /// Updates the current firewall config with a new value and notifies the firewall change watcher to update the firewall config.
     pub async fn apply_new_config(&self, mut config: EnforcerConfig) {
-        *self.enforcer_state.firewall_cfg.write().await = Some(config);
+        self.enforcer_state.write().await.config = config;
         self.change_notify.notify_one();
     }
 
@@ -80,8 +81,7 @@ impl FirewallService {
     /// Updates the nftables rules to reflect the current firewall config.
     async fn apply_current_config(&self) -> Result<()> {
         debug!("Configuration has changed, applying new rules to nftables");
-        let config_lock = self.enforcer_state.firewall_cfg.read().await;
-        let config = config_lock.as_ref().unwrap();
+        let config = &self.enforcer_state.read().await.config;
         let mut batch = Batch::new();
         self.add_old_config_deletion_instructions(&mut batch)?;
         self.convert_config_to_nftnl_commands(&mut batch, &config).await?;

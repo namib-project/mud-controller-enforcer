@@ -2,6 +2,7 @@ use std::env;
 
 pub mod dns;
 pub mod firewall_service;
+pub mod log_watcher;
 pub mod state;
 
 pub fn is_system_mode() -> bool {

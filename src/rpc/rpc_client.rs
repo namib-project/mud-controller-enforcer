@@ -13,6 +13,7 @@ use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 use crate::{
     error::{Error, Result},
     services::{firewall_service::FirewallService, state::EnforcerState},
+    Enforcer,
 };
 
 use super::controller_discovery::discover_controllers;
@@ -21,6 +22,7 @@ use tokio::{
     fs::File,
     io::{AsyncReadExt, ErrorKind},
     net::TcpStream,
+    sync::RwLock,
 };
 use tokio_native_tls::{
     native_tls,
@@ -63,31 +65,18 @@ pub async fn run() -> Result<RPCClient> {
     Ok(client)
 }
 
-pub(crate) async fn heartbeat(
-    enforcer_state: Arc<EnforcerState>,
-    client: Arc<Mutex<RPCClient>>,
-    fw_service: Arc<FirewallService>,
-) {
+pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<FirewallService>) {
     loop {
         {
-            let mut instance = client.lock().await;
-            let heartbeat: io::Result<Option<EnforcerConfig>> = instance
-                .heartbeat(
-                    context::current(),
-                    enforcer_state
-                        .firewall_cfg
-                        .read()
-                        .await
-                        .as_ref()
-                        .map(|c| c.version().into()),
-                )
-                .await;
+            let mut enf = enforcer.write().await;
+            let version = Some(enf.config.version().into());
+            let heartbeat: io::Result<Option<EnforcerConfig>> = enf.client.heartbeat(context::current(), version).await;
             match heartbeat {
                 Err(error) => match error.kind() {
                     ErrorKind::ConnectionReset => {
                         error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
                         if let Ok(new_client) = run().await {
-                            *instance = new_client;
+                            enf.client = new_client;
                         }
                     },
                     _ => {
@@ -100,8 +89,6 @@ pub(crate) async fn heartbeat(
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }
-
-            drop(instance);
         }
 
         sleep(Duration::from_secs(5)).await;
