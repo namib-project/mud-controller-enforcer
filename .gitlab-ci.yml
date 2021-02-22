@@ -14,7 +14,7 @@ cache:
 before_script:
   - git config --global credential.helper store
   - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
-  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev cmake clang
+  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev libnftnl-dev libmnl-dev cmake clang
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
   - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
   - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
@@ -144,7 +144,7 @@ openwrt_package_bcm2711_snapshot: # raspberry v4
   script:
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
-    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl
+    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl
     - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
     - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
     - mkdir package/namib/src
