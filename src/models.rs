@@ -50,14 +50,14 @@ pub type DuidContent = Vec<u8>;
 /// Represents the type value of a DHCP DUID according to [RFC 8415](https://tools.ietf.org/html/rfc8415#section-11).
 pub type DuidType = [u8; 2];
 
-/// Container for DHCP-version specific information about DHCP leases (values that are specific for e.g. DHCPv4).
+/// Container for DHCP-version specific information about DHCP leases (values that are specific for e.g. `DHCPv4`).
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub enum DhcpLeaseVersionSpecificInformation {
     V4(DhcpV4LeaseVersionSpecificInformation),
     V6(DhcpV6LeaseVersionSpecificInformation),
 }
 
-/// Container for DHCP lease information which is exclusive to DHCPv4.
+/// Container for DHCP lease information which is exclusive to `DHCPv4`.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct DhcpV4LeaseVersionSpecificInformation {
     pub ip_addr: Ipv4Addr,
@@ -131,7 +131,7 @@ impl ToString for Duid {
     }
 }
 
-/// Container for DHCP lease information which is exclusive to DHCPv6.
+/// Container for DHCP lease information which is exclusive to `DHCPv6`.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct DhcpV6LeaseVersionSpecificInformation {
     pub ip_addr: Ipv6Addr,

@@ -33,17 +33,17 @@ impl RuleName {
 /// Enum for the source or destination
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Network {
-    LAN,
-    WAN,
-    VPN,
+    Lan,
+    Wan,
+    Vpn,
 }
 
 impl fmt::Display for Network {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LAN => f.write_str("lan"),
-            Self::WAN => f.write_str("wan"),
-            Self::VPN => f.write_str("vpn"),
+            Self::Lan => f.write_str("lan"),
+            Self::Wan => f.write_str("wan"),
+            Self::Vpn => f.write_str("vpn"),
         }
     }
 }
@@ -92,18 +92,18 @@ impl Protocol {
 /// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Target {
-    ACCEPT,
-    REJECT,
-    DROP,
+    Accept,
+    Reject,
+    Drop,
 }
 
 impl Target {
     /// Return the key, value pair of target.
     pub fn to_option(&self) -> (String, String) {
         match self {
-            Self::ACCEPT => ("target".to_string(), "ACCEPT".to_string()),
-            Self::REJECT => ("target".to_string(), "REJECT".to_string()),
-            Self::DROP => ("target".to_string(), "DROP".to_string()),
+            Self::Accept => ("target".to_string(), "ACCEPT".to_string()),
+            Self::Reject => ("target".to_string(), "REJECT".to_string()),
+            Self::Drop => ("target".to_string(), "DROP".to_string()),
         }
     }
 }

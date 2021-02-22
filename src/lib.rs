@@ -23,7 +23,8 @@ where
 {
     let certfile = File::open(file)?;
     let mut reader = io::BufReader::new(certfile);
-    Ok(method(&mut reader).map_err(|_| io::Error::from(io::ErrorKind::Other))?)
+    let val = method(&mut reader).map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+    Ok(val)
 }
 
 /// Returns the codec used for RPC communication
