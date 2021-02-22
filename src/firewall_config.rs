@@ -5,7 +5,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use std::fmt::Formatter;
+use std::{fmt::Formatter, net::IpAddr};
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -32,13 +32,13 @@ impl RuleName {
 
 /// Enum for the source or destination
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum EnNetwork {
+pub enum Network {
     LAN,
     WAN,
     VPN,
 }
 
-impl fmt::Display for EnNetwork {
+impl fmt::Display for Network {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::LAN => f.write_str("lan"),
@@ -50,13 +50,13 @@ impl fmt::Display for EnNetwork {
 /// Struct for src and dest configs
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkConfig {
-    pub typ: EnNetwork,
+    pub typ: Network,
     pub ip: Option<String>,
     pub port: Option<String>,
 }
 
 impl NetworkConfig {
-    pub fn new(typ: EnNetwork, ip: Option<String>, port: Option<String>) -> NetworkConfig {
+    pub fn new(typ: Network, ip: Option<String>, port: Option<String>) -> NetworkConfig {
         NetworkConfig { typ, ip, port }
     }
 }
@@ -91,13 +91,13 @@ impl Protocol {
 
 /// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub enum EnTarget {
+pub enum Target {
     ACCEPT,
     REJECT,
     DROP,
 }
 
-impl EnTarget {
+impl Target {
     /// Return the key, value pair of target.
     pub fn to_option(&self) -> (String, String) {
         match self {
@@ -109,7 +109,7 @@ impl EnTarget {
 }
 
 /// Enum for optional settings. Here can be added some specified rules in key, value format.
-pub type EnOptionalSettings = Option<Vec<(String, String)>>;
+pub type OptionalSettings = Option<Vec<(String, String)>>;
 
 /// This struct contains the main configuration which is needed for firewall rules.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -118,14 +118,14 @@ pub struct FirewallRule {
     src: NetworkConfig,
     dst: NetworkConfig,
     protocol: Protocol,
-    target: EnTarget,
-    optional_settings: EnOptionalSettings,
+    target: Target,
+    optional_settings: OptionalSettings,
 }
 
 impl FirewallRule {
     /// Create a new `ConfigFirewall`.
     /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: EnTarget, optional_settings: EnOptionalSettings) -> FirewallRule {
+    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: Target, optional_settings: OptionalSettings) -> FirewallRule {
         FirewallRule {
             rule_name,
             src,
@@ -145,11 +145,12 @@ impl FirewallRule {
 
     /// Returns this firewall rule as list of key, value pairs.
     pub fn to_option(&self) -> Vec<(String, String)> {
-        let mut query: Vec<(String, String)> = Vec::new();
-        query.push(self.rule_name.to_option());
-        query.push(self.protocol.to_option());
-        query.push(self.target.to_option());
-        query.push(("src".to_string(), self.src.typ.to_string()));
+        let mut query: Vec<(String, String)> = vec![
+            self.rule_name.to_option(),
+            self.protocol.to_option(),
+            self.target.to_option(),
+            ("src".to_string(), self.src.typ.to_string()),
+        ];
         if let Some(ip) = &self.src.ip {
             query.push(("src_ip".to_string(), ip.clone()));
         }
@@ -175,17 +176,34 @@ impl FirewallRule {
     }
 }
 
-/// Stores a set of firewall rules and a config version
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct FirewallConfig {
-    version: String,
-    rules: Vec<FirewallRule>,
+pub struct KnownDevice {
+    pub ip: IpAddr,
+    pub collect_data: bool,
 }
 
-impl FirewallConfig {
+impl KnownDevice {
+    pub fn new(ip: IpAddr, collect_data: bool) -> Self {
+        Self { ip, collect_data }
+    }
+}
+
+/// Stores a set of firewall rules and a config version
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EnforcerConfig {
+    version: String,
+    firewall_rules: Vec<FirewallRule>,
+    known_devices: Vec<KnownDevice>,
+}
+
+impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, rules: Vec<FirewallRule>) -> Self {
-        FirewallConfig { version, rules }
+    pub fn new(version: String, firewall_rules: Vec<FirewallRule>, known_devices: Vec<KnownDevice>) -> Self {
+        EnforcerConfig {
+            version,
+            firewall_rules,
+            known_devices,
+        }
     }
 
     /// Returns the version of this config
@@ -194,7 +212,11 @@ impl FirewallConfig {
     }
 
     /// Returns a reference to the firewall rules in this config
-    pub fn rules(&self) -> &Vec<FirewallRule> {
-        &self.rules
+    pub fn firewall_rules(&self) -> &Vec<FirewallRule> {
+        &self.firewall_rules
+    }
+
+    pub fn known_devices(&self) -> &Vec<KnownDevice> {
+        &self.known_devices
     }
 }

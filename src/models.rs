@@ -2,6 +2,7 @@ use crate::MacAddr;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use std::{
+    fmt::Debug,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     slice,
     time::Duration,
