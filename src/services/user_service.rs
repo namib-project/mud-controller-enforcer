@@ -1,9 +1,10 @@
+use sqlx::Done;
+
 use crate::{
     db::DbConnection,
     error::Result,
     models::{RoleDbo, User, UserDbo},
 };
-use sqlx::Done;
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {

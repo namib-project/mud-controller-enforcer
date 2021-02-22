@@ -2,11 +2,46 @@ use crate::{
     db::DbConnection,
     error::{Error, Result},
     models::{Device, DeviceDbo},
-    services::mud_service::get_mud_from_url,
+    services::{
+        config_service, config_service::ConfigKeys, firewall_configuration_service, mud_service,
+        mud_service::get_mud_from_url,
+    },
 };
-use futures::TryStreamExt;
-use namib_shared::mac;
+pub use futures::TryStreamExt;
+
+use namib_shared::models::DhcpLeaseInformation;
 use sqlx::Done;
+
+pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
+    let mut dhcp_device_data = Device::from(lease_info);
+    let update = if let Ok(device) = find_by_ip(dhcp_device_data.ip_addr, pool).await {
+        dhcp_device_data.id = device.id;
+        dhcp_device_data.collect_info = device.collect_info;
+        true
+    } else {
+        dhcp_device_data.collect_info = dhcp_device_data.mud_url.is_none()
+            && config_service::get_config_value(ConfigKeys::CollectDeviceData.as_ref(), pool)
+                .await
+                .unwrap_or(false);
+        false
+    };
+    if update {
+        update_device(&dhcp_device_data, pool).await.unwrap();
+    } else {
+        insert_device(&dhcp_device_data, pool).await.unwrap();
+    }
+
+    debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
+
+    match dhcp_device_data.mud_url {
+        Some(url) => mud_service::get_mud_from_url(url, pool).await.ok(),
+        None => None,
+    };
+
+    firewall_configuration_service::update_config_version(pool).await?;
+
+    Ok(())
+}
 
 pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     let devices = sqlx::query_as!(DeviceDbo, "select * from devices").fetch(pool);
@@ -14,19 +49,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     let devices_data = devices
         .err_into::<Error>()
         .and_then(|device| async {
-            let mut device_data = Device {
-                id: device.id,
-                ip_addr: device.ip_addr.parse()?,
-                mac_addr: device
-                    .mac_addr
-                    .and_then(|mac| mac.parse::<mac::MacAddr>().ok())
-                    .map(|mac| mac.into()),
-                hostname: device.hostname,
-                vendor_class: device.vendor_class,
-                mud_url: device.mud_url,
-                last_interaction: device.last_interaction,
-                mud_data: None,
-            };
+            let mut device_data = Device::from(device);
             device_data.mud_data = match device_data.mud_url.clone() {
                 Some(url) => {
                     let data = get_mud_from_url(url.clone(), pool).await;
@@ -65,12 +88,13 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
     let ip_addr = device_data.ip_addr.to_string();
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
     let ins_count = sqlx::query!(
-        "insert into devices (ip_addr, mac_addr, hostname, vendor_class, mud_url, last_interaction) values (?, ?, ?, ?, ?, ?)",
+        "insert into devices (ip_addr, mac_addr, hostname, vendor_class, mud_url, collect_info, last_interaction) values (?, ?, ?, ?, ?, ?, ?)",
         ip_addr,
         mac_addr,
         device_data.hostname,
         device_data.vendor_class,
         device_data.mud_url,
+        device_data.collect_info,
         device_data.last_interaction,
     )
     .execute(pool)
@@ -83,12 +107,13 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
     let ip_addr = device_data.ip_addr.to_string();
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
     let upd_count = sqlx::query!(
-        "update devices set ip_addr = ?, mac_addr = ?, hostname = ?, vendor_class = ?, mud_url = ?, last_interaction = ? where id = ?",
+        "update devices set ip_addr = ?, mac_addr = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ? where id = ?",
         ip_addr,
         mac_addr,
         device_data.hostname,
         device_data.vendor_class,
         device_data.mud_url,
+        device_data.collect_info,
         device_data.last_interaction,
         device_data.id,
     )

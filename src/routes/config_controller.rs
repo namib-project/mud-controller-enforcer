@@ -2,7 +2,7 @@
 
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
-use crate::{auth::Auth, db::DbConnection, error::Result, routes::dtos::ConfigQueryDto, services::config_service};
+use crate::{auth::AuthToken, db::DbConnection, error::Result, routes::dtos::ConfigQueryDto, services::config_service};
 use std::collections::HashMap;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -14,7 +14,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 #[api_v2_operation]
 async fn get_configs(
     pool: web::Data<DbConnection>,
-    auth: Auth,
+    auth: AuthToken,
     config_query_dto: web::Query<ConfigQueryDto>,
 ) -> Result<Json<HashMap<String, Option<String>>>> {
     auth.require_permission("config/read")?;
@@ -40,7 +40,7 @@ async fn get_configs(
 #[api_v2_operation]
 async fn set_configs(
     pool: web::Data<DbConnection>,
-    auth: Auth,
+    auth: AuthToken,
     config_set_dto: Json<HashMap<String, String>>,
 ) -> Result<Json<HashMap<String, Option<String>>>> {
     auth.require_permission("config/write")?;
@@ -62,7 +62,7 @@ async fn set_configs(
 #[api_v2_operation]
 async fn delete_config(
     pool: web::Data<DbConnection>,
-    auth: Auth,
+    auth: AuthToken,
     config_delete_dto: Json<Vec<String>>,
 ) -> Result<Json<HashMap<String, bool>>> {
     auth.require_permission("config/delete")?;
