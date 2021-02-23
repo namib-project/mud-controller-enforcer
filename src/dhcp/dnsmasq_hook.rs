@@ -12,6 +12,8 @@ use namib_shared::{
     },
     MacAddr,
 };
+use regex::Regex;
+use std::convert::TryInto;
 
 enum EventType {
     Add,
@@ -48,7 +50,7 @@ impl From<DnsmasqHookError> for DnsmasqHookReturn {
             DnsmasqHookError::UnsupportedEventType { .. } => 8,
             DnsmasqHookError::EnforcerConnectionError { .. } => 63,
             DnsmasqHookError::EventSerializationError { .. } => 64,
-            //_ => 1,
+            DnsmasqHookError::RequiredArgumentMissing { .. } => 1,
         }
     }
 }
@@ -92,6 +94,9 @@ enum DnsmasqHookError {
         supplied_mac: String,
         source: macaddr::ParseError,
     },
+    /// The supplied DUID is not of the correct format.
+    #[snafu(display("Supplied DUID \"{}\" is not valid.", "supplied_mac"))]
+    InvalidDuid { supplied_duid: String },
     /// The event type this script was called with is not supported.
     #[snafu(display("Supplied event type \"{}\" is not supported", "supplied_type"))]
     UnsupportedEventType { supplied_type: String },
