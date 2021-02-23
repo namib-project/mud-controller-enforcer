@@ -17,19 +17,24 @@ mod test_dnsmasq_hook {
     use serial_test::serial;
 
     use namib_shared::models::{
-        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
+        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation,
+        DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
     };
 
     fn full_lease_info_v4() -> DhcpLeaseInformation {
         DhcpLeaseInformation {
-            version_specific_information: DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation {
-                ip_addr: Ipv4Addr::new(192, 168, 1, 15),
-            }),
+            version_specific_information: DhcpLeaseVersionSpecificInformation::V4(
+                DhcpV4LeaseVersionSpecificInformation {
+                    ip_addr: Ipv4Addr::new(192, 168, 1, 15),
+                },
+            ),
             domain: Some("64cb69b4591c.domain.example".to_string()),
             client_provided_hostname: Some("64cb69b4591c".to_string()),
             old_hostname: None,
             user_classes: vec!["testclass1".to_string(), "testclass2".to_string()],
-            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(Local.timestamp_opt(1605596290, 0).earliest().unwrap().into()),
+            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(
+                Local.timestamp_opt(1605596290, 0).earliest().unwrap().into(),
+            ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: Some("eth0".to_string()),
             mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
@@ -41,15 +46,19 @@ mod test_dnsmasq_hook {
 
     fn full_lease_info_v6() -> DhcpLeaseInformation {
         DhcpLeaseInformation {
-            version_specific_information: DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation {
-                ip_addr: Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0000, 0000, 0x8a2e, 0x0370, 0x7334),
-                duid: Duid::Uuid(Vec::from([0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])),
-            }),
+            version_specific_information: DhcpLeaseVersionSpecificInformation::V6(
+                DhcpV6LeaseVersionSpecificInformation {
+                    ip_addr: Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0000, 0000, 0x8a2e, 0x0370, 0x7334),
+                    duid: Duid::Uuid(Vec::from([0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])),
+                },
+            ),
             domain: Some("64cb69b4591c.domain.example".to_string()),
             client_provided_hostname: Some("64cb69b4591c".to_string()),
             old_hostname: None,
             user_classes: vec!["testclass1".to_string(), "testclass2".to_string()],
-            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(Local.timestamp_opt(1605596290, 0).earliest().unwrap().into()),
+            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(
+                Local.timestamp_opt(1605596290, 0).earliest().unwrap().into(),
+            ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: Some("eth0".to_string()),
             mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
@@ -132,15 +141,24 @@ mod test_dnsmasq_hook {
         let mut args = Vec::new();
         let mut envs: HashMap<String, String> = HashMap::new();
         let lease_info = match event {
-            DhcpEvent::LeaseAdded { event_timestamp: _, lease_info } => {
+            DhcpEvent::LeaseAdded {
+                event_timestamp: _,
+                lease_info,
+            } => {
                 args.push("add".to_string());
                 lease_info
             },
-            DhcpEvent::LeaseDestroyed { event_timestamp: _, lease_info } => {
+            DhcpEvent::LeaseDestroyed {
+                event_timestamp: _,
+                lease_info,
+            } => {
                 args.push("del".to_string());
                 lease_info
             },
-            DhcpEvent::ExistingLeaseUpdate { event_timestamp: _, lease_info } => {
+            DhcpEvent::ExistingLeaseUpdate {
+                event_timestamp: _,
+                lease_info,
+            } => {
                 args.push("old".to_string());
                 lease_info
             },
@@ -149,7 +167,10 @@ mod test_dnsmasq_hook {
             envs.insert("DNSMASQ_INTERFACE".to_string(), receiver_interface.clone());
         }
         envs.insert("DNSMASQ_TAGS".to_string(), lease_info.tags.join(" "));
-        envs.insert("DNSMASQ_TIME_REMAINING".to_string(), lease_info.time_remaining.as_secs().to_string());
+        envs.insert(
+            "DNSMASQ_TIME_REMAINING".to_string(),
+            lease_info.time_remaining.as_secs().to_string(),
+        );
         match &lease_info.lease_expiry {
             LeaseExpiryTime::LeaseExpiryTime(datetime) => {
                 envs.insert("DNSMASQ_LEASE_EXPIRES".to_string(), datetime.timestamp().to_string());
@@ -162,7 +183,10 @@ mod test_dnsmasq_hook {
             envs.insert("DNSMASQ_MUD_URL".to_string(), mud_url.to_string());
         }
         if let Some(client_provided_hostname) = &lease_info.client_provided_hostname {
-            envs.insert("DNSMASQ_SUPPLIED_HOSTNAME".to_string(), client_provided_hostname.to_string());
+            envs.insert(
+                "DNSMASQ_SUPPLIED_HOSTNAME".to_string(),
+                client_provided_hostname.to_string(),
+            );
         }
         if let Some(domain) = &lease_info.domain {
             envs.insert("DNSMASQ_DOMAIN".to_string(), domain.to_string());
@@ -171,12 +195,20 @@ mod test_dnsmasq_hook {
             envs.insert("DNSMASQ_OLD_HOSTNAME".to_string(), old_hostname.to_string());
         }
         for (class_num, user_class) in lease_info.user_classes.iter().enumerate() {
-            envs.insert(format!("DNSMASQ_USER_CLASS{}", class_num).to_string(), user_class.to_string());
+            envs.insert(
+                format!("DNSMASQ_USER_CLASS{}", class_num).to_string(),
+                user_class.to_string(),
+            );
         }
 
         match &lease_info.version_specific_information {
             DhcpLeaseVersionSpecificInformation::V4(v4info) => {
-                args.push(lease_info.mac_address.expect("DHCPv4 lease information must have MAC address set.").to_string());
+                args.push(
+                    lease_info
+                        .mac_address
+                        .expect("DHCPv4 lease information must have MAC address set.")
+                        .to_string(),
+                );
                 args.push(v4info.ip_addr.to_string());
             },
             DhcpLeaseVersionSpecificInformation::V6(v6info) => {
@@ -246,7 +278,10 @@ mod test_dnsmasq_hook {
                 actual_lease_info
             },
         };
-        let received_event = dhcp_listener_result.join().expect("Event listener thread paniced!").expect("Did not receive DHCP event!");
+        let received_event = dhcp_listener_result
+            .join()
+            .expect("Event listener thread paniced!")
+            .expect("Did not receive DHCP event!");
         let received_event_type;
         let received_lease_info = match received_event {
             DhcpEvent::LeaseAdded {
@@ -301,14 +336,18 @@ mod test_dnsmasq_hook {
     #[serial(dnsmasq_hook)]
     fn test_add_minimal_ipv4() {
         let lease_info = DhcpLeaseInformation {
-            version_specific_information: DhcpLeaseVersionSpecificInformation::V4(DhcpV4LeaseVersionSpecificInformation {
-                ip_addr: Ipv4Addr::new(192, 168, 1, 16),
-            }),
+            version_specific_information: DhcpLeaseVersionSpecificInformation::V4(
+                DhcpV4LeaseVersionSpecificInformation {
+                    ip_addr: Ipv4Addr::new(192, 168, 1, 16),
+                },
+            ),
             domain: None,
             client_provided_hostname: None,
             old_hostname: None,
             user_classes: vec![],
-            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(Local.timestamp_opt(1605596290, 0).earliest().unwrap().into()),
+            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(
+                Local.timestamp_opt(1605596290, 0).earliest().unwrap().into(),
+            ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: None,
             mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
@@ -329,15 +368,19 @@ mod test_dnsmasq_hook {
     #[serial(dnsmasq_hook)]
     fn test_add_minimal_ipv6() {
         let lease_info = DhcpLeaseInformation {
-            version_specific_information: DhcpLeaseVersionSpecificInformation::V6(DhcpV6LeaseVersionSpecificInformation {
-                ip_addr: Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0000, 0000, 0x8a2e, 0x0370, 0x7335),
-                duid: Duid::Uuid(Vec::from([0xaa, 0xbb, 0xcc, 0xdd, 0xef, 0xff])),
-            }),
+            version_specific_information: DhcpLeaseVersionSpecificInformation::V6(
+                DhcpV6LeaseVersionSpecificInformation {
+                    ip_addr: Ipv6Addr::new(0x2001, 0x0db8, 0x85a3, 0000, 0000, 0x8a2e, 0x0370, 0x7335),
+                    duid: Duid::Uuid(Vec::from([0xaa, 0xbb, 0xcc, 0xdd, 0xef, 0xff])),
+                },
+            ),
             domain: None,
             client_provided_hostname: None,
             old_hostname: None,
             user_classes: vec![],
-            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(Local.timestamp_opt(1605596290, 0).earliest().unwrap().into()),
+            lease_expiry: LeaseExpiryTime::LeaseExpiryTime(
+                Local.timestamp_opt(1605596290, 0).earliest().unwrap().into(),
+            ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: None,
             mac_address: None,
@@ -379,7 +422,11 @@ mod test_dnsmasq_hook {
         args.remove(3);
         args.remove(2);
 
-        result_command.args(args).envs(envs).stdout(Stdio::null()).stderr(Stdio::null());
+        result_command
+            .args(args)
+            .envs(envs)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
         // Removing a command line argument will make the program assume something else is the missing argument.
         // The error code may not be for a missing argument, but instead for an invalid value for another argument.
         assert_eq!(
@@ -730,7 +777,10 @@ mod test_dnsmasq_hook {
         };
         let mut result_command = Command::new(namib_dnsmasq_hook_exe());
         let (args, mut envs) = create_args_and_env_map_from_event(&event);
-        envs.insert("DNSMASQ_MAC".to_string(), "aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff".to_string());
+        envs.insert(
+            "DNSMASQ_MAC".to_string(),
+            "aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff:aa:bb:cc:dd:ee:ff".to_string(),
+        );
 
         assert_eq!(
             6,
