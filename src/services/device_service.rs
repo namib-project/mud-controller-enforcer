@@ -67,7 +67,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     Ok(devices_data)
 }
 
-pub async fn find_by_id(id: i32, pool: &DbConnection) -> Result<Device> {
+pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
     let device = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
         .fetch_one(pool)
         .await?;
@@ -123,7 +123,7 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
     Ok(upd_count.rows_affected())
 }
 
-pub async fn delete_device(id: i32, pool: &DbConnection) -> Result<u64> {
+pub async fn delete_device(id: i64, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("delete from devices where id = ?", id)
         .execute(pool)
         .await?;
