@@ -47,9 +47,9 @@ fn get_filtered_mud_urls(mut mud_vec: Vec<MudDboRefresh>) -> Vec<String> {
 }
 
 async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
-    for mud in vec_url.iter() {
-        log::debug!("Try to update url: {}", mud);
-        let updated_mud = get_mud_from_url(mud.to_owned(), db_pool).await?;
+    for mud_url in vec_url.iter() {
+        log::debug!("Try to update url: {}", mud_url);
+        let updated_mud = get_mud_from_url(mud_url.to_owned(), db_pool).await?;
         log::debug!("Updated mud profile: {:#?}", updated_mud);
     }
     Ok(())
@@ -58,12 +58,17 @@ async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDateTime;
+    use crate::{
+        models::{MudData, MudDbo},
+        services::mud_service::parser::parse_mud,
+    };
+    use chrono::{Duration, NaiveDateTime, Utc};
     use dotenv::dotenv;
     use sqlx::migrate;
+    use std::{fs::File, io::Read};
 
     #[actix_rt::test]
-    async fn test_update_outdated_profiles() -> Result<()> {
+    async fn test_trivial_functionality() -> Result<()> {
         let db_conn = init().await?;
         let url = "test_url".to_string();
         let data = "test_data".to_string();
@@ -124,5 +129,61 @@ mod tests {
             .expect("Database migrations failed");
 
         Ok(db_conn)
+    }
+    #[actix_rt::test]
+    async fn test_update_outdated_profiles() -> Result<()> {
+        const PATH: &str = "tests/mud_tests/Amazon-Echo";
+        let conn = init().await?;
+        let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
+        let duration: i64 = 50;
+        let mut file = File::open(PATH).expect(format!("Could not open {}", PATH).as_str());
+        let mut str_data = String::new();
+        file.read_to_string(&mut str_data)
+            .expect(format!("Could not read {}", PATH).as_str());
+
+        let mud_data: MudData =
+            parse_mud(url.clone(), str_data.as_str()).expect(format!("Could not parse {}", PATH).as_str());
+
+        let mud_dbo = MudDbo {
+            url: url.to_owned(),
+            data: serde_json::to_string(&mud_data)?,
+            created_at: Utc::now().naive_utc(),
+            expiration: (Utc::now() - Duration::hours(duration)).naive_utc(),
+        };
+
+        sqlx::query!(
+            "insert into mud_data (url, data, created_at, expiration) values (?, ?, ?, ?)",
+            mud_dbo.url,
+            mud_dbo.data,
+            mud_dbo.created_at,
+            mud_dbo.expiration,
+        )
+        .execute(&conn)
+        .await?;
+
+        update_outdated_profiles(&conn).await?;
+
+        let new_mud_data: MudDbo = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = $1", mud_data.url)
+            .fetch_one(&conn)
+            .await?;
+
+        let lower_expiration = mud_dbo.expiration + Duration::hours(149);
+        let higher_expiration = mud_dbo.expiration + Duration::hours(151);
+
+        assert_ne!(new_mud_data.expiration, mud_dbo.expiration);
+        assert!(new_mud_data.expiration > mud_dbo.expiration);
+        assert!(new_mud_data.expiration > lower_expiration);
+        assert!(new_mud_data.expiration < higher_expiration);
+
+        sqlx::query!("DELETE FROM mud_data WHERE url = ?", mud_dbo.url)
+            .execute(&conn)
+            .await?;
+
+        let is_delete: Option<MudDbo> = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = ?", mud_data.url)
+            .fetch_optional(&conn)
+            .await?;
+
+        assert!(is_delete.is_none());
+        Ok(())
     }
 }
