@@ -47,3 +47,4 @@ sha-1 = "0.9"
 base64 = "0.13"
 regex = "1"
 lazy_static = "1"
+actix-ratelimit = {version = "0.3.1", default-features = false, features = ["memory"]}
