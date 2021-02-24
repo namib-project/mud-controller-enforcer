@@ -16,7 +16,7 @@ actix-rt = "1.1"
 actix-files = "0.5"
 actix-cors = "0.5.4"
 sqlx = { version = "0.4", features = ["runtime-actix-rustls", "chrono"] }
-namib_shared = { tag = "0.2.1", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+namib_shared = { tag = "0.3.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "0.4"
 env_logger = "0.8"
 tokio = { version = "1", features = ["full"] }
@@ -42,5 +42,8 @@ isahc = "1.0"
 paperclip = { version = "0.5", features = ["actix", "chrono"] }
 glob = "0.3"
 const_format = "0.2"
+strum = { version = "0.20", features = ["derive"] }
+sha-1 = "0.9"
+base64 = "0.13"
 regex = "1"
-lazy_static = "1.4.0"
+lazy_static = "1"

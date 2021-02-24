@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::error::{ResponseError, Result};
+use crate::{error, error::Result};
 use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
@@ -50,7 +50,7 @@ impl AuthToken {
                 return Ok(());
             }
         }
-        ResponseError {
+        error::ResponseError {
             status: StatusCode::FORBIDDEN,
             message: Some("Forbidden".to_string()),
         }

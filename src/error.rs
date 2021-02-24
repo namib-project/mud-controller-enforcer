@@ -69,6 +69,20 @@ pub enum Error {
         source: glob::PatternError,
         backtrace: Backtrace,
     },
+    #[snafu(display("ParseIntError {}", source), context(false))]
+    ParseIntError {
+        source: std::num::ParseIntError,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("ChronoParseError {}", source), context(false))]
+    ChronoParseError {
+        source: chrono::ParseError,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("FromStrError"), visibility(pub))]
+    FromStrError { backtrace: Backtrace },
+    #[snafu(display("NoneError"), visibility(pub))]
+    NoneError { backtrace: Backtrace },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

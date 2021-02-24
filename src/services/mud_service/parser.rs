@@ -4,7 +4,8 @@ use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use crate::{
-    error::{MudError, Result},
+    error,
+    error::Result,
     models::{Ace, AceAction, AceMatches, AcePort, AceProtocol, Acl, AclDirection, AclType, MudData},
 };
 
@@ -16,7 +17,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
 
     let mud_data = &mud_json.mud;
     if mud_data.mud_version != 1 {
-        MudError {
+        error::MudError {
             message: String::from("Unsupported MUD Version"),
         }
         .fail()?;
@@ -24,7 +25,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
     let cachevalidity = mud_data.cache_validity.unwrap_or(48);
     ensure!(
         cachevalidity >= 1 && cachevalidity <= 168,
-        MudError {
+        error::MudError {
             message: String::from("MUD-File has invalid 'cache-validity'")
         }
     );
@@ -109,7 +110,7 @@ fn parse_device_policy(
                             direction_initiated = Some(match dir.as_str() {
                                 "from-device" => AclDirection::FromDevice,
                                 "to-device" => AclDirection::ToDevice,
-                                _ => MudError {
+                                _ => error::MudError {
                                     message: String::from("Invalid direction"),
                                 }
                                 .fail()?,
@@ -121,7 +122,7 @@ fn parse_device_policy(
                     }
                     if let Some(ipv6) = &aceitem.matches.ipv6 {
                         if acl_type != AclType::IPV6 {
-                            MudError {
+                            error::MudError {
                                 message: String::from("IPv6 ACE in IPv4 ACL"),
                             }
                             .fail()?
@@ -135,7 +136,7 @@ fn parse_device_policy(
                         dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
                     } else if let Some(ipv4) = &aceitem.matches.ipv4 {
                         if acl_type != AclType::IPV4 {
-                            MudError {
+                            error::MudError {
                                 message: String::from("IPv4 ACE in IPv6 ACL"),
                             }
                             .fail()?
@@ -181,7 +182,7 @@ fn parse_device_policy(
         }
         ensure!(
             found,
-            MudError {
+            error::MudError {
                 message: String::from("MUD-File has dangling ACL policy")
             }
         );
@@ -195,7 +196,7 @@ fn parse_mud_port(port: &json_models::Port) -> Result<AcePort> {
         json_models::Port { port: Some(p), .. } => {
             ensure!(
                 port.operator == Some(String::from("eq")),
-                MudError {
+                error::MudError {
                     message: String::from("Only 'eq' operator is supported")
                 }
             );
@@ -208,13 +209,13 @@ fn parse_mud_port(port: &json_models::Port) -> Result<AcePort> {
         } => {
             ensure!(
                 port.operator == None,
-                MudError {
+                error::MudError {
                     message: String::from("No operator for port range")
                 }
             );
             Ok(AcePort::Range(*lower_port, *upper_port))
         },
-        _ => MudError {
+        _ => error::MudError {
             message: String::from("Invalid port definition"),
         }
         .fail()?,
