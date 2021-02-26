@@ -141,8 +141,8 @@ mod test {
 
     #[test]
     fn expect_protocol_json() {
-        assert_eq!(json!(AceProtocol::Tcp), json!({"name": "TCP"}));
-        assert_eq!(json!(AceProtocol::Udp), json!({"name": "UDP"}));
+        assert_eq!(json!(AceProtocol::Tcp), json!({"name": "Tcp"}));
+        assert_eq!(json!(AceProtocol::Udp), json!({"name": "Udp"}));
         assert_eq!(json!(AceProtocol::Protocol(17)), json!({"name": "Protocol", "num": 17}))
     }
 }
