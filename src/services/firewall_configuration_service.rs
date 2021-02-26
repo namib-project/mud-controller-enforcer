@@ -42,8 +42,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
             let protocol = match &ace.matches.protocol {
                 None => Protocol::all(),
                 Some(proto) => match proto {
-                    AceProtocol::TCP => Protocol::tcp(),
-                    AceProtocol::UDP => Protocol::udp(),
+                    AceProtocol::Tcp => Protocol::tcp(),
+                    AceProtocol::Udp => Protocol::udp(),
                     AceProtocol::Protocol(proto_nr) => Protocol::from_number(proto_nr.to_owned()),
                 },
             };
@@ -174,7 +174,7 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::TCP),
+                        protocol: Some(AceProtocol::Tcp),
                         direction_initiated: None,
                         address_mask: None,
                         dnsname: None,
