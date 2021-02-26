@@ -146,7 +146,7 @@ mod tests {
         //Sets up an expired Amazon Echo profile
         const PATH: &str = "tests/mud_tests/Amazon-Echo";
         let conn = init().await?;
-          //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
+        //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
         let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
         let mut file = File::open(PATH).expect(format!("Could not open {}", PATH).as_str());
         let mut str_data = String::new();
