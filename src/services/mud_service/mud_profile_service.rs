@@ -186,4 +186,55 @@ mod tests {
         assert!(is_delete.is_none());
         Ok(())
     }
+    #[actix_rt::test]
+    async fn test_update_valid_profiles() -> Result<()> {
+        const PATH: &str = "tests/mud_tests/Amazon-Echo";
+        let conn = init().await?;
+        let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
+        let duration: i64 = 50;
+        let mut file = File::open(PATH).expect(format!("Could not open {}", PATH).as_str());
+        let mut str_data = String::new();
+        file.read_to_string(&mut str_data)
+            .expect(format!("Could not read {}", PATH).as_str());
+
+        let mud_data: MudData =
+            parse_mud(url.clone(), str_data.as_str()).expect(format!("Could not parse {}", PATH).as_str());
+
+        let mud_dbo = MudDbo {
+            url: url.to_owned(),
+            data: serde_json::to_string(&mud_data)?,
+            created_at: Utc::now().naive_utc(),
+            expiration: (Utc::now() + Duration::hours(duration)).naive_utc(),
+        };
+
+        sqlx::query!(
+            "insert into mud_data (url, data, created_at, expiration) values (?, ?, ?, ?)",
+            mud_dbo.url,
+            mud_dbo.data,
+            mud_dbo.created_at,
+            mud_dbo.expiration,
+        )
+            .execute(&conn)
+            .await?;
+
+        update_outdated_profiles(&conn).await?;
+
+        let new_mud_data: MudDbo = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = $1", mud_data.url)
+            .fetch_one(&conn)
+            .await?;
+
+        assert_eq!(new_mud_data.expiration, mud_dbo.expiration);
+        assert!(new_mud_data.expiration > Utc::now());
+
+        sqlx::query!("DELETE FROM mud_data WHERE url = ?", mud_dbo.url)
+            .execute(&conn)
+            .await?;
+
+        let is_delete: Option<MudDbo> = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = ?", mud_data.url)
+            .fetch_optional(&conn)
+            .await?;
+
+        assert!(is_delete.is_none());
+        Ok(())
+    }
 }
