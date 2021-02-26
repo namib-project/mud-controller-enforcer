@@ -10,6 +10,10 @@ use crate::{
     services::{firewall_configuration_service::update_config_version, mud_service::*},
 };
 
+/// Create new job scheduler that update the expired mud profiles.
+/// conn is the current database connection.
+/// Interval is the interval at which the profiles are tested.
+/// sleep_duration specifies how long the thread should sleep.
 pub fn job_update_outdated_profiles(conn: DbConnection, interval: clokwerk::Interval, sleep_duration: Duration) {
     log::info!("Start scheduler");
     let mut scheduler = Scheduler::new();

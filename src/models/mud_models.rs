@@ -86,8 +86,8 @@ impl Apiv2Schema for AcePort {
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(tag = "name", content = "num")]
 pub enum AceProtocol {
-    TCP,
-    UDP,
+    Tcp,
+    Udp,
     Protocol(u32),
 }
 
@@ -141,8 +141,8 @@ mod test {
 
     #[test]
     fn expect_protocol_json() {
-        assert_eq!(json!(AceProtocol::TCP), json!({"name": "TCP"}));
-        assert_eq!(json!(AceProtocol::UDP), json!({"name": "UDP"}));
+        assert_eq!(json!(AceProtocol::Tcp), json!({"name": "Tcp"}));
+        assert_eq!(json!(AceProtocol::Udp), json!({"name": "Udp"}));
         assert_eq!(json!(AceProtocol::Protocol(17)), json!({"name": "Protocol", "num": 17}))
     }
 }
