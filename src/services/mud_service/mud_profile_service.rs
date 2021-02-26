@@ -1,12 +1,14 @@
+use std::{thread, time::Duration};
+
+use chrono::Utc;
+use clokwerk::Scheduler;
+
 use crate::{
     db::DbConnection,
     error::Result,
     models::MudDboRefresh,
     services::{firewall_configuration_service::update_config_version, mud_service::*},
 };
-use chrono::Utc;
-use clokwerk::Scheduler;
-use std::{thread, time::Duration};
 
 pub fn job_update_outdated_profiles(conn: DbConnection, interval: clokwerk::Interval, sleep_duration: Duration) {
     log::info!("Start scheduler");
@@ -57,15 +59,18 @@ async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{fs::File, io::Read};
+
+    use chrono::{Duration, NaiveDateTime, Utc};
+    use dotenv::dotenv;
+    use sqlx::migrate;
+
     use crate::{
         models::{MudData, MudDbo},
         services::mud_service::parser::parse_mud,
     };
-    use chrono::{Duration, NaiveDateTime, Utc};
-    use dotenv::dotenv;
-    use sqlx::migrate;
-    use std::{fs::File, io::Read};
+
+    use super::*;
 
     #[actix_rt::test]
     async fn test_trivial_functionality() -> Result<()> {
@@ -135,20 +140,21 @@ mod tests {
         const PATH: &str = "tests/mud_tests/Amazon-Echo";
         let conn = init().await?;
         let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
-        let duration: i64 = 50;
         let mut file = File::open(PATH).expect(format!("Could not open {}", PATH).as_str());
         let mut str_data = String::new();
         file.read_to_string(&mut str_data)
             .expect(format!("Could not read {}", PATH).as_str());
-
+        let mud_json: json_models::MudJson = serde_json::from_str(&str_data)?;
+        let duration = mud_json.mud.cache_validity.unwrap_or(48);
         let mud_data: MudData =
             parse_mud(url.clone(), str_data.as_str()).expect(format!("Could not parse {}", PATH).as_str());
 
+        let present = Utc::now();
         let mud_dbo = MudDbo {
             url: url.to_owned(),
             data: serde_json::to_string(&mud_data)?,
             created_at: Utc::now().naive_utc(),
-            expiration: (Utc::now() - Duration::hours(duration)).naive_utc(),
+            expiration: (present - Duration::hours(duration)).naive_utc(),
         };
 
         sqlx::query!(
@@ -167,8 +173,8 @@ mod tests {
             .fetch_one(&conn)
             .await?;
 
-        let lower_expiration = mud_dbo.expiration + Duration::hours(149);
-        let higher_expiration = mud_dbo.expiration + Duration::hours(151);
+        let lower_expiration = present.naive_utc() + Duration::hours(duration - 1);
+        let higher_expiration = present.naive_utc() + Duration::hours(duration + 1);
 
         assert_ne!(new_mud_data.expiration, mud_dbo.expiration);
         assert!(new_mud_data.expiration > mud_dbo.expiration);
@@ -202,7 +208,7 @@ mod tests {
 
         let mud_dbo = MudDbo {
             url: url.to_owned(),
-            data: serde_json::to_string(&mud_data)?,
+            data: serde_json::to_string(&mud_data)? + "Test",
             created_at: Utc::now().naive_utc(),
             expiration: (Utc::now() + Duration::hours(duration)).naive_utc(),
         };
@@ -214,8 +220,8 @@ mod tests {
             mud_dbo.created_at,
             mud_dbo.expiration,
         )
-            .execute(&conn)
-            .await?;
+        .execute(&conn)
+        .await?;
 
         update_outdated_profiles(&conn).await?;
 
@@ -224,7 +230,11 @@ mod tests {
             .await?;
 
         assert_eq!(new_mud_data.expiration, mud_dbo.expiration);
-        assert!(new_mud_data.expiration > Utc::now());
+        assert_eq!(
+            serde_json::to_string(&new_mud_data).unwrap(),
+            serde_json::to_string(&mud_dbo).unwrap()
+        );
+        assert!(new_mud_data.expiration > Utc::now().naive_utc());
 
         sqlx::query!("DELETE FROM mud_data WHERE url = ?", mud_dbo.url)
             .execute(&conn)

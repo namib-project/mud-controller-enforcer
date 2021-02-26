@@ -15,7 +15,7 @@ pub struct MudDboRefresh {
     pub expiration: NaiveDateTime,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MudDbo {
     pub url: String,
     pub data: String,
