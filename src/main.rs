@@ -41,9 +41,14 @@ async fn main() -> Result<()> {
             .expect("failed running rpc server");
     });
 
+    /*Starts a new job that updates the expired profiles at regular intervals.*/
     let conn3 = conn.clone();
     let _computation = thread::spawn(move || {
-        job_update_outdated_profiles(conn3, clokwerk::TimeUnits::seconds(1), Duration::from_secs(10));
+        job_update_outdated_profiles(
+            conn3,                        // Given database connection.
+            clokwerk::TimeUnits::hour(1), // Interval at which the expired profiles are updated.
+            Duration::from_secs(600),     // How long does the thread sleep until next test.
+        );
     });
 
     HttpServer::new(move || {
