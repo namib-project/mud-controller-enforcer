@@ -9,7 +9,7 @@ use paperclip::{
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MudDboRefresh {
     pub url: String,
     pub expiration: NaiveDateTime,

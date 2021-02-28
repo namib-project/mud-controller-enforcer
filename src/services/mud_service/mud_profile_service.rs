@@ -6,7 +6,6 @@ use clokwerk::Scheduler;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::MudDboRefresh,
     services::{firewall_configuration_service::update_config_version, mud_service::*},
 };
 
@@ -35,27 +34,19 @@ pub fn job_update_outdated_profiles(conn: DbConnection, interval: clokwerk::Inte
 async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
     log::debug!("Update outdated profiles");
     let mud_data = get_all_mud_expiration(&db_pool).await?;
-    let mud_vec: Vec<String> = get_filtered_mud_urls(mud_data);
+    let mud_vec: Vec<String> = mud_data
+        .into_iter()
+        .filter(|mud| mud.expiration < Utc::now().naive_utc())
+        .map(|mud| mud.url)
+        .collect();
     update_mud_urls(mud_vec, &db_pool).await?;
     update_config_version(&db_pool).await
 }
 
-fn get_filtered_mud_urls(mut mud_vec: Vec<MudDboRefresh>) -> Vec<String> {
-    let mut result: Vec<String> = vec![];
-    for mud in mud_vec.iter_mut() {
-        if mud.expiration < Utc::now().naive_utc() {
-            log::debug!("Found outdated mud profile: {}", mud.url);
-            mud.expiration = Utc::now().naive_utc();
-            result.push(mud.url.to_owned());
-        }
-    }
-    result
-}
-
 async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
-    for mud_url in vec_url.iter() {
+    for mud_url in vec_url {
         log::debug!("Try to update url: {}", mud_url);
-        let updated_mud = get_mud_from_url(mud_url.to_owned(), db_pool).await?;
+        let updated_mud = get_mud_from_url(mud_url, db_pool).await?;
         log::debug!("Updated mud profile: {:#?}", updated_mud);
     }
     Ok(())
@@ -65,7 +56,7 @@ async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result
 mod tests {
     use std::{fs::File, io::Read};
 
-    use chrono::{Duration, NaiveDateTime, Utc};
+    use chrono::{Duration, Utc};
     use dotenv::dotenv;
     use sqlx::migrate;
 
@@ -75,35 +66,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[actix_rt::test]
-    async fn test_trivial_functionality() -> Result<()> {
-        let db_conn = init().await?;
-        let url = "test_url".to_string();
-        let data = "test_data".to_string();
-        let created = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
-        let expiration = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
-        sqlx::query!(
-            "insert into mud_data (url, data, created_at, expiration) values (?, ?, ?, ?)",
-            url,
-            data,
-            created,
-            expiration,
-        )
-        .execute(&db_conn)
-        .await?;
-
-        let mud_data = get_all_mud_expiration(&db_conn).await?;
-        let vec_mud: Vec<String> = get_filtered_mud_urls(mud_data);
-        let url = "test_url".to_string();
-        let opt_mud = vec_mud.iter().find(|&u| u == &url);
-        assert_eq!(opt_mud, Some(&url));
-        sqlx::query!("DELETE FROM mud_data WHERE url = ?", url)
-            .execute(&db_conn)
-            .await?;
-
-        Ok(())
-    }
 
     async fn init() -> Result<DbConnection> {
         dotenv().ok();

@@ -19,10 +19,8 @@ use dotenv::dotenv;
 use namib_mud_controller::{
     db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_update_outdated_profiles, VERSION,
 };
-/* Used for OpenApi/Swagger generation under the /swagger-ui url */
 use paperclip::actix::{web, OpenApiExt};
 
-/* Used for OpenApi/Swagger generation under the /swagger-ui url */
 #[actix_web::main]
 async fn main() -> Result<()> {
     dotenv().ok();

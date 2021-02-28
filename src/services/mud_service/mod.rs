@@ -74,17 +74,7 @@ async fn fetch_mud(url: &str) -> Result<String> {
 /// This function return MudDboRefresh they only containing url and expiration
 /// to reduce payload.
 async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
-    let mut mud_profiles = vec![];
-    let mud_data = sqlx::query!("select url, expiration from mud_data")
+    Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
         .fetch_all(pool)
-        .await?;
-    for mud in mud_data {
-        mud_profiles.push(MudDboRefresh {
-            url: mud.url,
-            expiration: mud.expiration,
-        });
-    }
-
-    println!("{:?}", mud_profiles);
-    Ok(mud_profiles)
+        .await?)
 }
