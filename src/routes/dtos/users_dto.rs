@@ -42,7 +42,7 @@ pub struct SuccessDto {
     pub status: String,
 }
 
-#[derive(Serialize, Apiv2Schema)]
+#[derive(Validate, Serialize, Deserialize, Apiv2Schema, Debug, Clone)]
 pub struct RoleDto {
     pub name: String,
     pub permissions: Vec<String>,
