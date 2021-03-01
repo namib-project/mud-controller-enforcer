@@ -100,11 +100,11 @@ fn parse_device_policy(
                     let mut source_port = None;
                     let mut destination_port = None;
                     if let Some(udp) = &aceitem.matches.udp {
-                        protocol = Some(AceProtocol::UDP);
+                        protocol = Some(AceProtocol::Udp);
                         source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                         destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     } else if let Some(tcp) = &aceitem.matches.tcp {
-                        protocol = Some(AceProtocol::TCP);
+                        protocol = Some(AceProtocol::Tcp);
                         if let Some(dir) = &tcp.direction_initiated {
                             direction_initiated = Some(match dir.as_str() {
                                 "from-device" => AclDirection::FromDevice,

@@ -1,13 +1,13 @@
-use chrono::Local;
-use isahc::AsyncReadResponseExt;
-
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{MudData, MudDbo},
+    models::{MudData, MudDbo, MudDboRefresh},
 };
+use chrono::Utc;
+use isahc::AsyncReadResponseExt;
 
 mod json_models;
+pub mod mud_profile_service;
 mod parser;
 
 pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudData> {
@@ -17,7 +17,7 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
         .await?;
     let mut exists = false;
     if let Some(mud) = existing_mud {
-        if mud.expiration > Local::now().naive_local() {
+        if mud.expiration > Utc::now().naive_utc() {
             if let Ok(mud) = serde_json::from_str::<MudData>(mud.data.as_str()) {
                 return Ok(mud);
             }
@@ -35,8 +35,8 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
     let mud = MudDbo {
         url: url.clone(),
         data: serde_json::to_string(&data)?,
-        created_at: Local::now().naive_local(),
-        expiration: data.expiration.naive_local(),
+        created_at: Utc::now().naive_utc(),
+        expiration: data.expiration.naive_utc(),
     };
 
     debug!("save mud file (exists: {:?}): {:?}", exists, mud);
@@ -69,4 +69,12 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
 
 async fn fetch_mud(url: &str) -> Result<String> {
     Ok(isahc::get_async(url).await?.text().await?)
+}
+
+/// This function return MudDboRefresh they only containing url and expiration
+/// to reduce payload.
+async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
+    Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
+        .fetch_all(pool)
+        .await?)
 }
