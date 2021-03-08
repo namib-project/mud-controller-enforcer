@@ -26,7 +26,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 #[api_v2_operation(summary = "List of all roles")]
 pub async fn get_roles(pool: web::Data<DbConnection>, _: AuthToken) -> Result<Json<Vec<RoleDto>>> {
     let res: Vec<RoleDto> = role_service::roles_get_all(pool.get_ref()).await?;
-    info!("{:?}", res);
     Ok(Json(res))
 }
 
@@ -38,7 +37,6 @@ pub async fn get_role(
 ) -> Result<Json<RoleDto>> {
     auth.require_permission(Permission::role__list)?;
     let res: RoleDto = role_service::role_get(pool.get_ref(), name.into_inner()).await?;
-    info!("{:?}", res);
     Ok(Json(res))
 }
 
@@ -58,7 +56,6 @@ pub async fn create_role(
     })?;
 
     let res: RoleDto = role_service::role_create(pool.get_ref(), role_dto.into_inner()).await?;
-    info!("{:?}", res);
     Ok(Json(res))
 }
 
@@ -91,7 +88,6 @@ pub async fn edit_role(
         })?;
 
     let res = role_service::role_update(pool.get_ref(), old_name_str, role_dto.into_inner()).await?;
-    info!("{:?}", res);
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -103,7 +99,6 @@ pub async fn delete_role(
 ) -> Result<HttpResponse> {
     auth.require_permission(Permission::role__delete)?;
     let res = role_service::role_delete(pool.get_ref(), name.into_inner()).await?;
-    info!("{:?}", res);
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -124,7 +119,6 @@ pub async fn assign_role(
 
     let assignment: RoleAssignDto = assignment_dto.into_inner();
     let res = role_service::role_add_to_user(pool.get_ref(), assignment.id, assignment.name).await?;
-    info!("{:?}", res);
     Ok(HttpResponse::NoContent().finish())
 }
 
