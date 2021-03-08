@@ -95,7 +95,7 @@ enum DnsmasqHookError {
         source: macaddr::ParseError,
     },
     /// The supplied DUID is not of the correct format.
-    #[snafu(display("Supplied DUID \"{}\" is not valid.", "supplied_mac"))]
+    #[snafu(display("Supplied DUID \"{}\" is not valid.", "supplied_duid"))]
     InvalidDuid { supplied_duid: String },
     /// The event type this script was called with is not supported.
     #[snafu(display("Supplied event type \"{}\" is not supported", "supplied_type"))]
