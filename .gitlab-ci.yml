@@ -37,7 +37,7 @@ build:
 test:
   stage: test
   script:
-    - cargo test
+    - cargo test --features dnsmasq_hook
 
 warnings:
   stage: test

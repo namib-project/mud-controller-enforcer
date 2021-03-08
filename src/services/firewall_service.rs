@@ -1,6 +1,6 @@
 use namib_shared::firewall_config::{EnforcerConfig, FirewallRule};
 
-use crate::{error::Result, services::is_system_mode, uci::UCI};
+use crate::{error::Result, services::is_system_mode, uci::Uci};
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -14,7 +14,7 @@ const SAVE_DIR: &str = "/tmp/.uci_namib";
 
 pub fn get_config_version() -> Result<String> {
     debug!("Getting config version");
-    let mut uci = UCI::new()?;
+    let mut uci = Uci::new()?;
     if !is_system_mode() {
         uci.set_config_dir(CONFIG_DIR)?;
         uci.set_save_dir(SAVE_DIR)?;
@@ -27,7 +27,7 @@ pub fn get_config_version() -> Result<String> {
 /// Return Result<()>.
 pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
     debug!("Applying {} configs", cfg.firewall_rules().len());
-    let mut uci = UCI::new()?;
+    let mut uci = Uci::new()?;
     if !is_system_mode() {
         uci.set_config_dir(CONFIG_DIR)?;
         uci.set_save_dir(SAVE_DIR)?;
@@ -51,7 +51,7 @@ pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
 /// and commit these changes. This function delete all previous changes from "Namib" and upload all
 /// new changes with "Namib".
 /// Return Result<()>.
-fn apply_uci_config(uci: &mut UCI, cfg: &EnforcerConfig) -> Result<()> {
+fn apply_uci_config(uci: &mut Uci, cfg: &EnforcerConfig) -> Result<()> {
     uci.set("firewall.namib_config_version", cfg.version())?;
     delete_all_config(uci)?;
     for c in cfg.firewall_rules() {
@@ -63,7 +63,7 @@ fn apply_uci_config(uci: &mut UCI, cfg: &EnforcerConfig) -> Result<()> {
 
 /// This function takes a UCI context and a configuration that should be uploaded to the firewall.
 /// Return Result<()>.
-fn apply_rule(uci: &mut UCI, rule: &FirewallRule) -> Result<()> {
+fn apply_rule(uci: &mut Uci, rule: &FirewallRule) -> Result<()> {
     let cfg_n = format!("firewall.namibrule_{}", rule.hash());
     debug!("Creating rule {}", cfg_n);
     uci.set(cfg_n.as_str(), "rule")?;
@@ -76,7 +76,7 @@ fn apply_rule(uci: &mut UCI, rule: &FirewallRule) -> Result<()> {
 
 /// This function delete all config changes with "Namib".
 /// Return Result<()>.
-fn delete_all_config(uci: &mut UCI) -> Result<()> {
+fn delete_all_config(uci: &mut Uci) -> Result<()> {
     debug!("Deleting all namib configs");
     let mut index = 0;
     while uci.get(format!("firewall.@rule[{}]", index).as_str()).is_ok() {
@@ -121,18 +121,18 @@ mod tests {
 
         File::create("tests/config/test_trivial_apply_config/firewall")?;
 
-        let mut uci = UCI::new()?;
+        let mut uci = Uci::new()?;
         uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
         uci.set_config_dir("tests/config/test_trivial_apply_config")?;
 
-        let src = NetworkConfig::new(Network::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(Network::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
+        let src = NetworkConfig::new(Network::Lan, Some("192.1.1.1".to_string()), Some("5000".to_string()));
+        let dst = NetworkConfig::new(Network::Lan, Some("192.2.2.2".to_string()), Some("5001".to_string()));
         let cfg = FirewallRule::new(
             RuleName::new("Regel2".to_string()),
             src,
             dst,
             Protocol::tcp(),
-            Target::DROP,
+            Target::Drop,
             OptionalSettings::None,
         );
         apply_rule(&mut uci, &cfg)?;
@@ -163,7 +163,7 @@ mod tests {
             "tests/config/test_delete_all_config/firewall",
         )?;
 
-        let mut uci = UCI::new()?;
+        let mut uci = Uci::new()?;
         uci.set_save_dir("/tmp/.uci_delete_all_config")?;
         uci.set_config_dir("tests/config/test_delete_all_config")?;
 
@@ -195,19 +195,19 @@ mod tests {
             "tests/config/test_apply_and_delete/firewall",
         )?;
 
-        let mut uci = UCI::new()?;
+        let mut uci = Uci::new()?;
         uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
         uci.set_config_dir("tests/config/test_apply_and_delete")?;
 
-        let src = NetworkConfig::new(Network::LAN, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(Network::LAN, Some("192.2.2.2".to_string()), Some("5001".to_string()));
+        let src = NetworkConfig::new(Network::Lan, Some("192.1.1.1".to_string()), Some("5000".to_string()));
+        let dst = NetworkConfig::new(Network::Lan, Some("192.2.2.2".to_string()), Some("5001".to_string()));
 
         let cfg = FirewallRule::new(
             RuleName::new("Regel3".to_string()),
             src,
             dst,
             Protocol::tcp(),
-            Target::DROP,
+            Target::Drop,
             OptionalSettings::None,
         );
 

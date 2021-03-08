@@ -29,8 +29,8 @@ pub enum Error {
         source: dotenv::Error,
         backtrace: Backtrace,
     },
-    #[snafu(display("UCIError: {}", message), visibility(pub))]
-    UCIError { message: String, backtrace: Backtrace },
+    #[snafu(display("UciError: {}", message), visibility(pub))]
+    UciError { message: String, backtrace: Backtrace },
     #[snafu(display("IntoStringError: {}", source), context(false))]
     IntoStringError {
         source: std::ffi::IntoStringError,

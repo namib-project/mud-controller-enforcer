@@ -26,9 +26,9 @@ mod unix {
     const UCI_OK: i32 = libuci_sys::UCI_OK as i32;
 
     /// Contains the native `uci_context`
-    pub struct UCI(*mut uci_context);
+    pub struct Uci(*mut uci_context);
 
-    impl Drop for UCI {
+    impl Drop for Uci {
         fn drop(&mut self) {
             unsafe { uci_free_context(self.0) }
         }
@@ -58,18 +58,18 @@ mod unix {
         }
     }
 
-    impl UCI {
+    impl Uci {
         /// Creates a new UCI context.
         /// The C memory will be freed when the object is dropped.
-        pub fn new() -> Result<UCI> {
+        pub fn new() -> Result<Uci> {
             let ctx = unsafe { uci_alloc_context() };
             ensure!(
                 !ctx.is_null(),
-                error::UCIError {
+                error::UciError {
                     message: String::from("Could not alloc uci context"),
                 }
             );
-            Ok(UCI(ctx))
+            Ok(Uci(ctx))
         }
 
         /// Sets the config directory of UCI, this is `/etc/config` by default.
@@ -80,7 +80,7 @@ mod unix {
             };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Cannot set config dir: {}, {}",
                         config_dir,
@@ -100,7 +100,7 @@ mod unix {
             };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Cannot set save dir: {}, {}",
                         save_dir,
@@ -123,7 +123,7 @@ mod unix {
             let result = unsafe { uci_delete(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not delete uci key: {}, {}, {}",
                         identifier,
@@ -135,7 +135,7 @@ mod unix {
             let result = unsafe { uci_save(self.0, ptr.p) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not save uci key: {}, {}, {}",
                         identifier,
@@ -157,7 +157,7 @@ mod unix {
             let result = unsafe { uci_revert(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not revert uci key: {}, {}, {}",
                         identifier,
@@ -169,7 +169,7 @@ mod unix {
             let result = unsafe { uci_save(self.0, ptr.p) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not save uci key: {}, {}, {}",
                         identifier,
@@ -190,21 +190,21 @@ mod unix {
         pub fn set(&mut self, identifier: &str, val: &str) -> Result<()> {
             ensure!(
                 !val.contains('\''),
-                error::UCIError {
+                error::UciError {
                     message: format!("Values may not contain quotes: {}={}", identifier, val)
                 }
             );
             let mut ptr = self.get_ptr(format!("{}={}", identifier, val).as_ref())?;
             ensure!(
                 !ptr.value.is_null(),
-                error::UCIError {
+                error::UciError {
                     message: format!("parsed value is null: {}={}", identifier, val)
                 }
             );
             let result = unsafe { uci_set(self.0, &mut ptr.0) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not set uci key: {}={}, {}, {}",
                         identifier,
@@ -217,7 +217,7 @@ mod unix {
             let result = unsafe { uci_save(self.0, ptr.p) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not save uci key: {}={}, {}, {}",
                         identifier,
@@ -237,7 +237,7 @@ mod unix {
             let result = unsafe { uci_commit(self.0, &mut ptr.p, false) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not set commit uci package: {}, {}, {}",
                         package,
@@ -264,7 +264,7 @@ mod unix {
             let ptr = self.get_ptr(key)?;
             ensure!(
                 ptr.flags & uci_ptr_UCI_LOOKUP_COMPLETE != 0,
-                error::UCIError {
+                error::UciError {
                     message: format!("Lookup failed: {}", key),
                 }
             );
@@ -275,20 +275,20 @@ mod unix {
                     let opt = unsafe { *ptr.o };
                     ensure!(
                         opt.type_ == uci_option_type_UCI_TYPE_STRING,
-                        error::UCIError {
+                        error::UciError {
                             message: format!("Cannot get string value of non-string: {} {}", key, opt.type_),
                         }
                     );
                     ensure!(
                         !opt.section.is_null(),
-                        error::UCIError {
+                        error::UciError {
                             message: format!("uci section was null: {}", key)
                         }
                     );
                     let sect = unsafe { *opt.section };
                     ensure!(
                         !sect.package.is_null(),
-                        error::UCIError {
+                        error::UciError {
                             message: format!("uci package was null: {}", key)
                         }
                     );
@@ -308,7 +308,7 @@ mod unix {
                     let sect = unsafe { *ptr.s };
                     ensure!(
                         !sect.package.is_null(),
-                        error::UCIError {
+                        error::UciError {
                             message: format!("uci package was null: {}", key)
                         }
                     );
@@ -323,7 +323,7 @@ mod unix {
                     );
                     Ok(String::from(typ))
                 },
-                _ => error::UCIError {
+                _ => error::UciError {
                     message: format!("unsupported type: {}", last.type_),
                 }
                 .fail()?,
@@ -356,7 +356,7 @@ mod unix {
             let result = unsafe { uci_lookup_ptr(self.0, &mut ptr, raw, true) };
             ensure!(
                 result == UCI_OK,
-                error::UCIError {
+                error::UciError {
                     message: format!(
                         "Could not parse uci key: {}, {}, {}",
                         identifier,
@@ -368,7 +368,7 @@ mod unix {
             debug!("{:?}", ptr);
             ensure!(
                 !ptr.last.is_null(),
-                error::UCIError {
+                error::UciError {
                     message: format!("Cannot access null value: {}", identifier),
                 }
             );
@@ -382,7 +382,7 @@ mod unix {
             unsafe { uci_get_errorstr(self.0, &mut raw, ptr::null()) };
             ensure!(
                 !raw.is_null(),
-                error::UCIError {
+                error::UciError {
                     message: String::from("last_error was null"),
                 }
             );
@@ -459,12 +459,12 @@ mod tests {
 
     use super::*;
 
-    fn init() -> Result<UCI> {
+    fn init() -> Result<Uci> {
         let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
             .is_test(true)
             .try_init();
 
-        let mut uci = UCI::new()?;
+        let mut uci = Uci::new()?;
         uci.set_config_dir("tests/config")?;
         uci.set_save_dir("/tmp/.uci_tests")?;
 
