@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::{error, error::Result};
+use crate::{error, error::Result, services::role_service::permission::Permission};
 use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
@@ -29,6 +29,7 @@ pub struct AuthToken {
 
     // User stuff
     pub username: String,
+    // TODO: Obsolete?
     pub permissions: Vec<String>,
 }
 
@@ -44,9 +45,10 @@ impl AuthToken {
         }
     }
 
-    pub fn require_permission(&self, permission: &str) -> Result<()> {
+    pub fn require_permission(&self, permission: Permission) -> Result<()> {
         for perm in &self.permissions {
-            if Pattern::new(perm)?.matches(permission) {
+            debug!("Checking perm {:?}", &*permission.to_string());
+            if Pattern::new(perm)?.matches(&*permission.to_string()) {
                 return Ok(());
             }
         }

@@ -1,20 +1,22 @@
-use crate::{db::DbConnection, error::Result, models::RoleDbo, routes::dtos::RoleDto};
+use crate::{
+    db::DbConnection, error::Result, models::RoleDbo, routes::dtos::RoleDto,
+    services::role_service::permission::Permission,
+};
 use sqlx::Done;
 use std::iter::FromIterator;
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
-pub async fn role_create(conn: &DbConnection, name: String, permissions: Vec<String>) -> Result<RoleDto> {
-    let permissions_vec: String = String::from_iter(permissions);
+pub async fn role_create(conn: &DbConnection, role: RoleDto) -> Result<RoleDto> {
+    let permissions_vec = role.permissions.join(",");
     let _ = sqlx::query!(
         "INSERT INTO roles (name, permissions) VALUES (?, ?)",
-        name,
+        role.name,
         permissions_vec,
     )
     .execute(conn)
     .await?;
 
-    let new_role = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name = ?", name,)
+    let new_role = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name = ?", role.name,)
         .fetch_one(conn)
         .await?;
 
@@ -39,6 +41,9 @@ pub async fn role_get(conn: &DbConnection, name: String) -> Result<RoleDto> {
 
 pub async fn role_update(conn: &DbConnection, old_name: String, updated_role: RoleDto) -> Result<()> {
     let permissions_vec: String = String::from_iter(updated_role.permissions);
+    let _ = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name=?", old_name)
+        .fetch_one(conn)
+        .await?;
     let _ = sqlx::query!(
         "UPDATE roles SET name=?, permissions=? WHERE name=?",
         updated_role.name,
@@ -70,7 +75,7 @@ pub async fn roles_get_all(conn: &DbConnection) -> Result<Vec<RoleDto>> {
         .collect())
 }
 
-pub async fn permissions_get_all() -> Result<Vec<String>> {
+pub fn permissions_get_all() -> Result<Vec<String>> {
     let mut permissions: Vec<String> = vec![];
     for permission in Permission::iter() {
         permissions.push(permission.to_string())
@@ -105,14 +110,4 @@ pub async fn role_delete_from_user(conn: &DbConnection, name: String) -> Result<
         .await?;
 
     Ok(())
-}
-
-#[derive(strum_macros::ToString, Debug, EnumIter)]
-pub enum Permission {
-    ConfigRead,
-    ConfigList,
-    ConfigWrite,
-    ConfigDelete,
-    DeviceList,
-    RoleList,
 }

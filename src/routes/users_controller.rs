@@ -14,7 +14,10 @@ use crate::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
         UserConfigValueDto,
     },
-    services::{user_config_service, user_service},
+    services::{
+        role_service::{permission::Permission, role_service},
+        user_config_service, user_service,
+    },
 };
 use actix_web::HttpResponse;
 
@@ -30,6 +33,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/configs/{key}", web::get().to(get_users_config));
     cfg.route("/configs/{key}", web::post().to(set_users_config));
     cfg.route("/configs/{key}", web::delete().to(delete_users_config));
+    cfg.route("/available-permissions", web::get().to(available_permissions));
 }
 
 #[api_v2_operation(summary = "Register a new user")]
@@ -89,12 +93,20 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 }
 
 #[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.")]
-pub async fn refresh_token(auth: AuthToken) -> Result<Json<TokenDto>> {
+pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<TokenDto>> {
+    let user = user_service::find_by_id(auth.sub, pool.get_ref()).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
     Ok(Json(TokenDto {
         token: AuthToken::encode_token(&AuthToken::generate_access_token(
             auth.sub,
-            auth.username,
-            auth.permissions,
+            user.username,
+            user.permissions,
         )),
     }))
 }
@@ -168,7 +180,7 @@ pub fn update_password(
 
 #[api_v2_operation(summary = "Retrieve all roles")]
 pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
-    auth.require_permission("role/list")?;
+    auth.require_permission(Permission::role__list)?;
 
     let roles = user_service::get_all_roles(pool.get_ref()).await?;
 
@@ -265,4 +277,10 @@ pub fn delete_users_config(
     user_config_service::delete_config_for_user(auth.sub, &key, pool.get_ref()).await?;
 
     Ok(HttpResponse::NoContent().finish())
+}
+
+#[api_v2_operation(summary = "List of all available permissions")]
+pub async fn available_permissions() -> Result<Json<Vec<String>>> {
+    let permissions: Vec<String> = role_service::permissions_get_all().unwrap();
+    Ok(Json(permissions))
 }

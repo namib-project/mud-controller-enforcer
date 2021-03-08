@@ -2,7 +2,13 @@
 
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
-use crate::{auth::AuthToken, db::DbConnection, error::Result, routes::dtos::ConfigQueryDto, services::config_service};
+use crate::{
+    auth::AuthToken,
+    db::DbConnection,
+    error::Result,
+    routes::dtos::ConfigQueryDto,
+    services::{config_service, role_service::permission::Permission},
+};
 use std::collections::HashMap;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -17,12 +23,12 @@ async fn get_configs(
     auth: AuthToken,
     config_query_dto: web::Query<ConfigQueryDto>,
 ) -> Result<Json<HashMap<String, Option<String>>>> {
-    auth.require_permission("config/read")?;
+    auth.require_permission(Permission::config__read)?;
 
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();
 
     if config_query_dto.keys.is_empty() {
-        auth.require_permission("config/list")?;
+        auth.require_permission(Permission::config__list)?;
         let data = config_service::get_all_config_data(&pool).await?;
         for config in data {
             config_map.insert(config.key, Some(config.value));
@@ -43,7 +49,7 @@ async fn set_configs(
     auth: AuthToken,
     config_set_dto: Json<HashMap<String, String>>,
 ) -> Result<Json<HashMap<String, Option<String>>>> {
-    auth.require_permission("config/write")?;
+    auth.require_permission(Permission::config__write)?;
 
     for (key, value) in &config_set_dto.0 {
         config_service::set_config_value(&key, value, &pool).await?;
@@ -65,7 +71,7 @@ async fn delete_config(
     auth: AuthToken,
     config_delete_dto: Json<Vec<String>>,
 ) -> Result<Json<HashMap<String, bool>>> {
-    auth.require_permission("config/delete")?;
+    auth.require_permission(Permission::config__delete)?;
 
     let mut deletion_map: HashMap<String, bool> = HashMap::new();
     for key in &config_delete_dto.0 {
