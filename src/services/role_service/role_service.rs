@@ -3,6 +3,7 @@ use crate::{
     services::role_service::permission::Permission,
 };
 use sqlx::Done;
+use std::io;
 use strum::IntoEnumIterator;
 
 pub async fn role_create(conn: &DbConnection, role: RoleDto) -> Result<RoleDto> {
@@ -34,7 +35,7 @@ pub async fn role_get(conn: &DbConnection, role_id: i64) -> Result<RoleDto> {
 
     Ok(RoleDto {
         name: role_db.name,
-        permissions: serde_json::from_str(&role_db.permissions)?, //role_db.permissions.split(",").map(|s| s.to_string()).collect(),
+        permissions: role_db.permissions.split(",").map(|s| s.to_string()).collect(),
     })
 }
 
@@ -113,4 +114,15 @@ pub async fn role_delete_from_user(conn: &DbConnection, user_id: i64, role_id: i
     .await?;
 
     Ok(())
+}
+
+pub fn permission_name_is_invalid(permissions: Vec<String>) -> ::std::io::Result<()> {
+    if permissions.iter().any(|name| name.contains(",")) {
+        Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Name must not contain a comma.",
+        ))
+    } else {
+        Ok(())
+    }
 }

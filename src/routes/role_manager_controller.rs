@@ -57,6 +57,14 @@ pub async fn create_role(
         .fail()
     })?;
 
+    role_service::permission_name_is_invalid(role_dto.clone().permissions).or_else(|e| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: e.to_string(),
+        }
+        .fail()
+    })?;
+
     let res: RoleDto = role_service::role_create(pool.get_ref(), role_dto.into_inner()).await?;
     Ok(Json(res))
 }
@@ -88,6 +96,14 @@ pub async fn edit_role(
             }
             .fail()
         })?;
+
+    role_service::permission_name_is_invalid(role_dto.clone().permissions).or_else(|e| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: e.to_string(),
+        }
+        .fail()
+    })?;
 
     let _ = role_service::role_update(pool.get_ref(), _role_id, role_dto.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
