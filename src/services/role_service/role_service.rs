@@ -3,7 +3,6 @@ use crate::{
     services::role_service::permission::Permission,
 };
 use sqlx::Done;
-use std::iter::FromIterator;
 use strum::IntoEnumIterator;
 
 pub async fn role_create(conn: &DbConnection, role: RoleDto) -> Result<RoleDto> {
@@ -28,27 +27,27 @@ pub async fn role_create(conn: &DbConnection, role: RoleDto) -> Result<RoleDto> 
     Ok(out_role)
 }
 
-pub async fn role_get(conn: &DbConnection, name: String) -> Result<RoleDto> {
-    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name = ?", name,)
+pub async fn role_get(conn: &DbConnection, role_id: i64) -> Result<RoleDto> {
+    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = ?", role_id,)
         .fetch_one(conn)
         .await?;
 
     Ok(RoleDto {
         name: role_db.name,
-        permissions: role_db.permissions.split(",").map(|s| s.to_string()).collect(),
+        permissions: serde_json::from_str(&role_db.permissions)?, //role_db.permissions.split(",").map(|s| s.to_string()).collect(),
     })
 }
 
-pub async fn role_update(conn: &DbConnection, old_name: String, updated_role: RoleDto) -> Result<()> {
-    let permissions_vec: String = String::from_iter(updated_role.permissions);
-    let _ = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name=?", old_name)
+pub async fn role_update(conn: &DbConnection, role_id: i64, updated_role: RoleDto) -> Result<()> {
+    let permissions_vec: String = updated_role.permissions.join(",");
+    let _ = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = ?", role_id)
         .fetch_one(conn)
         .await?;
     let _ = sqlx::query!(
-        "UPDATE roles SET name=?, permissions=? WHERE name=?",
+        "UPDATE roles SET name = ?, permissions = ? WHERE id = ?",
         updated_role.name,
         permissions_vec,
-        old_name,
+        role_id,
     )
     .execute(conn)
     .await?;
@@ -56,8 +55,8 @@ pub async fn role_update(conn: &DbConnection, old_name: String, updated_role: Ro
     Ok(())
 }
 
-pub async fn role_delete(conn: &DbConnection, name: String) -> Result<bool> {
-    let del_count = sqlx::query!("DELETE FROM roles WHERE name = ?", name)
+pub async fn role_delete(conn: &DbConnection, role_id: i64) -> Result<bool> {
+    let del_count = sqlx::query!("DELETE FROM roles WHERE id = ?", role_id)
         .execute(conn)
         .await?;
 
@@ -84,8 +83,8 @@ pub fn permissions_get_all() -> Result<Vec<String>> {
     Ok(permissions)
 }
 
-pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, name: String) -> Result<()> {
-    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name = ?", name,)
+pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
+    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = ?", role_id,)
         .fetch_one(conn)
         .await?;
 
@@ -100,14 +99,18 @@ pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, name: String) -
     Ok(())
 }
 
-pub async fn role_delete_from_user(conn: &DbConnection, name: String) -> Result<()> {
-    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE name = ?", name,)
+pub async fn role_delete_from_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
+    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = ?", role_id,)
         .fetch_one(conn)
         .await?;
 
-    sqlx::query!("DELETE FROM users_roles WHERE id = ?", role_db.id)
-        .execute(conn)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM users_roles WHERE user_id = ? and role_id = ?",
+        role_db.id,
+        user_id
+    )
+    .execute(conn)
+    .await?;
 
     Ok(())
 }

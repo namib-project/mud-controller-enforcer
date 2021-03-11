@@ -21,6 +21,9 @@ pub enum Permission {
     /// role/list
     #[strum(serialize = "role/list")]
     role__list,
+    /// role/read
+    #[strum(serialize = "role/read")]
+    role__read,
     /// role/write
     #[strum(serialize = "role/write")]
     role__write,

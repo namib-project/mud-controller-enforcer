@@ -17,7 +17,7 @@ static HEADER_PREFIX: &str = "Bearer ";
     apiKey,
     in = "header",
     name = "Authorization",
-    description = "Use format 'Bearer TOKEN'"
+    description = "Use format: 'Bearer JWT_TOKEN'"
 )]
 pub struct AuthToken {
     // Not before
@@ -47,7 +47,6 @@ impl AuthToken {
 
     pub fn require_permission(&self, permission: Permission) -> Result<()> {
         for perm in &self.permissions {
-            debug!("Checking perm {:?}", &*permission.to_string());
             if Pattern::new(perm)?.matches(&*permission.to_string()) {
                 return Ok(());
             }

@@ -14,10 +14,7 @@ use crate::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
         UserConfigValueDto,
     },
-    services::{
-        role_service::{permission::Permission, role_service},
-        user_config_service, user_service,
-    },
+    services::{role_service::permission::Permission, user_config_service, user_service},
 };
 use actix_web::HttpResponse;
 
@@ -33,7 +30,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/configs/{key}", web::get().to(get_users_config));
     cfg.route("/configs/{key}", web::post().to(set_users_config));
     cfg.route("/configs/{key}", web::delete().to(delete_users_config));
-    cfg.route("/available-permissions", web::get().to(available_permissions));
 }
 
 #[api_v2_operation(summary = "Register a new user")]
@@ -277,10 +273,4 @@ pub fn delete_users_config(
     user_config_service::delete_config_for_user(auth.sub, &key, pool.get_ref()).await?;
 
     Ok(HttpResponse::NoContent().finish())
-}
-
-#[api_v2_operation(summary = "List of all available permissions")]
-pub async fn available_permissions() -> Result<Json<Vec<String>>> {
-    let permissions: Vec<String> = role_service::permissions_get_all().unwrap();
-    Ok(Json(permissions))
 }
