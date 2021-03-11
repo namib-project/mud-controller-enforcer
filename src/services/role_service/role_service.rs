@@ -116,7 +116,7 @@ pub async fn role_delete_from_user(conn: &DbConnection, user_id: i64, role_id: i
     Ok(())
 }
 
-pub fn permission_name_is_invalid(permissions: Vec<String>) -> ::std::io::Result<()> {
+pub fn validate_permission_name(permissions: Vec<String>) -> ::std::io::Result<()> {
     if permissions.iter().any(|name| name.contains(",")) {
         Err(io::Error::new(
             io::ErrorKind::InvalidInput,

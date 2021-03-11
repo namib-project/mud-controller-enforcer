@@ -57,7 +57,7 @@ pub async fn create_role(
         .fail()
     })?;
 
-    role_service::permission_name_is_invalid(role_dto.clone().permissions).or_else(|e| {
+    role_service::validate_permission_name(role_dto.clone().permissions).or_else(|e| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: e.to_string(),
@@ -97,7 +97,7 @@ pub async fn edit_role(
             .fail()
         })?;
 
-    role_service::permission_name_is_invalid(role_dto.clone().permissions).or_else(|e| {
+    role_service::validate_permission_name(role_dto.clone().permissions).or_else(|e| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: e.to_string(),
