@@ -1,5 +1,5 @@
 use chrono::Local;
-use isahc::AsyncReadResponseExt;
+use isahc::{config::Configurable, AsyncReadResponseExt};
 
 use crate::{
     db::DbConnection,
@@ -26,7 +26,7 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
     }
 
     // wenn nicht: fetch
-    let mud_json = fetch_mud(url.as_str()).await?;
+    let mud_json = fetch_mud(url.as_str()).await.unwrap();
 
     // ruf parse_mud auf
     let data = parser::parse_mud(url.clone(), mud_json.as_str())?;
@@ -68,5 +68,11 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
 }
 
 async fn fetch_mud(url: &str) -> Result<String> {
-    Ok(isahc::get_async(url).await?.text().await?)
+    // TODO proper certificate validation.
+    let mut request = isahc::Request::builder()
+        .uri(url)
+        .ssl_options(isahc::config::SslOption::DANGER_ACCEPT_INVALID_CERTS)
+        .body(())
+        .unwrap();
+    Ok(isahc::send_async(request).await?.text().await?)
 }

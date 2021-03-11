@@ -5,8 +5,7 @@ use crate::{
     services::config_service::{get_config_value, set_config_value, ConfigKeys},
 };
 use namib_shared::firewall_config::{
-    EnforcerConfig, FirewallDevice, FirewallRule, KnownDevice, NetworkConfig, NetworkHost, Protocol, ResolvedIp,
-    RuleName, Target,
+    EnforcerConfig, FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, ResolvedIp, RuleName, Target,
 };
 use std::{
     net::{IpAddr, ToSocketAddrs},
@@ -15,14 +14,7 @@ use std::{
 
 pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
-    EnforcerConfig::new(
-        version,
-        rules,
-        devices
-            .into_iter()
-            .map(|d| KnownDevice::new(d.ip_addr, d.collect_info))
-            .collect(),
-    )
+    EnforcerConfig::new(version, rules)
 }
 
 pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
@@ -30,7 +22,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
-        None => return FirewallDevice::new(device.id, device.ip_addr, result),
+        None => return FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info),
     };
 
     for acl in &mud_data.acllist {
@@ -109,7 +101,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         Target::REJECT,
     ));
 
-    FirewallDevice::new(device.id, device.ip_addr, result)
+    FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info)
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
