@@ -11,7 +11,9 @@ use std::{
     time::Instant,
 };
 use tokio::sync::{Mutex, Notify, RwLock};
-use trust_dns_resolver::{error::ResolveError, lookup_ip::LookupIp, AsyncResolver, TokioAsyncResolver};
+use trust_dns_resolver::{
+    config::LookupIpStrategy, error::ResolveError, lookup_ip::LookupIp, AsyncResolver, TokioAsyncResolver,
+};
 
 /// The minimum time that is waited before refreshing the dns cache even though there are entries with a TTL of 0.
 const MIN_TIME_BEFORE_REFRESH: std::time::Duration = std::time::Duration::from_secs(30);
@@ -74,8 +76,10 @@ struct DnsServiceCache {
 
 impl DnsServiceCache {
     fn new() -> Result<DnsServiceCache, ResolveError> {
+        let (resolver_conf, mut resolver_opts) = trust_dns_resolver::system_conf::read_system_conf()?;
+        resolver_opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
         Ok(DnsServiceCache {
-            resolver: AsyncResolver::tokio_from_system_conf()?,
+            resolver: AsyncResolver::tokio(resolver_conf, resolver_opts)?,
             refresh_queue: Default::default(),
             cache_data: Default::default(),
         })

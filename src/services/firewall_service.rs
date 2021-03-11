@@ -38,6 +38,7 @@ pub struct FirewallService {
 }
 
 /// Helper enum for rule conversion.
+#[derive(Debug, Clone)]
 enum RuleAddrEntry {
     AnyAddr,
     AddrEntry(IpAddr),
@@ -79,7 +80,7 @@ impl FirewallService {
     }
 
     /// Updates the nftables rules to reflect the current firewall config.
-    async fn apply_current_config(&self) -> Result<()> {
+    pub(crate) async fn apply_current_config(&self) -> Result<()> {
         debug!("Configuration has changed, applying new rules to nftables");
         let config = &self.enforcer_state.read().await.config;
         let mut batch = Batch::new();

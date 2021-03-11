@@ -58,6 +58,7 @@ async fn main() -> Result<()> {
 
     let watcher = dns_service.create_watcher();
     let fw_service = Arc::new(FirewallService::new(enforcer.clone(), watcher));
+    fw_service.apply_current_config().await;
 
     let heartbeat_task = rpc::rpc_client::heartbeat(enforcer.clone(), fw_service.clone());
 
