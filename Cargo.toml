@@ -1,6 +1,6 @@
 [package]
 name = "namib_shared"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
 
@@ -12,3 +12,4 @@ serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 macaddr = { version = "1.0.1", features = ["serde_std"] }
+hex = "0.4"
