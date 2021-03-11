@@ -3,7 +3,7 @@ use namib_shared::firewall_config::{EnforcerConfig, FirewallRule, NetworkHost, P
 use crate::{
     error::Result,
     services::{dns::DnsWatcher, is_system_mode, state::EnforcerState},
-    uci::UCI,
+    uci::Uci,
     Enforcer,
 };
 use nftnl::{

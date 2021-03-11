@@ -34,8 +34,8 @@ pub enum Error {
         source: trust_dns_resolver::error::ResolveError,
         backtrace: Backtrace,
     },
-    #[snafu(display("UCIError: {}", message), visibility(pub))]
-    UCIError { message: String, backtrace: Backtrace },
+    #[snafu(display("UciError: {}", message), visibility(pub))]
+    UciError { message: String, backtrace: Backtrace },
     #[snafu(display("IntoStringError: {}", source), context(false))]
     IntoStringError {
         source: std::ffi::IntoStringError,
