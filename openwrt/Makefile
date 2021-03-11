@@ -69,11 +69,11 @@ define Package/namib/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(NAMIB_PATH) $(1)/usr/sbin/namib_enforcer
 	$(INSTALL_BIN) $(NAMIB_HOOK_PATH) $(1)/usr/sbin/namib_dnsmasq_hook
-	$(INSTALL_DIR) $(1)/etc/hotplug.d/dhcp
-	$(INSTALL_BIN) ./files/namib.hook $(1)/etc/hotplug.d/dhcp/namib
 	$(INSTALL_DIR) $(1)/etc/namib
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/namib_enforcer/certs/identity.pfx $(1)/etc/namib/identity.pfx
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/namib_enforcer/certs/namib-ca.pem $(1)/etc/namib/ca.pem
+	$(INSTALL_DIR) $(1)/usr/lib/namib
+	$(INSTALL_BIN) ./files/namib.hook $(1)/usr/lib/namib/dnsmasq_hook.sh
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/namib.init $(1)/etc/init.d/namib
 	$(INSTALL_DIR) $(1)/etc/uci-defaults

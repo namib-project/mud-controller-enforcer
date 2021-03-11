@@ -1,13 +1,2 @@
 #!/bin/sh
-
-case $ACTION in
-        "remove")
-                /usr/sbin/namib_dnsmasq_hook del $MACADDR $IPADDR $HOSTNAME
-        ;;
-        "update")
-                /usr/sbin/namib_dnsmasq_hook old $MACADDR $IPADDR $HOSTNAME
-        ;;
-        *)
-                /usr/sbin/namib_dnsmasq_hook $ACTION $MACADDR $IPADDR $HOSTNAME
-        ;;
-esac
+/usr/sbin/namib_dnsmasq_hook "$@"
