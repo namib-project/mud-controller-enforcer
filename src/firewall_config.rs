@@ -133,23 +133,12 @@ pub struct FirewallDevice {
     pub id: i64,
     pub ip: IpAddr,
     pub rules: Vec<FirewallRule>,
-}
-
-impl FirewallDevice {
-    pub fn new(id: i64, ip: IpAddr, rules: Vec<FirewallRule>) -> FirewallDevice {
-        FirewallDevice { id, ip, rules }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct KnownDevice {
-    pub ip: IpAddr,
     pub collect_data: bool,
 }
 
-impl KnownDevice {
-    pub fn new(ip: IpAddr, collect_data: bool) -> Self {
-        Self { ip, collect_data }
+impl FirewallDevice {
+    pub fn new(id: i64, ip: IpAddr, rules: Vec<FirewallRule>, collect_data: bool) -> FirewallDevice {
+        FirewallDevice { id, ip, rules, collect_data }
     }
 }
 
@@ -158,13 +147,12 @@ impl KnownDevice {
 pub struct EnforcerConfig {
     version: String,
     devices: Vec<FirewallDevice>,
-    known_devices: Vec<KnownDevice>,
 }
 
 impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, devices: Vec<FirewallDevice>, known_devices: Vec<KnownDevice>) -> Self {
-        EnforcerConfig { version, devices, known_devices }
+    pub fn new(version: String, devices: Vec<FirewallDevice>) -> Self {
+        EnforcerConfig { version, devices }
     }
 
     /// Returns the version of this config
@@ -180,9 +168,5 @@ impl EnforcerConfig {
     /// Returns a reference to the firewall rules in this config
     pub fn devices_mut(&mut self) -> &mut Vec<FirewallDevice> {
         &mut self.devices
-    }
-
-    pub fn known_devices(&self) -> &Vec<KnownDevice> {
-        &self.known_devices
     }
 }
