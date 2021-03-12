@@ -17,10 +17,12 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+/// `CertId` contains the url-safe base64-encoded sha1-hash of a certificate and may be regarded as a unique identifier for a Namib service.
 #[derive(Clone)]
 pub struct CertId(String);
 
 impl CertId {
+    /// Calculate the `CertId` for a given DER-encoded certificate.
     pub fn new(cert: &[u8]) -> Self {
         Self(base64::encode_config(
             Sha1::digest(cert),
@@ -34,8 +36,6 @@ impl fmt::Display for CertId {
         fmt::Display::fmt(&self.0, f)
     }
 }
-
-pub struct CertResolver;
 
 fn get_letsencrypt_url() -> DirectoryUrl<'static> {
     if env::var("STAGING").as_deref() == Ok("0") {
@@ -62,13 +62,19 @@ lazy_static! {
     static ref ACME_CERTIFIED_KEY: RwLock<Option<CertifiedKey>> = RwLock::new(None);
 }
 
+/// The server certificate resolver, which provides the tls certificate for the web frontend.
+/// It relies on the `update_certs`-Job to request and persist a valid certificate.
+pub struct CertResolver;
+
 impl ResolvesServerCert for CertResolver {
     fn resolve(&self, _client_hello: ClientHello<'_>) -> Option<CertifiedKey> {
+        // if a certificate is cached, simply return it
         if let Ok(g) = ACME_CERTIFIED_KEY.read() {
             if let Some(ref c) = *g {
                 return Some(c.clone());
             }
         }
+        // check whether a certificate is persisted on disk and abort the connection if it is not
         let cert = match ACCOUNT.certificate(&*DOMAIN) {
             Ok(Some(c)) => CertifiedKey::new(
                 vec![rustls_18::Certificate(c.certificate_der())],
@@ -79,6 +85,7 @@ impl ResolvesServerCert for CertResolver {
             ),
             _ => return None,
         };
+        // update the certificate cache
         if let Ok(mut g) = ACME_CERTIFIED_KEY.write() {
             *g = Some(cert.clone());
         }
@@ -86,6 +93,8 @@ impl ResolvesServerCert for CertResolver {
     }
 }
 
+/// Checks whether the persisted certificate is present and valid for more than 15 days
+/// and if not will request a new certificate from LetsEncrypt.
 pub fn update_certs() -> Result<()> {
     debug!("checking if a certificate exists");
     if let Some(c) = ACCOUNT.certificate(&DOMAIN).unwrap_or(None) {
@@ -99,6 +108,7 @@ pub fn update_certs() -> Result<()> {
     let mut order = ACCOUNT.new_order(&DOMAIN, &[])?;
     let csr = loop {
         if let Some(csr) = order.confirm_validations() {
+            info!("csr was validated");
             break csr;
         }
 
@@ -111,7 +121,10 @@ pub fn update_certs() -> Result<()> {
         // The private key for the server certificate
         File::open("certs/server-key.pem")?.read_to_end(&mut certs)?;
         let mut ca: Vec<u8> = Vec::new();
-        File::open(&env::var("NAMIB_CA_CERT").expect("NAMIB_CA_CERT env is missing"))?.read_to_end(&mut ca)?;
+        // Use the global namib certificate here, since the httpchallenge service is always using the global one.
+        File::open(&env::var("GLOBAL_NAMIB_CA_CERT").expect("GLOBAL_NAMIB_CA_CERT env is missing"))?
+            .read_to_end(&mut ca)?;
+        // send the httpchallenge token to the service.
         let response = reqwest::blocking::ClientBuilder::new()
             .add_root_certificate(Certificate::from_pem(&ca)?)
             .identity(Identity::from_pem(&certs)?)
@@ -124,12 +137,14 @@ pub fn update_certs() -> Result<()> {
             .body(chall.http_proof())
             .send()?;
         ensure!(response.text()? == "ok", error::NoneError {});
+        // tell LetsEncrypt to check the file
         chall.validate(5000)?;
+        // update the csr status
         order.refresh()?;
     };
-    // create a private key for the certificate
+    // create a private key for the new certificate
     let pkey = create_p384_key();
-    // finalize the csr using the pkey and download the certificate
+    // finalize the csr using the pkey and download the new certificate
     csr.finalize_pkey(pkey, 5000)?.download_and_save_cert()?;
     // make the resolver reload the certificate
     if let Ok(mut g) = ACME_CERTIFIED_KEY.write() {
@@ -138,7 +153,9 @@ pub fn update_certs() -> Result<()> {
     Ok(())
 }
 
+/// Get the tls server config for actix
 pub fn server_config() -> ServerConfig {
+    // create the certificate in the background, it doesn't have to be immediatly present for ActiX to start.
     actix_rt::spawn(async {
         if let Err(e) = update_certs() {
             warn!("Failed to update certificates: {:?}", e);
