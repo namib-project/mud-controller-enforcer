@@ -1,7 +1,6 @@
 [package]
 name = "neo4jthings-api"
 version = "1.0.0"
-build = "build.rs"
 authors = ["OpenAPI Generator team and contributors"]
 edition = "2018"
 

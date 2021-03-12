@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 rm -rf generated/src
 
 URL=http://localhost:7000
@@ -11,6 +13,6 @@ fi
 ./openapi-generator-cli.sh generate \
   -i openapi-schema.yml \
   -g rust \
-  -o generated \
+  -o . \
   --global-property models="ACL:Thing:Description:PatchedThing:Service:PaginatedThingList:PaginatedServiceList:PaginatedACLList",modelDocs=false,modelTests=false,apis="Thing",apiTests=false,apiDocs=false,supportingFiles \
   --additional-properties packageName=neo4jthings-api,supportAsync=true,library=reqwest
