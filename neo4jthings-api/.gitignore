@@ -1,4 +1,4 @@
 *.jar
-src/
+generated/*
+!generated/.openapi-generator-ignore
 neo4j/
-.openapi-generator
