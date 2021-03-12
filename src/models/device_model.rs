@@ -15,7 +15,7 @@ pub struct DeviceDbo {
     pub last_interaction: NaiveDateTime,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Device {
     pub id: i64,
     pub ip_addr: IpAddr,

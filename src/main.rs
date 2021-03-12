@@ -8,6 +8,7 @@
     clippy::similar_names,
     clippy::redundant_else,
     clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
     clippy::must_use_candidate
 )]
 

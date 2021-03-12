@@ -83,6 +83,8 @@ pub enum Error {
     FromStrError { backtrace: Backtrace },
     #[snafu(display("NoneError"), visibility(pub))]
     NoneError { backtrace: Backtrace },
+    #[snafu(display("Neo4jThingsError {}", message), visibility(pub))]
+    Neo4jThingsError { message: String, backtrace: Backtrace },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

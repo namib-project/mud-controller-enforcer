@@ -72,7 +72,7 @@ impl RPC for RPCServer {
             self.client_id,
             logs.len(),
         );
-        log_service::add_new_logs(self.client_id, logs).await
+        log_service::add_new_logs(self.client_id, logs, &self.db_connection).await
     }
 }
 
