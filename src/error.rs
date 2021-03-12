@@ -83,6 +83,16 @@ pub enum Error {
     FromStrError { backtrace: Backtrace },
     #[snafu(display("NoneError"), visibility(pub))]
     NoneError { backtrace: Backtrace },
+    #[snafu(display("AcmeError {}", source), context(false))]
+    AcmeError {
+        source: acme_lib::Error,
+        backtrace: Backtrace,
+    },
+    #[snafu(display("ReqwestError {}", source), context(false))]
+    ReqwestError {
+        source: reqwest::Error,
+        backtrace: Backtrace,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

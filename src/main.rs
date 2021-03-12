@@ -8,16 +8,20 @@
     clippy::similar_names,
     clippy::redundant_else,
     clippy::missing_errors_doc,
-    clippy::must_use_candidate
+    clippy::must_use_candidate,
+    clippy::missing_panics_doc
 )]
-
-use std::{thread, time::Duration};
 
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
 use namib_mud_controller::{
-    db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_update_outdated_profiles, VERSION,
+    db,
+    error::Result,
+    routes,
+    rpc::rpc_server,
+    services::{acme_service, job_service},
+    VERSION,
 };
 use paperclip::actix::{web, OpenApiExt};
 
@@ -29,25 +33,10 @@ async fn main() -> Result<()> {
     log::info!("Starting mud_controller {}", VERSION);
 
     let conn = db::connect().await?;
-    let conn2 = conn.clone();
-    actix_rt::spawn(async move {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("could not construct tokio runtime")
-            .block_on(rpc::rpc_server::listen(conn2))
-            .expect("failed running rpc server");
-    });
+    let _rpcserver = rpc_server::run_in_tokio(conn.clone());
 
-    /*Starts a new job that updates the expired profiles at regular intervals.*/
-    let conn3 = conn.clone();
-    let _computation = thread::spawn(move || {
-        job_update_outdated_profiles(
-            conn3,                        // Given database connection.
-            clokwerk::TimeUnits::hour(1), // Interval at which the expired profiles are updated.
-            Duration::from_secs(600),     // How long does the thread sleep until next test.
-        );
-    });
+    // Starts a new job that updates the expired profiles at regular intervals.
+    let _jobs = job_service::start_jobs(conn.clone());
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -78,6 +67,7 @@ async fn main() -> Result<()> {
             )
     })
     .bind("0.0.0.0:8000")?
+    .bind_rustls("0.0.0.0:9000", acme_service::server_config())?
     .run()
     .await?;
 

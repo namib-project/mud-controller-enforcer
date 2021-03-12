@@ -1,7 +1,4 @@
-use std::{thread, time::Duration};
-
 use chrono::Utc;
-use clokwerk::Scheduler;
 
 use crate::{
     db::DbConnection,
@@ -9,29 +6,7 @@ use crate::{
     services::{firewall_configuration_service::update_config_version, mud_service::*},
 };
 
-/// Create new job scheduler that update the expired mud profiles.
-/// conn is the current database connection.
-/// Interval is the interval at which the profiles are tested.
-/// sleep_duration specifies how long the thread should sleep.
-pub fn job_update_outdated_profiles(conn: DbConnection, interval: clokwerk::Interval, sleep_duration: Duration) {
-    log::info!("Start scheduler");
-    let mut scheduler = Scheduler::new();
-    scheduler.every(interval).run(move || {
-        log::info!("Start scheduler every {:?}", interval);
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("could not construct tokio runtime")
-            .block_on(update_outdated_profiles(&conn))
-            .expect("failed running scheduler for update_outdated_profiles");
-    });
-    loop {
-        scheduler.run_pending();
-        thread::sleep(sleep_duration);
-    }
-}
-
-async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
+pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
     log::debug!("Update outdated profiles");
     let mud_data = get_all_mud_expiration(&db_pool).await?;
     let mud_vec: Vec<String> = mud_data
