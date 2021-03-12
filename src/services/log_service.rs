@@ -34,6 +34,7 @@ async fn parse_log_line(line: &str, conn: &DbConnection) -> Result<()> {
     let ip: IpAddr = m[5].parse()?;
     info!("Received dns request: {} {} {}", date_time, ip, domain);
     let device = device_service::find_by_ip(ip, conn).await?;
+    // add the device connection in the background as it may take some time
     tokio::spawn(neo4jthings_service::add_device_connection(device, domain.to_string()));
     Ok(())
 }

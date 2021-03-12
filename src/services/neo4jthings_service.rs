@@ -9,6 +9,8 @@ use std::{env, future::Future};
 use tokio::time::{sleep, Duration};
 
 lazy_static! {
+    /// The configuration for connecting to the neo4jthings service.
+    /// We could configure the base_url here too
     static ref N4JT_CONFIG: Configuration = Configuration {
         basic_auth: Some((
             env::var("NEO4JTHINGS_USER").expect("NEO4JTHINGS_USER env missing"),
@@ -19,12 +21,14 @@ lazy_static! {
     };
 }
 
+/// Add a device in the neo4jthings service.
+/// This operation should be run in the background as it is failsafe.
 pub async fn add_device(device: Device) {
     if let Err(e) = retry_op(|| async {
         thing_api::thing_create(
             &*N4JT_CONFIG,
             Thing {
-                serial: "".to_string(),
+                serial: "".to_string(), // TODO: what here?
                 mac_addr: device.mac_addr.unwrap().to_string(),
                 ipv4_addr: if device.ip_addr.is_ipv4() {
                     device.ip_addr.to_string()
@@ -47,13 +51,15 @@ pub async fn add_device(device: Device) {
     }
 }
 
+/// Add a connection to a device in the neo4jthings service.
+/// This operation should be run in the background as it is failsafe.
 pub async fn add_device_connection(device: Device, connection: String) {
     if let Err(e) = retry_op(|| async {
         thing_api::thing_connections_create(
             &*N4JT_CONFIG,
             &device.mac_addr.unwrap().to_string(), // TODO: duid
             Acl {
-                name: "".to_string(),
+                name: "".to_string(), // TODO: name
                 _type: if device.ip_addr.is_ipv4() {
                     "4t".to_string()
                 } else {

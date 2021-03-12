@@ -101,6 +101,7 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
     .await?;
 
     if device_data.collect_info {
+        // add the device in the background as it may take some time
         tokio::spawn(neo4jthings_service::add_device(device_data.clone()));
     }
 
