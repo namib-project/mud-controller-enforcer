@@ -66,6 +66,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
         documentation: mud_data.documentation.clone(),
         expiration: exptime,
         acllist,
+        acl_override: None,
     };
     info!(
         "MUD URI <{}> Last Update <{}> System Info <{:?}> Cache-Validity <{}> MASA <{:?}> Expiration <{}>",
@@ -100,11 +101,11 @@ fn parse_device_policy(
                     let mut source_port = None;
                     let mut destination_port = None;
                     if let Some(udp) = &aceitem.matches.udp {
-                        protocol = Some(AceProtocol::UDP);
+                        protocol = Some(AceProtocol::Udp);
                         source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                         destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     } else if let Some(tcp) = &aceitem.matches.tcp {
-                        protocol = Some(AceProtocol::TCP);
+                        protocol = Some(AceProtocol::Tcp);
                         if let Some(dir) = &tcp.direction_initiated {
                             direction_initiated = Some(match dir.as_str() {
                                 "from-device" => AclDirection::FromDevice,
@@ -299,6 +300,7 @@ mod tests {
             documentation: Some("https://lighting.example.com/lightbulb2000/documentation".to_string()),
             expiration: mud.expiration.clone(),
             acllist: acl_list,
+            acl_override: None,
         };
 
         assert_eq!(mud, example);

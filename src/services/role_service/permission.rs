@@ -33,4 +33,19 @@ pub enum Permission {
     /// role/assign
     #[strum(serialize = "role/assign")]
     role__assign,
+    /// mud/list
+    #[strum(serialize = "mud/list")]
+    mud__list,
+    /// mud/read
+    #[strum(serialize = "mud/read")]
+    mud__read,
+    /// mud/write
+    #[strum(serialize = "mud/write")]
+    mud__write,
+    /// mud/delete
+    #[strum(serialize = "mud/delete")]
+    mud__delete,
+    /// mud/delete
+    #[strum(serialize = "mud/create")]
+    mud__create,
 }
