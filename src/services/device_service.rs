@@ -4,7 +4,7 @@ use crate::{
     models::{Device, DeviceDbo},
     services::{
         config_service, config_service::ConfigKeys, firewall_configuration_service, mud_service,
-        mud_service::get_mud_from_url, neo4jthings_service,
+        mud_service::get_or_fetch_mud, neo4jthings_service,
     },
 };
 pub use futures::TryStreamExt;
@@ -34,7 +34,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
     debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
 
     match dhcp_device_data.mud_url {
-        Some(url) => mud_service::get_mud_from_url(url, pool).await.ok(),
+        Some(url) => mud_service::get_or_fetch_mud(url, pool).await.ok(),
         None => None,
     };
 
@@ -52,7 +52,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
             let mut device_data = Device::from(device);
             device_data.mud_data = match device_data.mud_url.clone() {
                 Some(url) => {
-                    let data = get_mud_from_url(url.clone(), pool).await;
+                    let data = get_or_fetch_mud(url.clone(), pool).await;
                     debug!("Get all devices: mud url {:?}: {:?}", url, data);
                     data.ok()
                 },

@@ -34,6 +34,7 @@ pub struct MudData {
     pub documentation: Option<String>,
     pub expiration: DateTime<Utc>,
     pub acllist: Vec<Acl>,
+    pub acl_override: Option<Vec<Acl>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]

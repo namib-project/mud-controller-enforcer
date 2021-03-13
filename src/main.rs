@@ -12,9 +12,10 @@
     clippy::must_use_candidate
 )]
 
-use std::{thread, time::Duration};
+use std::{env, thread, time::Duration};
 
 use actix_cors::Cors;
+use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
 use namib_mud_controller::{
@@ -59,11 +60,26 @@ async fn main() -> Result<()> {
             .allow_any_method()
             .allow_any_header()
             .max_age(3600);
+        let rate_limiter = RateLimiter::new(MemoryStoreActor::from(MemoryStore::new()).start())
+            .with_interval(Duration::from_secs(60))
+            .with_max_requests(
+                env::var("RATELIMITER_REQUESTS_PER_MINUTE")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(120),
+            )
+            .with_identifier(|req| {
+                let connection_info = req.connection_info();
+                let ip = connection_info.remote_addr().ok_or(ARError::IdentificationError)?;
+                let ip_parts: Vec<&str> = ip.split(':').collect();
+                Ok(ip_parts[0].to_string())
+            });
 
         App::new()
             .data(conn.clone())
             .wrap(cors)
             .wrap(middleware::Logger::default())
+            .wrap(rate_limiter)
             .wrap_api()
             .service(web::scope("/status").configure(routes::status_controller::init))
             .service(web::scope("/users").configure(routes::users_controller::init))
