@@ -18,6 +18,15 @@ pub enum Permission {
     /// device/list
     #[strum(serialize = "device/list")]
     device__list,
+    /// device/read
+    #[strum(serialize = "device/read")]
+    device__read,
+    /// device/write
+    #[strum(serialize = "device/write")]
+    device__write,
+    /// device/delete
+    #[strum(serialize = "device/delete")]
+    device__delete,
     /// role/list
     #[strum(serialize = "role/list")]
     role__list,
