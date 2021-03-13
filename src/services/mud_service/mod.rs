@@ -9,9 +9,9 @@ use crate::{
 use sqlx::Done;
 use url::Url;
 
-mod json_models;
+pub mod json_models;
 pub mod mud_profile_service;
-mod parser;
+pub mod parser;
 
 /// Writes the `MudDbo` to the database.
 /// Upserts data by `MudDbo::url`

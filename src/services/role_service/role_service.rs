@@ -110,39 +110,3 @@ pub fn validate_permission_name(permissions: &[String]) -> ::std::io::Result<()>
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::{role_add_to_user, role_create};
-    use crate::{
-        db,
-        error::{Error, Result},
-        models::User,
-        routes::dtos::RoleUpdateDto,
-        services::user_service,
-    };
-
-    #[actix_rt::test]
-    async fn test_inserting_role_mappings() -> Result<()> {
-        let conn = db::test::init("test_inserting_role_mappings").await?;
-        let user_id = user_service::insert(User::new("admin".to_string(), "pass")?, &conn).await?;
-        let role = role_create(
-            &conn,
-            RoleUpdateDto {
-                name: "some name".to_string(),
-                permissions: vec!["some_permission".to_string()],
-            },
-        )
-        .await?;
-
-        // try inserting relation with role_id that doesn't exist
-        // this should result in a DatabaseError
-        match role_add_to_user(&conn, user_id, 37).await {
-            Err(Error::DatabaseError { .. }) => {},
-            _ => panic!(),
-        }
-
-        // this should work though
-        role_add_to_user(&conn, user_id, role.id).await
-    }
-}
