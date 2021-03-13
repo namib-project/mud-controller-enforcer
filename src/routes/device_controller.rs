@@ -6,8 +6,11 @@ use crate::{
     error,
     error::Result,
     models::Device,
-    routes::dtos::{DeviceCreationUpdateDto, DeviceDto},
-    services::{device_service, role_service::permission::Permission},
+    routes::dtos::{DeviceCreationUpdateDto, DeviceDto, GuessDto},
+    services::{
+        config_service, config_service::ConfigKeys, device_service, neo4jthings_service,
+        role_service::permission::Permission,
+    },
 };
 use actix_web::http::StatusCode;
 use paperclip::actix::{
@@ -22,6 +25,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{ip}", web::get().to(get_device));
     cfg.route("/{ip}", web::put().to(update_device));
     cfg.route("/{ip}", web::delete().to(delete_device));
+    cfg.route("/{ip}/guess", web::get().to(guess_thing));
 }
 
 #[api_v2_operation]
@@ -37,9 +41,7 @@ async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
 async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__read)?;
 
-    let ip_addr = parse_ip(&ip)?;
-
-    let device = find_device(ip_addr, &pool).await?;
+    let device = find_device(&ip, &pool).await?;
 
     Ok(Json(DeviceDto::from(device)))
 }
@@ -52,11 +54,14 @@ async fn create_device(
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
 
-    let ip_addr = parse_ip(&device_creation_update_dto.ip_addr)?;
+    let collect_info = device_creation_update_dto.mud_url.is_none()
+        && config_service::get_config_value(ConfigKeys::CollectDeviceData.as_ref(), &pool)
+            .await
+            .unwrap_or(false);
+    let device = device_creation_update_dto.into_inner().into_device(collect_info)?;
+    device_service::insert_device(&device, &pool).await?;
 
-    device_service::insert_device(&device_creation_update_dto.to_device(0, false)?, &pool).await?;
-
-    let created_device = find_device(ip_addr, &pool).await?;
+    let created_device = find_device(&device.ip_addr.to_string(), &pool).await?;
 
     Ok(Json(DeviceDto::from(created_device)))
 }
@@ -70,12 +75,11 @@ async fn update_device(
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
 
-    let ip_addr = parse_ip(&ip)?;
-
-    let existing_device = find_device(ip_addr, &pool).await?;
+    let existing_device = find_device(&ip, &pool).await?;
 
     let updated_device = device_creation_update_dto
-        .to_device(existing_device.id, existing_device.collect_info)
+        .into_inner()
+        .merge(existing_device)
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::BAD_REQUEST,
@@ -92,16 +96,29 @@ async fn update_device(
 async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<HttpResponse> {
     auth.require_permission(Permission::device__delete)?;
 
-    let ip_addr = parse_ip(&ip)?;
-
-    let existing_device = find_device(ip_addr, &pool).await?;
+    let existing_device = find_device(&ip, &pool).await?;
 
     device_service::delete_device(existing_device.id, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
-async fn find_device(ip_addr: IpAddr, pool: &DbConnection) -> Result<Device> {
-    device_service::find_by_ip(ip_addr, pool).await.or_else(|_| {
+#[api_v2_operation]
+async fn guess_thing(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    ip: web::Path<String>,
+) -> Result<Json<Vec<GuessDto>>> {
+    auth.require_permission(Permission::device__read)?;
+
+    let device = find_device(&ip, &pool).await?;
+
+    let guesses = neo4jthings_service::guess_thing(device).await?;
+
+    Ok(Json(guesses))
+}
+
+async fn find_device(ip_addr: &str, pool: &DbConnection) -> Result<Device> {
+    device_service::find_by_ip(parse_ip(ip_addr)?, pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some("No device with this IP found".to_string()),

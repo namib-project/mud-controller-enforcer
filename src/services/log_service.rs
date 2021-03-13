@@ -1,13 +1,11 @@
 use crate::{
     db::DbConnection,
-    error,
     error::{none_error, Result},
     services::{device_service, neo4jthings_service},
 };
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 use lazy_static::lazy_static;
 use regex::Regex;
-use snafu::OptionExt;
 use std::net::IpAddr;
 
 const MONTHS: &str = "JanFebMarAprMayJunJulAugSepOctNovDec";

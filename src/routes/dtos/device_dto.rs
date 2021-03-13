@@ -4,7 +4,7 @@ use crate::{
     error::Result,
     models::{Device, MudData},
 };
-use chrono::{Local, NaiveDateTime};
+use chrono::{NaiveDateTime, Utc};
 use namib_shared::{mac, MacAddr};
 use paperclip::actix::Apiv2Schema;
 
@@ -46,23 +46,43 @@ pub struct DeviceCreationUpdateDto {
 }
 
 impl DeviceCreationUpdateDto {
-    pub fn to_device(&self, id: i64, collect_info: bool) -> Result<Device> {
-        let mac_addr = match self.mac_addr.clone() {
+    pub fn into_device(self, collect_info: bool) -> Result<Device> {
+        let mac_addr = match self.mac_addr {
             None => None,
             Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
         };
-        let ip_addr = self.ip_addr.clone().parse::<std::net::IpAddr>()?;
+        let ip_addr = self.ip_addr.parse::<std::net::IpAddr>()?;
 
         Ok(Device {
-            id,
+            id: 0,
             mac_addr,
             ip_addr,
-            hostname: self.hostname.clone().unwrap_or("".to_string()),
-            vendor_class: self.vendor_class.clone().unwrap_or("".to_string()),
-            mud_url: self.mud_url.clone(),
+            hostname: self.hostname.unwrap_or("".to_string()),
+            vendor_class: self.vendor_class.unwrap_or("".to_string()),
+            mud_url: self.mud_url,
             collect_info,
-            last_interaction: Local::now().naive_local(),
+            last_interaction: Utc::now().naive_local(),
             mud_data: None,
         })
     }
+
+    pub fn merge(self, mut device: Device) -> Result<Device> {
+        let mac_addr = match self.mac_addr {
+            None => None,
+            Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
+        };
+        let ip_addr = self.ip_addr.parse::<std::net::IpAddr>()?;
+        device.mac_addr = mac_addr;
+        device.ip_addr = ip_addr;
+        device.mud_url = self.mud_url;
+        device.mud_data = None;
+        Ok(device)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+pub struct GuessDto {
+    pub mud_url: String,
+    pub model_name: Option<String>,
+    pub manufacturer_name: Option<String>,
 }

@@ -1,8 +1,8 @@
-use crate::{models::Device, VERSION};
+use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
 use chrono::Utc;
 use lazy_static::lazy_static;
 use neo4jthings_api::{
-    apis::{configuration::Configuration, thing_api},
+    apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Thing},
 };
 use std::{env, future::Future};
@@ -78,6 +78,23 @@ pub async fn add_device_connection(device: Device, connection: String) {
     {
         error!("Failed to add thing connection {:?}", e)
     }
+}
+
+pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
+    let result = mud_api::mud_guess_thing_list(&*N4JT_CONFIG, &device.mac_addr.unwrap().to_string(), None)
+        .await
+        .or_else(|e| error::Neo4jThingsError { message: e.to_string() }.fail())?;
+
+    Ok(result
+        .results
+        .unwrap()
+        .into_iter()
+        .map(|mud| GuessDto {
+            mud_url: mud.mud_url,
+            manufacturer_name: Some(mud.mud_signature),
+            model_name: Some(mud.name),
+        })
+        .collect())
 }
 
 async fn retry_op<F, T, U, E>(mut f: F) -> std::result::Result<(), E>
