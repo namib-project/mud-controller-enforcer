@@ -1,6 +1,7 @@
 #![allow(clippy::pub_enum_variant_names, clippy::module_name_repetitions)]
 
 use isahc::http::StatusCode;
+use namib_shared::mac::ParseError;
 use paperclip::actix::{api_v2_errors, web::HttpResponse};
 use snafu::{Backtrace, Snafu};
 
@@ -39,6 +40,8 @@ pub enum Error {
         source: std::net::AddrParseError,
         backtrace: Backtrace,
     },
+    #[snafu(display("MacParseError: {}", source), context(false))]
+    MacParseError { source: ParseError, backtrace: Backtrace },
     #[snafu(display("DotEnvError: {}", source), context(false))]
     DotEnvError {
         source: dotenv::Error,
