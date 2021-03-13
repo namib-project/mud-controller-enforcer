@@ -42,14 +42,14 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
             let protocol = match &ace.matches.protocol {
                 None => Protocol::all(),
                 Some(proto) => match proto {
-                    AceProtocol::TCP => Protocol::tcp(),
-                    AceProtocol::UDP => Protocol::udp(),
+                    AceProtocol::Tcp => Protocol::tcp(),
+                    AceProtocol::Udp => Protocol::udp(),
                     AceProtocol::Protocol(proto_nr) => Protocol::from_number(proto_nr.to_owned()),
                 },
             };
             let target = match ace.action {
-                AceAction::Accept => Target::ACCEPT,
-                AceAction::Deny => Target::REJECT,
+                AceAction::Accept => Target::Accept,
+                AceAction::Deny => Target::Reject,
             };
 
             if let Some(dnsname) = &ace.matches.dnsname {
@@ -70,8 +70,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                             }
                         },
                     };
-                    let route_network_lan = NetworkConfig::new(Network::LAN, Some(device.ip_addr.to_string()), None);
-                    let route_network_wan = NetworkConfig::new(Network::WAN, Some(addr.ip().to_string()), None);
+                    let route_network_lan = NetworkConfig::new(Network::Lan, Some(device.ip_addr.to_string()), None);
+                    let route_network_wan = NetworkConfig::new(Network::Wan, Some(addr.ip().to_string()), None);
                     let (route_network_src, route_network_dest) = match acl.packet_direction {
                         AclDirection::FromDevice => (route_network_lan, route_network_wan),
                         AclDirection::ToDevice => (route_network_wan, route_network_lan),
@@ -87,8 +87,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                     result.push(config_firewall);
                 }
             } else {
-                let route_network_lan = NetworkConfig::new(Network::LAN, None, None);
-                let route_network_wan = NetworkConfig::new(Network::WAN, None, None);
+                let route_network_lan = NetworkConfig::new(Network::Lan, None, None);
+                let route_network_wan = NetworkConfig::new(Network::Wan, None, None);
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
                     AclDirection::FromDevice => (route_network_lan, route_network_wan),
                     AclDirection::ToDevice => (route_network_wan, route_network_lan),
@@ -114,19 +114,19 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
     }
     result.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", index)),
-        NetworkConfig::new(Network::LAN, Some(device.ip_addr.to_string()), None),
-        NetworkConfig::new(Network::WAN, None, None),
+        NetworkConfig::new(Network::Lan, Some(device.ip_addr.to_string()), None),
+        NetworkConfig::new(Network::Wan, None, None),
         Protocol::all(),
-        Target::REJECT,
+        Target::Reject,
         None,
     ));
     index += 1;
     result.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", index)),
-        NetworkConfig::new(Network::WAN, None, None),
-        NetworkConfig::new(Network::LAN, Some(device.ip_addr.to_string()), None),
+        NetworkConfig::new(Network::Wan, None, None),
+        NetworkConfig::new(Network::Lan, Some(device.ip_addr.to_string()), None),
         Protocol::all(),
-        Target::REJECT,
+        Target::Reject,
         Some(vec![("dest_ip".to_string(), device.ip_addr.to_string())]),
     ));
 
@@ -174,7 +174,7 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::TCP),
+                        protocol: Some(AceProtocol::Tcp),
                         direction_initiated: None,
                         address_mask: None,
                         dnsname: None,

@@ -243,3 +243,4 @@ GitHub.sublime-settings
 # End of https://www.toptal.com/developers/gitignore/api/rust,vscode,intellij,eclipse,sublimetext,git
 
 .idea/
+.DS_Store
