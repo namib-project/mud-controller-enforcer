@@ -42,6 +42,7 @@ pub struct DeviceCreationUpdateDto {
     pub hostname: Option<String>,
     pub vendor_class: Option<String>,
     pub mud_url: Option<String>,
+    pub mud_url_from_guess: Option<bool>,
     pub last_interaction: Option<NaiveDateTime>,
 }
 
@@ -57,8 +58,8 @@ impl DeviceCreationUpdateDto {
             id: 0,
             mac_addr,
             ip_addr,
-            hostname: self.hostname.unwrap_or("".to_string()),
-            vendor_class: self.vendor_class.unwrap_or("".to_string()),
+            hostname: self.hostname.unwrap_or_else(|| "".to_string()),
+            vendor_class: self.vendor_class.unwrap_or_else(|| "".to_string()),
             mud_url: self.mud_url,
             collect_info,
             last_interaction: Utc::now().naive_local(),
@@ -67,15 +68,16 @@ impl DeviceCreationUpdateDto {
     }
 
     pub fn merge(self, mut device: Device) -> Result<Device> {
-        let mac_addr = match self.mac_addr {
-            None => None,
-            Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
-        };
-        let ip_addr = self.ip_addr.parse::<std::net::IpAddr>()?;
-        device.mac_addr = mac_addr;
-        device.ip_addr = ip_addr;
-        device.mud_url = self.mud_url;
-        device.mud_data = None;
+        if self.mud_url.is_some() {
+            device.mud_url = self.mud_url;
+            device.mud_data = None;
+        }
+        if let Some(hostname) = self.hostname {
+            device.hostname = hostname;
+        }
+        if let Some(vendor_class) = self.vendor_class {
+            device.vendor_class = vendor_class;
+        }
         Ok(device)
     }
 }

@@ -3,7 +3,7 @@ use chrono::Utc;
 use lazy_static::lazy_static;
 use neo4jthings_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
-    models::{Acl, Thing},
+    models::{Acl, Description, Thing},
 };
 use std::{env, future::Future};
 use tokio::time::{sleep, Duration};
@@ -80,6 +80,8 @@ pub async fn add_device_connection(device: Device, connection: String) {
     }
 }
 
+/// Query the neo4jthings service for possible mud-urls that match a given device.
+/// This operation should be run directly, since we are interested in the results.
 pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
     let result = mud_api::mud_guess_thing_list(&*N4JT_CONFIG, &device.mac_addr.unwrap().to_string(), None)
         .await
@@ -95,6 +97,26 @@ pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
             model_name: Some(mud.name),
         })
         .collect())
+}
+
+/// Notify the neo4jthings service that a mud_url was chosen for a given device.
+/// This operation should be run in the background as it is failsafe.
+pub async fn describe_thing(mac_addr: String, mud_url: String) {
+    if let Err(e) = retry_op(|| async {
+        thing_api::thing_describe_create(
+            &*N4JT_CONFIG,
+            &mac_addr, // TODO: duid
+            Description {
+                mud_url: mud_url.clone(),
+                mac_addr: mac_addr.clone(),
+            },
+        )
+        .await
+    })
+    .await
+    {
+        error!("Failed to describe thing {:?}", e)
+    }
 }
 
 async fn retry_op<F, T, U, E>(mut f: F) -> std::result::Result<(), E>

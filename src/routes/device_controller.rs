@@ -25,7 +25,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{ip}", web::get().to(get_device));
     cfg.route("/{ip}", web::put().to(update_device));
     cfg.route("/{ip}", web::delete().to(delete_device));
-    cfg.route("/{ip}/guess", web::get().to(guess_thing));
+    cfg.route("/{ip}/guesses", web::get().to(guess_thing));
 }
 
 #[api_v2_operation]
@@ -77,6 +77,8 @@ async fn update_device(
 
     let existing_device = find_device(&ip, &pool).await?;
 
+    let mud_url_from_guess = device_creation_update_dto.mud_url_from_guess.unwrap_or(false);
+
     let updated_device = device_creation_update_dto
         .into_inner()
         .merge(existing_device)
@@ -88,6 +90,14 @@ async fn update_device(
             .fail()
         })?;
     device_service::update_device(&updated_device, &pool).await?;
+
+    // if the mud_url was chosen from the guesses, notify the neo4jthings service
+    if mud_url_from_guess && updated_device.mud_url.is_some() {
+        actix_rt::spawn(neo4jthings_service::describe_thing(
+            updated_device.mac_addr.map(|m| m.to_string()).unwrap(),
+            updated_device.mud_url.clone().unwrap(),
+        ));
+    }
 
     Ok(Json(DeviceDto::from(updated_device)))
 }
@@ -102,7 +112,7 @@ async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation]
+#[api_v2_operation(summary = "Retrieve the MUD-URL guesses for a device")]
 async fn guess_thing(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -117,6 +127,7 @@ async fn guess_thing(
     Ok(Json(guesses))
 }
 
+/// Helper method for finding a device with a given ip, or returning a 404 error if not found.
 async fn find_device(ip_addr: &str, pool: &DbConnection) -> Result<Device> {
     device_service::find_by_ip(parse_ip(ip_addr)?, pool).await.or_else(|_| {
         error::ResponseError {
@@ -127,6 +138,7 @@ async fn find_device(ip_addr: &str, pool: &DbConnection) -> Result<Device> {
     })
 }
 
+/// Helper method for parsing a given ip address string into the corresponding struct
 fn parse_ip(ip: &str) -> Result<IpAddr> {
     ip.parse().or_else(|_| {
         error::ResponseError {
