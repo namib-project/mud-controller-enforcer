@@ -184,6 +184,7 @@ pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<
         roles
             .into_iter()
             .map(|r| RoleDto {
+                id: r.id,
                 name: r.name,
                 permissions: r.permissions.split(',').map(ToOwned::to_owned).collect(),
             })

@@ -57,57 +57,21 @@ mod tests {
     use std::{fs::File, io::Read};
 
     use chrono::{Duration, Utc};
-    use dotenv::dotenv;
-    use sqlx::migrate;
 
     use crate::{
+        db,
         models::{MudData, MudDbo},
         services::mud_service::parser::parse_mud,
     };
 
     use super::*;
 
-    async fn init() -> Result<DbConnection> {
-        dotenv().ok();
-        env_logger::try_init().ok();
-
-        #[cfg(feature = "sqlite")]
-        let db_url = "sqlite::memory:".to_string();
-
-        #[cfg(feature = "postgres")]
-        let db_url = format!(
-            "{}/{}",
-            std::env::var("DATABASE_URL").expect("Failed to load DB URL from .env"),
-            db_name
-        );
-
-        info!("Using DB {:?}", db_url);
-
-        let db_conn = DbConnection::connect(&db_url)
-            .await
-            .expect("Couldn't establish connection pool for database");
-
-        #[cfg(feature = "sqlite")]
-        migrate!("migrations/sqlite")
-            .run(&db_conn)
-            .await
-            .expect("Database migrations failed");
-
-        #[cfg(feature = "postgres")]
-        migrate!("migrations/postgres")
-            .run(&db_conn)
-            .await
-            .expect("Database migrations failed");
-
-        Ok(db_conn)
-    }
-
     #[actix_rt::test]
     //tests whether update_outdated_profiles() works on expired profiles. Dependent on external Service.
     async fn test_update_outdated_profiles() -> Result<()> {
         //Sets up an expired Amazon Echo profile
         const PATH: &str = "tests/mud_tests/Amazon-Echo";
-        let conn = init().await?;
+        let conn = db::test::init("test_update_outdated_profiles").await?;
         //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
         let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
         let mut file = File::open(PATH).expect(format!("Could not open {}", PATH).as_str());
@@ -179,7 +143,7 @@ mod tests {
     async fn test_update_valid_profiles() -> Result<()> {
         //Sets up a valid Amazon Echo profile
         const PATH: &str = "tests/mud_tests/Amazon-Echo";
-        let conn = init().await?;
+        let conn = db::test::init("test_update_valid_profiles").await?;
         //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
         let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
         let duration: i64 = 50;

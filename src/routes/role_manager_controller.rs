@@ -5,7 +5,7 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    routes::dtos::{RoleAssignDto, RoleDto},
+    routes::dtos::{RoleAssignDto, RoleDto, RoleUpdateDto},
     services::role_service::{permission::Permission, role_service},
 };
 use actix_web::HttpResponse;
@@ -45,7 +45,7 @@ pub async fn get_role(
 #[api_v2_operation(summary = "Create a new role")]
 pub async fn create_role(
     pool: web::Data<DbConnection>,
-    role_dto: Json<RoleDto>,
+    role_dto: Json<RoleUpdateDto>,
     auth: AuthToken,
 ) -> Result<Json<RoleDto>> {
     auth.require_permission(Permission::role__write)?;
@@ -57,7 +57,7 @@ pub async fn create_role(
         .fail()
     })?;
 
-    role_service::validate_permission_name(role_dto.clone().permissions).or_else(|e| {
+    role_service::validate_permission_name(&role_dto.permissions).or_else(|e| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: e.to_string(),
@@ -73,7 +73,7 @@ pub async fn create_role(
 pub async fn edit_role(
     pool: web::Data<DbConnection>,
     role_id: web::Path<i64>,
-    role_dto: Json<RoleDto>,
+    role_dto: Json<RoleUpdateDto>,
     auth: AuthToken,
 ) -> Result<HttpResponse> {
     auth.require_permission(Permission::role__write)?;
@@ -85,19 +85,17 @@ pub async fn edit_role(
         .fail()
     })?;
 
-    let _role_id = role_id.into_inner();
+    let role_id = role_id.into_inner();
 
-    role_service::role_get(pool.get_ref(), _role_id.clone())
-        .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::NOT_FOUND,
-                message: "Role not found".to_string(),
-            }
-            .fail()
-        })?;
+    role_service::role_get(pool.get_ref(), role_id).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: "Role not found".to_string(),
+        }
+        .fail()
+    })?;
 
-    role_service::validate_permission_name(role_dto.clone().permissions).or_else(|e| {
+    role_service::validate_permission_name(&role_dto.permissions).or_else(|e| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: e.to_string(),
@@ -105,8 +103,12 @@ pub async fn edit_role(
         .fail()
     })?;
 
-    let _ = role_service::role_update(pool.get_ref(), _role_id, role_dto.into_inner()).await?;
-    Ok(HttpResponse::NoContent().finish())
+    if role_service::role_update(pool.get_ref(), role_id, role_dto.into_inner()).await? {
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        // return 404 if no role was updated
+        Ok(HttpResponse::NotFound().finish())
+    }
 }
 
 #[api_v2_operation(summary = "Delete a role")]
@@ -116,7 +118,7 @@ pub async fn delete_role(
     auth: AuthToken,
 ) -> Result<HttpResponse> {
     auth.require_permission(Permission::role__delete)?;
-    let _ = role_service::role_delete(pool.get_ref(), role_id.into_inner()).await?;
+    role_service::role_delete(pool.get_ref(), role_id.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -136,7 +138,7 @@ pub async fn assign_role(
     })?;
 
     let assignment: RoleAssignDto = assignment_dto.into_inner();
-    let _ = role_service::role_add_to_user(pool.get_ref(), assignment.user_id, assignment.role_id).await?;
+    role_service::role_add_to_user(pool.get_ref(), assignment.user_id, assignment.role_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -156,7 +158,7 @@ pub async fn unassign_role(
     })?;
 
     let assignment: RoleAssignDto = assignment_dto.into_inner();
-    let _ = role_service::role_delete_from_user(pool.get_ref(), assignment.user_id, assignment.role_id).await?;
+    role_service::role_delete_from_user(pool.get_ref(), assignment.user_id, assignment.role_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

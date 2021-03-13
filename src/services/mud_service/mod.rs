@@ -1,7 +1,5 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use isahc::AsyncReadResponseExt;
-use lazy_static::lazy_static;
-use regex::Regex;
 
 use crate::{
     db::DbConnection,

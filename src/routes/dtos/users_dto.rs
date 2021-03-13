@@ -44,6 +44,13 @@ pub struct SuccessDto {
 
 #[derive(Validate, Serialize, Deserialize, Apiv2Schema, Debug, Clone)]
 pub struct RoleDto {
+    pub id: i64,
+    pub name: String,
+    pub permissions: Vec<String>,
+}
+
+#[derive(Validate, Serialize, Deserialize, Apiv2Schema, Debug, Clone)]
+pub struct RoleUpdateDto {
     pub name: String,
     pub permissions: Vec<String>,
 }

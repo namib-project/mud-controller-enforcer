@@ -65,7 +65,7 @@ pub async fn update_mud(
     url: web::Path<String>,
     mud_update_dto: Json<MudUpdateDto>,
 ) -> Result<Json<MudData>> {
-    auth.require_permission(Permission::mud__read)?;
+    auth.require_permission(Permission::mud__write)?;
 
     let mut mud_dbo = mud_service::get_mud(&url.into_inner(), &pool).await.ok_or_else(|| {
         error::ResponseError {

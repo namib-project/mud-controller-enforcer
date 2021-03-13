@@ -78,7 +78,7 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     })
 }
 
-pub async fn insert(user: User, conn: &DbConnection) -> Result<u64> {
+pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
     let ins_count = sqlx::query!(
         "insert into users (username, password, salt) values (?, ?, ?)",
         user.username,
@@ -88,7 +88,7 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<u64> {
     .execute(conn)
     .await?;
 
-    Ok(ins_count.rows_affected())
+    Ok(ins_count.last_insert_rowid())
 }
 
 pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
