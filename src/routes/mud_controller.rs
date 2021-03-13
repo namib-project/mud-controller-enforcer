@@ -7,7 +7,7 @@ use crate::{
     error::Result,
     models::{MudData, MudDbo},
     routes::dtos::{MudCreationDto, MudUpdateDto},
-    services::{mud_service, mud_service::is_url},
+    services::{mud_service, mud_service::is_url, role_service::permission::Permission},
 };
 use actix_web::http::StatusCode;
 use chrono::Utc;
@@ -26,8 +26,8 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 
 #[api_v2_operation]
 pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<MudData>>> {
-    auth.require_permission("mud/list")?;
-    auth.require_permission("mud/read")?;
+    auth.require_permission(Permission::mud__list)?;
+    auth.require_permission(Permission::mud__read)?;
 
     let mud_dbos = mud_service::get_all_muds(&pool).await.or_else(|_| {
         error::ResponseError {
@@ -46,7 +46,7 @@ pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: AuthToken) -> Res
 
 #[api_v2_operation]
 pub async fn get_mud(pool: web::Data<DbConnection>, auth: AuthToken, url: web::Path<String>) -> Result<Json<MudData>> {
-    auth.require_permission("mud/read")?;
+    auth.require_permission(Permission::mud__read)?;
 
     let mud_dbo = mud_service::get_mud(&url, &pool).await.ok_or_else(|| {
         error::ResponseError {
@@ -65,7 +65,7 @@ pub async fn update_mud(
     url: web::Path<String>,
     mud_update_dto: Json<MudUpdateDto>,
 ) -> Result<Json<MudData>> {
-    auth.require_permission("mud/write")?;
+    auth.require_permission(Permission::mud__read)?;
 
     let mut mud_dbo = mud_service::get_mud(&url.into_inner(), &pool).await.ok_or_else(|| {
         error::ResponseError {
@@ -92,7 +92,7 @@ pub async fn delete_mud(
     auth: AuthToken,
     url: web::Path<String>,
 ) -> Result<HttpResponse> {
-    auth.require_permission("mud/delete")?;
+    auth.require_permission(Permission::mud__delete)?;
 
     let url = url.into_inner();
 
@@ -122,7 +122,7 @@ pub async fn create_mud(
     auth: AuthToken,
     mud_creation_dto: Json<MudCreationDto>,
 ) -> Result<Json<MudData>> {
-    auth.require_permission("mud/create")?;
+    auth.require_permission(Permission::mud__create)?;
 
     let mud_creation_dto = mud_creation_dto.into_inner();
 

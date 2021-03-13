@@ -44,6 +44,7 @@ paperclip = { version = "0.5", features = ["actix", "chrono"] }
 glob = "0.3"
 const_format = "0.2"
 strum = { version = "0.20", features = ["derive"] }
+strum_macros = { version = "0.20" }
 sha-1 = "0.9"
 base64 = "0.13"
 regex = "1"
