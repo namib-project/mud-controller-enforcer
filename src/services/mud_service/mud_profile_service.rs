@@ -123,6 +123,7 @@ mod tests {
         let mud_dbo = MudDbo {
             url: url.to_owned(),
             data: serde_json::to_string(&mud_data)?,
+            acl_override: None,
             created_at: Utc::now().naive_utc(),
             //the expiration time is set to an arbitrary value that is guaranteed to be prior to the current date
             expiration: (present - Duration::hours(duration)).naive_utc(),
@@ -195,6 +196,7 @@ mod tests {
             url: url.to_owned(),
             //the profile content is modified from it's original state to distinguish it from the original
             data: serde_json::to_string(&mud_data)? + "Test",
+            acl_override: None,
             created_at: Utc::now().naive_utc(),
             //the expiration time is set to an arbitrary value that is after the current date
             expiration: (Utc::now() + Duration::hours(duration)).naive_utc(),
