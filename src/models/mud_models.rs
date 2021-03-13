@@ -9,7 +9,13 @@ use paperclip::{
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct MudDboRefresh {
+    pub url: String,
+    pub expiration: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct MudDbo {
     pub url: String,
     pub data: String,
@@ -28,6 +34,7 @@ pub struct MudData {
     pub documentation: Option<String>,
     pub expiration: DateTime<Utc>,
     pub acllist: Vec<Acl>,
+    pub acl_override: Option<Vec<Acl>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
@@ -80,8 +87,8 @@ impl Apiv2Schema for AcePort {
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(tag = "name", content = "num")]
 pub enum AceProtocol {
-    TCP,
-    UDP,
+    Tcp,
+    Udp,
     Protocol(u32),
 }
 
@@ -135,8 +142,8 @@ mod test {
 
     #[test]
     fn expect_protocol_json() {
-        assert_eq!(json!(AceProtocol::TCP), json!({"name": "TCP"}));
-        assert_eq!(json!(AceProtocol::UDP), json!({"name": "UDP"}));
+        assert_eq!(json!(AceProtocol::Tcp), json!({"name": "Tcp"}));
+        assert_eq!(json!(AceProtocol::Udp), json!({"name": "Udp"}));
         assert_eq!(json!(AceProtocol::Protocol(17)), json!({"name": "Protocol", "num": 17}))
     }
 }

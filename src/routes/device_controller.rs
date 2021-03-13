@@ -5,8 +5,9 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
+    models::Device,
     routes::dtos::{DeviceCreationUpdateDto, DeviceDto},
-    services::device_service,
+    services::{device_service, role_service::permission::Permission},
 };
 use actix_web::http::StatusCode;
 use paperclip::actix::{
@@ -25,8 +26,8 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 
 #[api_v2_operation]
 async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<DeviceDto>>> {
-    auth.require_permission("device/list")?;
-    auth.require_permission("device/read")?;
+    auth.require_permission(Permission::device__list)?;
+    auth.require_permission(Permission::device__read)?;
 
     let devices = device_service::get_all_devices(&pool).await?;
     Ok(Json(devices.into_iter().map(DeviceDto::from).collect()))
@@ -34,23 +35,11 @@ async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
 
 #[api_v2_operation]
 async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<Json<DeviceDto>> {
-    auth.require_permission("device/read")?;
+    auth.require_permission(Permission::device__read)?;
 
-    let ip_addr = (&ip).parse::<IpAddr>().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: Some("Invalid IP address".to_string()),
-        }
-        .fail()
-    })?;
+    let ip_addr = parse_ip(&ip)?;
 
-    let device = device_service::find_by_ip(ip_addr, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::NOT_FOUND,
-            message: Some("No device with this IP found".to_string()),
-        }
-        .fail()
-    })?;
+    let device = find_device(ip_addr, &pool).await?;
 
     Ok(Json(DeviceDto::from(device)))
 }
@@ -61,25 +50,13 @@ async fn create_device(
     auth: AuthToken,
     device_creation_update_dto: Json<DeviceCreationUpdateDto>,
 ) -> Result<Json<DeviceDto>> {
-    auth.require_permission("device/write")?;
+    auth.require_permission(Permission::device__write)?;
 
-    let ip_addr = device_creation_update_dto.ip_addr.parse::<IpAddr>().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: Some("Invalid IP address".to_string()),
-        }
-        .fail()
-    })?;
+    let ip_addr = parse_ip(&device_creation_update_dto.ip_addr)?;
 
     device_service::insert_device(&device_creation_update_dto.to_device(0, false)?, &pool).await?;
 
-    let created_device = device_service::find_by_ip(ip_addr, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: Some("Couldn't fetch created device.".to_string()),
-        }
-        .fail()
-    })?;
+    let created_device = find_device(ip_addr, &pool).await?;
 
     Ok(Json(DeviceDto::from(created_device)))
 }
@@ -91,23 +68,11 @@ async fn update_device(
     ip: web::Path<String>,
     device_creation_update_dto: Json<DeviceCreationUpdateDto>,
 ) -> Result<Json<DeviceDto>> {
-    auth.require_permission("device/write")?;
+    auth.require_permission(Permission::device__write)?;
 
-    let ip_addr = (&ip).parse::<IpAddr>().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: Some("Invalid IP address".to_string()),
-        }
-        .fail()
-    })?;
+    let ip_addr = parse_ip(&ip)?;
 
-    let existing_device = device_service::find_by_ip(ip_addr, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::NOT_FOUND,
-            message: Some("No device with this IP found".to_string()),
-        }
-        .fail()
-    })?;
+    let existing_device = find_device(ip_addr, &pool).await?;
 
     let updated_device = device_creation_update_dto
         .to_device(existing_device.id, existing_device.collect_info)
@@ -125,24 +90,32 @@ async fn update_device(
 
 #[api_v2_operation]
 async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<HttpResponse> {
-    auth.require_permission("device/delete")?;
+    auth.require_permission(Permission::device__delete)?;
 
-    let ip_addr = (&ip).parse::<IpAddr>().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: Some("Invalid IP address".to_string()),
-        }
-        .fail()
-    })?;
+    let ip_addr = parse_ip(&ip)?;
 
-    let existing_device = device_service::find_by_ip(ip_addr, &pool).await.or_else(|_| {
+    let existing_device = find_device(ip_addr, &pool).await?;
+
+    device_service::delete_device(existing_device.id, &pool).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+async fn find_device(ip_addr: IpAddr, pool: &DbConnection) -> Result<Device> {
+    device_service::find_by_ip(ip_addr, pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some("No device with this IP found".to_string()),
         }
         .fail()
-    })?;
+    })
+}
 
-    device_service::delete_device(existing_device.id, &pool).await?;
-    Ok(HttpResponse::NoContent().finish())
+fn parse_ip(ip: &str) -> Result<IpAddr> {
+    ip.parse().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: Some("Invalid IP address".to_string()),
+        }
+        .fail()
+    })
 }

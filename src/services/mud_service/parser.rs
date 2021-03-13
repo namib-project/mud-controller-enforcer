@@ -66,6 +66,7 @@ pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
         documentation: mud_data.documentation.clone(),
         expiration: exptime,
         acllist,
+        acl_override: None,
     };
     info!(
         "MUD URI <{}> Last Update <{}> System Info <{:?}> Cache-Validity <{}> MASA <{:?}> Expiration <{}>",
@@ -100,11 +101,11 @@ fn parse_device_policy(
                     let mut source_port = None;
                     let mut destination_port = None;
                     if let Some(udp) = &aceitem.matches.udp {
-                        protocol = Some(AceProtocol::UDP);
+                        protocol = Some(AceProtocol::Udp);
                         source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                         destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                     } else if let Some(tcp) = &aceitem.matches.tcp {
-                        protocol = Some(AceProtocol::TCP);
+                        protocol = Some(AceProtocol::Tcp);
                         if let Some(dir) = &tcp.direction_initiated {
                             direction_initiated = Some(match dir.as_str() {
                                 "from-device" => AclDirection::FromDevice,
@@ -228,15 +229,16 @@ mod tests {
     use chrono::{offset::TimeZone, NaiveDateTime, Utc};
 
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn test_trivial_example() -> Result<()> {
         const URL: &str = "https://lighting.example.com/lightbulb2000";
         let mut mud_data = String::new();
-        let mut mud_profile = File::open("tests/mud_tests/MUD-Profile-example")?;
+        let mut mud_profile = File::open("tests/mud_tests/MUD-Profile-example.json")?;
         mud_profile.read_to_string(&mut mud_data)?;
 
-        let mud = parse_mud(URL.to_string().clone(), mud_data.as_str())?;
+        let mud = parse_mud(URL.to_string(), mud_data.as_str())?;
 
         let matches = AceMatches {
             protocol: None,
@@ -259,13 +261,13 @@ mod tests {
         ace_list_f.push(ace.clone());
         ace_list_f.push(ace.clone());
         ace.name = "myman2-frdev".to_string();
-        ace_list_f.push(ace.clone());
+        ace_list_f.push(ace);
 
         let mut ace_list_t: Vec<Ace> = Vec::new();
         let mut ace = Ace {
             name: "myman0-todev".to_string(),
             action: AceAction::Accept,
-            matches: matches.clone(),
+            matches,
         };
 
         ace_list_t.push(ace.clone());
@@ -273,7 +275,7 @@ mod tests {
         ace_list_t.push(ace.clone());
         ace_list_t.push(ace.clone());
         ace.name = "myman2-todev".to_string();
-        ace_list_t.push(ace.clone());
+        ace_list_t.push(ace);
 
         let mut acl_list = Vec::new();
         let mut acl = Acl {
@@ -290,15 +292,16 @@ mod tests {
 
         acl_list.push(acl);
         let example = MudData {
-            url: URL.to_string().clone(),
+            url: URL.to_string(),
             masa_url: None,
             last_update: "2019-07-23T19:54:24".to_string(),
             systeminfo: Some("The BMS Example Light Bulb".to_string()),
             mfg_name: None,
             model_name: None,
             documentation: Some("https://lighting.example.com/lightbulb2000/documentation".to_string()),
-            expiration: mud.expiration.clone(),
+            expiration: mud.expiration,
             acllist: acl_list,
+            acl_override: None,
         };
 
         assert_eq!(mud, example);
@@ -308,54 +311,54 @@ mod tests {
     #[test]
     fn test_example_amazon_echo() -> Result<()> {
         compare_mud_accept(
-            "tests/mud_tests/Amazon-Echo",
+            "tests/mud_tests/Amazon-Echo.json",
             "https://amazonecho.com/amazonecho",
-            "tests/mud_tests/Amazon-Echo-Test",
+            "tests/mud_tests/Amazon-Echo-Test.json",
         )
     }
 
     #[test]
     fn test_example_amazon_echo_wrong_expired() -> Result<()> {
         compare_mud_fail(
-            "tests/mud_tests/Amazon-Echo",
+            "tests/mud_tests/Amazon-Echo.json",
             "https://amazonecho.com/amazonecho",
-            "tests/mud_tests/Amazon-Echo-Test",
+            "tests/mud_tests/Amazon-Echo-Test.json",
         )
     }
 
     #[test]
     fn test_example_ring_doorbell() -> Result<()> {
         compare_mud_accept(
-            "tests/mud_tests/Ring-Doorbell",
+            "tests/mud_tests/Ring-Doorbell.json",
             "https://ringdoorbell.com/ringdoorbell",
-            "tests/mud_tests/Ring-Doorbell-Test",
+            "tests/mud_tests/Ring-Doorbell-Test.json",
         )
     }
 
     #[test]
     fn test_example_ring_doorbell_wrong_expired() -> Result<()> {
         compare_mud_fail(
-            "tests/mud_tests/Ring-Doorbell",
+            "tests/mud_tests/Ring-Doorbell.json",
             "https://ringdoorbell.com/ringdoorbell",
-            "tests/mud_tests/Ring-Doorbell-Test",
+            "tests/mud_tests/Ring-Doorbell-Test.json",
         )
     }
 
     #[test]
     fn test_example_august_doorbell() -> Result<()> {
         compare_mud_accept(
-            "tests/mud_tests/August-Doorbell",
+            "tests/mud_tests/August-Doorbell.json",
             "https://augustdoorbellcam.com/augustdoorbellcam",
-            "tests/mud_tests/August-Doorbell-Test",
+            "tests/mud_tests/August-Doorbell-Test.json",
         )
     }
 
     #[test]
     fn test_example_august_doorbell_wrong_expired() -> Result<()> {
         compare_mud_fail(
-            "tests/mud_tests/August-Doorbell",
+            "tests/mud_tests/August-Doorbell.json",
             "https://augustdoorbellcam.com/augustdoorbellcam",
-            "tests/mud_tests/August-Doorbell-Test",
+            "tests/mud_tests/August-Doorbell-Test.json",
         )
     }
 
@@ -373,20 +376,23 @@ mod tests {
         mud_profile.read_to_string(&mut mud_data)?;
         mud_profile_test.read_to_string(&mut mud_data_test)?;
 
-        let mud = parse_mud(mud_profile_url.to_string().clone(), mud_data.as_str())?;
+        let mud = parse_mud(mud_profile_url.to_string(), mud_data.as_str())?;
         Ok((mud, mud_data_test))
     }
     fn compare_mud_fail(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
         let mud_data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        assert_ne!(serde_json::to_string(&mud_data.0).unwrap(), mud_data.1);
+        assert_ne!(
+            serde_json::to_value(&mud_data.0)?,
+            serde_json::from_str::<Value>(&mud_data.1)?
+        );
         Ok(())
     }
 
     fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
         let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S").unwrap();
+        let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S")?;
         data.0.expiration = Utc.from_local_datetime(&naive).unwrap();
-        assert_eq!(serde_json::to_string(&data.0).unwrap(), data.1);
+        assert_eq!(serde_json::to_value(&data.0)?, serde_json::from_str::<Value>(&data.1)?);
         Ok(())
     }
 }
