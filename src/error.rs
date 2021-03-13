@@ -89,6 +89,10 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub fn none_error() -> Error {
+    self::NoneError {}.build()
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ErrorDto {
     pub error: String,
