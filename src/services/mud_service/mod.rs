@@ -9,6 +9,7 @@ use crate::{
     models::{Acl, MudData, MudDbo, MudDboRefresh},
 };
 use sqlx::Done;
+use url::Url;
 
 mod json_models;
 pub mod mud_profile_service;
@@ -18,12 +19,11 @@ mod parser;
 /// Upserts data by `MudDbo::url`
 pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
     let _ins_count = sqlx::query!(
-        "INSERT INTO mud_data (url, data, created_at, expiration, acl_override) VALUES (?, ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET data = excluded.data, created_at = excluded.created_at, expiration = excluded.expiration, acl_override = excluded.acl_override",
+        "INSERT INTO mud_data (url, data, created_at, expiration) VALUES (?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET data = excluded.data, created_at = excluded.created_at, expiration = excluded.expiration",
         mud_profile.url,
         mud_profile.data,
         mud_profile.created_at,
         mud_profile.expiration,
-        mud_profile.acl_override,
     )
         .execute(pool)
         .await?;
@@ -35,12 +35,11 @@ pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()>
 /// Creates MUD Profile using `MudDbo` Data
 pub async fn create_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
     let _ins_count = sqlx::query!(
-        "INSERT INTO mud_data (url, data, created_at, expiration, acl_override) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO mud_data (url, data, created_at, expiration) VALUES (?, ?, ?, ?)",
         mud_profile.url,
         mud_profile.data,
         mud_profile.created_at,
         mud_profile.expiration,
-        mud_profile.acl_override,
     )
     .execute(pool)
     .await?;
@@ -83,12 +82,20 @@ pub async fn is_mud_used(url: &str, pool: &DbConnection) -> Result<bool> {
     Ok(device_using_mud.is_some())
 }
 
+/// This function return MudDboRefresh they only containing url and expiration
+/// to reduce payload.
+async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
+    Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
+        .fetch_all(pool)
+        .await?)
+}
+
 /// Returns a MUD-Profile Data using the MUD-URL
 /// Creates the MUD-Profile if it doesn't exist
 /// If it exists, uses existing data from DB
 /// This function is mainly used in the `RPCServer`, where it's used to save Device's MUD-URLs which are being sent via DHCP
 /// Local MUD-Profiles can be loaded *BUT NOT CREATED* through this function, since they have an expiration far far in the future
-pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudData> {
+pub async fn get_or_fetch_mud(url: String, pool: &DbConnection) -> Result<MudData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
     let existing_mud = get_mud(&url, pool).await;
 
@@ -110,7 +117,6 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
     let mud = MudDbo {
         url: url.clone(),
         data: serde_json::to_string(&data)?,
-        acl_override: None,
         created_at: Utc::now().naive_utc(),
         expiration: data.expiration.naive_utc(),
     };
@@ -130,10 +136,7 @@ async fn fetch_mud(url: &str) -> Result<String> {
 
 /// Checks if the given string is an URL. Used to check if the MUD-Profile being created is local or needs to be fetched.
 pub fn is_url(url: &str) -> bool {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"https?://(-\.)?([^\s/?\.#-]+\.?)+(/[^\s]*)?$").unwrap();
-    }
-    RE.is_match(url)
+    Url::parse(url).is_ok()
 }
 
 /// Generates an empty MUD-Profile for custom local usage
@@ -155,12 +158,4 @@ pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl
 /// Generates an expiration date, which is far in the future. Mainly used for custom local MUD-Profiles
 pub fn get_custom_mud_expiration() -> DateTime<Utc> {
     Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 1, 31).and_hms(0, 0, 0))
-}
-
-/// This function return MudDboRefresh they only containing url and expiration
-/// to reduce payload.
-async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
-    Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
-        .fetch_all(pool)
-        .await?)
 }

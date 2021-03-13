@@ -39,9 +39,8 @@ pub async fn get_all_muds(pool: web::Data<DbConnection>, auth: AuthToken) -> Res
     Ok(Json(
         mud_dbos
             .iter()
-            .map(|mud_dbo| serde_json::from_str::<MudData>(mud_dbo.data.as_str()))
-            // .filter_map(serde_json::Result::ok) // TODO: remove this, fix it & don't ignore failures
-            .collect::<std::result::Result<Vec<MudData>, serde_json::Error>>()?,
+            .map(|mud_dbo| serde_json::from_str::<MudData>(&mud_dbo.data))
+            .collect::<serde_json::Result<_>>()?,
     ))
 }
 
@@ -56,7 +55,7 @@ pub async fn get_mud(pool: web::Data<DbConnection>, auth: AuthToken, url: web::P
         }
         .build()
     })?;
-    Ok(Json(serde_json::from_str::<MudData>(mud_dbo.data.as_str())?))
+    Ok(Json(serde_json::from_str::<MudData>(&mud_dbo.data)?))
 }
 
 #[api_v2_operation]
@@ -77,8 +76,8 @@ pub async fn update_mud(
     })?;
 
     // update the acl_override in mud_data
-    let mut mud_data = serde_json::from_str::<MudData>(mud_dbo.data.as_str())?;
-    mud_data.acl_override = mud_update_dto.acl_override.clone();
+    let mut mud_data = serde_json::from_str::<MudData>(&mud_dbo.data)?;
+    mud_data.acl_override = mud_update_dto.into_inner().acl_override;
 
     // use the new mud_data in the existing mud_dbo
     mud_dbo.data = serde_json::to_string(&mud_data)?;
@@ -125,6 +124,8 @@ pub async fn create_mud(
 ) -> Result<Json<MudData>> {
     auth.require_permission("mud/create")?;
 
+    let mud_creation_dto = mud_creation_dto.into_inner();
+
     if mud_service::get_mud(&mud_creation_dto.mud_url, &pool).await.is_some() {
         error::ResponseError {
             status: StatusCode::CONFLICT,
@@ -135,21 +136,15 @@ pub async fn create_mud(
 
     // Check if the mud_url is actually an url. It might be a custom user mud-profile
     if is_url(&mud_creation_dto.mud_url) {
-        let created_mud = mud_service::get_mud_from_url(mud_creation_dto.mud_url.clone(), &pool).await?;
+        let created_mud = mud_service::get_or_fetch_mud(mud_creation_dto.mud_url, &pool).await?;
 
         Ok(Json(created_mud))
     } else {
-        let empty_mud = mud_service::generate_empty_custom_mud_profile(
-            &mud_creation_dto.mud_url,
-            mud_creation_dto.acl_override.clone(),
-        );
+        let empty_mud =
+            mud_service::generate_empty_custom_mud_profile(&mud_creation_dto.mud_url, mud_creation_dto.acl_override);
         let mud_dbo = MudDbo {
-            url: mud_creation_dto.mud_url.clone(),
+            url: mud_creation_dto.mud_url,
             data: serde_json::to_string(&empty_mud)?,
-            acl_override: match &mud_creation_dto.acl_override {
-                Some(acls) => Some(serde_json::to_string(acls)?),
-                None => None,
-            },
             created_at: Utc::now().naive_local(),
             expiration: empty_mud.expiration.naive_local(),
         };

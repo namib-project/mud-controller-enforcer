@@ -46,7 +46,7 @@ async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
 async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
     for mud_url in vec_url {
         log::debug!("Try to update url: {}", mud_url);
-        let updated_mud = get_mud_from_url(mud_url, db_pool).await?;
+        let updated_mud = get_or_fetch_mud(mud_url, db_pool).await?;
         log::debug!("Updated mud profile: {:#?}", updated_mud);
     }
     Ok(())
@@ -123,7 +123,6 @@ mod tests {
         let mud_dbo = MudDbo {
             url: url.to_owned(),
             data: serde_json::to_string(&mud_data)?,
-            acl_override: None,
             created_at: Utc::now().naive_utc(),
             //the expiration time is set to an arbitrary value that is guaranteed to be prior to the current date
             expiration: (present - Duration::hours(duration)).naive_utc(),
@@ -196,7 +195,6 @@ mod tests {
             url: url.to_owned(),
             //the profile content is modified from it's original state to distinguish it from the original
             data: serde_json::to_string(&mud_data)? + "Test",
-            acl_override: None,
             created_at: Utc::now().naive_utc(),
             //the expiration time is set to an arbitrary value that is after the current date
             expiration: (Utc::now() + Duration::hours(duration)).naive_utc(),

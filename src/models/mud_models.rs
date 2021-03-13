@@ -19,7 +19,6 @@ pub struct MudDboRefresh {
 pub struct MudDbo {
     pub url: String,
     pub data: String,
-    pub acl_override: Option<String>,
     pub created_at: NaiveDateTime,
     pub expiration: NaiveDateTime,
 }
