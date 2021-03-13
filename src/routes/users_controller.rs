@@ -14,7 +14,7 @@ use crate::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
         UserConfigValueDto,
     },
-    services::{user_config_service, user_service},
+    services::{role_service::permission::Permission, user_config_service, user_service},
 };
 use actix_web::HttpResponse;
 
@@ -89,12 +89,20 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 }
 
 #[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.")]
-pub async fn refresh_token(auth: AuthToken) -> Result<Json<TokenDto>> {
+pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<TokenDto>> {
+    let user = user_service::find_by_id(auth.sub, pool.get_ref()).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
     Ok(Json(TokenDto {
         token: AuthToken::encode_token(&AuthToken::generate_access_token(
             auth.sub,
-            auth.username,
-            auth.permissions,
+            user.username,
+            user.permissions,
         )),
     }))
 }
@@ -168,7 +176,7 @@ pub fn update_password(
 
 #[api_v2_operation(summary = "Retrieve all roles")]
 pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
-    auth.require_permission("role/list")?;
+    auth.require_permission(Permission::role__list)?;
 
     let roles = user_service::get_all_roles(pool.get_ref()).await?;
 
@@ -176,6 +184,7 @@ pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<
         roles
             .into_iter()
             .map(|r| RoleDto {
+                id: r.id,
                 name: r.name,
                 permissions: r.permissions.split(',').map(ToOwned::to_owned).collect(),
             })
