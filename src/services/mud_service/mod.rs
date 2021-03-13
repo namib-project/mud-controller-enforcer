@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use isahc::AsyncReadResponseExt;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -6,11 +6,12 @@ use regex::Regex;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{Acl, MudData, MudDbo},
+    models::{Acl, MudData, MudDbo, MudDboRefresh},
 };
 use sqlx::Done;
 
 mod json_models;
+pub mod mud_profile_service;
 mod parser;
 
 /// Writes the `MudDbo` to the database.
@@ -92,7 +93,7 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
     let existing_mud = get_mud(&url, pool).await;
 
     if let Some(mud) = existing_mud {
-        if mud.expiration > Local::now().naive_local() {
+        if mud.expiration > Utc::now().naive_utc() {
             if let Ok(mud) = serde_json::from_str::<MudData>(mud.data.as_str()) {
                 return Ok(mud);
             }
@@ -110,8 +111,8 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
         url: url.clone(),
         data: serde_json::to_string(&data)?,
         acl_override: None,
-        created_at: Local::now().naive_local(),
-        expiration: data.expiration.naive_local(),
+        created_at: Utc::now().naive_utc(),
+        expiration: data.expiration.naive_utc(),
     };
 
     debug!("new/updating mud profile: {:?}", mud);
@@ -140,7 +141,7 @@ pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl
     MudData {
         url: url.to_string(),
         masa_url: None,
-        last_update: Local::now().naive_local().to_string(),
+        last_update: Utc::now().naive_local().to_string(),
         systeminfo: None,
         mfg_name: None,
         model_name: None,
@@ -153,5 +154,13 @@ pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl
 
 /// Generates an expiration date, which is far in the future. Mainly used for custom local MUD-Profiles
 pub fn get_custom_mud_expiration() -> DateTime<Utc> {
-    chrono::Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 1, 31).and_hms(0, 0, 0))
+    Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 1, 31).and_hms(0, 0, 0))
+}
+
+/// This function return MudDboRefresh they only containing url and expiration
+/// to reduce payload.
+async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
+    Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
+        .fetch_all(pool)
+        .await?)
 }

@@ -11,11 +11,14 @@
     clippy::must_use_candidate
 )]
 
+use std::{thread, time::Duration};
+
 use actix_cors::Cors;
 use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
-use namib_mud_controller::{db, error::Result, routes, rpc, VERSION};
-/* Used for OpenApi/Swagger generation under the /swagger-ui url */
+use namib_mud_controller::{
+    db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_update_outdated_profiles, VERSION,
+};
 use paperclip::actix::{web, OpenApiExt};
 
 #[actix_web::main]
@@ -27,7 +30,6 @@ async fn main() -> Result<()> {
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
-
     actix_rt::spawn(async move {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -36,6 +38,17 @@ async fn main() -> Result<()> {
             .block_on(rpc::rpc_server::listen(conn2))
             .expect("failed running rpc server");
     });
+
+    /*Starts a new job that updates the expired profiles at regular intervals.*/
+    let conn3 = conn.clone();
+    let _computation = thread::spawn(move || {
+        job_update_outdated_profiles(
+            conn3,                        // Given database connection.
+            clokwerk::TimeUnits::hour(1), // Interval at which the expired profiles are updated.
+            Duration::from_secs(600),     // How long does the thread sleep until next test.
+        );
+    });
+
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|origin, _req_head| {

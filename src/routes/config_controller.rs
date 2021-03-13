@@ -11,7 +11,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::delete().to(delete_config));
 }
 
-#[api_v2_operation]
+#[api_v2_operation(summary = "Retrieve all or a subset of system config key-value pairs")]
 async fn get_configs(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -28,8 +28,9 @@ async fn get_configs(
             config_map.insert(config.key, Some(config.value));
         }
     } else {
-        for key in &config_query_dto.keys {
-            config_map.insert(key.clone(), config_service::get_config_value(key, &pool).await.ok());
+        for key in config_query_dto.into_inner().keys {
+            let value = config_service::get_config_value(&key, &pool).await.ok();
+            config_map.insert(key, value);
         }
     }
 
@@ -37,7 +38,7 @@ async fn get_configs(
     Ok(Json(config_map))
 }
 
-#[api_v2_operation]
+#[api_v2_operation(summary = "Set system config values")]
 async fn set_configs(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -45,21 +46,20 @@ async fn set_configs(
 ) -> Result<Json<HashMap<String, Option<String>>>> {
     auth.require_permission("config/write")?;
 
-    for (key, value) in &config_set_dto.0 {
+    for (key, value) in config_set_dto.iter() {
         config_service::set_config_value(&key, value, &pool).await?;
     }
 
-    let keyrefs = config_set_dto.0.keys().collect::<Vec<&String>>();
-
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();
-    for key in keyrefs {
-        config_map.insert((*key).clone(), config_service::get_config_value(key, &pool).await.ok());
+    for (key, _) in config_set_dto.into_inner() {
+        let value = config_service::get_config_value(&key, &pool).await.ok();
+        config_map.insert(key, value);
     }
 
     Ok(Json(config_map))
 }
 
-#[api_v2_operation]
+#[api_v2_operation(summary = "Delete the given system config entries")]
 async fn delete_config(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -68,8 +68,9 @@ async fn delete_config(
     auth.require_permission("config/delete")?;
 
     let mut deletion_map: HashMap<String, bool> = HashMap::new();
-    for key in &config_delete_dto.0 {
-        deletion_map.insert(key.clone(), config_service::delete_config_key(key, &pool).await? != 0);
+    for key in config_delete_dto.into_inner() {
+        let value = config_service::delete_config_key(&key, &pool).await?;
+        deletion_map.insert(key, value != 0);
     }
 
     Ok(Json(deletion_map))
