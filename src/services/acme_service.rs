@@ -1,6 +1,7 @@
 use crate::error::{self, Result};
 use acme_lib::{create_p384_key, persist::FilePersist, Account, Directory, DirectoryUrl};
 use base64::CharacterSet;
+use get_if_addrs::get_if_addrs;
 use lazy_static::lazy_static;
 use namib_shared::open_file_with;
 use reqwest::{Certificate, Identity};
@@ -14,6 +15,7 @@ use std::{
     env, fmt,
     fs::File,
     io::Read,
+    net::ToSocketAddrs,
     sync::{Arc, RwLock},
 };
 
@@ -164,4 +166,26 @@ pub fn server_config() -> ServerConfig {
     let mut config = ServerConfig::new(rustls_18::NoClientAuth::new());
     config.cert_resolver = Arc::new(CertResolver {});
     config
+}
+
+/// Returns the secure dns name for this controller.
+/// Will return `None` if no certificate has been issued yet, or the domain is not resolved to be this controller's ip.
+pub fn secure_name() -> Option<String> {
+    if let Ok(g) = ACME_CERTIFIED_KEY.read() {
+        if g.is_some() {
+            drop(g);
+            if let Ok(ifs) = get_if_addrs() {
+                if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
+                    for resolved in resolved {
+                        for interf in &ifs {
+                            if interf.ip() == resolved.ip() {
+                                return Some(DOMAIN.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
