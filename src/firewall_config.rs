@@ -194,15 +194,17 @@ pub struct EnforcerConfig {
     version: String,
     firewall_rules: Vec<FirewallRule>,
     known_devices: Vec<KnownDevice>,
+    secure_name: String,
 }
 
 impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, firewall_rules: Vec<FirewallRule>, known_devices: Vec<KnownDevice>) -> Self {
+    pub fn new(version: String, firewall_rules: Vec<FirewallRule>, known_devices: Vec<KnownDevice>, secure_name: String) -> Self {
         EnforcerConfig {
             version,
             firewall_rules,
             known_devices,
+            secure_name,
         }
     }
 
@@ -218,5 +220,9 @@ impl EnforcerConfig {
 
     pub fn known_devices(&self) -> &Vec<KnownDevice> {
         &self.known_devices
+    }
+
+    pub fn secure_name(&self) -> &str {
+        &self.secure_name
     }
 }
