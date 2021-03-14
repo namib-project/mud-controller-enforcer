@@ -1,6 +1,7 @@
 use namib_shared::firewall_config::{EnforcerConfig, FirewallRule};
 
 use crate::{error::Result, services::is_system_mode, uci::Uci};
+use std::net::SocketAddr;
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -25,7 +26,7 @@ pub fn get_config_version() -> Result<String> {
 /// This function create new configuration that should be uploaded on the firewall.
 /// It use the function `apply_uci_config`.
 /// Return Result<()>.
-pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
+pub fn apply_config(cfg: &EnforcerConfig, controller_addr: SocketAddr) -> Result<()> {
     debug!("Applying {} configs", cfg.firewall_rules().len());
     let mut uci = Uci::new()?;
     if !is_system_mode() {
@@ -38,6 +39,10 @@ pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
         uci.revert("firewall")?;
         return Err(e);
     }
+    if let Err(e) = apply_secure_name_config(&mut uci, cfg.secure_name(), controller_addr) {
+        uci.revert("dhcp")?;
+        return Err(e);
+    }
 
     #[cfg(feature = "execute_uci_commands")]
     {
@@ -45,6 +50,13 @@ pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
         debug!("restart firewall: {:?}", std::str::from_utf8(&output.stderr));
     }
     Ok(())
+}
+
+fn apply_secure_name_config(uci: &mut Uci, secure_name: &str, controller_addr: SocketAddr) -> Result<()> {
+    uci.set("dhcp.namib", "domain")?;
+    uci.set("dhcp.namib.name", secure_name)?;
+    uci.set("dhcp.namib.ip", &controller_addr.ip().to_string())?;
+    uci.commit("dhcp")
 }
 
 /// This function takes an UCI context and a Vector of configurations that should be uploaded on firewall.
