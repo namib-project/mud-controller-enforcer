@@ -59,7 +59,7 @@ lazy_static! {
     /// The certificate id (sha1 hash in base64)
     static ref SERVER_ID: CertId = CertId::new(SERVER_CERT[0].as_ref());
     /// The domain that this controllers certificate will be valid for
-    static ref DOMAIN: String = format!("{}.{}", *SERVER_ID, env::var("DOMAIN").expect("DOMAIN was not defined"));
+    pub static ref DOMAIN: String = format!("{}.{}", *SERVER_ID, env::var("DOMAIN").expect("DOMAIN was not defined"));
     /// store the CertifiedKey to not recreate it on every request
     static ref ACME_CERTIFIED_KEY: RwLock<Option<CertifiedKey>> = RwLock::new(None);
 }

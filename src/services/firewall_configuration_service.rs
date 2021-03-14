@@ -2,7 +2,10 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{AceAction, AceProtocol, AclDirection, AclType, Device},
-    services::config_service::{get_config_value, set_config_value, ConfigKeys},
+    services::{
+        acme_service,
+        config_service::{get_config_value, set_config_value, ConfigKeys},
+    },
 };
 use namib_shared::firewall_config::{
     EnforcerConfig, FirewallRule, KnownDevice, Network, NetworkConfig, Protocol, RuleName, Target,
@@ -25,6 +28,7 @@ pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerCo
             .into_iter()
             .map(|d| KnownDevice::new(d.ip_addr, d.collect_info))
             .collect(),
+        acme_service::DOMAIN.clone(),
     )
 }
 
