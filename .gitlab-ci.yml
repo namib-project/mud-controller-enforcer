@@ -108,7 +108,7 @@ openwrt_package_bcm2710: # raspberry v3
 
 openwrt_package_bcm2710_snapshot: # raspberry v3
   extends: .openwrt_package_base
-  image: openwrtorg/sdk@sha256:ec9996c6fe15a0fae3c1b3890d42148e48ec193bd3f4a8824970bab492cd627e # :bcm27xx-bcm2710-snapshot
+  image: openwrtorg/sdk@sha256:4034164a5897dc582551485fc16fabc9b1c8c46dfd3345969d5e5b9f3b03a4de # :bcm27xx-bcm2710-snapshot
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
