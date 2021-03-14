@@ -407,11 +407,11 @@ mod mock {
 
     use crate::error::{self, Result};
 
-    pub struct UCI {}
+    pub struct Uci {}
 
-    impl UCI {
-        pub fn new() -> Result<UCI> {
-            Ok(UCI {})
+    impl Uci {
+        pub fn new() -> Result<Self> {
+            Ok(Self {})
         }
 
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {
