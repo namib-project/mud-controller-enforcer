@@ -113,12 +113,13 @@ impl FirewallDevice {
 pub struct EnforcerConfig {
     version: String,
     devices: Vec<FirewallDevice>,
+    secure_name: String,
 }
 
 impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, devices: Vec<FirewallDevice>) -> Self {
-        EnforcerConfig { version, devices }
+    pub fn new(version: String, devices: Vec<FirewallDevice>, secure_name: String) -> Self {
+        EnforcerConfig { version, devices, secure_name }
     }
 
     /// Returns the version of this config
@@ -134,5 +135,9 @@ impl EnforcerConfig {
     /// Returns a reference to the firewall rules in this config
     pub fn devices_mut(&mut self) -> &mut Vec<FirewallDevice> {
         &mut self.devices
+    }
+
+    pub fn secure_name(&self) -> &str {
+        &self.secure_name
     }
 }
