@@ -88,7 +88,13 @@ where
 
         Poll::Ready(loop {
             if let Some(conn) = this.pending_conn.as_mut().as_pin_mut() {
-                let accepted: rustls::server::TlsStream<TcpStream> = ready!(conn.poll(cx)?);
+                let accepted: rustls::server::TlsStream<TcpStream> = match ready!(conn.poll(cx)) {
+                    Ok(fut) => fut,
+                    Err(e) => {
+                        this.pending_conn.set(None);
+                        break Some(Err(e));
+                    },
+                };
                 this.pending_conn.set(None);
 
                 break Some(Ok(serde_transport::new(
