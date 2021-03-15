@@ -23,7 +23,7 @@ use tokio_native_tls::{
 };
 use tokio_util::codec::LengthDelimitedCodec;
 
-pub async fn run() -> Result<RPCClient> {
+pub async fn run() -> Result<(RPCClient, SocketAddr)> {
     let identity = {
         // set client auth cert
         let mut vec = Vec::new();
@@ -39,7 +39,7 @@ pub async fn run() -> Result<RPCClient> {
         Certificate::from_pem(&vec)?
     };
 
-    let client = loop {
+    loop {
         let addr_stream = discover_controllers("_namib_controller._tcp")?
             .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
             .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
@@ -47,14 +47,12 @@ pub async fn run() -> Result<RPCClient> {
         pin_mut!(addr_stream);
 
         if let Some(client) = addr_stream.next().await {
-            break client;
+            return Ok(client);
         }
 
         warn!("No controller found, retrying in 5 secs");
         sleep(Duration::from_secs(5)).await;
-    };
-
-    Ok(client)
+    }
 }
 
 pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
@@ -69,8 +67,9 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
                 Err(error) => match error.kind() {
                     ErrorKind::ConnectionReset => {
                         error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
-                        if let Ok(new_client) = run().await {
+                        if let Ok((new_client, addr)) = run().await {
                             enforcer.client = new_client;
+                            enforcer.addr = addr;
                         }
                     },
                     _ => {
@@ -79,8 +78,8 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
                 },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
-                    if let Err(e) = firewall_service::apply_config(&config) {
-                        error!("Failed to apply config! {}", e)
+                    if let Err(e) = firewall_service::apply_config(&config, enforcer.addr) {
+                        error!("Failed to apply config! {:?}", e)
                     }
                     enforcer.config = config;
                 },
@@ -99,7 +98,7 @@ async fn try_connect(
     dns_name: &'static str,
     identity: Identity,
     ca: Certificate,
-) -> Result<Option<RPCClient>> {
+) -> Result<Option<(RPCClient, SocketAddr)>> {
     debug!("trying to connect to address {:?}", addr);
 
     // ip6 geht anscheinend nicht
@@ -120,7 +119,10 @@ async fn try_connect(
         .new_framed(tls_connector.connect(dns_name, tcp_stream).await?);
     let transport = serde_transport::new(framed_io, codec()());
 
-    Ok(Some(RPCClient::new(client::Config::default(), transport).spawn()?))
+    Ok(Some((
+        RPCClient::new(client::Config::default(), transport).spawn()?,
+        addr,
+    )))
 }
 
 /// Returns the context for the current request, or a default Context if no request is active.

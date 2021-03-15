@@ -12,7 +12,7 @@ use tokio::{fs, fs::OpenOptions};
 use crate::rpc::rpc_client::current_rpc_context;
 use error::Result;
 use namib_shared::{firewall_config::EnforcerConfig, rpc::RPCClient};
-use std::thread;
+use std::{net::SocketAddr, thread};
 use tokio::sync::RwLock;
 
 mod dhcp;
@@ -23,6 +23,7 @@ mod uci;
 
 pub struct Enforcer {
     pub client: RPCClient,
+    pub addr: SocketAddr,
     pub config: EnforcerConfig,
 }
 
@@ -45,13 +46,13 @@ async fn main() -> Result<()> {
     }
 
     info!("Trying to find & connect to NAMIB Controller");
-    let mut client = rpc::rpc_client::run().await?;
+    let (mut client, addr) = rpc::rpc_client::run().await?;
     // todo read config from file
     let config = client
         .heartbeat(current_rpc_context(), None)
         .await?
         .expect("no initial config sent from controller");
-    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config }));
+    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config, addr }));
     info!("Connected to NAMIB Controller RPC server");
 
     let heartbeat_task = rpc::rpc_client::heartbeat(enforcer.clone());
