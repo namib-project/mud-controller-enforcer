@@ -1,12 +1,10 @@
-#![feature(async_closure)]
 use core::pin::Pin;
-use futures::{future::err, TryFutureExt};
 use std::{
     cmp::{max, Ordering},
     collections::{hash_map::DefaultHasher, BinaryHeap, HashMap, HashSet},
     hash::{Hash, Hasher},
     net::IpAddr,
-    ops::{Add, Deref, Sub},
+    ops::{Add, Deref},
     sync::Arc,
     time::Instant,
 };
@@ -92,7 +90,7 @@ impl DnsServiceCache {
 
     /// Resolves a supplied name and adds it to the DNS cache.
     async fn lookup_and_cache(&mut self, name: &str) -> Result<DnsCacheEntry, ResolveError> {
-        let mut lookup_result = DnsCacheEntry {
+        let lookup_result = DnsCacheEntry {
             name: String::from(name),
             lookup_result: Arc::new(self.resolver.lookup_ip(name).await?),
             watchers: Arc::new(RwLock::new(HashSet::new())),
@@ -253,7 +251,7 @@ impl DnsWatcher {
 
     /// Removes a name from the list of watched DNS entries.
     pub async fn remove_watched_name(&self, name: &str) {
-        let mut cache = self.cache.read().await;
+        let cache = self.cache.read().await;
         let cache_entry = cache.resolve_if_cached(name).unwrap();
         cache_entry.watchers.write().await.remove(&self.sender.clone());
         self.current_watched_entries.lock().await.remove(name.into());

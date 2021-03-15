@@ -1,23 +1,15 @@
-use namib_shared::firewall_config::{EnforcerConfig, FirewallRule, NetworkHost, Protocol, Target};
+use namib_shared::firewall_config::{EnforcerConfig, NetworkHost, Protocol, Target};
 
-use crate::{
-    error::Result,
-    services::{dns::DnsWatcher, is_system_mode, state::EnforcerState},
-    uci::Uci,
-    Enforcer,
-};
+use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
 use nftnl::{
     expr::{IcmpCode, RejectionType, Verdict},
-    nft_expr,
-    set::Set,
-    Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
+    nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
 };
 use std::{ffi::CString, net::IpAddr, sync::Arc};
 use tokio::{
     select,
-    sync::{Mutex, Notify, RwLock},
+    sync::{Notify, RwLock},
 };
-use trust_dns_resolver::AsyncResolver;
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -31,6 +23,11 @@ const SAVE_DIR: &str = "/tmp/.uci_namib";
 const TABLE_NAME: &str = "namib";
 const BASE_CHAIN_NAME: &str = "base_chain";
 
+/// Service which provides firewall configuration functionality by integrating into the linux system
+/// firewall (nftables).
+/// For more information on the way the linux firewall works, see [the nftables wiki](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page).
+/// To construct nftables expressions, the [nftnl-rs](https://github.com/mullvad/nftnl-rs) library is used.
+/// To send commands to the netlink interface, the [mnl-rs](https://github.com/mullvad/mnl-rs) library is used.
 pub struct FirewallService {
     dns_watcher: Arc<DnsWatcher>,
     enforcer_state: Arc<RwLock<Enforcer>>,
@@ -52,7 +49,7 @@ impl From<IpAddr> for RuleAddrEntry {
 
 impl FirewallService {
     /// Creates a new FirewallService instance with the given enforcer state and dns watcher (generated from the dns service).
-    pub(crate) fn new(enforcer_state: Arc<RwLock<Enforcer>>, mut watcher: DnsWatcher) -> FirewallService {
+    pub(crate) fn new(enforcer_state: Arc<RwLock<Enforcer>>, watcher: DnsWatcher) -> FirewallService {
         FirewallService {
             enforcer_state,
             dns_watcher: Arc::new(watcher),
@@ -121,7 +118,7 @@ impl FirewallService {
         // Iterate over all devices.
         for device in config.devices() {
             // Create chain which is responsible for deciding how packets for/from this device will be treated.
-            let mut device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
+            let device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
             batch.add(&device_chain, nftnl::MsgType::Add);
 
             // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.

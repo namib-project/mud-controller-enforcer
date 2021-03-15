@@ -1,20 +1,12 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use snafu::{Backtrace, GenerateBacktrace};
 use tarpc::{client, context, rpc, serde_transport};
-use tokio::{
-    sync::Mutex,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 
 use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
-use crate::{
-    error::{Error, Result},
-    services::{firewall_service::FirewallService, state::EnforcerState},
-    Enforcer,
-};
+use crate::{error::Result, services::firewall_service::FirewallService, Enforcer};
 
 use super::controller_discovery::discover_controllers;
 use std::time::SystemTime;

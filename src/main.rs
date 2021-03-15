@@ -7,7 +7,7 @@ extern crate log;
 use std::sync::Arc;
 
 use dotenv::dotenv;
-use tokio::{fs, fs::OpenOptions, sync::Mutex};
+use tokio::{fs, fs::OpenOptions};
 
 use crate::{rpc::rpc_client::current_rpc_context, services::firewall_service::FirewallService};
 use error::Result;
@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
 
     let watcher = dns_service.create_watcher();
     let fw_service = Arc::new(FirewallService::new(enforcer.clone(), watcher));
-    fw_service.apply_current_config().await;
+    fw_service.apply_current_config().await?;
 
     let heartbeat_task = rpc::rpc_client::heartbeat(enforcer.clone(), fw_service.clone());
 
@@ -73,6 +73,7 @@ async fn main() -> Result<()> {
         fw_service.firewall_change_watcher().await;
     });
 
-    tokio::join!(heartbeat_task, dhcp_event_task, dns_task, firewall_task);
+    let ((), (), dns_result, firewall_result) = tokio::join!(heartbeat_task, dhcp_event_task, dns_task, firewall_task);
+    dns_result.and(firewall_result)?;
     Ok(())
 }
