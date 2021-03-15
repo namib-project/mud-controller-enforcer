@@ -11,7 +11,7 @@ execute_uci_commands = ["libuci-sys", "libc"]
 dnsmasq_hook  = []
 
 [dependencies]
-namib_shared = { branch = "http_challenge_impl", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+namib_shared = { tag = "0.3.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 tokio = { version = "1.2", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
 log = "0.4"
 env_logger = "0.8"
