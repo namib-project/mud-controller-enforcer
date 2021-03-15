@@ -24,7 +24,7 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
 
 pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
-    EnforcerConfig::new(version, rules)
+    EnforcerConfig::new(version, rules, String::from("www.namib.test"))
 }
 
 pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {

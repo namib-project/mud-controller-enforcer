@@ -130,10 +130,9 @@ pub async fn get_or_fetch_mud(url: String, pool: &DbConnection) -> Result<MudDat
 
 /// Basic HTTP(S)-GET wrapper to fetch MUD-URL Data
 async fn fetch_mud(url: &str) -> Result<String> {
-    // TODO proper certificate validation.
     let request = isahc::Request::builder()
         .uri(url)
-        .ssl_options(isahc::config::SslOption::DANGER_ACCEPT_INVALID_CERTS)
+        //.ssl_options(isahc::config::SslOption::DANGER_ACCEPT_INVALID_CERTS)
         .body(())
         .unwrap();
     Ok(isahc::send_async(request).await?.text().await?)
