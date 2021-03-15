@@ -39,6 +39,7 @@ pub async fn run() -> Result<RPCClient> {
         Certificate::from_pem(&vec)?
     };
 
+    info!("Trying to find & connect to NAMIB Controller");
     let client = loop {
         let addr_stream = discover_controllers("_namib_controller._tcp")?
             .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
@@ -53,7 +54,7 @@ pub async fn run() -> Result<RPCClient> {
         warn!("No controller found, retrying in 5 secs");
         sleep(Duration::from_secs(5)).await;
     };
-
+    info!("Connected to NAMIB Controller RPC server");
     Ok(client)
 }
 
@@ -78,6 +79,7 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     drop(enf);
+                    // Apply new config and notify firewall service.
                     enforcer.write().await.apply_new_config(config).await;
                     fw_service.notify_firewall_change();
                 },

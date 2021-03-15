@@ -21,6 +21,7 @@ mod rpc;
 mod services;
 mod uci;
 
+/// Default location for the file containing the last received enforcer configuration.
 const DEFAULT_CONFIG_STATE_FILE: &str = "/etc/namib/state.json";
 
 pub struct Enforcer {
@@ -29,12 +30,15 @@ pub struct Enforcer {
 }
 
 impl Enforcer {
+    /// Applies a new enforcer configuration and persists it to the filesystem for the next start.
     pub(crate) async fn apply_new_config(&mut self, config: EnforcerConfig) {
         self.config = config;
         persist_config(&self.config).await;
     }
 }
 
+/// Persists a given enforcer configuration to the filesystem at the location specified by the NAMIB_CONFIG_STATE_FILE
+/// environment variable (or DEFAULT_CONFIG_STATE_FILE if the environment variable is not set).
 async fn persist_config(config: &EnforcerConfig) {
     let config_state_path = env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or(String::from(DEFAULT_CONFIG_STATE_FILE));
     let config_state_path = Path::new(config_state_path.as_str());
@@ -79,6 +83,8 @@ async fn main() -> Result<()> {
             .open("config/firewall")
             .await?;
     }
+
+    // Attempt to read last persisted enforcer state.
     info!("Reading last saved enforcer state");
     let config_state_path = env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or(String::from(DEFAULT_CONFIG_STATE_FILE));
     let config: Option<EnforcerConfig> = match fs::read(config_state_path)
@@ -96,8 +102,10 @@ async fn main() -> Result<()> {
         },
     };
 
-    info!("Trying to find & connect to NAMIB Controller");
     let mut client = rpc::rpc_client::run().await?;
+
+    // Restore enforcer config if persisted file could be restored, otherwise wait for the enforcer
+    // to provide an initial configuration.
     let config = match config {
         Some(v) => {
             info!("Successfully restored last persisted config");
@@ -115,9 +123,7 @@ async fn main() -> Result<()> {
         },
     };
 
-    // todo read config from file
     let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config }));
-    info!("Connected to NAMIB Controller RPC server");
 
     let mut dns_service = services::dns::DnsService::new().unwrap();
 
