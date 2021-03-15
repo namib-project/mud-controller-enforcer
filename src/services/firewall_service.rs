@@ -61,8 +61,7 @@ impl FirewallService {
     }
 
     /// Updates the current firewall config with a new value and notifies the firewall change watcher to update the firewall config.
-    pub async fn apply_new_config(&self, mut config: EnforcerConfig) {
-        self.enforcer_state.write().await.config = config;
+    pub fn notify_firewall_change(&self) {
         self.change_notify.notify_one();
     }
 
@@ -171,7 +170,7 @@ impl FirewallService {
                     },
                     // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
                     // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-                    Some(NetworkHost::Hostname { dns_name, resolved_ip }) => self
+                    Some(NetworkHost::Hostname(dns_name)) => self
                         .dns_watcher
                         .resolve_and_watch(dns_name.as_str())
                         .await
@@ -186,7 +185,7 @@ impl FirewallService {
                     },
                     // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
                     // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-                    Some(NetworkHost::Hostname { dns_name, resolved_ip }) => self
+                    Some(NetworkHost::Hostname(dns_name)) => self
                         .dns_watcher
                         .resolve_and_watch(dns_name.as_str())
                         .await

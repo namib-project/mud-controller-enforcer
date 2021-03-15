@@ -86,7 +86,8 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     drop(enf);
-                    fw_service.apply_new_config(config).await;
+                    enforcer.write().await.config = config;
+                    fw_service.notify_firewall_change();
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }
