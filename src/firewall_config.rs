@@ -1,12 +1,10 @@
 use std::{
     collections::hash_map::DefaultHasher,
-    fmt,
     hash::{Hash, Hasher},
 };
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Formatter, net::IpAddr};
+use std::net::IpAddr;
 
 /// This file represent the config for firewall on openwrt.
 ///
