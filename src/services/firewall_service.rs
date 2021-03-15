@@ -323,7 +323,7 @@ impl FirewallService {
 /// Sends the supplied expression batch to nftables for execution.
 /// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
 /// Note: An error of type IoError due to an OS error with code 71 might not indicate a protocol
-/// error but a permission error instead.
+/// error but a permission error instead (either run as root or use `setcap 'cap_net_admin=+ep' /path/to/program` on the built binary.
 /// For information on how to debug, see http://0x90.at/post/netlink-debugging
 fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
     // Create a netlink socket to netfilter.
