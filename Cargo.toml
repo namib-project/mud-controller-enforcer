@@ -50,6 +50,3 @@ name = "namib_enforcer"
 name = "namib_dnsmasq_hook"
 path = "src/dhcp/dnsmasq_hook.rs"
 required-features = ["dnsmasq_hook"]
-
-[patch.crates-io]
-libc = { version = "0.2.86", package = "libc" }
