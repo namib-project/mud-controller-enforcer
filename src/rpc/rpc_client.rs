@@ -4,6 +4,7 @@ use futures::{pin_mut, prelude::*};
 use tarpc::{client, context, rpc, serde_transport};
 use tokio::time::{sleep, Duration};
 
+use crate::services::controller_name::apply_secure_name_config;
 use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
 use crate::{error::Result, services::firewall_service::FirewallService, Enforcer};
@@ -23,7 +24,7 @@ use tokio_native_tls::{
 };
 use tokio_util::codec::LengthDelimitedCodec;
 
-pub async fn run() -> Result<RPCClient> {
+pub async fn run() -> Result<(RPCClient, SocketAddr)> {
     let identity = {
         // set client auth cert
         let mut vec = Vec::new();
@@ -39,8 +40,7 @@ pub async fn run() -> Result<RPCClient> {
         Certificate::from_pem(&vec)?
     };
 
-    info!("Trying to find & connect to NAMIB Controller");
-    let client = loop {
+    loop {
         let addr_stream = discover_controllers("_namib_controller._tcp")?
             .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
             .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
@@ -48,14 +48,13 @@ pub async fn run() -> Result<RPCClient> {
         pin_mut!(addr_stream);
 
         if let Some(client) = addr_stream.next().await {
-            break client;
+            info!("Connected to NAMIB Controller RPC server");
+            return Ok(client);
         }
 
         warn!("No controller found, retrying in 5 secs");
         sleep(Duration::from_secs(5)).await;
-    };
-    info!("Connected to NAMIB Controller RPC server");
-    Ok(client)
+    }
 }
 
 pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<FirewallService>) {
@@ -68,8 +67,12 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                 Err(error) => match error.kind() {
                     ErrorKind::ConnectionReset => {
                         error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
-                        if let Ok(new_client) = run().await {
+                        if let Ok((new_client, addr)) = run().await {
                             enf.client = new_client;
+                            enf.addr = addr;
+                        }
+                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr.clone()) {
+                            error!("Error while applying new controller address: {:?}", e);
                         }
                     },
                     _ => {
@@ -96,7 +99,7 @@ async fn try_connect(
     dns_name: &'static str,
     identity: Identity,
     ca: Certificate,
-) -> Result<Option<RPCClient>> {
+) -> Result<Option<(RPCClient, SocketAddr)>> {
     debug!("trying to connect to address {:?}", addr);
 
     // ip6 geht anscheinend nicht
@@ -117,7 +120,10 @@ async fn try_connect(
         .new_framed(tls_connector.connect(dns_name, tcp_stream).await?);
     let transport = serde_transport::new(framed_io, codec()());
 
-    Ok(Some(RPCClient::new(client::Config::default(), transport).spawn()?))
+    Ok(Some((
+        RPCClient::new(client::Config::default(), transport).spawn()?,
+        addr,
+    )))
 }
 
 /// Returns the context for the current request, or a default Context if no request is active.

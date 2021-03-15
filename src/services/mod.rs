@@ -1,5 +1,6 @@
 use std::env;
 
+pub mod controller_name;
 pub mod dns;
 pub mod firewall_service;
 pub mod log_watcher;

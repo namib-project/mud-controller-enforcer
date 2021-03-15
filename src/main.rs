@@ -9,10 +9,13 @@ use std::sync::Arc;
 use dotenv::dotenv;
 use tokio::{fs, fs::OpenOptions};
 
-use crate::{rpc::rpc_client::current_rpc_context, services::firewall_service::FirewallService};
+use crate::{
+    rpc::rpc_client::current_rpc_context,
+    services::{controller_name::apply_secure_name_config, firewall_service::FirewallService},
+};
 use error::Result;
 use namib_shared::{firewall_config::EnforcerConfig, rpc::RPCClient};
-use std::{env, path::Path, thread};
+use std::{env, net::SocketAddr, path::Path, thread};
 use tokio::sync::RwLock;
 
 mod dhcp;
@@ -26,6 +29,7 @@ const DEFAULT_CONFIG_STATE_FILE: &str = "/etc/namib/state.json";
 
 pub struct Enforcer {
     pub client: RPCClient,
+    pub addr: SocketAddr,
     pub config: EnforcerConfig,
 }
 
@@ -102,7 +106,7 @@ async fn main() -> Result<()> {
         },
     };
 
-    let mut client = rpc::rpc_client::run().await?;
+    let (mut client, addr) = rpc::rpc_client::run().await?;
 
     // Restore enforcer config if persisted file could be restored, otherwise wait for the enforcer
     // to provide an initial configuration.
@@ -122,8 +126,9 @@ async fn main() -> Result<()> {
             init_config
         },
     };
+    apply_secure_name_config(&config.secure_name(), addr.clone())?;
 
-    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config }));
+    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config, addr }));
 
     let mut dns_service = services::dns::DnsService::new().unwrap();
 
