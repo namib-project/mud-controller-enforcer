@@ -1,5 +1,4 @@
 use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
-use chrono::Utc;
 use lazy_static::lazy_static;
 use neo4jthings_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
@@ -72,7 +71,7 @@ pub async fn add_device_connection(device: Device, connection: String) {
                 port: vec![],
                 direction_initiated: "from-device".to_string(),
                 forwarding: "accept".to_string(),
-                timestamp: Some(Utc::now().to_rfc3339()),
+                timestamp: None,
             },
         )
         .await

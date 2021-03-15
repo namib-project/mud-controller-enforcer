@@ -51,4 +51,5 @@ regex = "1"
 lazy_static = "1"
 clokwerk = "0.3.4"
 url = "2"
+tokio-compat-02 = "0.2"
 neo4jthings-api = { path = "neo4jthings-api" }

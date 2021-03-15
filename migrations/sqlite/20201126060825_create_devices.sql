@@ -6,6 +6,6 @@ CREATE TABLE devices
     mac_addr            TEXT,
     hostname            TEXT NOT NULL DEFAULT '',
     vendor_class        TEXT NOT NULL DEFAULT '',
-    mud_url             TEXT REFERENCES mud_data (url),
+    mud_url             TEXT,
     last_interaction    DATETIME NOT NULL
 )

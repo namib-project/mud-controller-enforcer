@@ -18,6 +18,7 @@ use paperclip::actix::{
     web::{HttpResponse, Json},
 };
 use std::net::IpAddr;
+use tokio::runtime::Builder;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));
@@ -93,10 +94,15 @@ async fn update_device(
 
     // if the mud_url was chosen from the guesses, notify the neo4jthings service
     if mud_url_from_guess && updated_device.mud_url.is_some() {
-        actix_rt::spawn(neo4jthings_service::describe_thing(
-            updated_device.mac_addr.map(|m| m.to_string()).unwrap(),
-            updated_device.mud_url.clone().unwrap(),
-        ));
+        let mac_addr = updated_device.mac_addr.map(|m| m.to_string()).unwrap();
+        let mud_url = updated_device.mud_url.clone().unwrap();
+        actix_rt::spawn(async move {
+            Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(neo4jthings_service::describe_thing(mac_addr, mud_url))
+        });
     }
 
     Ok(Json(DeviceDto::from(updated_device)))
@@ -122,7 +128,10 @@ async fn guess_thing(
 
     let device = find_device(&ip, &pool).await?;
 
-    let guesses = neo4jthings_service::guess_thing(device).await?;
+    let guesses = Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(neo4jthings_service::guess_thing(device))?;
 
     Ok(Json(guesses))
 }
