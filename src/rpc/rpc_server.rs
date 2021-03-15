@@ -9,13 +9,7 @@ use tarpc::{
     server,
 };
 
-use namib_shared::{
-    codec,
-    firewall_config::{EnforcerConfig, FirewallRule},
-    models::DhcpEvent,
-    open_file_with,
-    rpc::RPC,
-};
+use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::RPC};
 
 use crate::{
     db::DbConnection,

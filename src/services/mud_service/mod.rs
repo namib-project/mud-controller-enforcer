@@ -69,7 +69,7 @@ pub async fn get_mud_from_url(url: String, pool: &DbConnection) -> Result<MudDat
 
 async fn fetch_mud(url: &str) -> Result<String> {
     // TODO proper certificate validation.
-    let mut request = isahc::Request::builder()
+    let request = isahc::Request::builder()
         .uri(url)
         .ssl_options(isahc::config::SslOption::DANGER_ACCEPT_INVALID_CERTS)
         .body(())

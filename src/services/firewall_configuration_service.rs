@@ -1,16 +1,13 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AceProtocol, AclDirection, AclType, Device},
+    models::{AceAction, AceProtocol, AclDirection, Device},
     services::config_service::{get_config_value, set_config_value, ConfigKeys},
 };
 use namib_shared::firewall_config::{
-    EnforcerConfig, FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, ResolvedIp, RuleName, Target,
+    EnforcerConfig, FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, RuleName, Target,
 };
-use std::{
-    net::{IpAddr, ToSocketAddrs},
-    sync::atomic::{AtomicU32, Ordering},
-};
+use std::net::IpAddr;
 
 pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
