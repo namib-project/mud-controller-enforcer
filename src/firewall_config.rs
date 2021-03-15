@@ -13,7 +13,7 @@ use std::net::IpAddr;
 /// @author Namib Group 3.
 
 /// Represent the name of the Config.
-#[derive(Clone, Debug, Hash, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Hash, Deserialize, Serialize)]
 pub struct RuleName(String);
 
 impl RuleName {
@@ -23,7 +23,7 @@ impl RuleName {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum NetworkHost {
     Ip(IpAddr),
     Hostname(String),
@@ -31,7 +31,7 @@ pub enum NetworkHost {
 }
 
 /// Struct for src and dest configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkConfig {
     pub host: Option<NetworkHost>,
     pub port: Option<String>,
@@ -43,7 +43,7 @@ impl NetworkConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum Protocol {
     Tcp,
     Udp,
@@ -51,7 +51,7 @@ pub enum Protocol {
 }
 
 /// Enum for the target: ACCEPT, REJECT and DROP.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Eq, Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Target {
     Accept,
     Reject,
@@ -59,7 +59,7 @@ pub enum Target {
 }
 
 /// This struct contains the main configuration which is needed for firewall rules.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
     pub rule_name: RuleName,
     pub src: NetworkConfig,
@@ -94,7 +94,7 @@ impl FirewallRule {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallDevice {
     pub id: i64,
     pub ip: IpAddr,
