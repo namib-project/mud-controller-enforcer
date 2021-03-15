@@ -35,8 +35,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
                 },
             };
             let target = match ace.action {
-                AceAction::Accept => Target::ACCEPT,
-                AceAction::Deny => Target::REJECT,
+                AceAction::Accept => Target::Accept,
+                AceAction::Deny => Target::Reject,
             };
 
             if let Some(dns_name) = &ace.matches.dnsname {
@@ -82,7 +82,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
         NetworkConfig::new(None, None),
         Protocol::All,
-        Target::REJECT,
+        Target::Reject,
     ));
     index += 1;
     result.push(FirewallRule::new(
@@ -90,7 +90,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         NetworkConfig::new(None, None),
         NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
         Protocol::All,
-        Target::REJECT,
+        Target::Reject,
     ));
 
     FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info)
