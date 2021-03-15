@@ -304,11 +304,11 @@ impl FirewallService {
 
                         // Set verdict if current rule matches.
                         match rule_spec.target {
-                            Target::ACCEPT => current_rule.add_expr(&nft_expr!(verdict accept)),
-                            Target::REJECT => {
+                            Target::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
+                            Target::Reject => {
                                 current_rule.add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
                             },
-                            Target::DROP => current_rule.add_expr(&nft_expr!(verdict drop)),
+                            Target::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
                         }
                         batch.add(&current_rule, nftnl::MsgType::Add);
                     }
