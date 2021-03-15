@@ -52,7 +52,7 @@ impl From<DhcpLeaseInformation> for Device {
             id: 0,
             mac_addr: lease_info.mac_address,
             ip_addr: lease_info.ip_addr(),
-            hostname: lease_info.old_hostname.unwrap_or_default(),
+            hostname: lease_info.hostname.unwrap_or_default(),
             vendor_class: "".to_string(),
             mud_url: lease_info.mud_url,
             collect_info: false,

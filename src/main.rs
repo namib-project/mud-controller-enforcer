@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
 
     let conn = db::connect().await?;
     let conn2 = conn.clone();
-    actix_rt::spawn(async move {
+    let _rpc = thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
