@@ -88,7 +88,7 @@ mod unix {
                     )
                 }
             );
-            info!("Set config dir to: {}", config_dir);
+            debug!("Set config dir to: {}", config_dir);
             Ok(())
         }
 
@@ -108,7 +108,7 @@ mod unix {
                     )
                 }
             );
-            info!("Set save dir to: {}", save_dir);
+            debug!("Set save dir to: {}", save_dir);
             Ok(())
         }
 
@@ -407,11 +407,11 @@ mod mock {
 
     use crate::error::{self, Result};
 
-    pub struct UCI {}
+    pub struct Uci {}
 
-    impl UCI {
-        pub fn new() -> Result<UCI> {
-            Ok(UCI {})
+    impl Uci {
+        pub fn new() -> Result<Self> {
+            Ok(Self {})
         }
 
         pub fn set_config_dir(&mut self, config_dir: &str) -> Result<()> {

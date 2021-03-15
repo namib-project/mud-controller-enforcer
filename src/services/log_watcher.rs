@@ -29,18 +29,14 @@ pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
         path = "dnsmasq.log".as_ref();
         tmp_path = "dnsmasq.log.tmp".as_ref();
     };
-    if !path.is_file() {
-        warn!("Skipping watching dnsmasq.log, since dnsmasq is either not running or wrongly configured");
-        return;
-    }
-    if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
-        warn!("failed to process file {}", e);
-    }
     loop {
         if let Err(e) = watcher.watch(path, RecursiveMode::NonRecursive) {
-            warn!("Failed to watch dnsmasq.log! {}", e);
+            debug!("Failed to watch dnsmasq.log! {:?}", e);
             sleep(Duration::from_secs(10));
             continue;
+        }
+        if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
+            warn!("failed to process file {:?}", e);
         }
 
         loop {
@@ -48,11 +44,11 @@ pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
                 Ok(DebouncedEvent::Write(_)) | Ok(DebouncedEvent::NoticeWrite(_)) => {
                     // inner function to make use of Result
                     if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
-                        warn!("failed to process file {}", e);
+                        debug!("failed to process file {:?}", e);
                     }
                 },
                 Ok(_) => {},
-                Err(e) => warn!("watch error: {}", e),
+                Err(e) => warn!("watch error: {:?}", e),
             }
         }
     }
@@ -63,7 +59,7 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
     fs::rename(path, tmp_path)?;
     let lines = io::BufReader::new(File::open(tmp_path)?).lines();
     // create async runtime to run rpc client
-    Builder::new_current_thread().build()?.block_on(async {
+    Builder::new_current_thread().enable_all().build()?.block_on(async {
         let mut enforcer = enforcer.write().await;
         debug!("acquired known devices");
         let lines = lines
