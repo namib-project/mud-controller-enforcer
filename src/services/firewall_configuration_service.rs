@@ -43,25 +43,19 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
             };
 
             if let Some(dns_name) = &ace.matches.dnsname {
-                let route_network_lan;
-                let route_network_wan;
+                let route_network_src;
+                let route_network_dst;
                 if let Ok(addr) = dns_name.parse::<IpAddr>() {
-                    route_network_lan = NetworkConfig::new(Some(NetworkHost::FirewallDevice), None);
-                    route_network_wan = NetworkConfig::new(Some(NetworkHost::Ip(addr)), None);
+                    route_network_src = NetworkConfig::new(Some(NetworkHost::FirewallDevice), None);
+                    route_network_dst = NetworkConfig::new(Some(NetworkHost::Ip(addr)), None);
                 } else {
-                    route_network_lan = NetworkConfig::new(Some(NetworkHost::FirewallDevice), None);
-                    route_network_wan = NetworkConfig::new(
-                        Some(NetworkHost::Hostname {
-                            dns_name: dns_name.clone(),
-                            resolved_ip: ResolvedIp::default(),
-                        }),
-                        None,
-                    );
+                    route_network_src = NetworkConfig::new(Some(NetworkHost::FirewallDevice), None);
+                    route_network_dst = NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None);
                 }
 
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
-                    AclDirection::FromDevice => (route_network_lan, route_network_wan),
-                    AclDirection::ToDevice => (route_network_wan, route_network_lan),
+                    AclDirection::FromDevice => (route_network_src, route_network_dst),
+                    AclDirection::ToDevice => (route_network_dst, route_network_src),
                 };
                 let config_firewall = FirewallRule::new(
                     rule_name.clone(),
@@ -72,6 +66,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
                 );
                 result.push(config_firewall);
             } else {
+                // The default should not be "let every package through"
                 //let route_network_lan = NetworkConfig::new(None, None);
                 //let route_network_wan = NetworkConfig::new(None, None);
                 //let (route_network_src, route_network_dest) = match acl.packet_direction {
