@@ -9,6 +9,9 @@ use sqlx::Done;
 use std::io;
 use strum::IntoEnumIterator;
 
+pub const ROLE_ID_ADMIN: i64 = 0;
+pub const ROLE_ID_GUEST: i64 = 1;
+
 pub async fn role_create(conn: &DbConnection, role: RoleUpdateDto) -> Result<RoleDto> {
     let permissions_vec = role.permissions.join(",");
     let result = sqlx::query!(
