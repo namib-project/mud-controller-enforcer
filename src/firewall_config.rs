@@ -32,24 +32,9 @@ impl RuleName {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ResolvedIp {
-    pub ip: Option<IpAddr>,
-    pub refresh_at: DateTime<Utc>,
-}
-
-impl Default for ResolvedIp {
-    fn default() -> ResolvedIp {
-        ResolvedIp {
-            ip: None,
-            refresh_at: chrono::MIN_DATETIME,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum NetworkHost {
     Ip(IpAddr),
-    Hostname { dns_name: String, resolved_ip: ResolvedIp },
+    Hostname(String),
     FirewallDevice,
 }
 
