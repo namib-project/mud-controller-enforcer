@@ -1,13 +1,26 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AceProtocol, AclDirection, Device},
+    models::{AceAction, AceProtocol, Acl, AclDirection, Device},
     services::config_service::{get_config_value, set_config_value, ConfigKeys},
 };
 use namib_shared::firewall_config::{
     EnforcerConfig, FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, RuleName, Target,
 };
 use std::net::IpAddr;
+
+pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
+    let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
+    let mut merged_acls: Vec<&Acl> = override_with.iter().collect();
+    let mut filtered_original_acls = original
+        .iter()
+        .filter(|x| !override_keys.contains(&x.name.as_str()))
+        .collect::<Vec<&Acl>>();
+
+    merged_acls.append(&mut filtered_original_acls);
+
+    merged_acls
+}
 
 pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
@@ -28,8 +41,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
             let protocol = match &ace.matches.protocol {
                 None => Protocol::All,
                 Some(proto) => match proto {
-                    AceProtocol::TCP => Protocol::Tcp,
-                    AceProtocol::UDP => Protocol::Udp,
+                    AceProtocol::Tcp => Protocol::Tcp,
+                    AceProtocol::Udp => Protocol::Udp,
                     AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
                                                                        // TODO add support for more protocols
                 },
@@ -62,17 +75,6 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
                     target.clone(),
                 );
                 result.push(config_firewall);
-            } else {
-                // The default should not be "let every package through"
-                //let route_network_lan = NetworkConfig::new(None, None);
-                //let route_network_wan = NetworkConfig::new(None, None);
-                //let (route_network_src, route_network_dest) = match acl.packet_direction {
-                //    AclDirection::FromDevice => (route_network_lan, route_network_wan),
-                //    AclDirection::ToDevice => (route_network_wan, route_network_lan),
-                //};
-                //let config_firewall =
-                //    FirewallRule::new(rule_name, route_network_src, route_network_dest, protocol, target);
-                //result.push(config_firewall);
             }
             index += 1;
         }
@@ -137,7 +139,7 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::TCP),
+                        protocol: Some(AceProtocol::Tcp),
                         direction_initiated: None,
                         address_mask: None,
                         dnsname: None,
@@ -146,6 +148,7 @@ mod tests {
                     },
                 }],
             }],
+            acl_override: None,
         };
 
         let device = Device {

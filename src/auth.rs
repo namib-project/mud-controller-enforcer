@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::{error, error::Result};
+use crate::{error, error::Result, services::role_service::permission::Permission};
 use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
@@ -17,7 +17,7 @@ static HEADER_PREFIX: &str = "Bearer ";
     apiKey,
     in = "header",
     name = "Authorization",
-    description = "Use format 'Bearer TOKEN'"
+    description = "Use format: 'Bearer JWT_TOKEN'"
 )]
 pub struct AuthToken {
     // Not before
@@ -29,6 +29,7 @@ pub struct AuthToken {
 
     // User stuff
     pub username: String,
+    // TODO: Obsolete?
     pub permissions: Vec<String>,
 }
 
@@ -44,9 +45,9 @@ impl AuthToken {
         }
     }
 
-    pub fn require_permission(&self, permission: &str) -> Result<()> {
+    pub fn require_permission(&self, permission: Permission) -> Result<()> {
         for perm in &self.permissions {
-            if Pattern::new(perm)?.matches(permission) {
+            if Pattern::new(perm)?.matches(&*permission.to_string()) {
                 return Ok(());
             }
         }
