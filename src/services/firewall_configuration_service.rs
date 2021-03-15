@@ -142,7 +142,7 @@ mod tests {
                         protocol: Some(AceProtocol::Tcp),
                         direction_initiated: None,
                         address_mask: None,
-                        dnsname: None,
+                        dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
                     },
@@ -163,17 +163,41 @@ mod tests {
             last_interaction: Utc::now().naive_local(),
         };
 
-        let x = convert_device_to_fw_rules(&device)?;
+        let x = convert_device_to_fw_rules(&device);
 
         println!("{:#?}", x);
 
-        let opts = x[0].to_option();
-        assert!(opts.iter().any(|x| x.0 == "name" && x.1 == "rule_0"));
-        assert!(opts.iter().any(|x| x.0 == "src" && x.1 == "wan"));
-        assert!(opts.iter().any(|x| x.0 == "dest" && x.1 == "lan"));
-        assert!(opts.iter().any(|x| x.0 == "dest_ip" && x.1 == "127.0.0.1"));
-        assert!(opts.iter().any(|x| x.0 == "proto" && x.1 == "6"));
-        assert!(opts.iter().any(|x| x.0 == "target" && x.1 == "ACCEPT"));
+        let resulting_device = FirewallDevice::new(
+            device.id,
+            device.ip_addr,
+            vec![
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_0")),
+                    NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    Protocol::Tcp,
+                    Target::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_1")),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    NetworkConfig::new(None, None),
+                    Protocol::All,
+                    Target::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_2")),
+                    NetworkConfig::new(None, None),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    Protocol::All,
+                    Target::Reject,
+                ),
+            ],
+            true,
+        );
+
+        println!("{:#?}", resulting_device);
+        assert!(x.eq(&resulting_device));
 
         Ok(())
     }
