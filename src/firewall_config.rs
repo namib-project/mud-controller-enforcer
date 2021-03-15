@@ -21,12 +21,6 @@ impl RuleName {
     pub fn new(name: String) -> Self {
         RuleName(name)
     }
-
-    /// Return the key, value pair.
-    /// Example: key = name, value YOURNAME.
-    pub fn to_option(&self) -> (String, String) {
-        ("name".to_string(), self.0.clone())
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -59,20 +53,9 @@ pub enum Protocol {
 /// Enum for the target: ACCEPT, REJECT and DROP.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Target {
-    ACCEPT,
-    REJECT,
-    DROP,
-}
-
-impl Target {
-    /// Return the key, value pair of target.
-    pub fn to_option(&self) -> (String, String) {
-        match self {
-            Self::ACCEPT => ("target".to_string(), "ACCEPT".to_string()),
-            Self::REJECT => ("target".to_string(), "REJECT".to_string()),
-            Self::DROP => ("target".to_string(), "DROP".to_string()),
-        }
-    }
+    Accept,
+    Reject,
+    Drop,
 }
 
 /// This struct contains the main configuration which is needed for firewall rules.
