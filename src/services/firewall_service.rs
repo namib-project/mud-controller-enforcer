@@ -41,7 +41,7 @@ pub fn apply_config(cfg: &EnforcerConfig) -> Result<()> {
 
     #[cfg(feature = "execute_uci_commands")]
     {
-        let output = restart_firewall_command();
+        let output = restart_firewall_command()?;
         debug!("restart firewall: {:?}", std::str::from_utf8(&output.stderr));
     }
     Ok(())
@@ -99,11 +99,10 @@ fn delete_all_config(uci: &mut Uci) -> Result<()> {
 /// It should be used after succeeded commit.
 /// Return an Output.
 #[cfg(feature = "execute_uci_commands")]
-pub fn restart_firewall_command() -> std::process::Output {
+pub fn restart_firewall_command() -> std::io::Result<std::process::Output> {
     std::process::Command::new("/etc/init.d/firewall")
         .arg("restart")
         .output()
-        .expect("failed to execute process")
 }
 
 #[cfg(test)]

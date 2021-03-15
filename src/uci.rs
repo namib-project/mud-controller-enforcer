@@ -88,7 +88,7 @@ mod unix {
                     )
                 }
             );
-            info!("Set config dir to: {}", config_dir);
+            debug!("Set config dir to: {}", config_dir);
             Ok(())
         }
 
@@ -108,7 +108,7 @@ mod unix {
                     )
                 }
             );
-            info!("Set save dir to: {}", save_dir);
+            debug!("Set save dir to: {}", save_dir);
             Ok(())
         }
 
