@@ -29,6 +29,11 @@ pub enum Error {
         source: dotenv::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("TrustDnsResolverError: {}", source), context(false))]
+    TrustDnsResolver {
+        source: trust_dns_resolver::error::ResolveError,
+        backtrace: Backtrace,
+    },
     #[snafu(display("UciError: {}", message), visibility(pub))]
     UciError { message: String, backtrace: Backtrace },
     #[snafu(display("IntoStringError: {}", source), context(false))]

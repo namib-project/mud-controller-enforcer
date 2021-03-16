@@ -67,7 +67,7 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
                 if let Ok(l) = l {
                     enforcer
                         .config
-                        .known_devices()
+                        .devices()
                         .iter()
                         .filter(|d| d.collect_data)
                         .any(|d| l.contains(&d.ip.to_string()))

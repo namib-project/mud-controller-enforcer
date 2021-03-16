@@ -1,12 +1,13 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use tarpc::{client, rpc, serde_transport};
+use tarpc::{client, context, rpc, serde_transport};
 use tokio::time::{sleep, Duration};
 
+use crate::services::controller_name::apply_secure_name_config;
 use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
 
-use crate::{error::Result, services::firewall_service, Enforcer};
+use crate::{error::Result, services::firewall_service::FirewallService, Enforcer};
 
 use super::controller_discovery::discover_controllers;
 use std::time::SystemTime;
@@ -47,6 +48,7 @@ pub async fn run() -> Result<(RPCClient, SocketAddr)> {
         pin_mut!(addr_stream);
 
         if let Some(client) = addr_stream.next().await {
+            info!("Connected to NAMIB Controller RPC server");
             return Ok(client);
         }
 
@@ -55,21 +57,22 @@ pub async fn run() -> Result<(RPCClient, SocketAddr)> {
     }
 }
 
-pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
+pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<FirewallService>) {
     loop {
         {
-            let mut enforcer = enforcer.write().await;
-            let heartbeat: io::Result<Option<EnforcerConfig>> = enforcer
-                .client
-                .heartbeat(current_rpc_context(), firewall_service::get_config_version().ok())
-                .await;
+            let mut enf = enforcer.write().await;
+            let version = Some(enf.config.version().into());
+            let heartbeat: io::Result<Option<EnforcerConfig>> = enf.client.heartbeat(context::current(), version).await;
             match heartbeat {
                 Err(error) => match error.kind() {
                     ErrorKind::ConnectionReset => {
                         error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
                         if let Ok((new_client, addr)) = run().await {
-                            enforcer.client = new_client;
-                            enforcer.addr = addr;
+                            enf.client = new_client;
+                            enf.addr = addr;
+                        }
+                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr.clone()) {
+                            error!("Error while applying new controller address: {:?}", e);
                         }
                     },
                     _ => {
@@ -78,15 +81,13 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>) {
                 },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
-                    if let Err(e) = firewall_service::apply_config(&config, enforcer.addr) {
-                        error!("Failed to apply config! {:?}", e)
-                    }
-                    enforcer.config = config;
+                    drop(enf);
+                    // Apply new config and notify firewall service.
+                    enforcer.write().await.apply_new_config(config).await;
+                    fw_service.notify_firewall_change();
                 },
                 Ok(None) => debug!("Heartbeat OK!"),
             }
-
-            drop(enforcer)
         }
 
         sleep(Duration::from_secs(5)).await;

@@ -1,7 +1,15 @@
-use namib_shared::firewall_config::{EnforcerConfig, FirewallRule};
+use namib_shared::firewall_config::{EnforcerConfig, NetworkHost, Protocol, Target};
 
-use crate::{error::Result, services::is_system_mode, uci::Uci};
-use std::net::SocketAddr;
+use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
+use nftnl::{
+    expr::{IcmpCode, RejectionType, Verdict},
+    nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
+};
+use std::{ffi::CString, net::IpAddr, sync::Arc};
+use tokio::{
+    select,
+    sync::{Notify, RwLock},
+};
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -12,258 +20,340 @@ use std::net::SocketAddr;
 /// The folder where the configuration file should be stored.
 const CONFIG_DIR: &str = "config";
 const SAVE_DIR: &str = "/tmp/.uci_namib";
+const TABLE_NAME: &str = "namib";
+const BASE_CHAIN_NAME: &str = "base_chain";
 
-pub fn get_config_version() -> Result<String> {
-    debug!("Getting config version");
-    let mut uci = Uci::new()?;
-    if !is_system_mode() {
-        uci.set_config_dir(CONFIG_DIR)?;
-        uci.set_save_dir(SAVE_DIR)?;
-    }
-    uci.get("firewall.namib_config_version")
+/// Service which provides firewall configuration functionality by integrating into the linux system
+/// firewall (nftables).
+/// For more information on the way the linux firewall works, see [the nftables wiki](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page).
+/// To construct nftables expressions, the [nftnl-rs](https://github.com/mullvad/nftnl-rs) library is used.
+/// To send commands to the netlink interface, the [mnl-rs](https://github.com/mullvad/mnl-rs) library is used.
+pub struct FirewallService {
+    dns_watcher: Arc<DnsWatcher>,
+    enforcer_state: Arc<RwLock<Enforcer>>,
+    change_notify: Notify,
 }
 
-/// This function create new configuration that should be uploaded on the firewall.
-/// It use the function `apply_uci_config`.
-/// Return Result<()>.
-pub fn apply_config(cfg: &EnforcerConfig, controller_addr: SocketAddr) -> Result<()> {
-    debug!("Applying {} configs", cfg.firewall_rules().len());
-    let mut uci = Uci::new()?;
-    if !is_system_mode() {
-        uci.set_config_dir(CONFIG_DIR)?;
-        uci.set_save_dir(SAVE_DIR)?;
-    }
-
-    // if an error occurred roll back any changes
-    if let Err(e) = apply_uci_config(&mut uci, &cfg) {
-        uci.revert("firewall")?;
-        return Err(e);
-    }
-    if let Err(e) = apply_secure_name_config(&mut uci, cfg.secure_name(), controller_addr) {
-        uci.revert("dhcp")?;
-        return Err(e);
-    }
-
-    #[cfg(feature = "execute_uci_commands")]
-    {
-        let output = restart_firewall_command()?;
-        debug!("restart firewall: {:?}", std::str::from_utf8(&output.stderr));
-    }
-    Ok(())
+/// Helper enum for rule conversion.
+#[derive(Debug, Clone)]
+enum RuleAddrEntry {
+    AnyAddr,
+    AddrEntry(IpAddr),
 }
 
-fn apply_secure_name_config(uci: &mut Uci, secure_name: &str, controller_addr: SocketAddr) -> Result<()> {
-    uci.set("dhcp.namib", "domain")?;
-    uci.set("dhcp.namib.name", secure_name)?;
-    uci.set("dhcp.namib.ip", &controller_addr.ip().to_string())?;
-    uci.commit("dhcp")
-}
-
-/// This function takes an UCI context and a Vector of configurations that should be uploaded on firewall.
-/// and commit these changes. This function delete all previous changes from "Namib" and upload all
-/// new changes with "Namib".
-/// Return Result<()>.
-fn apply_uci_config(uci: &mut Uci, cfg: &EnforcerConfig) -> Result<()> {
-    uci.set("firewall.namib_config_version", cfg.version())?;
-    delete_all_config(uci)?;
-    for c in cfg.firewall_rules() {
-        apply_rule(uci, c)?;
+impl From<IpAddr> for RuleAddrEntry {
+    fn from(a: IpAddr) -> Self {
+        RuleAddrEntry::AddrEntry(a)
     }
-    uci.commit("firewall")?;
-    Ok(())
 }
 
-/// This function takes a UCI context and a configuration that should be uploaded to the firewall.
-/// Return Result<()>.
-fn apply_rule(uci: &mut Uci, rule: &FirewallRule) -> Result<()> {
-    let cfg_n = format!("firewall.namibrule_{}", rule.hash());
-    debug!("Creating rule {}", cfg_n);
-    uci.set(cfg_n.as_str(), "rule")?;
-    for c in &rule.to_option() {
-        uci.set(format!("{}.{}", cfg_n, c.0).as_str(), c.1.as_str())?;
-    }
-    uci.set(format!("{}.namib", cfg_n).as_str(), "1")?;
-    Ok(())
-}
-
-/// This function delete all config changes with "Namib".
-/// Return Result<()>.
-fn delete_all_config(uci: &mut Uci) -> Result<()> {
-    debug!("Deleting all namib configs");
-    let mut index = 0;
-    while uci.get(format!("firewall.@rule[{}]", index).as_str()).is_ok() {
-        let is_namib = uci
-            .get(format!("firewall.@rule[{}].namib", index).as_str())
-            .map_or(false, |s| s == "1");
-
-        if is_namib {
-            uci.delete(format!("firewall.@rule[{}]", index).as_str())?;
-            debug!("Delete entry firewall.@rule[{}]", index);
-        } else {
-            index += 1;
+impl FirewallService {
+    /// Creates a new FirewallService instance with the given enforcer state and dns watcher (generated from the dns service).
+    pub(crate) fn new(enforcer_state: Arc<RwLock<Enforcer>>, watcher: DnsWatcher) -> FirewallService {
+        FirewallService {
+            enforcer_state,
+            dns_watcher: Arc::new(watcher),
+            change_notify: Notify::new(),
         }
     }
 
-    Ok(())
-}
-
-/// This function restart the Firewall.
-/// It should be used after succeeded commit.
-/// Return an Output.
-#[cfg(feature = "execute_uci_commands")]
-pub fn restart_firewall_command() -> std::io::Result<std::process::Output> {
-    std::process::Command::new("/etc/init.d/firewall")
-        .arg("restart")
-        .output()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{fs, fs::File, io::Read};
-
-    use namib_shared::firewall_config::{Network, NetworkConfig, OptionalSettings, Protocol, RuleName, Target};
-
-    use super::*;
-
-    /// The test checks a single added rule on the firewall and compare two files.
-    #[test]
-    fn test_trivial_apply_config() -> Result<()> {
-        init();
-
-        File::create("tests/config/test_trivial_apply_config/firewall")?;
-
-        let mut uci = Uci::new()?;
-        uci.set_save_dir("/tmp/.uci_trivial_apply_config")?;
-        uci.set_config_dir("tests/config/test_trivial_apply_config")?;
-
-        let src = NetworkConfig::new(Network::Lan, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(Network::Lan, Some("192.2.2.2".to_string()), Some("5001".to_string()));
-        let cfg = FirewallRule::new(
-            RuleName::new("Regel2".to_string()),
-            src,
-            dst,
-            Protocol::tcp(),
-            Target::Drop,
-            OptionalSettings::None,
-        );
-        apply_rule(&mut uci, &cfg)?;
-        uci.commit("firewall")?;
-
-        let mut expected_string = String::new();
-        let mut test_string = String::new();
-
-        {
-            let mut expected_file = File::open("tests/config/test_trivial_apply_config/expected_firewall")?;
-            let mut test_file = File::open("tests/config/test_trivial_apply_config/firewall")?;
-
-            expected_file.read_to_string(&mut expected_string)?;
-            test_file.read_to_string(&mut test_string)?;
-        }
-
-        assert_eq!(test_string, expected_string);
-        Ok(())
+    /// Updates the current firewall config with a new value and notifies the firewall change watcher to update the firewall config.
+    pub fn notify_firewall_change(&self) {
+        self.change_notify.notify_one();
     }
 
-    /// The test checks a delete all rules with "Namib" on the firewall and compare two files.
-    #[test]
-    fn test_delete_config() -> Result<()> {
-        init();
+    /// Watcher which watches for firewall or DNS resolution changes and updates the nftables firewall accordingly.
+    pub async fn firewall_change_watcher(&self) {
+        loop {
+            select! {
+                _ = self.change_notify.notified() => {}
+                _ = self.dns_watcher.address_changed() => {}
+            }
+            self.apply_current_config()
+                .await
+                .unwrap_or_else(|e| error!("An error occurred while updating the firewall configuration: {}", e));
+        }
+    }
 
-        fs::copy(
-            "tests/config/test_delete_all_config/firewall_before",
-            "tests/config/test_delete_all_config/firewall",
-        )?;
-
-        let mut uci = Uci::new()?;
-        uci.set_save_dir("/tmp/.uci_delete_all_config")?;
-        uci.set_config_dir("tests/config/test_delete_all_config")?;
-
-        delete_all_config(&mut uci)?;
-
-        uci.commit("firewall")?;
-
-        let mut expected_firewall = File::open("tests/config/test_delete_all_config/expected_firewall")?;
-        let mut actual_firewall = File::open("tests/config/test_delete_all_config/firewall")?;
-
-        let mut expected_firewall_string = String::new();
-        let mut actual_firewall_string = String::new();
-
-        expected_firewall.read_to_string(&mut expected_firewall_string)?;
-        actual_firewall.read_to_string(&mut actual_firewall_string)?;
-
-        assert_eq!(expected_firewall_string, actual_firewall_string);
+    /// Updates the nftables rules to reflect the current firewall config.
+    pub(crate) async fn apply_current_config(&self) -> Result<()> {
+        debug!("Configuration has changed, applying new rules to nftables");
+        let config = &self.enforcer_state.read().await.config;
+        let mut batch = Batch::new();
+        self.add_old_config_deletion_instructions(&mut batch)?;
+        self.dns_watcher.clear_watched_names().await;
+        self.convert_config_to_nftnl_commands(&mut batch, &config).await?;
+        let batch = batch.finalize();
+        // TODO proper error handling
+        send_and_process(&batch).unwrap();
 
         Ok(())
     }
 
-    /// This test apply few config firewall changes with "Namib" and delete there again.
-    #[test]
-    fn test_apply_and_delete_config() -> Result<()> {
-        init();
-
-        fs::copy(
-            "tests/config/test_apply_and_delete/firewall_before",
-            "tests/config/test_apply_and_delete/firewall",
-        )?;
-
-        let mut uci = Uci::new()?;
-        uci.set_save_dir("/tmp/.uci_apply_and_delete")?;
-        uci.set_config_dir("tests/config/test_apply_and_delete")?;
-
-        let src = NetworkConfig::new(Network::Lan, Some("192.1.1.1".to_string()), Some("5000".to_string()));
-        let dst = NetworkConfig::new(Network::Lan, Some("192.2.2.2".to_string()), Some("5001".to_string()));
-
-        let cfg = FirewallRule::new(
-            RuleName::new("Regel3".to_string()),
-            src,
-            dst,
-            Protocol::tcp(),
-            Target::Drop,
-            OptionalSettings::None,
-        );
-
-        // apply the config
-        apply_rule(&mut uci, &cfg)?;
-        uci.commit("firewall")?;
-
-        let mut expected_firewall_string = String::new();
-        let mut firewall_string = String::new();
-
-        {
-            let mut expected_firewall = File::open("tests/config/test_apply_and_delete/expected_firewall")?;
-            let mut firewall = File::open("tests/config/test_apply_and_delete/firewall")?;
-
-            expected_firewall.read_to_string(&mut expected_firewall_string)?;
-            firewall.read_to_string(&mut firewall_string)?;
-        }
-
-        // check if applied config matches expected
-        assert_eq!(firewall_string, expected_firewall_string);
-
-        // now delete the applied config
-        delete_all_config(&mut uci)?;
-        uci.commit("firewall")?;
-
-        let mut firewall_before_string = String::new();
-        let mut firewall_string = String::new();
-
-        {
-            let mut firewall = File::open("tests/config/test_apply_and_delete/firewall")?;
-            let mut firewall_before = File::open("tests/config/test_apply_and_delete/firewall_before")?;
-
-            firewall_before.read_to_string(&mut firewall_before_string)?;
-            firewall.read_to_string(&mut firewall_string)?;
-        }
-
-        assert_eq!(firewall_string, firewall_before_string);
-
+    /// Creates nftnl expressions which delete the current namib firewall table if it exists and adds them to the given batch.
+    fn add_old_config_deletion_instructions(&self, batch: &mut Batch) -> Result<()> {
+        // Create the table if it doesn't exist, otherwise removing the table might cause a NotFound error.
+        // If the table already exists, this doesn't do anything.
+        let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+        batch.add(&table, nftnl::MsgType::Add);
+        // Delete the table.
+        let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+        batch.add(&table, nftnl::MsgType::Del);
         Ok(())
     }
 
-    fn init() {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
-            .is_test(true)
-            .try_init()
-            .ok();
+    /// Converts the given firewall config into nftnl expressions and applies them to the supplied batch.
+    async fn convert_config_to_nftnl_commands(&self, batch: &mut Batch, config: &EnforcerConfig) -> Result<()> {
+        // Create new firewall table.
+        let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+        batch.add(&table, nftnl::MsgType::Add);
+
+        // Create base chain. This base chain is the entry point for the firewall table and will redirect all
+        // packets corresponding to a configured device in the firewall config to its separate chain.
+        let mut base_chain = Chain::new(&CString::new(BASE_CHAIN_NAME).unwrap(), &table);
+        base_chain.set_hook(nftnl::Hook::In, 0);
+        // If a device is not one of the configured devices, accept packets by default.
+        base_chain.set_policy(nftnl::Policy::Accept);
+        batch.add(&base_chain, nftnl::MsgType::Add);
+
+        // Iterate over all devices.
+        for device in config.devices() {
+            // Create chain which is responsible for deciding how packets for/from this device will be treated.
+            let device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
+            batch.add(&device_chain, nftnl::MsgType::Add);
+
+            // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
+            let mut device_jump_rule_src = Rule::new(&base_chain);
+            device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+            let mut device_jump_rule_dst = Rule::new(&base_chain);
+            device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+            // Match rule if source or target address is configured device.
+            match device.ip {
+                IpAddr::V4(v4addr) => {
+                    device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                    device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                    device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
+                    device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
+                    device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                    device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
+                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
+                },
+                IpAddr::V6(v6addr) => {
+                    device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                    device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                    device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
+                    device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
+                    device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                    device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
+                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
+                },
+            }
+            // If these rules apply, jump to the chain responsible for handling this device.
+            device_jump_rule_src
+                .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+            device_jump_rule_dst
+                .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+            batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
+            batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+
+            // Iterate over device rules.
+            for rule_spec in &device.rules {
+                // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
+                // for the packet source or destination, create a vector of ip addresses for this identifier.
+                let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
+                    Some(NetworkHost::Ip(ipaddr)) => {
+                        vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
+                    },
+                    // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
+                    // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
+                    Some(NetworkHost::Hostname(dns_name)) => self
+                        .dns_watcher
+                        .resolve_and_watch(dns_name.as_str())
+                        .await
+                        .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
+                        .unwrap_or(Vec::new()),
+                    Some(NetworkHost::FirewallDevice) => vec![RuleAddrEntry::AddrEntry(device.ip)],
+                    _ => vec![RuleAddrEntry::AnyAddr],
+                };
+                let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
+                    Some(NetworkHost::Ip(ipaddr)) => {
+                        vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
+                    },
+                    // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
+                    // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
+                    Some(NetworkHost::Hostname(dns_name)) => self
+                        .dns_watcher
+                        .resolve_and_watch(dns_name.as_str())
+                        .await
+                        .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
+                        .unwrap_or(Vec::new()),
+                    Some(NetworkHost::FirewallDevice) => vec![RuleAddrEntry::AddrEntry(device.ip)],
+                    _ => vec![RuleAddrEntry::AnyAddr],
+                };
+
+                // Create a rule for each source/destination ip combination.
+                // Ideally, we would instead used nftnl sets, but these currently have the limitation that they
+                // can only either contain IPv4 or IPv6 addresses, not both. Also, nftnl-rs does not support anonymous
+                // sets yet.
+                for source_ip in &source_ips {
+                    for dest_ip in &dest_ips {
+                        let protocol_reference_ip;
+                        // Do not create rules which mix IPv4 and IPV6 addresses. Also, save at least one specified IP to match for protocol later on.
+                        if let &RuleAddrEntry::AddrEntry(saddr) = source_ip {
+                            if let RuleAddrEntry::AddrEntry(daddr) = dest_ip {
+                                if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
+                                    continue;
+                                }
+                            }
+                            protocol_reference_ip = Some(saddr);
+                        } else if let &RuleAddrEntry::AddrEntry(daddr) = dest_ip {
+                            protocol_reference_ip = Some(daddr);
+                        } else {
+                            protocol_reference_ip = None;
+                        }
+                        // Create rule for current address combination.
+                        let mut current_rule = Rule::new(&device_chain);
+                        // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
+                        match protocol_reference_ip {
+                            Some(IpAddr::V4(_v4addr)) => {
+                                // Match for protocol.
+                                match rule_spec.protocol {
+                                    Protocol::Tcp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
+                                        current_rule.add_expr(&nft_expr!(cmp == "tcp"));
+                                    },
+                                    Protocol::Udp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
+                                        current_rule.add_expr(&nft_expr!(cmp == "udp"));
+                                    },
+                                    _ => {}, // TODO expand with further options (icmp, sctp)
+                                }
+                            },
+                            Some(IpAddr::V6(_v6addr)) => {
+                                match rule_spec.protocol {
+                                    Protocol::Tcp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
+                                        current_rule.add_expr(&nft_expr!(cmp == "tcp"));
+                                    },
+                                    Protocol::Udp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
+                                        current_rule.add_expr(&nft_expr!(cmp == "udp"));
+                                    },
+                                    _ => {}, // TODO expand with further options (icmp, sctp)
+                                }
+                            },
+                            _ => {},
+                        }
+                        // Create expressions to match source IP.
+                        match source_ip {
+                            RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv4 saddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
+                            },
+                            RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv6 saddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
+                            },
+                            RuleAddrEntry::AnyAddr => {},
+                        }
+                        // Create expressions to match destination IP.
+                        match dest_ip {
+                            RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv4 daddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
+                            },
+                            RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv6 daddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
+                            },
+                            RuleAddrEntry::AnyAddr => {},
+                        }
+                        // Create expressions to match for port numbers.
+                        match rule_spec.protocol {
+                            Protocol::Tcp => {
+                                if let Some(port) = &rule_spec.dst.port {
+                                    current_rule.add_expr(&nft_expr!(payload tcp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                                if let Some(port) = &rule_spec.src.port {
+                                    current_rule.add_expr(&nft_expr!(payload tcp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                            },
+                            Protocol::Udp => {
+                                if let Some(port) = &rule_spec.dst.port {
+                                    current_rule.add_expr(&nft_expr!(payload udp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                                if let Some(port) = &rule_spec.src.port {
+                                    current_rule.add_expr(&nft_expr!(payload udp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                            },
+                            _ => {},
+                        }
+
+                        // Set verdict if current rule matches.
+                        match rule_spec.target {
+                            Target::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
+                            Target::Reject => {
+                                current_rule.add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
+                            },
+                            Target::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
+                        }
+                        batch.add(&current_rule, nftnl::MsgType::Add);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Sends the supplied expression batch to nftables for execution.
+/// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+/// Note: An error of type IoError due to an OS error with code 71 might not indicate a protocol
+/// error but a permission error instead (either run as root or use `setcap 'cap_net_admin=+ep' /path/to/program` on the built binary.
+/// For information on how to debug, see http://0x90.at/post/netlink-debugging
+fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
+    // Create a netlink socket to netfilter.
+    let socket = mnl::Socket::new(mnl::Bus::Netfilter)?;
+    // Send all the bytes in the batch.
+    socket.send_all(batch)?;
+
+    // Try to parse the messages coming back from netfilter. This part is still very unclear.
+    let portid = socket.portid();
+    let mut buffer = vec![0; nftnl::nft_nlmsg_maxsize() as usize];
+    let very_unclear_what_this_is_for = 2;
+    while let Some(message) = socket_recv(&socket, &mut buffer[..])? {
+        match mnl::cb_run(message, very_unclear_what_this_is_for, portid)? {
+            mnl::CbResult::Stop => {
+                break;
+            },
+            mnl::CbResult::Ok => (),
+        }
+    }
+    Ok(())
+}
+
+/// Helper function for send_and_process().
+/// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+fn socket_recv<'a>(socket: &mnl::Socket, buf: &'a mut [u8]) -> Result<Option<&'a [u8]>> {
+    let ret = socket.recv(buf)?;
+    if ret > 0 {
+        Ok(Some(&buf[..ret]))
+    } else {
+        Ok(None)
     }
 }
