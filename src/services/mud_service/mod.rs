@@ -129,7 +129,12 @@ pub async fn get_or_fetch_mud(url: String, pool: &DbConnection) -> Result<MudDat
 
 /// Basic HTTP(S)-GET wrapper to fetch MUD-URL Data
 async fn fetch_mud(url: &str) -> Result<String> {
-    Ok(isahc::get_async(url).await?.text().await?)
+    let request = isahc::Request::builder()
+        .uri(url)
+        //.ssl_options(isahc::config::SslOption::DANGER_ACCEPT_INVALID_CERTS)
+        .body(())
+        .unwrap();
+    Ok(isahc::send_async(request).await?.text().await?)
 }
 
 /// Checks if the given string is an URL. Used to check if the MUD-Profile being created is local or needs to be fetched.

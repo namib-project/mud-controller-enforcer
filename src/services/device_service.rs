@@ -25,18 +25,18 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
                 .unwrap_or(false);
         false
     };
+
+    debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
+
+    match &dhcp_device_data.mud_url {
+        Some(url) => mud_service::get_or_fetch_mud(url.clone(), pool).await.ok(),
+        None => None,
+    };
     if update {
         update_device(&dhcp_device_data, pool).await.unwrap();
     } else {
         insert_device(&dhcp_device_data, pool).await.unwrap();
     }
-
-    debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
-
-    match dhcp_device_data.mud_url {
-        Some(url) => mud_service::get_or_fetch_mud(url, pool).await.ok(),
-        None => None,
-    };
 
     firewall_configuration_service::update_config_version(pool).await?;
 

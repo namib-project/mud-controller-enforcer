@@ -1,13 +1,13 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AceProtocol, Acl, AclDirection, AclType, Device},
+    models::{AceAction, AceProtocol, Acl, AclDirection, Device},
     services::config_service::{get_config_value, set_config_value, ConfigKeys},
 };
 use namib_shared::firewall_config::{
-    EnforcerConfig, FirewallRule, KnownDevice, Network, NetworkConfig, Protocol, RuleName, Target,
+    EnforcerConfig, FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, RuleName, Target,
 };
-use std::net::{IpAddr, ToSocketAddrs};
+use std::net::IpAddr;
 
 pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
@@ -23,30 +23,16 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
 }
 
 pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
-    let rules: Vec<FirewallRule> = devices
-        .iter()
-        .flat_map(move |d| {
-            convert_device_to_fw_rules(d)
-                .map_err(|err| error!("Flat Map Error {:#?}", err))
-                .unwrap_or_default()
-        })
-        .collect();
-    EnforcerConfig::new(
-        version,
-        rules,
-        devices
-            .into_iter()
-            .map(|d| KnownDevice::new(d.ip_addr, d.collect_info))
-            .collect(),
-    )
+    let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
+    EnforcerConfig::new(version, rules, String::from("www.namib.test"))
 }
 
-pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> {
+pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
     let mut index = 0;
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
-        None => return Ok(result),
+        None => return FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info),
     };
 
     let merged_acls = match &mud_data.acl_override {
@@ -54,15 +40,16 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
         None => (&mud_data.acllist).iter().collect::<Vec<&Acl>>(),
     };
 
-    for acl in merged_acls {
+    for acl in &merged_acls {
         for ace in &acl.ace {
             let rule_name = RuleName::new(format!("rule_{}", index));
             let protocol = match &ace.matches.protocol {
-                None => Protocol::all(),
+                None => Protocol::All,
                 Some(proto) => match proto {
-                    AceProtocol::Tcp => Protocol::tcp(),
-                    AceProtocol::Udp => Protocol::udp(),
-                    AceProtocol::Protocol(proto_nr) => Protocol::from_number(proto_nr.to_owned()),
+                    AceProtocol::Tcp => Protocol::Tcp,
+                    AceProtocol::Udp => Protocol::Udp,
+                    AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
+                                                                       // TODO add support for more protocols
                 },
             };
             let target = match ace.action {
@@ -70,60 +57,23 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
                 AceAction::Deny => Target::Reject,
             };
 
-            if let Some(dnsname) = &ace.matches.dnsname {
-                let socket_addresses = match format!("{}:443", dnsname).to_socket_addrs() {
-                    Ok(socket) => socket,
-                    Err(_) => Vec::new().into_iter(),
+            let route_network_fw_device = NetworkConfig::new(Some(NetworkHost::FirewallDevice), None);
+            if let Some(dns_name) = &ace.matches.dnsname {
+                let route_network_remote_host = match dns_name.parse::<IpAddr>() {
+                    Ok(addr) => NetworkConfig::new(Some(NetworkHost::Ip(addr)), None),
+                    _ => NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None),
                 };
-                for addr in socket_addresses {
-                    match addr.ip() {
-                        IpAddr::V4(_) => {
-                            if acl.acl_type == AclType::IPV6 {
-                                continue;
-                            }
-                        },
-                        IpAddr::V6(_) => {
-                            if acl.acl_type == AclType::IPV4 {
-                                continue;
-                            }
-                        },
-                    };
-                    let route_network_lan = NetworkConfig::new(Network::Lan, Some(device.ip_addr.to_string()), None);
-                    let route_network_wan = NetworkConfig::new(Network::Wan, Some(addr.ip().to_string()), None);
-                    let (route_network_src, route_network_dest) = match acl.packet_direction {
-                        AclDirection::FromDevice => (route_network_lan, route_network_wan),
-                        AclDirection::ToDevice => (route_network_wan, route_network_lan),
-                    };
-                    let config_firewall = FirewallRule::new(
-                        rule_name.clone(),
-                        route_network_src,
-                        route_network_dest,
-                        protocol.clone(),
-                        target.clone(),
-                        None,
-                    );
-                    result.push(config_firewall);
-                }
-            } else {
-                let route_network_lan = NetworkConfig::new(Network::Lan, None, None);
-                let route_network_wan = NetworkConfig::new(Network::Wan, None, None);
+
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
-                    AclDirection::FromDevice => (route_network_lan, route_network_wan),
-                    AclDirection::ToDevice => (route_network_wan, route_network_lan),
+                    AclDirection::FromDevice => (route_network_fw_device, route_network_remote_host),
+                    AclDirection::ToDevice => (route_network_remote_host, route_network_fw_device),
                 };
                 let config_firewall = FirewallRule::new(
-                    rule_name,
+                    rule_name.clone(),
                     route_network_src,
                     route_network_dest,
-                    protocol,
-                    target,
-                    Some(vec![(
-                        match acl.packet_direction {
-                            AclDirection::FromDevice => "src_ip".to_string(),
-                            AclDirection::ToDevice => "dest_ip".to_string(),
-                        },
-                        device.ip_addr.to_string(),
-                    )]),
+                    protocol.clone(),
+                    target.clone(),
                 );
                 result.push(config_firewall);
             }
@@ -132,23 +82,21 @@ pub fn convert_device_to_fw_rules(device: &Device) -> Result<Vec<FirewallRule>> 
     }
     result.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", index)),
-        NetworkConfig::new(Network::Lan, Some(device.ip_addr.to_string()), None),
-        NetworkConfig::new(Network::Wan, None, None),
-        Protocol::all(),
+        NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+        NetworkConfig::new(None, None),
+        Protocol::All,
         Target::Reject,
-        None,
     ));
     index += 1;
     result.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", index)),
-        NetworkConfig::new(Network::Wan, None, None),
-        NetworkConfig::new(Network::Lan, Some(device.ip_addr.to_string()), None),
-        Protocol::all(),
+        NetworkConfig::new(None, None),
+        NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+        Protocol::All,
         Target::Reject,
-        Some(vec![("dest_ip".to_string(), device.ip_addr.to_string())]),
     ));
 
-    Ok(result)
+    FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info)
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
@@ -304,7 +252,7 @@ mod tests {
                         protocol: Some(AceProtocol::Tcp),
                         direction_initiated: None,
                         address_mask: None,
-                        dnsname: None,
+                        dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
                     },
@@ -321,7 +269,7 @@ mod tests {
                         protocol: Some(AceProtocol::Udp),
                         direction_initiated: None,
                         address_mask: None,
-                        dnsname: None,
+                        dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
                     },
@@ -341,19 +289,40 @@ mod tests {
             collect_info: false,
         };
 
-        let x = convert_device_to_fw_rules(&device)?;
+        let x = convert_device_to_fw_rules(&device);
 
         println!("{:#?}", x);
 
-        let first_rule = x[0].to_option();
-        println!("First Rule: {:#?}", first_rule);
+        let resulting_device = FirewallDevice::new(
+            device.id,
+            device.ip_addr,
+            vec![
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_0")),
+                    NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    Protocol::Udp,
+                    Target::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_1")),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    NetworkConfig::new(None, None),
+                    Protocol::All,
+                    Target::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_2")),
+                    NetworkConfig::new(None, None),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    Protocol::All,
+                    Target::Reject,
+                ),
+            ],
+            false,
+        );
 
-        assert!(first_rule.iter().any(|x| x.0 == "name" && x.1 == "rule_0"));
-        assert!(first_rule.iter().any(|x| x.0 == "src" && x.1 == "wan"));
-        assert!(first_rule.iter().any(|x| x.0 == "dest" && x.1 == "lan"));
-        assert!(first_rule.iter().any(|x| x.0 == "dest_ip" && x.1 == "127.0.0.1"));
-        assert!(first_rule.iter().any(|x| x.0 == "proto" && x.1 == "17"));
-        assert!(first_rule.iter().any(|x| x.0 == "target" && x.1 == "REJECT"));
+        assert!(x.eq(&resulting_device));
 
         Ok(())
     }
@@ -380,7 +349,7 @@ mod tests {
                         protocol: Some(AceProtocol::Tcp),
                         direction_initiated: None,
                         address_mask: None,
-                        dnsname: None,
+                        dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
                     },
@@ -401,17 +370,40 @@ mod tests {
             last_interaction: Utc::now().naive_local(),
         };
 
-        let x = convert_device_to_fw_rules(&device)?;
+        let x = convert_device_to_fw_rules(&device);
 
         println!("{:#?}", x);
 
-        let opts = x[0].to_option();
-        assert!(opts.iter().any(|x| x.0 == "name" && x.1 == "rule_0"));
-        assert!(opts.iter().any(|x| x.0 == "src" && x.1 == "wan"));
-        assert!(opts.iter().any(|x| x.0 == "dest" && x.1 == "lan"));
-        assert!(opts.iter().any(|x| x.0 == "dest_ip" && x.1 == "127.0.0.1"));
-        assert!(opts.iter().any(|x| x.0 == "proto" && x.1 == "6"));
-        assert!(opts.iter().any(|x| x.0 == "target" && x.1 == "ACCEPT"));
+        let resulting_device = FirewallDevice::new(
+            device.id,
+            device.ip_addr,
+            vec![
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_0")),
+                    NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    Protocol::Tcp,
+                    Target::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_1")),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    NetworkConfig::new(None, None),
+                    Protocol::All,
+                    Target::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_2")),
+                    NetworkConfig::new(None, None),
+                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    Protocol::All,
+                    Target::Reject,
+                ),
+            ],
+            true,
+        );
+
+        assert!(x.eq(&resulting_device));
 
         Ok(())
     }
