@@ -1,7 +1,7 @@
 use core::pin::Pin;
 use std::{
     cmp::{max, Ordering},
-    collections::{hash_map::DefaultHasher, BinaryHeap, HashMap, HashSet},
+    collections::{BinaryHeap, HashMap, HashSet},
     hash::{Hash, Hasher},
     net::IpAddr,
     ops::{Add, Deref},
@@ -122,12 +122,7 @@ impl Eq for DnsWatcherSender {}
 
 impl PartialEq for DnsWatcherSender {
     fn eq(&self, other: &Self) -> bool {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        let v1 = hasher.finish();
-        let mut hasher = DefaultHasher::new();
-        other.hash(&mut hasher);
-        v1.eq(&hasher.finish())
+        (self as *const DnsWatcherSender) == (other as *const DnsWatcherSender)
     }
 }
 
@@ -268,5 +263,61 @@ impl DnsWatcher {
     /// Returns immediately in case a change has already happened but was not waited for.
     pub async fn address_changed(&self) {
         self.sender.notify.notified().await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{error::Result, services::dns::DnsService};
+
+    #[tokio::test]
+    async fn test() -> Result<()> {
+        let service = DnsService::new().unwrap();
+        let watcher = service.create_watcher();
+        let lookup = watcher.resolve_and_watch("www.google.com").await?;
+        let cache_entry = watcher.cache.read().await.resolve_if_cached("www.google.com").unwrap();
+        assert_eq!(cache_entry.name, "www.google.com");
+        assert!(cache_entry.watchers.read().await.contains(watcher.sender.as_ref()));
+        assert_eq!(cache_entry.lookup_result.as_lookup(), lookup.as_lookup());
+        assert!(watcher.cache.read().await.refresh_queue.peek().is_some());
+
+        watcher.resolve_and_watch("www.youtube.com").await?;
+        watcher.resolve_and_watch("www.google.com").await?;
+
+        assert!(watcher
+            .current_watched_entries
+            .lock()
+            .await
+            .eq(&["www.google.com", "www.youtube.com"]
+                .iter()
+                .map(ToString::to_string)
+                .collect()));
+
+        assert_eq!(
+            watcher
+                .cache
+                .read()
+                .await
+                .resolve_if_cached("www.google.com")
+                .unwrap()
+                .watchers
+                .read()
+                .await
+                .len(),
+            1
+        );
+        assert!(watcher.cache.read().await.resolve_if_cached("www.blabla.com").is_none());
+
+        watcher.remove_watched_name("www.google.com").await;
+
+        let cache_entry = watcher.cache.read().await.resolve_if_cached("www.google.com").unwrap();
+        assert!(cache_entry.watchers.read().await.is_empty());
+        assert!(watcher
+            .current_watched_entries
+            .lock()
+            .await
+            .eq(&["www.youtube.com"].iter().map(ToString::to_string).collect()));
+
+        Ok(())
     }
 }
