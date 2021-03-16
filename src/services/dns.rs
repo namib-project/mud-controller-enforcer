@@ -8,7 +8,7 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock, RwLockWriteGuard};
 use trust_dns_resolver::{
     config::LookupIpStrategy, error::ResolveError, lookup_ip::LookupIp, AsyncResolver, TokioAsyncResolver,
 };
@@ -27,20 +27,17 @@ impl Eq for DnsRefreshQueueEntry {}
 
 impl PartialEq for DnsRefreshQueueEntry {
     fn eq(&self, other: &Self) -> bool {
-        self.cache_entry
-            .lookup_result
-            .valid_until()
-            .eq(&other.cache_entry.lookup_result.valid_until())
+        self.cache_entry.lookup_result.valid_until() == other.cache_entry.lookup_result.valid_until()
     }
 }
 
 impl Ord for DnsRefreshQueueEntry {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.cache_entry
+        other
+            .cache_entry
             .lookup_result
             .valid_until()
-            .cmp(&other.cache_entry.lookup_result.valid_until())
-            .reverse()
+            .cmp(&self.cache_entry.lookup_result.valid_until())
     }
 }
 
@@ -171,35 +168,8 @@ impl DnsService {
                         break;
                     }
                 }
-                let name = queue_element.cache_entry.name.clone();
-                debug!("Refreshing DNS cache entry for {:?} because cache entry expired.", name);
-                let new_entry = cache.resolver.lookup_ip(name.as_str()).await.map(|v| DnsCacheEntry {
-                    name: name.clone(),
-                    lookup_result: Arc::new(v),
-                    watchers: queue_element.cache_entry.watchers.clone(),
-                });
-                if let Ok(new_entry) = new_entry {
-                    let new_set: HashSet<IpAddr> = new_entry.lookup_result.iter().collect();
-                    let old_set: HashSet<IpAddr> = queue_element.cache_entry.lookup_result.iter().collect();
-                    if !new_set.eq(&old_set) {
-                        debug!(
-                            "IP address set for {:?} has changed from {:?} to {:?}, notifying watchers of DNS entry change.",
-                            name, old_set, new_set
-                        );
-                        let watchers = new_entry.watchers.read().await;
-                        for w in watchers.iter() {
-                            watchers_to_notify.insert(w.clone());
-                            w.updated_names.lock().await.insert(name.clone());
-                        }
-                    }
-                    cache.cache_data.remove(name.as_str());
-                    cache.cache_data.insert(name.clone(), new_entry);
-                    new_entries.push(DnsRefreshQueueEntry {
-                        cache_entry: cache.cache_data.get(name.as_str()).unwrap().clone(),
-                    });
-                } else {
-                    new_entries.push(queue_element);
-                }
+                new_entries
+                    .push(DnsService::refresh_dns_entry(queue_element, &mut cache, &mut watchers_to_notify).await);
             }
             cache.refresh_queue.append(&mut new_entries.into());
             watchers_to_notify.iter().for_each(|w| w.notify.notify_one());
@@ -208,6 +178,44 @@ impl DnsService {
                 .peek()
                 .map(|v| v.cache_entry.lookup_result.valid_until());
             debug!("Finished DNS cache refresh cycle.");
+        }
+    }
+
+    async fn refresh_dns_entry<'a>(
+        queue_element: DnsRefreshQueueEntry,
+        cache: &mut RwLockWriteGuard<'a, DnsServiceCache>,
+        watchers_to_notify: &mut HashSet<Arc<Pin<Box<DnsWatcherSender>>>>,
+    ) -> DnsRefreshQueueEntry {
+        debug!(
+            "Refreshing DNS cache entry for {:?} because cache entry expired.",
+            queue_element.cache_entry.name
+        );
+        let name = queue_element.cache_entry.name.as_str();
+        let new_entry = cache.resolver.lookup_ip(name).await.map(|v| DnsCacheEntry {
+            name: name.to_string(),
+            lookup_result: Arc::new(v),
+            watchers: queue_element.cache_entry.watchers.clone(),
+        });
+        if let Ok(new_entry) = new_entry {
+            let new_set: HashSet<IpAddr> = new_entry.lookup_result.iter().collect();
+            let old_set: HashSet<IpAddr> = queue_element.cache_entry.lookup_result.iter().collect();
+            if new_set != old_set {
+                debug!(
+                    "IP address set for {:?} has changed from {:?} to {:?}, notifying watchers of DNS entry change.",
+                    name, old_set, new_set
+                );
+                let watchers = new_entry.watchers.read().await;
+                for w in watchers.iter() {
+                    watchers_to_notify.insert(w.clone());
+                    w.updated_names.lock().await.insert(name.to_string());
+                }
+            }
+            cache.cache_data.insert(name.to_string(), new_entry);
+            DnsRefreshQueueEntry {
+                cache_entry: cache.cache_data.get(name).unwrap().clone(),
+            }
+        } else {
+            queue_element
         }
     }
 
