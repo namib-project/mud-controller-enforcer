@@ -6,7 +6,6 @@ use crate::{
     error::Result,
     models::{Acl, MudData, MudDbo, MudDboRefresh},
 };
-use isahc::config::Configurable;
 use sqlx::Done;
 use url::Url;
 
