@@ -156,6 +156,11 @@ impl DnsService {
             let mut watchers_to_notify = HashSet::new();
             let mut new_entries = Vec::new();
             while let Some(queue_element) = cache.refresh_queue.pop() {
+                // remove cache entries without watchers
+                if queue_element.cache_entry.watchers.read().await.is_empty() {
+                    cache.cache_data.remove(&queue_element.cache_entry.name);
+                    continue;
+                }
                 if let Some(duration_until_invalid) = queue_element
                     .cache_entry
                     .lookup_result
