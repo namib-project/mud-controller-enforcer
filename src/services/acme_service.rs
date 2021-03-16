@@ -1,15 +1,15 @@
 use crate::error::{self, Result};
-use acme_lib::{create_p384_key, persist::FilePersist, Account, Directory, DirectoryUrl};
-use base64::CharacterSet;
+use acme_lib::{create_rsa_key, persist::FilePersist, Account, Directory, DirectoryUrl};
 use get_if_addrs::get_if_addrs;
 use lazy_static::lazy_static;
 use namib_shared::open_file_with;
+use regex::Regex;
 use reqwest::{Certificate, Identity};
 use rustls_18::{
-    sign::{any_ecdsa_type, CertifiedKey},
+    sign::{any_supported_type, CertifiedKey},
     ClientHello, ResolvesServerCert, ServerConfig,
 };
-use sha1::{Digest, Sha1};
+use sha3::{Digest, Sha3_224};
 use snafu::ensure;
 use std::{
     env, fmt,
@@ -26,10 +26,17 @@ pub struct CertId(String);
 impl CertId {
     /// Calculate the `CertId` for a given DER-encoded certificate.
     pub fn new(cert: &[u8]) -> Self {
-        Self(base64::encode_config(
-            Sha1::digest(cert),
-            base64::Config::new(CharacterSet::UrlSafe, false),
-        ))
+        lazy_static! {
+            static ref PATTERN: Regex = Regex::new("([A-Z])|([_-])").unwrap();
+        }
+        Self(
+            PATTERN
+                .replace_all(
+                    &base64::encode_config(Sha3_224::digest(cert), base64::URL_SAFE_NO_PAD),
+                    "\\L$1\\E",
+                )
+                .to_string(),
+        )
     }
 }
 
@@ -76,29 +83,40 @@ impl ResolvesServerCert for CertResolver {
                 return Some(c.clone());
             }
         }
-        // check whether a certificate is persisted on disk and abort the connection if it is not
-        let cert = match ACCOUNT.certificate(&*DOMAIN) {
-            Ok(Some(c)) => CertifiedKey::new(
-                vec![rustls_18::Certificate(c.certificate_der())],
-                Arc::new(match any_ecdsa_type(&rustls_18::PrivateKey(c.private_key_der())) {
-                    Ok(key) => key,
-                    _ => return None,
-                }),
-            ),
-            _ => return None,
-        };
         // update the certificate cache
         if let Ok(mut g) = ACME_CERTIFIED_KEY.write() {
+            // if another thread has already filled the cache, return it here
+            if g.is_some() {
+                return g.clone();
+            }
+            // check whether a certificate is persisted on disk and abort the connection if it is not
+            let cert = match ACCOUNT.certificate(&*DOMAIN) {
+                Ok(Some(c)) => CertifiedKey::new(
+                    vec![rustls_18::Certificate(c.certificate_der())],
+                    Arc::new(match any_supported_type(&rustls_18::PrivateKey(c.private_key_der())) {
+                        Ok(key) => key,
+                        Err(e) => {
+                            error!("Could not load certificate from persisted certificate {:?}", e);
+                            return None;
+                        },
+                    }),
+                ),
+                _ => return None,
+            };
             *g = Some(cert.clone());
+            info!("Loaded certificate for {} from disk", *DOMAIN);
+
+            return Some(cert);
         }
-        Some(cert)
+        warn!("Cannot fulfil https request, since no certificate is present");
+        None
     }
 }
 
 /// Checks whether the persisted certificate is present and valid for more than 15 days
 /// and if not will request a new certificate from LetsEncrypt.
 pub fn update_certs() -> Result<()> {
-    debug!("checking if a certificate exists");
+    debug!("checking if a certificate for {} exists", *DOMAIN);
     if let Some(c) = ACCOUNT.certificate(&DOMAIN).unwrap_or(None) {
         debug!("certificate found, days left: {}", c.valid_days_left());
         // if more than 15 days are left, nothing to do
@@ -115,8 +133,8 @@ pub fn update_certs() -> Result<()> {
         }
 
         let auths = order.authorizations()?;
-        let chall = auths[0].http_challenge();
-        debug!("got http challenge: {}", chall.http_token());
+        let challenge = auths[0].http_challenge();
+        debug!("got http challenge: {}", challenge.http_token());
         let mut certs: Vec<u8> = Vec::new();
         // The server certificate for communicating with namib services
         File::open("certs/server.pem")?.read_to_end(&mut certs)?;
@@ -134,18 +152,18 @@ pub fn update_certs() -> Result<()> {
             .post(format!(
                 "https://{}/.well-known/acme-challenge/{}",
                 *DOMAIN,
-                chall.http_token()
+                challenge.http_token()
             ))
-            .body(chall.http_proof())
+            .body(challenge.http_proof())
             .send()?;
         ensure!(response.text()? == "ok", error::NoneError {});
         // tell LetsEncrypt to check the file
-        chall.validate(5000)?;
+        challenge.validate(5000)?;
         // update the csr status
         order.refresh()?;
     };
     // create a private key for the new certificate
-    let pkey = create_p384_key();
+    let pkey = create_rsa_key(4096);
     // finalize the csr using the pkey and download the new certificate
     csr.finalize_pkey(pkey, 5000)?.download_and_save_cert()?;
     // make the resolver reload the certificate
