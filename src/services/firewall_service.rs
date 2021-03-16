@@ -81,6 +81,7 @@ impl FirewallService {
         let config = &self.enforcer_state.read().await.config;
         let mut batch = Batch::new();
         self.add_old_config_deletion_instructions(&mut batch)?;
+        self.dns_watcher.clear_watched_names().await;
         self.convert_config_to_nftnl_commands(&mut batch, &config).await?;
         let batch = batch.finalize();
         // TODO proper error handling
