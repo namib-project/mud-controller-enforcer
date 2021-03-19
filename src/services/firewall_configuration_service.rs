@@ -287,6 +287,7 @@ mod tests {
             mud_data: Some(mud_data),
             last_interaction: Utc::now().naive_local(),
             collect_info: false,
+            clipart: None,
         };
 
         let x = convert_device_to_fw_rules(&device);
@@ -368,6 +369,7 @@ mod tests {
             collect_info: true,
             mud_data: Some(mud_data),
             last_interaction: Utc::now().naive_local(),
+            clipart: None,
         };
 
         let x = convert_device_to_fw_rules(&device);
