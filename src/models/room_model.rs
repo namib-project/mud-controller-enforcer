@@ -1,14 +1,9 @@
 use palette::Srgb;
+use paperclip::actix::Apiv2Schema;
 
-#[derive(Debug, Clone)]
-pub struct RoomDbo {
-    pub id: i64,
-    pub name: String,
-    pub color: u32,
-}
-
+#[derive(Debug, Clone, Serialize, Deserialize, Apiv2Schema)]
 pub struct Room {
-    pub id: i64,
+    pub room_id: i64,
     pub name: String,
-    pub color: Srgb,
+    pub color: String,
 }

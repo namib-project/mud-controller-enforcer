@@ -2,6 +2,10 @@ use crate::models::mud_models::MudData;
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
 use std::net::IpAddr;
+use crate::models::{Room};
+use crate::services::room_service::find_by_id;
+use sqlx::Pool;
+use sqlx::pool::PoolConnection;
 
 #[derive(Debug, Clone)]
 pub struct DeviceDbo {
@@ -12,6 +16,7 @@ pub struct DeviceDbo {
     pub vendor_class: String,
     pub mud_url: Option<String>,
     pub collect_info: bool,
+    pub room_id: Option<i64>,
     pub last_interaction: NaiveDateTime,
 }
 
@@ -25,6 +30,7 @@ pub struct Device {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
+    pub room: Option<Room>,
     pub mud_data: Option<MudData>,
 }
 
@@ -41,10 +47,12 @@ impl From<DeviceDbo> for Device {
             mud_url: device.mud_url,
             collect_info: device.collect_info,
             last_interaction: device.last_interaction,
+            room: None,
             mud_data: None,
         }
     }
 }
+
 
 impl From<DhcpLeaseInformation> for Device {
     fn from(lease_info: DhcpLeaseInformation) -> Self {
@@ -57,6 +65,7 @@ impl From<DhcpLeaseInformation> for Device {
             mud_url: lease_info.mud_url,
             collect_info: false,
             last_interaction: Local::now().naive_local(),
+            room: None,
             mud_data: None,
         }
     }

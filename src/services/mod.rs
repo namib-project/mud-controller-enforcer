@@ -5,3 +5,4 @@ pub mod log_service;
 pub mod mud_service;
 pub mod user_config_service;
 pub mod user_service;
+pub mod room_service;
