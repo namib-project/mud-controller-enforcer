@@ -88,7 +88,7 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
     let ip_addr = device_data.ip_addr.to_string();
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
     let ins_count = sqlx::query!(
-        "insert into devices (ip_addr, mac_addr, hostname, vendor_class, mud_url, collect_info, last_interaction) values (?, ?, ?, ?, ?, ?, ?)",
+        "insert into devices (ip_addr, mac_addr, hostname, vendor_class, mud_url, collect_info, last_interaction, clipart) values (?, ?, ?, ?, ?, ?, ?, ?)",
         ip_addr,
         mac_addr,
         device_data.hostname,
@@ -96,6 +96,7 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
         device_data.mud_url,
         device_data.collect_info,
         device_data.last_interaction,
+        device_data.clipart,
     )
     .execute(pool)
     .await?;
@@ -107,7 +108,7 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
     let ip_addr = device_data.ip_addr.to_string();
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
     let upd_count = sqlx::query!(
-        "update devices set ip_addr = ?, mac_addr = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ? where id = ?",
+        "update devices set ip_addr = ?, mac_addr = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ?, clipart = ? where id = ?",
         ip_addr,
         mac_addr,
         device_data.hostname,
@@ -115,6 +116,7 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
         device_data.mud_url,
         device_data.collect_info,
         device_data.last_interaction,
+        device_data.clipart,
         device_data.id,
     )
     .execute(pool)

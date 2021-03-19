@@ -15,6 +15,7 @@ use paperclip::actix::{
     web::{HttpResponse, Json},
 };
 use std::net::IpAddr;
+use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));
@@ -52,6 +53,14 @@ async fn create_device(
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
 
+    device_creation_update_dto.validate().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
     let ip_addr = parse_ip(&device_creation_update_dto.ip_addr)?;
 
     device_service::insert_device(&device_creation_update_dto.to_device(0, false)?, &pool).await?;
@@ -69,6 +78,14 @@ async fn update_device(
     device_creation_update_dto: Json<DeviceCreationUpdateDto>,
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
+
+    device_creation_update_dto.validate().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
 
     let ip_addr = parse_ip(&ip)?;
 
