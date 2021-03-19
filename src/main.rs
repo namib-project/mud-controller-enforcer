@@ -69,7 +69,18 @@ async fn main() -> Result<()> {
             )
             .with_identifier(|req| {
                 let connection_info = req.connection_info();
-                let ip = connection_info.remote_addr().ok_or(ARError::IdentificationError)?;
+
+                // Setup optional reverse-proxy measures and strip the port from the IP
+                // Will be changed in v0.4, more info: https://github.com/TerminalWitchcraft/actix-ratelimit/issues/15
+                let ip = match env::var("RATELIMITER_BEHIND_REVERSE_PROXY")
+                    .unwrap_or("false".to_string())
+                    .as_str()
+                {
+                    "true" => connection_info.realip_remote_addr(),
+                    _ => connection_info.remote_addr(),
+                }
+                .ok_or(ARError::IdentificationError)?;
+
                 let ip_parts: Vec<&str> = ip.split(':').collect();
                 Ok(ip_parts[0].to_string())
             });
