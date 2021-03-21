@@ -40,5 +40,9 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 }
 
 pub async fn insert_room(name: String, color: String) -> Result<i64> {
-    Ok(1)
+    let insert = sqlx::query!("insert into room (name, color) values (?, ?)", name, color,)
+        .execute(pool)
+        .await?;
+
+    Ok(insert.rows_affected())
 }
