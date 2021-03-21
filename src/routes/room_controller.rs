@@ -35,7 +35,7 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
 #[api_v2_operation]
 async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, name: web::Path<String>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__read)?;
-    let res = room_service::find_by_name(name.0, pool.get_ref()).await?.unwrap(); //Unsauber.. gibt es eine bessere Methode.
+    let res = room_service::find_by_name(name.0, pool.get_ref()).await?;
     info!("{:?}", res);
     Ok(Json(RoomDto::from(res)))
 }
@@ -45,7 +45,7 @@ async fn get_all_devices_inside_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
     id: web::Path<i64>,
-) -> Result<Json<DeviceDto>> {
+) -> Result<Json<Vec<DeviceDto>>> {
     auth.require_permission(Permission::room__read)?;
     auth.require_permission(Permission::room__list)?;
     auth.require_permission(Permission::device__list)?;
@@ -60,7 +60,7 @@ async fn create_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
     room_name: web::Path<String>,
-) -> Result<Json<Option<RoomDto>>> {
+) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__write)?;
     let name = room_name.0;
     let color = "FFFFFF".to_string();
@@ -76,7 +76,7 @@ async fn update_room(
     auth: AuthToken,
     room_name: web::Path<String>,
     room: Json<RoomDto>,
-) -> Result<Json<Option<RoomDto>>> {
+) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__write)?;
     room.validate().or_else(|_| {
         error::ResponseError {
@@ -86,27 +86,32 @@ async fn update_room(
         .fail()
     })?;
 
-    let find_room = room_service::find_by_name(room_name.0, pool.get_ref()).await?;
+    let find_room = room_service::find_by_name(room_name.0, pool.get_ref())
+        .await
+        .or_else(|_| {
+            error::ResponseError {
+                status: StatusCode::BAD_REQUEST,
+                message: None,
+            }
+            .fail()
+        })?;
 
-    if find_room.is_none() {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()?
-    }
+    room_service::update(&find_room, pool.get_ref()).await?;
 
-    let room = find_room.clone().unwrap();
-    room_service::update(&room, pool.get_ref()).await?;
-
-    Ok(Json(find_room.map(RoomDto::from)))
+    Ok(Json(RoomDto::from(find_room)))
 }
 
 #[api_v2_operation]
 async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, name: web::Path<String>) -> Result<HttpResponse> {
     auth.require_permission(Permission::room__delete)?;
 
-    let find_room = room_service::find_by_name(name.0, &pool).await?;
+    let find_room = room_service::find_by_name(name.0, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: None,
+        }
+        .fail()
+    })?;
 
     room_service::delete_room(find_room.unwrap().name, &pool).await?;
     Ok(HttpResponse::NoContent().finish())

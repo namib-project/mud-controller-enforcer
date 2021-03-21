@@ -7,3 +7,5 @@ pub mod role_service;
 pub mod room_service;
 pub mod user_config_service;
 pub mod user_service;
+
+pub use room_service::*;

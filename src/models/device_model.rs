@@ -1,7 +1,6 @@
 use crate::models::{mud_models::MudData, Room};
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
-use sqlx::{pool::PoolConnection, Pool};
 use std::net::IpAddr;
 
 #[derive(Debug, Clone)]

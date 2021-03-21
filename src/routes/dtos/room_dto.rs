@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use crate::models::{Device, MudData, Room};
+use crate::models::Room;
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema, PartialEq)]

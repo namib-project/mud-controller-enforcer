@@ -1,7 +1,7 @@
 use crate::{
     db::DbConnection,
-    error::{Error, Result},
-    models::{Device, DeviceDbo, Room},
+    error::Result,
+    models::{Device, Room},
     services::device_service::get_all_devices,
 };
 pub use futures::TryStreamExt;
@@ -13,21 +13,6 @@ pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
 
     Ok(room_data)
 }
-/*
-pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let rooms: Vec<_> = sqlx::query!("SELECT room_id, name, color FROM rooms")
-        .fetch_all(pool)
-        .await?;
-
-    Ok(rooms
-        .into_iter()
-        .map(|r| Room {
-            room_id: r.room_id,
-            name: r.name,
-            color: r.color,
-        })
-        .collect())
-}*/
 
 ///returns room by id from the database
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
@@ -39,25 +24,12 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
 }
 
 ///returns room by name from the database
-pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Option<Room>> {
+pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Room> {
     let room = sqlx::query_as!(Room, "SELECT room_id, name, color FROM rooms WHERE name= ?", name)
         .fetch_one(pool)
         .await?;
 
-    Ok(Some(room))
-}
-
-/*pub fn find_by_optional_id(id: Option<i64>, pool: &DbConnection) -> Result<Option<Room>> {
-    match id {
-        Some(room) => Ok(Some(find_by_id(room, pool))),
-        None => Ok(None)
-    }
-}*/
-
-pub fn convert_devicedbo_and_room_to_device(device: DeviceDbo, room: Room) -> Device {
-    let mut device_with_room = Device::from(device);
-    device_with_room.room = Some(room);
-    device_with_room
+    Ok(room)
 }
 
 ///updates a room with a new name and color in the database
