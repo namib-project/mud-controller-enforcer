@@ -7,6 +7,7 @@ use crate::{
 pub use futures::TryStreamExt;
 use sqlx::Done;
 
+///returns all rooms from the database
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
     let room_data = sqlx::query_as!(Room, "select * from rooms").fetch_all(pool).await?;
 
@@ -28,6 +29,7 @@ pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
         .collect())
 }*/
 
+///returns room by id from the database
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
     let room = sqlx::query_as!(Room, "select * from rooms where room_id = ?", id)
         .fetch_one(pool)
@@ -36,6 +38,7 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
     Ok(room)
 }
 
+///returns room by name from the database
 pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Option<Room>> {
     let room = sqlx::query_as!(Room, "SELECT room_id, name, color FROM rooms WHERE name= ?", name)
         .fetch_one(pool)
@@ -57,6 +60,7 @@ pub fn convert_devicedbo_and_room_to_device(device: DeviceDbo, room: Room) -> De
     device_with_room
 }
 
+///updates a room with a new name and color in the database
 pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
     let upd_count = sqlx::query!(
         "update rooms set name = ?, color = ? where room_id = ?",
@@ -70,6 +74,7 @@ pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
     Ok(upd_count.rows_affected())
 }
 
+///returns all devices that are associated with a given room from the database
 pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> Result<Vec<Device>> {
     let devices = get_all_devices(pool).await?;
 
@@ -80,6 +85,7 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
         .collect())
 }
 
+///Creates a new room with a given name and color in the database
 pub async fn insert_room(name: String, color: String, pool: &DbConnection) -> Result<u64> {
     let insert = sqlx::query!("insert into rooms (name, color) values (?, ?)", name, color,)
         .execute(pool)
@@ -88,6 +94,7 @@ pub async fn insert_room(name: String, color: String, pool: &DbConnection) -> Re
     Ok(insert.rows_affected())
 }
 
+///Deletes a room with a given name from database
 pub async fn delete_room(name: String, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("delete from rooms where name = ?", name)
         .execute(pool)
