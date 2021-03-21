@@ -115,6 +115,27 @@ pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
     Ok(upd_count.rows_affected())
 }
 
+pub async fn update_basic(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
+    let upd_count = sqlx::query!("update users set username = ? where id = ?", user.username, id)
+        .execute(conn)
+        .await?;
+
+    Ok(upd_count.rows_affected())
+}
+
+pub async fn update_password(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
+    let upd_count = sqlx::query!(
+        "update users set password = ?, salt = ? where id = ?",
+        user.password,
+        user.salt,
+        id
+    )
+    .execute(conn)
+    .await?;
+
+    Ok(upd_count.rows_affected())
+}
+
 pub async fn delete(id: i64, conn: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("delete from users where id = ?", id).execute(conn).await?;
 

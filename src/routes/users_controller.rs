@@ -167,7 +167,7 @@ pub fn update_password(
 
     user.password = User::hash_password(&update_password_dto.new_password, &user.salt)?;
 
-    user_service::update(user.id, &user, pool.get_ref()).await?;
+    user_service::update_password(user.id, &user, pool.get_ref()).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
