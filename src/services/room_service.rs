@@ -8,8 +8,7 @@ pub use futures::TryStreamExt;
 use sqlx::Done;
 
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let room_data = sqlx::query_as!(Room, "select * from rooms")
-        .fetch_all(pool).await?;
+    let room_data = sqlx::query_as!(Room, "select * from rooms").fetch_all(pool).await?;
 
     Ok(room_data)
 }
@@ -65,8 +64,8 @@ pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
         room.color,
         room.room_id
     )
-        .execute(pool)
-        .await?;
+    .execute(pool)
+    .await?;
 
     Ok(upd_count.rows_affected())
 }
@@ -89,8 +88,8 @@ pub async fn insert_room(name: String, color: String, pool: &DbConnection) -> Re
     Ok(insert.rows_affected())
 }
 
-pub async fn delete_room(id: i64, pool: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("delete from rooms where room_id = ?", id)
+pub async fn delete_room(name: String, pool: &DbConnection) -> Result<u64> {
+    let del_count = sqlx::query!("delete from rooms where name = ?", name)
         .execute(pool)
         .await?;
 

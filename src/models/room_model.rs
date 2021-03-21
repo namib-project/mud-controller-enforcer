@@ -1,6 +1,6 @@
 use paperclip::actix::Apiv2Schema;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Apiv2Schema, PartialEq)]
 pub struct Room {
     pub room_id: i64,
     pub name: String,

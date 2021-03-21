@@ -117,6 +117,7 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
         device_data.collect_info,
         device_data.last_interaction,
         device_data.clipart,
+        //device_data.room.as_ref().unwrap().room_id,
         device_data.id,
     )
     .execute(pool)
