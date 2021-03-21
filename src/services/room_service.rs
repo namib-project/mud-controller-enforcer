@@ -58,8 +58,8 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 }
 
 ///Creates a new room with a given name and color in the database
-pub async fn insert_room(name: String, color: String, pool: &DbConnection) -> Result<u64> {
-    let insert = sqlx::query!("insert into rooms (name, color) values (?, ?)", name, color,)
+pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
+    let insert = sqlx::query!("insert into rooms (name, color) values (?, ?)", room.name, room.color,)
         .execute(pool)
         .await?;
 

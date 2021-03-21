@@ -4,7 +4,7 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    routes::dtos::{DeviceDto, RoomDto},
+    routes::dtos::{DeviceDto, RoomCreationUpdateDto, RoomDto},
     services::{role_service::permission::Permission, room_service},
 };
 use actix_web::http::StatusCode;
@@ -19,7 +19,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{name}", web::get().to(get_room));
     cfg.route("/{id}/devices", web::get().to(get_all_devices_inside_room));
     cfg.route("/{name}", web::post().to(create_room));
-    cfg.route("/{name}", web::put().to(update_room));
+    cfg.route("", web::put().to(update_room));
     cfg.route("/{name}", web::delete().to(delete_room));
 }
 
@@ -59,13 +59,20 @@ async fn get_all_devices_inside_room(
 async fn create_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
-    room_name: web::Path<String>,
+    room_creation_update_dto: Json<RoomCreationUpdateDto>,
 ) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__write)?;
-    let name = room_name.0;
-    let color = "FFFFFF".to_string();
-    room_service::insert_room(name.clone(), color, pool.get_ref()).await?;
-    let res = room_service::find_by_name(name, pool.get_ref()).await?;
+
+    room_creation_update_dto.validate().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    room_service::insert_room(&room_creation_update_dto.to_room(0)?, pool.get_ref()).await?;
+    let res = room_service::find_by_name(room_creation_update_dto.name.to_owned(), pool.get_ref()).await?;
 
     Ok(Json(RoomDto::from(res)))
 }
@@ -74,11 +81,11 @@ async fn create_room(
 async fn update_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
-    room_name: web::Path<String>,
-    room: Json<RoomDto>,
+    room_creation_update_dto: Json<RoomCreationUpdateDto>,
 ) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__write)?;
-    room.validate().or_else(|_| {
+
+    room_creation_update_dto.validate().or_else(|_| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: None,
@@ -86,17 +93,9 @@ async fn update_room(
         .fail()
     })?;
 
-    let find_room = room_service::find_by_name(room_name.0, pool.get_ref())
-        .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::BAD_REQUEST,
-                message: None,
-            }
-            .fail()
-        })?;
+    let find_room = room_service::find_by_name(room_creation_update_dto.name.clone(), pool.get_ref()).await?;
 
-    room_service::update(&find_room, pool.get_ref()).await?;
+    room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, pool.get_ref()).await?;
 
     Ok(Json(RoomDto::from(find_room)))
 }
