@@ -14,7 +14,7 @@ use crate::{
 
 use crate::{
     models::User,
-    routes::dtos::{MgmCreateUserDto, MgmUserDto, RoleDto, MgmRoleInfoDto, MgmUpdateUserBasicDto},
+    routes::dtos::{MgmCreateUserDto, MgmRoleInfoDto, MgmUpdateUserBasicDto, MgmUserDto, RoleDto},
     services::user_service,
 };
 use actix_web::HttpResponse;
