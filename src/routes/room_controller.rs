@@ -2,7 +2,13 @@
 
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
-use crate::{auth::AuthToken, db::DbConnection, error::Result, routes::dtos::DeviceDto, services::room_service};
+use crate::{
+    auth::AuthToken,
+    db::DbConnection,
+    error::Result,
+    routes::dtos::{DeviceDto, RoomDto},
+    services::room_service,
+};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_rooms));
