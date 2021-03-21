@@ -1,8 +1,7 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{Device, Room},
-    services::device_service::get_all_devices,
+    models::{Device, DeviceDbo, Room},
 };
 pub use futures::TryStreamExt;
 use sqlx::Done;
@@ -48,12 +47,15 @@ pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
 
 ///returns all devices that are associated with a given room from the database
 pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> Result<Vec<Device>> {
-    let devices = get_all_devices(pool).await?;
+    let room = find_by_id(room_id, pool).await?;
 
-    Ok(devices
+    let device_dbo: Vec<DeviceDbo> = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE room_id = ?", room_id,)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(device_dbo
         .into_iter()
-        .filter(|d| d.room.is_some())
-        .filter(|d| d.room.as_ref().unwrap().room_id == room_id)
+        .map(|d| Device::from_dbo(d, Some(room.clone())))
         .collect())
 }
 
