@@ -13,7 +13,7 @@ pub struct RoomDto {
 impl From<Room> for RoomDto {
     fn from(room: Room) -> Self {
         RoomDto {
-            id: r.room_id,
+            id: room.room_id,
             name: room.name,
             color: room.color,
         }

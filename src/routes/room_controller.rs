@@ -15,7 +15,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 }
 
 #[api_v2_operation]
-async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<DeviceDto>>> {
+async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoomDto>>> {
     auth.require_permission("room/list")?;
     let res = room_service::get_all_rooms(pool.get_ref()).await?;
     info!("{:?}", res);
