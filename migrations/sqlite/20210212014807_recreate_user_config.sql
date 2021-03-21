@@ -1,5 +1,5 @@
 -- Your SQL goes here
-DROP TABLE  user_configs;
+ALTER TABLE user_configs RENAME TO _old_user_configs;
 
 CREATE TABLE user_configs
 (
@@ -9,4 +9,10 @@ CREATE TABLE user_configs
     PRIMARY KEY (key, user_id),
     FOREIGN KEY (user_id) REFERENCES users (id)
         ON DELETE CASCADE ON UPDATE NO ACTION
-)
+);
+
+INSERT INTO user_configs (key, user_id, value)
+    SELECT key, user_id, value
+    FROM _old_user_configs;
+
+DROP TABLE _old_user_configs;

@@ -4,6 +4,7 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{RoleDbo, User, UserDbo},
+    services::role_service::role_service,
 };
 
 // Database methods
@@ -78,8 +79,8 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     })
 }
 
-pub async fn insert(user: User, conn: &DbConnection) -> Result<u64> {
-    let ins_count = sqlx::query!(
+pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
+    let result = sqlx::query!(
         "insert into users (username, password, salt) values (?, ?, ?)",
         user.username,
         user.password,
@@ -88,7 +89,16 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<u64> {
     .execute(conn)
     .await?;
 
-    Ok(ins_count.rows_affected())
+    let user_count = sqlx::query!("select count(*) as count from users")
+        .fetch_one(conn)
+        .await?
+        .count;
+
+    if user_count == 1 {
+        role_service::role_add_to_user(conn, result.last_insert_rowid(), role_service::ROLE_ID_ADMIN).await?;
+    }
+
+    Ok(result.last_insert_rowid())
 }
 
 pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {

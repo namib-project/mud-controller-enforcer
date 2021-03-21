@@ -14,6 +14,7 @@ pub struct DeviceDbo {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
+    pub clipart: Option<String>,
     pub room_id: Option<i64>,
 }
 
@@ -28,6 +29,7 @@ pub struct Device {
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
+    pub clipart: Option<String>,
     pub room: Option<Room>,
 }
 
@@ -45,6 +47,7 @@ impl From<DeviceDbo> for Device {
             collect_info: device.collect_info,
             last_interaction: device.last_interaction,
             mud_data: None,
+            clipart: device.clipart,
             room: None,
         }
     }
@@ -62,6 +65,7 @@ impl From<DhcpLeaseInformation> for Device {
             collect_info: false,
             last_interaction: Local::now().naive_local(),
             mud_data: None,
+            clipart: None,
             room: None,
         }
     }
