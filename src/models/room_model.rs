@@ -1,4 +1,3 @@
-use palette::Srgb;
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Apiv2Schema)]

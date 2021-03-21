@@ -13,8 +13,8 @@ pub struct DeviceDto {
     pub vendor_class: String,
     pub mud_url: Option<String>,
     pub last_interaction: NaiveDateTime,
-    pub room_id: Option<Room>,
     pub mud_data: Option<MudData>,
+    pub room: Option<Room>,
 }
 
 impl From<Device> for DeviceDto {
@@ -27,8 +27,8 @@ impl From<Device> for DeviceDto {
             vendor_class: d.vendor_class,
             mud_url: d.mud_url,
             last_interaction: d.last_interaction,
-            room_id: d.room,
             mud_data: d.mud_data,
+            room: d.room,
         }
     }
 }
