@@ -3,16 +3,16 @@
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
-pub struct UserDto {
+pub struct MgmUserDto {
     pub user_id: i64,
     #[validate(length(min = 1, max = 128))]
     pub username: String,
-    pub roles: Vec<RoleInfoDto>,
+    pub roles: Vec<MgmRoleInfoDto>,
     pub permissions: Vec<String>,
 }
 
 #[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
-pub struct CreateUserDto {
+pub struct MgmCreateUserDto {
     #[validate(length(min = 1, max = 128))]
     pub username: String,
     #[validate(length(min = 6))]
@@ -21,7 +21,7 @@ pub struct CreateUserDto {
 }
 
 #[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
-pub struct UpdateUserBasicDto {
+pub struct MgmUpdateUserBasicDto {
     #[validate(length(min = 1, max = 128))]
     pub username: String,
     pub password: String,
@@ -29,7 +29,7 @@ pub struct UpdateUserBasicDto {
 }
 
 #[derive(Validate, Serialize, Deserialize, Apiv2Schema, Debug, Clone)]
-pub struct RoleInfoDto {
+pub struct MgmRoleInfoDto {
     pub id: i64,
     pub name: String,
 }
