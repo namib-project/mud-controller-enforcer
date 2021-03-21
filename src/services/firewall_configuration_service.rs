@@ -287,6 +287,7 @@ mod tests {
             mud_data: Some(mud_data),
             last_interaction: Utc::now().naive_local(),
             collect_info: false,
+            room: None,
             clipart: None,
         };
 
@@ -369,6 +370,7 @@ mod tests {
             collect_info: true,
             mud_data: Some(mud_data),
             last_interaction: Utc::now().naive_local(),
+            room: None,
             clipart: None,
         };
 

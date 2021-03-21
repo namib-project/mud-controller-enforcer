@@ -136,7 +136,7 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
     }
 
     let upd_count = sqlx::query!(
-        "update devices set ip_addr = ?, mac_addr = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ?, clipart = ?, room_id = ? where id = ?",
+        "update devices set ip_addr = ?, mac_addr = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ?, room_id = ?, clipart = ? where id = ?",
         ip_addr,
         mac_addr,
         device_data.hostname,
