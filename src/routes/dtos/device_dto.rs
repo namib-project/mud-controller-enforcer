@@ -70,6 +70,7 @@ impl DeviceCreationUpdateDto {
             last_interaction: Local::now().naive_local(),
             mud_data: None,
             clipart: self.clipart.clone(),
+            room: None,
         })
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     db::DbConnection,
     error::Result,
     routes::dtos::{DeviceDto, RoomDto},
-    services::room_service,
+    services::{role_service::permission::Permission, room_service},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -16,7 +16,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 
 #[api_v2_operation]
 async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoomDto>>> {
-    auth.require_permission("room/list")?;
+    auth.require_permission(Permission::room__list)?;
     let res = room_service::get_all_rooms(pool.get_ref()).await?;
     info!("{:?}", res);
     Ok(Json(res.into_iter().map(RoomDto::from).collect()))
