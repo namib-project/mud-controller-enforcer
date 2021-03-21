@@ -32,8 +32,8 @@ pub struct Device {
     pub room: Option<Room>,
 }
 
-impl From<DeviceDbo> for Device {
-    fn from(device: DeviceDbo) -> Device {
+impl Device {
+    pub(crate) fn from_dbo(device: DeviceDbo, room: Option<Room>) -> Device {
         Device {
             id: device.id,
             ip_addr: device.ip_addr.parse::<std::net::IpAddr>().expect("Is valid ip addr"),
@@ -47,7 +47,7 @@ impl From<DeviceDbo> for Device {
             last_interaction: device.last_interaction,
             mud_data: None,
             clipart: device.clipart,
-            room: None,
+            room,
         }
     }
 }

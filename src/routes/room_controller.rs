@@ -67,7 +67,7 @@ async fn create_room(
     room_service::insert_room(name.clone(), color, pool.get_ref()).await?;
     let res = room_service::find_by_name(name, pool.get_ref()).await?;
 
-    Ok(Json(res.map(RoomDto::from)))
+    Ok(Json(RoomDto::from(res)))
 }
 
 #[api_v2_operation]
@@ -113,6 +113,6 @@ async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, name: web::
         .fail()
     })?;
 
-    room_service::delete_room(find_room.unwrap().name, &pool).await?;
+    room_service::delete_room(find_room.name, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
 }
