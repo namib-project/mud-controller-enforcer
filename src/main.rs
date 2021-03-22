@@ -45,6 +45,9 @@ async fn main() -> Result<()> {
             .allowed_origin_fn(|origin, _req_head| {
                 origin.as_bytes().starts_with(b"https://localhost:")
                     || origin.as_bytes().starts_with(b"http://localhost:")
+                    || origin
+                        .as_bytes()
+                        .starts_with(format!("https://{}", *acme_service::DOMAIN).as_bytes())
             })
             .allow_any_method()
             .allow_any_header()
@@ -62,12 +65,10 @@ async fn main() -> Result<()> {
 
                 // Setup optional reverse-proxy measures and strip the port from the IP
                 // Will be changed in v0.4, more info: https://github.com/TerminalWitchcraft/actix-ratelimit/issues/15
-                let ip = match env::var("RATELIMITER_BEHIND_REVERSE_PROXY")
-                    .unwrap_or("false".to_string())
-                    .as_str()
-                {
-                    "true" => connection_info.realip_remote_addr(),
-                    _ => connection_info.remote_addr(),
+                let ip = if env::var("RATELIMITER_BEHIND_REVERSE_PROXY").as_deref() == Ok("true") {
+                    connection_info.realip_remote_addr()
+                } else {
+                    connection_info.remote_addr()
                 }
                 .ok_or(ARError::IdentificationError)?;
 
