@@ -18,6 +18,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
     let update = if let Ok(device) = find_by_ip(dhcp_device_data.ip_addr, pool).await {
         dhcp_device_data.id = device.id;
         dhcp_device_data.collect_info = device.collect_info;
+        dhcp_device_data.room = Some(room_service::find_by_id(dhcp_device_data.id, pool).await?);
         true
     } else {
         dhcp_device_data.collect_info = dhcp_device_data.mud_url.is_none()
