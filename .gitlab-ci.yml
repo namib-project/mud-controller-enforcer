@@ -88,6 +88,8 @@ build-release:
   script:
     - cargo install --root ./install --path .
     - apt-get install git-secret -y
+    # download namib frontend
+    - ./scripts/download_namib_frontend.sh
     # decrypt ca secret
     - gpg --import $GPG_PRIVATE_KEY
     - cd ..
@@ -96,8 +98,6 @@ build-release:
     - git secret reveal
     - cd certs
     - ./gen_server_cert.sh namib-ca
-    # download namib frontend
-    - ./scripts/download_namib_frontend.sh
   artifacts:
     paths:
       - install/bin
