@@ -7,6 +7,7 @@ use tarpc::{
     rpc::server::{BaseChannel, Channel, Handler},
     server,
 };
+use tokio_compat_02::FutureExt;
 
 use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::RPC};
 
@@ -38,6 +39,7 @@ impl RPC for RPCServer {
         if Some(&current_config_version) != version.as_ref() {
             debug!("Client has outdated version. Starting update...");
             let devices = device_service::get_all_devices(&self.db_connection)
+                .compat()
                 .await
                 .unwrap_or_default();
             let new_config = firewall_configuration_service::create_configuration(current_config_version, devices);
@@ -69,7 +71,7 @@ impl RPC for RPCServer {
             self.client_id,
             logs.len(),
         );
-        log_service::add_new_logs(self.client_id, logs).await
+        log_service::add_new_logs(self.client_id, logs, &self.db_connection).await
     }
 }
 

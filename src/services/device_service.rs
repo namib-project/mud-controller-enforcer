@@ -4,7 +4,7 @@ use crate::{
     models::{Device, DeviceDbo},
     services::{
         config_service, config_service::ConfigKeys, firewall_configuration_service, mud_service,
-        mud_service::get_or_fetch_mud,
+        mud_service::get_or_fetch_mud, neo4jthings_service,
     },
 };
 pub use futures::TryStreamExt;
@@ -100,6 +100,11 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
     )
     .execute(pool)
     .await?;
+
+    if device_data.collect_info {
+        // add the device in the background as it may take some time
+        tokio::spawn(neo4jthings_service::add_device(device_data.clone()));
+    }
 
     Ok(ins_count.rows_affected())
 }
