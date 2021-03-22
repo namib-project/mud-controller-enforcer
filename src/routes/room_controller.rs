@@ -16,11 +16,11 @@ use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_rooms));
-    cfg.route("/{name}", web::get().to(get_room));
+    cfg.route("/{id}", web::get().to(get_room));
     cfg.route("/{id}/devices", web::get().to(get_all_devices_inside_room));
-    cfg.route("/{name}", web::post().to(create_room));
+    cfg.route("", web::post().to(create_room));
     cfg.route("", web::put().to(update_room));
-    cfg.route("/{name}", web::delete().to(delete_room));
+    cfg.route("/{id}", web::delete().to(delete_room));
 }
 
 #[api_v2_operation]
@@ -33,9 +33,9 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
 }
 
 #[api_v2_operation]
-async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, name: web::Path<String>) -> Result<Json<RoomDto>> {
+async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__read)?;
-    let res = room_service::find_by_name(name.0, pool.get_ref()).await?;
+    let res = room_service::find_by_id(id.0, pool.get_ref()).await?;
     info!("{:?}", res);
     Ok(Json(RoomDto::from(res)))
 }
@@ -101,10 +101,10 @@ async fn update_room(
 }
 
 #[api_v2_operation]
-async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, name: web::Path<String>) -> Result<HttpResponse> {
+async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<HttpResponse> {
     auth.require_permission(Permission::room__delete)?;
 
-    let find_room = room_service::find_by_name(name.0, &pool).await.or_else(|_| {
+    let find_room = room_service::find_by_id(id.0, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: None,
