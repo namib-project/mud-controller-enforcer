@@ -141,4 +141,11 @@ impl DhcpLeaseInformation {
             DhcpLeaseVersionSpecificInformation::V6(info) => info.ip_addr.into(),
         }
     }
+
+    pub fn duid(&self) -> Option<&Duid> {
+        match &self.version_specific_information {
+            DhcpLeaseVersionSpecificInformation::V6(info) => Some(&info.duid),
+            _ => None,
+        }
+    }
 }
