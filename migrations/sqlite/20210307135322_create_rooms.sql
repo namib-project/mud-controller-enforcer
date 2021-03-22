@@ -3,9 +3,8 @@ CREATE TABLE rooms (
    room_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
    name varchar(50) NOT NULL UNIQUE,
    color varchar(6) NOT NULL
-)
+);
 
-
-
-
-
+ALTER TABLE devices ADD room_id INTEGER
+    REFERENCES rooms (room_id)
+    ON DELETE SET NULL ON UPDATE NO ACTION;
