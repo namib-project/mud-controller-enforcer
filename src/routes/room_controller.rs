@@ -28,7 +28,7 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
     auth.require_permission(Permission::room__list)?;
     auth.require_permission(Permission::room__read)?;
     let res = room_service::get_all_rooms(pool.get_ref()).await?;
-    info!("{:?}", res);
+    debug!("{:?}", res);
     Ok(Json(res.into_iter().map(RoomDto::from).collect()))
 }
 
@@ -36,7 +36,7 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
 async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__read)?;
     let res = room_service::find_by_id(id.0, pool.get_ref()).await?;
-    info!("{:?}", res);
+    debug!("{:?}", res);
     Ok(Json(RoomDto::from(res)))
 }
 
@@ -51,7 +51,7 @@ async fn get_all_devices_inside_room(
     auth.require_permission(Permission::device__list)?;
     auth.require_permission(Permission::device__read)?;
     let res = room_service::get_all_devices_inside_room(id.0, pool.get_ref()).await?;
-    info!("{:?}", res);
+    debug!("{:?}", res);
     Ok(Json(res.into_iter().map(DeviceDto::from).collect()))
 }
 
@@ -73,7 +73,7 @@ async fn create_room(
 
     room_service::insert_room(&room_creation_update_dto.to_room(0)?, pool.get_ref()).await?;
     let res = room_service::find_by_name(room_creation_update_dto.name.to_owned(), pool.get_ref()).await?;
-
+    debug!("{:?}", res);
     Ok(Json(RoomDto::from(res)))
 }
 
@@ -96,7 +96,7 @@ async fn update_room(
     let find_room = room_service::find_by_name(room_creation_update_dto.name.clone(), pool.get_ref()).await?;
 
     room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, pool.get_ref()).await?;
-
+    debug!("{:?}", find_room);
     Ok(Json(RoomDto::from(find_room)))
 }
 
