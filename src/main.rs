@@ -41,8 +41,8 @@ impl Enforcer {
     }
 }
 
-/// Persists a given enforcer configuration to the filesystem at the location specified by the NAMIB_CONFIG_STATE_FILE
-/// environment variable (or DEFAULT_CONFIG_STATE_FILE if the environment variable is not set).
+/// Persists a given enforcer configuration to the filesystem at the location specified by the `NAMIB_CONFIG_STATE_FILE`
+/// environment variable (or `DEFAULT_CONFIG_STATE_FILE` if the environment variable is not set).
 async fn persist_config(config: &EnforcerConfig) {
     let config_state_path = env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or(String::from(DEFAULT_CONFIG_STATE_FILE));
     let config_state_path = Path::new(config_state_path.as_str());
@@ -53,16 +53,15 @@ async fn persist_config(config: &EnforcerConfig) {
     };
     match serde_json::to_vec(&config) {
         Ok(serialised_bytes) => {
-            fs::write(config_state_path.clone(), serialised_bytes)
-                .await
-                .and_then(|_| {
+            fs::write(config_state_path, serialised_bytes).await.map_or_else(
+                |e| warn!("Error while persisting config state: {:?}", e),
+                |_| {
                     debug!(
                         "Persisted configuration at path \"{}\"",
                         config_state_path.to_string_lossy()
                     );
-                    Ok(())
-                })
-                .unwrap_or_else(|e| warn!("Error while persisting config state: {:?}", e));
+                },
+            );
         },
         Err(e) => {
             warn!("Error while serialising config state: {:?}", e);
@@ -90,7 +89,8 @@ async fn main() -> Result<()> {
 
     // Attempt to read last persisted enforcer state.
     info!("Reading last saved enforcer state");
-    let config_state_path = env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or(String::from(DEFAULT_CONFIG_STATE_FILE));
+    let config_state_path =
+        env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or_else(|_| DEFAULT_CONFIG_STATE_FILE.to_string());
     let config: Option<EnforcerConfig> = match fs::read(config_state_path)
         .await
         .map(|state_bytes| serde_json::from_slice(state_bytes.as_slice()))
@@ -110,23 +110,20 @@ async fn main() -> Result<()> {
 
     // Restore enforcer config if persisted file could be restored, otherwise wait for the enforcer
     // to provide an initial configuration.
-    let config = match config {
-        Some(v) => {
-            info!("Successfully restored last persisted config");
-            v
-        },
-        None => {
-            info!("Retrieving initial config from NAMIB Controller");
-            let init_config = client
-                .heartbeat(current_rpc_context(), None)
-                .await?
-                .expect("no initial config sent from controller");
-            persist_config(&init_config).await;
-            info!("Successfully retrieved initial configuration from NAMIB controller");
-            init_config
-        },
+    let config = if let Some(config) = config {
+        info!("Successfully restored last persisted config");
+        config
+    } else {
+        info!("Retrieving initial config from NAMIB Controller");
+        let config = client
+            .heartbeat(current_rpc_context(), None)
+            .await?
+            .expect("no initial config sent from controller");
+        persist_config(&config).await;
+        info!("Successfully retrieved initial configuration from NAMIB controller");
+        config
     };
-    apply_secure_name_config(&config.secure_name(), addr.clone())?;
+    apply_secure_name_config(&config.secure_name(), addr)?;
 
     let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config, addr }));
 
