@@ -11,8 +11,11 @@ use paperclip::actix::Apiv2Schema;
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceDto {
     pub id: i64,
-    pub ip_addr: String,
+    pub name: Option<String>,
+    pub ipv4_addr: Option<String>,
+    pub ipv6_addr: Option<String>,
     pub mac_addr: Option<String>,
+    pub duid: Option<String>,
     pub hostname: String,
     pub vendor_class: String,
     pub mud_url: Option<String>,
@@ -25,8 +28,11 @@ impl From<Device> for DeviceDto {
     fn from(d: Device) -> Self {
         DeviceDto {
             id: d.id,
-            ip_addr: d.ip_addr.to_string(),
+            name: d.name,
+            ipv4_addr: d.ipv4_addr.map(|ip| ip.to_string()),
+            ipv6_addr: d.ipv6_addr.map(|ip| ip.to_string()),
             mac_addr: d.mac_addr.map(|m| m.to_string()),
+            duid: d.duid,
             hostname: d.hostname,
             vendor_class: d.vendor_class,
             mud_url: d.mud_url,
@@ -39,8 +45,11 @@ impl From<Device> for DeviceDto {
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceCreationUpdateDto {
-    pub ip_addr: String,
+    pub name: Option<String>,
+    pub ipv4_addr: Option<String>,
+    pub ipv6_addr: Option<String>,
     pub mac_addr: Option<String>,
+    pub duid: Option<String>,
     pub hostname: Option<String>,
     pub vendor_class: Option<String>,
     pub mud_url: Option<String>,
@@ -51,28 +60,7 @@ pub struct DeviceCreationUpdateDto {
 }
 
 impl DeviceCreationUpdateDto {
-    pub fn into_device(self, collect_info: bool) -> Result<Device> {
-        let mac_addr = match self.mac_addr {
-            None => None,
-            Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
-        };
-        let ip_addr = self.ip_addr.parse::<std::net::IpAddr>()?;
-
-        Ok(Device {
-            id: 0,
-            mac_addr,
-            ip_addr,
-            hostname: self.hostname.unwrap_or_else(|| "".to_string()),
-            vendor_class: self.vendor_class.unwrap_or_else(|| "".to_string()),
-            mud_url: self.mud_url,
-            collect_info,
-            last_interaction: Utc::now().naive_local(),
-            mud_data: None,
-            clipart: self.clipart.clone(),
-        })
-    }
-
-    pub fn merge(self, mut device: Device) -> Result<Device> {
+    pub fn apply_to(self, device: &mut Device) {
         if self.mud_url.is_some() {
             device.mud_url = self.mud_url;
             device.mud_data = None;
@@ -83,7 +71,29 @@ impl DeviceCreationUpdateDto {
         if let Some(vendor_class) = self.vendor_class {
             device.vendor_class = vendor_class;
         }
-        Ok(device)
+    }
+}
+
+impl Into<Device> for DeviceCreationUpdateDto {
+    fn into(self) -> Device {
+        Device {
+            id: 0,
+            name: self.name,
+            ipv4_addr: self.ipv4_addr.and_then(|ip| ip.parse().ok()),
+            ipv6_addr: self.ipv6_addr.and_then(|ip| ip.parse().ok()),
+            mac_addr: self
+                .mac_addr
+                .and_then(|m| m.parse::<mac::MacAddr>().ok())
+                .map(|m| m.into()),
+            duid: self.duid,
+            hostname: self.hostname.unwrap_or_default(),
+            vendor_class: self.vendor_class.unwrap_or_default(),
+            mud_url: self.mud_url,
+            mud_data: None,
+            collect_info: false,
+            last_interaction: Utc::now().naive_local(),
+            clipart: self.clipart.clone(),
+        }
     }
 }
 

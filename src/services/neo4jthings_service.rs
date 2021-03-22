@@ -24,21 +24,22 @@ lazy_static! {
 /// Add a device in the neo4jthings service.
 /// This operation should be run in the background as it is failsafe.
 pub async fn add_device(device: Device) {
-    debug!("adding device to neo4jthings: {}", device.ip_addr);
+    let identifier = device.mac_or_duid();
+    debug!("adding device to neo4jthings: {}", identifier);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_create(
             &*N4JT_CONFIG,
             Thing {
-                serial: device.mac_addr.unwrap().to_string(),
-                mac_addr: device.mac_addr.unwrap().to_string(),
-                ipv4_addr: match device.ip_addr {
-                    IpAddr::V4(addr) => addr.to_string(),
-                    IpAddr::V6(_) => "0.0.0.0".to_string(), // TODO blank not allowed?
-                },
-                ipv6_addr: match device.ip_addr {
-                    IpAddr::V4(addr) => addr.to_ipv6_mapped().to_string(), // TODO blank not allowed?
-                    IpAddr::V6(addr) => addr.to_string(),
-                },
+                serial: device.id.to_string(),
+                mac_addr: identifier.clone(),
+                ipv4_addr: device
+                    .ipv4_addr
+                    .map(|ip| ip.to_string())
+                    .unwrap_or_else(|| "0.0.0.0".to_string()),
+                ipv6_addr: device
+                    .ipv6_addr
+                    .map(|ip| ip.to_string())
+                    .unwrap_or_else((|| "::".to_string())),
                 hostname: device.hostname.to_string(),
             },
         )
@@ -53,21 +54,15 @@ pub async fn add_device(device: Device) {
 /// Add a connection to a device in the neo4jthings service.
 /// This operation should be run in the background as it is failsafe.
 pub async fn add_device_connection(device: Device, connection: String) {
-    debug!(
-        "adding device connection to neo4jthings: {} {}",
-        device.ip_addr, connection
-    );
+    let identifier = device.mac_or_duid();
+    debug!("adding device connection to neo4jthings: {} {}", identifier, connection);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_connections_create(
             &*N4JT_CONFIG,
             &device.mac_addr.unwrap().to_string(), // TODO: duid
             Acl {
                 name: connection.clone(),
-                _type: if device.ip_addr.is_ipv4() {
-                    "4t".to_string()
-                } else {
-                    "6t".to_string()
-                },
+                _type: "4t".to_string(), // TODO 6t ?
                 acl_dns: connection.clone(),
                 port: vec![],
                 direction_initiated: "from-device".to_string(),
@@ -86,7 +81,8 @@ pub async fn add_device_connection(device: Device, connection: String) {
 /// Query the neo4jthings service for possible mud-urls that match a given device.
 /// This operation should be run directly, since we are interested in the results.
 pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
-    let result = mud_api::mud_guess_thing_list(&*N4JT_CONFIG, &device.mac_addr.unwrap().to_string(), None)
+    let identifier = device.mac_or_duid();
+    let result = mud_api::mud_guess_thing_list(&*N4JT_CONFIG, &identifier, None)
         .await
         .or_else(|e| error::Neo4jThingsError { message: e.to_string() }.fail())?;
 
@@ -104,15 +100,15 @@ pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
 
 /// Notify the neo4jthings service that a mud_url was chosen for a given device.
 /// This operation should be run in the background as it is failsafe.
-pub async fn describe_thing(mac_addr: String, mud_url: String) {
-    debug!("describing thing to neo4jthings: {} {}", mac_addr, mud_url);
+pub async fn describe_thing(mac_or_duid: String, mud_url: String) {
+    debug!("describing thing to neo4jthings: {} {}", mac_or_duid, mud_url);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_describe_create(
             &*N4JT_CONFIG,
-            &mac_addr, // TODO: duid
+            &mac_or_duid,
             Description {
                 mud_url: mud_url.clone(),
-                mac_addr: mac_addr.clone(),
+                mac_addr: mac_or_duid.clone(),
             },
         )
         .await?)
