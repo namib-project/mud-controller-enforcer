@@ -848,6 +848,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/MudByManufacturer'
           description: ''
+  /mud/connections:
+    get:
+      operationId: mud_connections_list
+      description: Create or List connections (ACL Relationsships for MUDs)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mud url of the MUD
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedACLList'
+          description: ''
+    post:
+      operationId: mud_connections_create
+      description: Create or List connections (ACL Relationsships for MUDs)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mud url of the MUD
+        required: true
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ACL'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ACL'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ACL'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ACL'
+          description: ''
   /mud/dns:
     get:
       operationId: mud_dns_list

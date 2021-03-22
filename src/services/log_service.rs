@@ -1,7 +1,7 @@
 use crate::{
     db::DbConnection,
     error::{none_error, Result},
-    services::{device_service, neo4jthings_service},
+    services::{acme_service::CertId, device_service, neo4jthings_service},
 };
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 use lazy_static::lazy_static;
@@ -37,7 +37,7 @@ async fn parse_log_line(line: &str, conn: &DbConnection) -> Result<()> {
     Ok(())
 }
 
-pub async fn add_new_logs(_enforcer: String, logs: Vec<String>, conn: &DbConnection) {
+pub async fn add_new_logs(_enforcer: CertId, logs: Vec<String>, conn: &DbConnection) {
     for line in &logs {
         if let Err(e) = parse_log_line(line, conn).await {
             debug!("failed to parse log line: {:?}", e);

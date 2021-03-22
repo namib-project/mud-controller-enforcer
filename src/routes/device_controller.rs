@@ -19,6 +19,7 @@ use paperclip::actix::{
 };
 use std::net::IpAddr;
 use tokio::runtime::Builder;
+use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));
@@ -55,6 +56,14 @@ async fn create_device(
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
 
+    device_creation_update_dto.validate().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
     let collect_info = device_creation_update_dto.mud_url.is_none()
         && config_service::get_config_value(ConfigKeys::CollectDeviceData.as_ref(), &pool)
             .await
@@ -75,6 +84,14 @@ async fn update_device(
     device_creation_update_dto: Json<DeviceCreationUpdateDto>,
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
+
+    device_creation_update_dto.validate().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
 
     let existing_device = find_device(&ip, &pool).await?;
 

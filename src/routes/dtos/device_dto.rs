@@ -18,6 +18,7 @@ pub struct DeviceDto {
     pub mud_url: Option<String>,
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
+    pub clipart: Option<String>,
 }
 
 impl From<Device> for DeviceDto {
@@ -31,11 +32,12 @@ impl From<Device> for DeviceDto {
             mud_url: d.mud_url,
             last_interaction: d.last_interaction,
             mud_data: d.mud_data,
+            clipart: d.clipart,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceCreationUpdateDto {
     pub ip_addr: String,
     pub mac_addr: Option<String>,
@@ -44,6 +46,8 @@ pub struct DeviceCreationUpdateDto {
     pub mud_url: Option<String>,
     pub mud_url_from_guess: Option<bool>,
     pub last_interaction: Option<NaiveDateTime>,
+    #[validate(length(max = 512))]
+    pub clipart: Option<String>,
 }
 
 impl DeviceCreationUpdateDto {
@@ -64,6 +68,7 @@ impl DeviceCreationUpdateDto {
             collect_info,
             last_interaction: Utc::now().naive_local(),
             mud_data: None,
+            clipart: self.clipart.clone(),
         })
     }
 

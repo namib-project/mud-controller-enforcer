@@ -9,19 +9,24 @@
     clippy::redundant_else,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::must_use_candidate
+    clippy::must_use_candidate,
+    clippy::missing_panics_doc
 )]
-
-use std::{env, thread, time::Duration};
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
 use namib_mud_controller::{
-    db, error::Result, routes, rpc, services::mud_service::mud_profile_service::job_update_outdated_profiles, VERSION,
+    db,
+    error::Result,
+    routes,
+    rpc::rpc_server,
+    services::{acme_service, job_service},
+    VERSION,
 };
 use paperclip::actix::{web, OpenApiExt};
+use std::{env, time::Duration};
 
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -31,31 +36,19 @@ async fn main() -> Result<()> {
     log::info!("Starting mud_controller {}", VERSION);
 
     let conn = db::connect().await?;
-    let conn2 = conn.clone();
-    let _rpc = thread::spawn(move || {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("could not construct tokio runtime")
-            .block_on(rpc::rpc_server::listen(conn2))
-            .expect("failed running rpc server");
-    });
+    let _rpcserver = rpc_server::run_in_tokio(conn.clone());
 
-    /*Starts a new job that updates the expired profiles at regular intervals.*/
-    let conn3 = conn.clone();
-    let _computation = thread::spawn(move || {
-        job_update_outdated_profiles(
-            conn3,                        // Given database connection.
-            clokwerk::TimeUnits::hour(1), // Interval at which the expired profiles are updated.
-            Duration::from_secs(600),     // How long does the thread sleep until next test.
-        );
-    });
+    // Starts a new job that updates the expired profiles at regular intervals.
+    let _jobs = job_service::start_jobs(conn.clone());
 
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|origin, _req_head| {
                 origin.as_bytes().starts_with(b"https://localhost:")
                     || origin.as_bytes().starts_with(b"http://localhost:")
+                    || origin
+                        .as_bytes()
+                        .starts_with(format!("https://{}", *acme_service::DOMAIN).as_bytes())
             })
             .allow_any_method()
             .allow_any_header()
@@ -70,7 +63,16 @@ async fn main() -> Result<()> {
             )
             .with_identifier(|req| {
                 let connection_info = req.connection_info();
-                let ip = connection_info.remote_addr().ok_or(ARError::IdentificationError)?;
+
+                // Setup optional reverse-proxy measures and strip the port from the IP
+                // Will be changed in v0.4, more info: https://github.com/TerminalWitchcraft/actix-ratelimit/issues/15
+                let ip = if env::var("RATELIMITER_BEHIND_REVERSE_PROXY").as_deref() == Ok("true") {
+                    connection_info.realip_remote_addr()
+                } else {
+                    connection_info.remote_addr()
+                }
+                .ok_or(ARError::IdentificationError)?;
+
                 let ip_parts: Vec<&str> = ip.split(':').collect();
                 Ok(ip_parts[0].to_string())
             });
@@ -96,6 +98,7 @@ async fn main() -> Result<()> {
             )
     })
     .bind("0.0.0.0:8000")?
+    .bind_rustls("0.0.0.0:9000", acme_service::server_config())?
     .run()
     .await?;
 
