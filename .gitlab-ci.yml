@@ -24,8 +24,8 @@ before_script:
   - rustc --version
   - cargo --version
   - cargo install sqlx-cli
-  - ./.cargo/bin/sqlx db create
-  - ./.cargo/bin/sqlx migrate --source migrations/sqlite run
+  - export PATH=$PATH:$CARGO_HOME/bin
+  - ./scripts/recreate_db.sh
 
 default:
   tags:
@@ -96,6 +96,8 @@ build-release:
     - git secret reveal
     - cd certs
     - ./gen_server_cert.sh namib-ca
+    # download namib frontend
+    - ./scripts/download_namib_frontend.sh
   artifacts:
     paths:
       - install/bin
