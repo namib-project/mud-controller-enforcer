@@ -18,7 +18,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
     let update = if let Ok(device) = find_by_ip(dhcp_device_data.ip_addr, pool).await {
         dhcp_device_data.id = device.id;
         dhcp_device_data.collect_info = device.collect_info;
-        dhcp_device_data.room = Some(room_service::find_by_id(dhcp_device_data.id, pool).await?);
+        dhcp_device_data.room = device.room;
         true
     } else {
         dhcp_device_data.collect_info = dhcp_device_data.mud_url.is_none()
@@ -51,7 +51,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     let devices_data = devices
         .err_into::<Error>()
         .and_then(|device| async {
-            let room = match device_dbo_id(&device) {
+            let room = match device.room_id {
                 Some(id) => Some(room_service::find_by_id(id, pool).await?),
                 None => None,
             };
@@ -74,11 +74,11 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
 }
 
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
-    let device = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
+    let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
         .fetch_one(pool)
         .await?;
 
-    let room = match device_dbo_id(&device) {
+    let room = match device.room_id {
         Some(id) => Some(room_service::find_by_id(id, pool).await?),
         None => None,
     };
@@ -87,11 +87,11 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
 
 pub async fn find_by_ip(ip_addr: std::net::IpAddr, pool: &DbConnection) -> Result<Device> {
     let ip_addr = ip_addr.to_string();
-    let device = sqlx::query_as!(DeviceDbo, "select * from devices where ip_addr = ?", ip_addr)
+    let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "select * from devices where ip_addr = ?", ip_addr)
         .fetch_one(pool)
         .await?;
 
-    let room = match device_dbo_id(&device) {
+    let room = match device.room_id {
         Some(id) => Some(room_service::find_by_id(id, pool).await?),
         None => None,
     };
@@ -166,9 +166,4 @@ pub async fn delete_device(id: i64, pool: &DbConnection) -> Result<bool> {
         .await?;
 
     Ok(del_count.rows_affected() == 1)
-}
-
-/*Weil er sonst aus der query nicht direkt devicedbo erkennt*/
-fn device_dbo_id(device: &DeviceDbo) -> Option<i64> {
-    device.room_id
 }
