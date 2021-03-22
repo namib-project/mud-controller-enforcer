@@ -1,11 +1,16 @@
+#[cfg(feature = "nftables")]
 use namib_shared::firewall_config::{EnforcerConfig, NetworkHost, Protocol, Target};
 
 use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
+
+#[cfg(feature = "nftables")]
 use nftnl::{
     expr::{IcmpCode, RejectionType, Verdict},
     nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
 };
-use std::{ffi::CString, net::IpAddr, sync::Arc};
+#[cfg(feature = "nftables")]
+use std::ffi::CString;
+use std::{net::IpAddr, sync::Arc};
 use tokio::{
     select,
     sync::{Notify, RwLock},
@@ -71,12 +76,13 @@ impl FirewallService {
             }
             self.apply_current_config()
                 .await
-                .unwrap_or_else(|e| error!("An error occurred while updating the firewall configuration: {}", e));
+                .unwrap_or_else(|e| error!("An error occurred while updating the firewall configuration: {:?}", e));
         }
     }
 
     /// Updates the nftables rules to reflect the current firewall config.
-    pub(crate) async fn apply_current_config(&self) -> Result<()> {
+    #[cfg(feature = "nftables")]
+    pub async fn apply_current_config(&self) -> Result<()> {
         debug!("Configuration has changed, applying new rules to nftables");
         let config = &self.enforcer_state.read().await.config;
         let mut batch = Batch::new();
@@ -90,7 +96,13 @@ impl FirewallService {
         Ok(())
     }
 
+    #[cfg(not(feature = "nftables"))]
+    pub async fn apply_current_config(&self) -> Result<()> {
+        Ok(())
+    }
+
     /// Creates nftnl expressions which delete the current namib firewall table if it exists and adds them to the given batch.
+    #[cfg(feature = "nftables")]
     fn add_old_config_deletion_instructions(&self, batch: &mut Batch) -> Result<()> {
         // Create the table if it doesn't exist, otherwise removing the table might cause a NotFound error.
         // If the table already exists, this doesn't do anything.
@@ -103,6 +115,7 @@ impl FirewallService {
     }
 
     /// Converts the given firewall config into nftnl expressions and applies them to the supplied batch.
+    #[cfg(feature = "nftables")]
     async fn convert_config_to_nftnl_commands(&self, batch: &mut Batch, config: &EnforcerConfig) -> Result<()> {
         // Create new firewall table.
         let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
@@ -326,6 +339,7 @@ impl FirewallService {
 /// Note: An error of type IoError due to an OS error with code 71 might not indicate a protocol
 /// error but a permission error instead (either run as root or use `setcap 'cap_net_admin=+ep' /path/to/program` on the built binary.
 /// For information on how to debug, see http://0x90.at/post/netlink-debugging
+#[cfg(feature = "nftables")]
 fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
     // Create a netlink socket to netfilter.
     let socket = mnl::Socket::new(mnl::Bus::Netfilter)?;
@@ -349,6 +363,7 @@ fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
 
 /// Helper function for send_and_process().
 /// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+#[cfg(feature = "nftables")]
 fn socket_recv<'a>(socket: &mnl::Socket, buf: &'a mut [u8]) -> Result<Option<&'a [u8]>> {
     let ret = socket.recv(buf)?;
     if ret > 0 {

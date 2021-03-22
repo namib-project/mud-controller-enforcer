@@ -1,9 +1,9 @@
-#[cfg(not(feature = "execute_uci_commands"))]
+#[cfg(not(feature = "uci"))]
 pub use mock::*;
-#[cfg(feature = "execute_uci_commands")]
+#[cfg(feature = "uci")]
 pub use unix::*;
 
-#[cfg(feature = "execute_uci_commands")]
+#[cfg(feature = "uci")]
 #[allow(clippy::shadow_unrelated)]
 mod unix {
     use core::ptr;
@@ -401,7 +401,7 @@ mod unix {
     }
 }
 
-#[cfg(not(feature = "execute_uci_commands"))]
+#[cfg(not(feature = "uci"))]
 #[allow(clippy::unused_self)]
 mod mock {
 

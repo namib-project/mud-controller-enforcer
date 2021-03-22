@@ -6,9 +6,10 @@ edition = "2018"
 default-run = "namib_enforcer"
 
 [features]
-default = ["execute_uci_commands"]
-execute_uci_commands = ["libuci-sys", "libc"]
-dnsmasq_hook  = []
+default = ["uci", "nftables"]
+uci = ["libuci-sys", "libc"]
+nftables = ["nftnl", "mnl"]
+dnsmasq_hook = []
 
 [dependencies]
 namib_shared = { tag = "0.4.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
@@ -39,8 +40,8 @@ serial_test = "0.5.1"
 [target.'cfg(unix)'.dependencies]
 libuci-sys = { tag = "1.0.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git", optional = true }
 libc = { branch = "nftables-musl", git = "https://github.com/namib-project/libc.git", optional = true }
-nftnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/nftnl-rs.git"}
-mnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/mnl-rs.git"}
+nftnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/nftnl-rs.git", optional = true }
+mnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/mnl-rs.git", optional = true}
 
 
 [[bin]]
