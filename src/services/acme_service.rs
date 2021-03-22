@@ -3,7 +3,7 @@ use acme_lib::{create_rsa_key, persist::FilePersist, Account, Directory, Directo
 use get_if_addrs::get_if_addrs;
 use lazy_static::lazy_static;
 use namib_shared::open_file_with;
-use regex::Regex;
+use regex::{Captures, Regex};
 use reqwest::{Certificate, Identity};
 use rustls_18::{
     sign::{any_supported_type, CertifiedKey},
@@ -30,11 +30,10 @@ impl CertId {
             static ref PATTERN: Regex = Regex::new("([A-Z])|([_-])").unwrap();
         }
         Self(
-            PATTERN
-                .replace_all(
-                    &base64::encode_config(Sha3_224::digest(cert), base64::URL_SAFE_NO_PAD),
-                    "\\L$1\\E",
-                )
+            PATTERN.replace_all(
+                &base64::encode_config(Sha3_224::digest(cert), base64::URL_SAFE_NO_PAD),
+                |c: &Captures| c.get(1).map(|c| c.as_str().to_lowercase()).unwrap_or_default(),
+            )[..20]
                 .to_string(),
         )
     }
@@ -206,4 +205,15 @@ pub fn secure_name() -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod test {
+    use super::CertId;
+
+    #[test]
+    fn test_certid() {
+        assert_eq!(CertId::new(&[12u8]).0, "z9t6h6bfeuuki0ukgbda");
+        assert_eq!(CertId::new(&[128u8, 17u8, 5u8]).0, "crd8hajcagwy439c4jv1");
+    }
 }
