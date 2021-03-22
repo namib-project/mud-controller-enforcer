@@ -1,13 +1,13 @@
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc, thread};
 
 use futures::{future, StreamExt, TryStreamExt};
 use rustls::{RootCertStore, Session};
-use sha1::{Digest, Sha1};
 use tarpc::{
     context,
     rpc::server::{BaseChannel, Channel, Handler},
     server,
 };
+use tokio_compat_02::FutureExt;
 
 use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::RPC};
 
@@ -18,12 +18,13 @@ use crate::{
 };
 
 use super::tls_serde_transport;
-use crate::services::log_service;
+use crate::services::{acme_service::CertId, log_service};
+use std::thread::JoinHandle;
 
 #[derive(Clone)]
 pub struct RPCServer {
     pub client_ip: SocketAddr,
-    pub client_id: String,
+    pub client_id: CertId,
     pub db_connection: DbConnection,
 }
 
@@ -38,6 +39,7 @@ impl RPC for RPCServer {
         if Some(&current_config_version) != version.as_ref() {
             debug!("Client has outdated version. Starting update...");
             let devices = device_service::get_all_devices(&self.db_connection)
+                .compat()
                 .await
                 .unwrap_or_default();
             let new_config = firewall_configuration_service::create_configuration(current_config_version, devices);
@@ -69,8 +71,19 @@ impl RPC for RPCServer {
             self.client_id,
             logs.len(),
         );
-        log_service::add_new_logs(self.client_id, logs).await
+        log_service::add_new_logs(self.client_id, logs, &self.db_connection).await
     }
+}
+
+pub fn run_in_tokio(conn: DbConnection) -> JoinHandle<()> {
+    thread::spawn(move || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("could not construct tokio runtime")
+            .block_on(listen(conn))
+            .expect("failed running rpc server")
+    })
 }
 
 pub async fn listen(pool: DbConnection) -> Result<()> {
@@ -118,7 +131,7 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
             let server = RPCServer {
                 client_ip: channel.get_ref().get_ref().get_ref().get_ref().0.peer_addr().unwrap(),
                 // the fingerprint of a certificate is the sha1 of its entire bytes encoded in DER
-                client_id: base64::encode(Sha1::digest(
+                client_id: CertId::new(
                     channel
                         .get_ref() // BaseChannel
                         .get_ref() // Transport
@@ -128,7 +141,7 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
                         .get_peer_certificates()
                         .unwrap()[0]
                         .as_ref(),
-                )),
+                ),
                 db_connection: pool.clone(),
             };
             channel.respond_with(server.serve()).execute()

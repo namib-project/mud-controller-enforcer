@@ -1,0 +1,3 @@
+*.jar
+.openapi-generator
+neo4j/

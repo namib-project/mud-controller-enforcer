@@ -1,0 +1,2601 @@
+openapi: 3.0.3
+info:
+  title: ''
+  version: 0.0.0
+servers:
+- url: http://localhost:7000
+paths:
+  /api/schema/:
+    get:
+      operationId: api_schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+      - in: query
+        name: lang
+        schema:
+          type: string
+          enum:
+          - af
+          - ar
+          - ar-dz
+          - ast
+          - az
+          - be
+          - bg
+          - bn
+          - br
+          - bs
+          - ca
+          - cs
+          - cy
+          - da
+          - de
+          - dsb
+          - el
+          - en
+          - en-au
+          - en-gb
+          - eo
+          - es
+          - es-ar
+          - es-co
+          - es-mx
+          - es-ni
+          - es-ve
+          - et
+          - eu
+          - fa
+          - fi
+          - fr
+          - fy
+          - ga
+          - gd
+          - gl
+          - he
+          - hi
+          - hr
+          - hsb
+          - hu
+          - hy
+          - ia
+          - id
+          - ig
+          - io
+          - is
+          - it
+          - ja
+          - ka
+          - kab
+          - kk
+          - km
+          - kn
+          - ko
+          - ky
+          - lb
+          - lt
+          - lv
+          - mk
+          - ml
+          - mn
+          - mr
+          - my
+          - nb
+          - ne
+          - nl
+          - nn
+          - os
+          - pa
+          - pl
+          - pt
+          - pt-br
+          - ro
+          - ru
+          - sk
+          - sl
+          - sq
+          - sr
+          - sr-latn
+          - sv
+          - sw
+          - ta
+          - te
+          - tg
+          - th
+          - tk
+          - tr
+          - tt
+          - udm
+          - uk
+          - ur
+          - uz
+          - vi
+          - zh-hans
+          - zh-hant
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /groups/:
+    get:
+      operationId: groups_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - groups
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGroupList'
+          description: ''
+    post:
+      operationId: groups_create
+      description: API endpoint that allows groups to be viewed or edited.
+      tags:
+      - groups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Group'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Group'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Group'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+          description: ''
+  /groups/{id}/:
+    get:
+      operationId: groups_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - groups
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+          description: ''
+    put:
+      operationId: groups_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - groups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Group'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Group'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Group'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+          description: ''
+    patch:
+      operationId: groups_partial_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - groups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGroup'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGroup'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGroup'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+          description: ''
+    delete:
+      operationId: groups_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this group.
+        required: true
+      tags:
+      - groups
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /manager/:
+    get:
+      operationId: manager_list
+      description: API endpoint that allows Managers to be edited or viewed.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - manager
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedManagerList'
+          description: ''
+    post:
+      operationId: manager_create
+      description: API endpoint that allows Managers to be edited or viewed.
+      tags:
+      - manager
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Manager'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Manager'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Manager'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manager'
+          description: ''
+  /manager/{name}/:
+    get:
+      operationId: manager_retrieve
+      description: API endpoint that allows Managers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manager
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manager'
+          description: ''
+    put:
+      operationId: manager_update
+      description: API endpoint that allows Managers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manager
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Manager'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Manager'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Manager'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manager'
+          description: ''
+    patch:
+      operationId: manager_partial_update
+      description: API endpoint that allows Managers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manager
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedManager'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedManager'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedManager'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manager'
+          description: ''
+    delete:
+      operationId: manager_destroy
+      description: API endpoint that allows Managers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manager
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /manager/things:
+    get:
+      operationId: manager_things_list
+      description: Returns a List of all Things, which are managed by a specific Manager
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - manager
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedThingList'
+          description: ''
+  /manufacturer/:
+    get:
+      operationId: manufacturer_list
+      description: API endpoint that allows Manufacturers to be edited or viewed.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - manufacturer
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedManufacturerList'
+          description: ''
+    post:
+      operationId: manufacturer_create
+      description: API endpoint that allows Manufacturers to be edited or viewed.
+      tags:
+      - manufacturer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Manufacturer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Manufacturer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Manufacturer'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manufacturer'
+          description: ''
+  /manufacturer/{name}/:
+    get:
+      operationId: manufacturer_retrieve
+      description: API endpoint that allows Manufacturers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manufacturer
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manufacturer'
+          description: ''
+    put:
+      operationId: manufacturer_update
+      description: API endpoint that allows Manufacturers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manufacturer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Manufacturer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Manufacturer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Manufacturer'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manufacturer'
+          description: ''
+    patch:
+      operationId: manufacturer_partial_update
+      description: API endpoint that allows Manufacturers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manufacturer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedManufacturer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedManufacturer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedManufacturer'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manufacturer'
+          description: ''
+    delete:
+      operationId: manufacturer_destroy
+      description: API endpoint that allows Manufacturers to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - manufacturer
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /mud/:
+    get:
+      operationId: mud_list
+      description: API endpoint that allows Things to be edited or viewed.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+    post:
+      operationId: mud_create
+      description: API endpoint that allows Things to be edited or viewed.
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MUD'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MUD'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MUD'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MUD'
+          description: ''
+  /mud/{mud_url}/:
+    get:
+      operationId: mud_retrieve
+      description: API endpoint that allows Things to be edited or viewed.
+      parameters:
+      - in: path
+        name: mud_url
+        schema:
+          type: string
+        required: true
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MUD'
+          description: ''
+    put:
+      operationId: mud_update
+      description: API endpoint that allows Things to be edited or viewed.
+      parameters:
+      - in: path
+        name: mud_url
+        schema:
+          type: string
+        required: true
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MUD'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MUD'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MUD'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MUD'
+          description: ''
+    patch:
+      operationId: mud_partial_update
+      description: API endpoint that allows Things to be edited or viewed.
+      parameters:
+      - in: path
+        name: mud_url
+        schema:
+          type: string
+        required: true
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMUD'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMUD'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMUD'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MUD'
+          description: ''
+    delete:
+      operationId: mud_destroy
+      description: API endpoint that allows Things to be edited or viewed.
+      parameters:
+      - in: path
+        name: mud_url
+        schema:
+          type: string
+        required: true
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /mud/byManufacturer:
+    get:
+      operationId: mud_byManufacturer_list
+      description: API endpoint that allows admins to upload MUD-files
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMudByManufacturerList'
+          description: ''
+    post:
+      operationId: mud_byManufacturer_create
+      description: API endpoint that allows admins to upload MUD-files
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MudByManufacturer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MudByManufacturer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MudByManufacturer'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MudByManufacturer'
+          description: ''
+  /mud/connections:
+    get:
+      operationId: mud_connections_list
+      description: Create or List connections (ACL Relationsships for MUDs)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mud url of the MUD
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedACLList'
+          description: ''
+    post:
+      operationId: mud_connections_create
+      description: Create or List connections (ACL Relationsships for MUDs)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mud url of the MUD
+        required: true
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ACL'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ACL'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ACL'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ACL'
+          description: ''
+  /mud/dns:
+    get:
+      operationId: mud_dns_list
+      description: |-
+        Return a set of MUD files which match all the connections specified in acl_dns
+        MUD files are only returned if all of the connections are allowed
+      parameters:
+      - in: query
+        name: acl_dns
+        schema:
+          type: string
+        description: DNS Names which have been accessed
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+  /mud/domains:
+    get:
+      operationId: mud_domains_list
+      description: |-
+        Return a set of MUD files which match all the connections specified in acl_dns
+        MUD files are only returned if all of the connections are allowed
+      parameters:
+      - in: query
+        name: acl_dns
+        schema:
+          type: string
+        description: DNS Names which have been accessed
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+  /mud/guessThing:
+    get:
+      operationId: mud_guessThing_list
+      description: Guesses which MUD file belongs to a Thing by analysing its connections
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+  /mud/json:
+    get:
+      operationId: mud_json_list
+      description: JSON file of a MUD URL, this can be newer than the file served
+        at the URL
+      parameters:
+      - in: query
+        name: mud_url
+        schema:
+          type: string
+        description: The mud-url for which the Things are shown
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDJsonList'
+          description: ''
+  /mud/port:
+    get:
+      operationId: mud_port_list
+      description: Return all MUD Files which allow connections to a specific port
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: port_end
+        schema:
+          type: integer
+        description: This is where the port range ends
+      - in: query
+        name: port_start
+        schema:
+          type: integer
+        description: This is where the port range starts
+        required: true
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+  /mud/schema:
+    get:
+      operationId: mud_schema_list
+      description: Return all MUD Files which allow a specific network Protocol schema
+        (ssh, ipp, etc)
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: schema
+        schema:
+          type: string
+        description: The schema which will be in the returned mud files
+        required: true
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+  /mud/thing:
+    get:
+      operationId: mud_thing_list
+      description: All Things which are described by a MUD
+      parameters:
+      - in: query
+        name: mud_url
+        schema:
+          type: string
+        description: The mud-url for which the Things are shown
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedThingList'
+          description: ''
+  /mud/upload:
+    get:
+      operationId: mud_upload_list
+      description: API endpoint that allows admins to upload MUD-files
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - mud
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUploadMudList'
+          description: ''
+    post:
+      operationId: mud_upload_create
+      description: API endpoint that allows admins to upload MUD-files
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadMud'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UploadMud'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadMud'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadMud'
+          description: ''
+  /os/:
+    get:
+      operationId: os_list
+      description: API endpoint that allows OSs to be edited or viewed.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - os
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOSList'
+          description: ''
+    post:
+      operationId: os_create
+      description: API endpoint that allows OSs to be edited or viewed.
+      tags:
+      - os
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OS'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OS'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OS'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OS'
+          description: ''
+  /os/{name}/:
+    get:
+      operationId: os_retrieve
+      description: API endpoint that allows OSs to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - os
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OS'
+          description: ''
+    put:
+      operationId: os_update
+      description: API endpoint that allows OSs to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - os
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OS'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OS'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OS'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OS'
+          description: ''
+    patch:
+      operationId: os_partial_update
+      description: API endpoint that allows OSs to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - os
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOS'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOS'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOS'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OS'
+          description: ''
+    delete:
+      operationId: os_destroy
+      description: API endpoint that allows OSs to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - os
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /service/:
+    get:
+      operationId: service_list
+      description: API endpoint that allows Services to be edited or viewed.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - service
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServiceList'
+          description: ''
+    post:
+      operationId: service_create
+      description: API endpoint that allows Services to be edited or viewed.
+      tags:
+      - service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Service'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Service'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+  /service/{name}/:
+    get:
+      operationId: service_retrieve
+      description: API endpoint that allows Services to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - service
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+    put:
+      operationId: service_update
+      description: API endpoint that allows Services to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Service'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Service'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Service'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+    patch:
+      operationId: service_partial_update
+      description: API endpoint that allows Services to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - service
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedService'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedService'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedService'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+          description: ''
+    delete:
+      operationId: service_destroy
+      description: API endpoint that allows Services to be edited or viewed.
+      parameters:
+      - in: path
+        name: name
+        schema:
+          type: string
+        required: true
+      tags:
+      - service
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /thing/:
+    get:
+      operationId: thing_list
+      description: API endpoint that allows NetworkCards to be edited or viewed.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedThingList'
+          description: ''
+    post:
+      operationId: thing_create
+      description: API endpoint that allows NetworkCards to be edited or viewed.
+      tags:
+      - thing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thing'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Thing'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Thing'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+          description: ''
+  /thing/{mac_addr}/:
+    get:
+      operationId: thing_retrieve
+      description: API endpoint that allows NetworkCards to be edited or viewed.
+      parameters:
+      - in: path
+        name: mac_addr
+        schema:
+          type: string
+        required: true
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+          description: ''
+    put:
+      operationId: thing_update
+      description: API endpoint that allows NetworkCards to be edited or viewed.
+      parameters:
+      - in: path
+        name: mac_addr
+        schema:
+          type: string
+        required: true
+      tags:
+      - thing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thing'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Thing'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Thing'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+          description: ''
+    patch:
+      operationId: thing_partial_update
+      description: API endpoint that allows NetworkCards to be edited or viewed.
+      parameters:
+      - in: path
+        name: mac_addr
+        schema:
+          type: string
+        required: true
+      tags:
+      - thing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedThing'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedThing'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedThing'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+          description: ''
+    delete:
+      operationId: thing_destroy
+      description: API endpoint that allows NetworkCards to be edited or viewed.
+      parameters:
+      - in: path
+        name: mac_addr
+        schema:
+          type: string
+        required: true
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /thing/allowedConnections:
+    get:
+      operationId: thing_allowedConnections_list
+      description: List of allow Connections allowed for a Thing specified in its
+        MUD
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedACLList'
+          description: ''
+  /thing/connections:
+    get:
+      operationId: thing_connections_list
+      description: Create or List connections (ACL Relationsships for Things)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedACLList'
+          description: ''
+    post:
+      operationId: thing_connections_create
+      description: Create or List connections (ACL Relationsships for Things)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      tags:
+      - thing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ACL'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ACL'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ACL'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ACL'
+          description: ''
+  /thing/describe:
+    post:
+      operationId: thing_describe_create
+      description: 'POST: Things is described by the specified MUD'
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      tags:
+      - thing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Description'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Description'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Description'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Description'
+          description: ''
+  /thing/mac:
+    get:
+      operationId: thing_mac_list
+      description: |-
+        Returns all know devices of a specified mac vendor
+        Errata: This is broken if the Thing uses mac adress randomisation (Smartphones)
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedThingList'
+          description: ''
+  /thing/services:
+    get:
+      operationId: thing_services_list
+      description: API endpoint that shows which Services a Thing can access
+      parameters:
+      - in: query
+        name: mac-addr
+        schema:
+          type: string
+        description: The mac adress of the Thing
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - thing
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServiceList'
+          description: ''
+  /users/:
+    get:
+      operationId: users_list
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - users
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: users_create
+      description: API endpoint that allows users to be viewed or edited.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: users_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/User'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUser'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: users_destroy
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    ACL:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 40
+        type:
+          type: string
+          maxLength: 40
+        acl_dns:
+          type: string
+          maxLength: 512
+        port:
+          type: array
+          items:
+            type: integer
+        direction_initiated:
+          type: string
+          maxLength: 40
+        forwarding:
+          type: string
+          maxLength: 50
+        timestamp:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - acl_dns
+      - direction_initiated
+      - forwarding
+      - name
+      - port
+      - timestamp
+      - type
+    Description:
+      type: object
+      properties:
+        mud_url:
+          type: string
+          maxLength: 512
+        mac_addr:
+          type: string
+          maxLength: 17
+          minLength: 10
+      required:
+      - mac_addr
+      - mud_url
+    Group:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+      required:
+      - name
+      - url
+    MUD:
+      type: object
+      properties:
+        mud_version:
+          type: integer
+        mud_url:
+          type: string
+          format: uri
+        mud_signature:
+          type: string
+          maxLength: 128
+        cache_validity:
+          type: integer
+          maximum: 168
+        systeminfo:
+          type: string
+          maxLength: 512
+        name:
+          type: string
+          maxLength: 64
+        firmware_rev:
+          type: string
+          maxLength: 5
+        software_rev:
+          type: string
+          maxLength: 5
+        documentation:
+          type: string
+          format: uri
+      required:
+      - cache_validity
+      - documentation
+      - firmware_rev
+      - mud_signature
+      - mud_url
+      - mud_version
+      - name
+      - software_rev
+      - systeminfo
+    MUDJson:
+      type: object
+      properties:
+        json:
+          type: string
+          maxLength: 524288
+      required:
+      - json
+    Manager:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        ip_internal:
+          type: string
+        ip_external:
+          type: string
+      required:
+      - ip_external
+      - ip_internal
+      - name
+    Manufacturer:
+      type: object
+      properties:
+        uid:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 50
+      required:
+      - name
+      - uid
+    MudByManufacturer:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+      required:
+      - name
+    OS:
+      type: object
+      properties:
+        family:
+          type: string
+          maxLength: 50
+        gen:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 50
+      required:
+      - family
+      - gen
+      - name
+    PaginatedACLList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ACL'
+    PaginatedGroupList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+    PaginatedMUDJsonList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MUDJson'
+    PaginatedMUDList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MUD'
+    PaginatedManagerList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Manager'
+    PaginatedManufacturerList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Manufacturer'
+    PaginatedMudByManufacturerList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MudByManufacturer'
+    PaginatedOSList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OS'
+    PaginatedServiceList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+    PaginatedThingList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Thing'
+    PaginatedUploadMudList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UploadMud'
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PatchedGroup:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+    PatchedMUD:
+      type: object
+      properties:
+        mud_version:
+          type: integer
+        mud_url:
+          type: string
+          format: uri
+        mud_signature:
+          type: string
+          maxLength: 128
+        cache_validity:
+          type: integer
+          maximum: 168
+        systeminfo:
+          type: string
+          maxLength: 512
+        name:
+          type: string
+          maxLength: 64
+        firmware_rev:
+          type: string
+          maxLength: 5
+        software_rev:
+          type: string
+          maxLength: 5
+        documentation:
+          type: string
+          format: uri
+    PatchedManager:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        ip_internal:
+          type: string
+        ip_external:
+          type: string
+    PatchedManufacturer:
+      type: object
+      properties:
+        uid:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 50
+    PatchedOS:
+      type: object
+      properties:
+        family:
+          type: string
+          maxLength: 50
+        gen:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 50
+    PatchedService:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        product:
+          type: string
+          maxLength: 50
+        method:
+          type: string
+          maxLength: 50
+    PatchedThing:
+      type: object
+      properties:
+        serial:
+          type: string
+          maxLength: 64
+        mac_addr:
+          type: string
+          maxLength: 17
+          minLength: 10
+        ipv4_addr:
+          type: string
+        ipv6_addr:
+          type: string
+        hostname:
+          type: string
+          maxLength: 512
+    PatchedUser:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        groups:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: The groups this user belongs to. A user will get all permissions
+            granted to each of their groups.
+    Service:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        product:
+          type: string
+          maxLength: 50
+        method:
+          type: string
+          maxLength: 50
+      required:
+      - method
+      - name
+      - product
+    Thing:
+      type: object
+      properties:
+        serial:
+          type: string
+          maxLength: 64
+        mac_addr:
+          type: string
+          maxLength: 17
+          minLength: 10
+        ipv4_addr:
+          type: string
+        ipv6_addr:
+          type: string
+        hostname:
+          type: string
+          maxLength: 512
+      required:
+      - hostname
+      - ipv4_addr
+      - ipv6_addr
+      - mac_addr
+      - serial
+    UploadMud:
+      type: object
+      properties:
+        serial:
+          type: string
+          maxLength: 4000
+      required:
+      - serial
+    User:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        groups:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: The groups this user belongs to. A user will get all permissions
+            granted to each of their groups.
+      required:
+      - url
+      - username
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: Session
