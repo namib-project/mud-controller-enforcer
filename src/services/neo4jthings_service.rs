@@ -1,11 +1,12 @@
 use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
+use backoff::{backoff::Backoff, future::retry, ExponentialBackoff};
 use lazy_static::lazy_static;
 use neo4jthings_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Description, Thing},
 };
-use std::{env, fmt::Debug, future::Future, net::IpAddr};
-use tokio::time::{sleep, Duration};
+use std::{env, net::IpAddr};
+use tokio::time::Duration;
 
 lazy_static! {
     /// The configuration for connecting to the neo4jthings service.
@@ -24,8 +25,8 @@ lazy_static! {
 /// This operation should be run in the background as it is failsafe.
 pub async fn add_device(device: Device) {
     debug!("adding device to neo4jthings: {}", device.ip_addr);
-    if let Err(e) = retry_op(|| async {
-        thing_api::thing_create(
+    if let Err(e) = retry(backoff_policy(), || async {
+        Ok(thing_api::thing_create(
             &*N4JT_CONFIG,
             Thing {
                 serial: device.mac_addr.unwrap().to_string(),
@@ -41,7 +42,7 @@ pub async fn add_device(device: Device) {
                 hostname: device.hostname.to_string(),
             },
         )
-        .await
+        .await?)
     })
     .await
     {
@@ -56,12 +57,12 @@ pub async fn add_device_connection(device: Device, connection: String) {
         "adding device connection to neo4jthings: {} {}",
         device.ip_addr, connection
     );
-    if let Err(e) = retry_op(|| async {
-        thing_api::thing_connections_create(
+    if let Err(e) = retry(backoff_policy(), || async {
+        Ok(thing_api::thing_connections_create(
             &*N4JT_CONFIG,
             &device.mac_addr.unwrap().to_string(), // TODO: duid
             Acl {
-                name: "".to_string(), // TODO: name
+                name: connection.clone(),
                 _type: if device.ip_addr.is_ipv4() {
                     "4t".to_string()
                 } else {
@@ -74,7 +75,7 @@ pub async fn add_device_connection(device: Device, connection: String) {
                 timestamp: None,
             },
         )
-        .await
+        .await?)
     })
     .await
     {
@@ -105,8 +106,8 @@ pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
 /// This operation should be run in the background as it is failsafe.
 pub async fn describe_thing(mac_addr: String, mud_url: String) {
     debug!("describing thing to neo4jthings: {} {}", mac_addr, mud_url);
-    if let Err(e) = retry_op(|| async {
-        thing_api::thing_describe_create(
+    if let Err(e) = retry(backoff_policy(), || async {
+        Ok(thing_api::thing_describe_create(
             &*N4JT_CONFIG,
             &mac_addr, // TODO: duid
             Description {
@@ -114,7 +115,7 @@ pub async fn describe_thing(mac_addr: String, mud_url: String) {
                 mac_addr: mac_addr.clone(),
             },
         )
-        .await
+        .await?)
     })
     .await
     {
@@ -122,27 +123,12 @@ pub async fn describe_thing(mac_addr: String, mud_url: String) {
     }
 }
 
-async fn retry_op<F, T, U, E>(mut f: F) -> std::result::Result<(), E>
-where
-    F: FnMut() -> T,
-    T: Future<Output=std::result::Result<U, E>>,
-    E: Debug,
-{
-    let mut err;
-    let mut i = 0u32;
-    loop {
-        match f().await {
-            Ok(_) => return Ok(()),
-            Err(e) => {
-                err = e;
-                i += 1;
-                warn!("failed to reach neo4jthings: {:?} (attempt {})", err, i);
-                if i == 10 {
-                    break;
-                }
-                sleep(Duration::from_secs(60)).await;
-            },
-        }
-    }
-    Err(err)
+fn backoff_policy() -> ExponentialBackoff {
+    let mut eb = ExponentialBackoff {
+        initial_interval: Duration::from_secs(10),
+        max_interval: Duration::from_secs(60),
+        ..Default::default()
+    };
+    eb.reset();
+    eb
 }
