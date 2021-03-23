@@ -6,8 +6,8 @@ CREATE TABLE devices
 (
     id               INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
     name             TEXT,
-    ipv4_addr        TEXT,
-    ipv6_addr        TEXT,
+    ipv4_addr        TEXT UNIQUE,
+    ipv6_addr        TEXT UNIQUE,
     mac_addr         TEXT,
     duid             TEXT,
     hostname         TEXT     NOT NULL DEFAULT '',

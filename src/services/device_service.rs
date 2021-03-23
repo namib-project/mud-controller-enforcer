@@ -76,15 +76,28 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
     Ok(Device::from(device))
 }
 
+pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
+    let device = sqlx::query_as!(
+        DeviceDbo,
+        "select * from devices where ipv4_addr = ? or ipv6_addr = ?",
+        ip,
+        ip
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(device.into())
+}
+
 pub async fn find_by_mac_or_duid(
     mac_addr: Option<MacAddr>,
     duid: Option<String>,
     pool: &DbConnection,
 ) -> Result<Device> {
-    let device: Option<DeviceDbo> = None;
+    let mut device: Option<DeviceDbo> = None;
     if let Some(mac_addr) = mac_addr {
         let mac_addr = mac_addr.to_string();
-        let device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr)
+        device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr)
             .fetch_optional(pool)
             .await?;
     }

@@ -35,7 +35,15 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
-        None => return FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info),
+        None => {
+            return FirewallDevice {
+                id: device.id,
+                ipv4: device.ipv4_addr,
+                ipv6: device.ipv6_addr,
+                rules: result,
+                collect_data: device.collect_info,
+            }
+        },
     };
 
     let merged_acls = match &mud_data.acl_override {
@@ -99,7 +107,13 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         Target::Reject,
     ));
 
-    FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info)
+    FirewallDevice {
+        id: device.id,
+        ipv4: device.ipv4_addr,
+        ipv6: device.ipv6_addr,
+        rules: result,
+        collect_data: device.collect_info,
+    }
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
@@ -282,8 +296,11 @@ mod tests {
 
         let device = Device {
             id: 0,
+            name: None,
             mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
-            ip_addr: "127.0.0.1".parse().unwrap(),
+            duid: None,
+            ipv4_addr: "127.0.0.1".parse().ok(),
+            ipv6_addr: None,
             hostname: "".to_string(),
             vendor_class: "".to_string(),
             mud_url: Some("http://example.com/mud_url.json".to_string()),
@@ -297,10 +314,11 @@ mod tests {
 
         println!("{:#?}", x);
 
-        let resulting_device = FirewallDevice::new(
-            device.id,
-            device.ip_addr,
-            vec![
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4: device.ipv4_addr,
+            ipv6: device.ipv6_addr,
+            rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
@@ -323,8 +341,8 @@ mod tests {
                     Target::Reject,
                 ),
             ],
-            false,
-        );
+            collect_data: false,
+        };
 
         assert!(x.eq(&resulting_device));
 
@@ -364,8 +382,11 @@ mod tests {
 
         let device = Device {
             id: 0,
+            name: None,
             mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
-            ip_addr: "127.0.0.1".parse().unwrap(),
+            duid: None,
+            ipv4_addr: "127.0.0.1".parse().ok(),
+            ipv6_addr: None,
             hostname: "".to_string(),
             vendor_class: "".to_string(),
             mud_url: Some("http://example.com/mud_url.json".to_string()),
@@ -379,10 +400,11 @@ mod tests {
 
         println!("{:#?}", x);
 
-        let resulting_device = FirewallDevice::new(
-            device.id,
-            device.ip_addr,
-            vec![
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4: device.ipv4_addr,
+            ipv6: device.ipv6_addr,
+            rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
@@ -405,8 +427,8 @@ mod tests {
                     Target::Reject,
                 ),
             ],
-            true,
-        );
+            collect_data: true,
+        };
 
         assert!(x.eq(&resulting_device));
 

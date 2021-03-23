@@ -5,7 +5,7 @@ use neo4jthings_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Description, Thing},
 };
-use std::{env, net::IpAddr};
+use std::env;
 use tokio::time::Duration;
 
 lazy_static! {
@@ -34,12 +34,8 @@ pub async fn add_device(device: Device) {
                 mac_addr: identifier.clone(),
                 ipv4_addr: device
                     .ipv4_addr
-                    .map(|ip| ip.to_string())
-                    .unwrap_or_else(|| "0.0.0.0".to_string()),
-                ipv6_addr: device
-                    .ipv6_addr
-                    .map(|ip| ip.to_string())
-                    .unwrap_or_else((|| "::".to_string())),
+                    .map_or_else(|| "0.0.0.0".to_string(), |ip| ip.to_string()),
+                ipv6_addr: device.ipv6_addr.map_or_else(|| "::".to_string(), |ip| ip.to_string()),
                 hostname: device.hostname.to_string(),
             },
         )
@@ -59,7 +55,7 @@ pub async fn add_device_connection(device: Device, connection: String) {
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_connections_create(
             &*N4JT_CONFIG,
-            &device.mac_addr.unwrap().to_string(), // TODO: duid
+            &identifier,
             Acl {
                 name: connection.clone(),
                 _type: "4t".to_string(), // TODO 6t ?
@@ -98,7 +94,7 @@ pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
         .collect())
 }
 
-/// Notify the neo4jthings service that a mud_url was chosen for a given device.
+/// Notify the neo4jthings service that a `mud_url` was chosen for a given device.
 /// This operation should be run in the background as it is failsafe.
 pub async fn describe_thing(mac_or_duid: String, mud_url: String) {
     debug!("describing thing to neo4jthings: {} {}", mac_or_duid, mud_url);

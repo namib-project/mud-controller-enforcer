@@ -96,7 +96,7 @@ impl Device {
     pub fn mac_or_duid(&self) -> String {
         self.mac_addr
             .map(|m| m.to_string())
-            .or_else(|| self.duid.map(|d| d.to_string()))
+            .or_else(|| self.duid.as_ref().cloned())
             .unwrap()
     }
 

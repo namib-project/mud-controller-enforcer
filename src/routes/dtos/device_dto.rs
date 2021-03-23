@@ -1,11 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use crate::{
-    error::Result,
-    models::{Device, MudData},
-};
+use crate::models::{Device, MudData};
 use chrono::{NaiveDateTime, Utc};
-use namib_shared::{mac, MacAddr};
+use namib_shared::mac;
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
@@ -74,25 +71,25 @@ impl DeviceCreationUpdateDto {
     }
 }
 
-impl Into<Device> for DeviceCreationUpdateDto {
-    fn into(self) -> Device {
+impl From<DeviceCreationUpdateDto> for Device {
+    fn from(dto: DeviceCreationUpdateDto) -> Device {
         Device {
             id: 0,
-            name: self.name,
-            ipv4_addr: self.ipv4_addr.and_then(|ip| ip.parse().ok()),
-            ipv6_addr: self.ipv6_addr.and_then(|ip| ip.parse().ok()),
-            mac_addr: self
+            name: dto.name,
+            ipv4_addr: dto.ipv4_addr.and_then(|ip| ip.parse().ok()),
+            ipv6_addr: dto.ipv6_addr.and_then(|ip| ip.parse().ok()),
+            mac_addr: dto
                 .mac_addr
                 .and_then(|m| m.parse::<mac::MacAddr>().ok())
                 .map(|m| m.into()),
-            duid: self.duid,
-            hostname: self.hostname.unwrap_or_default(),
-            vendor_class: self.vendor_class.unwrap_or_default(),
-            mud_url: self.mud_url,
+            duid: dto.duid,
+            hostname: dto.hostname.unwrap_or_default(),
+            vendor_class: dto.vendor_class.unwrap_or_default(),
+            mud_url: dto.mud_url,
             mud_data: None,
             collect_info: false,
             last_interaction: Utc::now().naive_local(),
-            clipart: self.clipart.clone(),
+            clipart: dto.clipart,
         }
     }
 }
