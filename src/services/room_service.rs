@@ -76,3 +76,13 @@ pub async fn delete_room(name: String, pool: &DbConnection) -> Result<u64> {
 
     Ok(del_count.rows_affected())
 }
+///Checks if room is available.
+pub async fn exists_room(name: String, pool: &DbConnection) -> Result<bool> {
+    Ok(
+        sqlx::query!("SELECT count(name) AS name FROM rooms WHERE name = ?", name)
+            .fetch_one(pool)
+            .await?
+            .name
+            > 0,
+    )
+}
