@@ -136,7 +136,6 @@ async fn update_room(
     })?;
 
     room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, pool.get_ref())
-        .await?
         .await
         .or_else(|_| {
             error::ResponseError {
