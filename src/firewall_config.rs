@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -97,15 +97,10 @@ impl FirewallRule {
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallDevice {
     pub id: i64,
-    pub ip: IpAddr,
+    pub ipv4: Option<Ipv4Addr>,
+    pub ipv6: Option<Ipv6Addr>,
     pub rules: Vec<FirewallRule>,
     pub collect_data: bool,
-}
-
-impl FirewallDevice {
-    pub fn new(id: i64, ip: IpAddr, rules: Vec<FirewallRule>, collect_data: bool) -> FirewallDevice {
-        FirewallDevice { id, ip, rules, collect_data }
-    }
 }
 
 /// Stores a set of firewall rules and a config version
