@@ -7,7 +7,7 @@ use crate::{
     error::Result,
     models::{MudData, MudDbo},
     routes::dtos::{MudCreationDto, MudUpdateDto},
-    services::{mud_service, mud_service::is_url, role_service::permission::Permission},
+    services::{mud_service, mud_service::is_url, role_service::Permission},
 };
 use actix_web::http::StatusCode;
 use chrono::Utc;

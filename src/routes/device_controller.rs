@@ -9,7 +9,7 @@ use crate::{
     routes::dtos::{DeviceCreationUpdateDto, DeviceDto, GuessDto},
     services::{
         config_service, config_service::ConfigKeys, device_service, neo4jthings_service,
-        role_service::permission::Permission,
+        role_service::Permission,
     },
 };
 use actix_web::http::StatusCode;

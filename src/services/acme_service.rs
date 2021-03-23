@@ -113,7 +113,7 @@ impl ResolvesServerCert for CertResolver {
 }
 
 /// Checks whether the persisted certificate is present and valid for more than 15 days
-/// and if not will request a new certificate from LetsEncrypt.
+/// and if not will request a new certificate from Let's Encrypt.
 pub fn update_certs() -> Result<()> {
     debug!("checking if a certificate for {} exists", *DOMAIN);
     if let Some(c) = ACCOUNT.certificate(&DOMAIN).unwrap_or(None) {

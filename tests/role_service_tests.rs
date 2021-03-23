@@ -3,7 +3,7 @@ use namib_mud_controller::{
     error::{Error, Result},
     models::User,
     routes::dtos::RoleUpdateDto,
-    services::{role_service::role_service, user_service},
+    services::{role_service, user_service},
 };
 
 #[actix_rt::test]

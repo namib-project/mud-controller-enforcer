@@ -42,7 +42,7 @@ impl RPC for RPCServer {
                 .compat()
                 .await
                 .unwrap_or_default();
-            let new_config = firewall_configuration_service::create_configuration(current_config_version, devices);
+            let new_config = firewall_configuration_service::create_configuration(current_config_version, &devices);
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }

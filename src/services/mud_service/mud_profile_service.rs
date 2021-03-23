@@ -3,7 +3,10 @@ use chrono::Utc;
 use crate::{
     db::DbConnection,
     error::Result,
-    services::{firewall_configuration_service::update_config_version, mud_service::*},
+    services::{
+        firewall_configuration_service::update_config_version,
+        mud_service::{get_all_mud_expiration, get_or_fetch_mud},
+    },
 };
 
 pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
