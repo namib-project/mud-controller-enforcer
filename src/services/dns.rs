@@ -75,8 +75,8 @@ impl DnsServiceCache {
         resolver_opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
         Ok(DnsServiceCache {
             resolver: AsyncResolver::tokio(resolver_conf, resolver_opts)?,
-            refresh_queue: Default::default(),
-            cache_data: Default::default(),
+            refresh_queue: BinaryHeap::default(),
+            cache_data: HashMap::default(),
         })
     }
 
@@ -94,9 +94,9 @@ impl DnsServiceCache {
         };
         self.cache_data.insert(name.into(), lookup_result);
         self.refresh_queue.push(DnsRefreshQueueEntry {
-            cache_entry: self.cache_data.get(name.into()).unwrap().clone(),
+            cache_entry: self.cache_data.get(name).unwrap().clone(),
         });
-        Ok(self.cache_data.get(name.into()).unwrap().clone())
+        Ok(self.cache_data.get(name).unwrap().clone())
     }
 
     /// Resolves the supplied DNS name. If the name is already in the DNS cache, returns the cached result instead.
@@ -119,7 +119,7 @@ impl Eq for DnsWatcherSender {}
 
 impl PartialEq for DnsWatcherSender {
     fn eq(&self, other: &Self) -> bool {
-        (self as *const DnsWatcherSender) == (other as *const DnsWatcherSender)
+        std::ptr::eq(self, other)
     }
 }
 
@@ -146,7 +146,7 @@ impl DnsService {
         let mut next_expiry_time = None;
         loop {
             tokio::time::sleep_until(max(
-                next_expiry_time.unwrap_or(Instant::now()).into(),
+                next_expiry_time.unwrap_or_else(Instant::now).into(),
                 Instant::now().add(MIN_TIME_BEFORE_REFRESH).into(),
             ))
             .await;
@@ -186,9 +186,9 @@ impl DnsService {
         }
     }
 
-    async fn refresh_dns_entry<'a>(
+    async fn refresh_dns_entry(
         queue_element: DnsRefreshQueueEntry,
-        cache: &mut RwLockWriteGuard<'a, DnsServiceCache>,
+        cache: &mut RwLockWriteGuard<'_, DnsServiceCache>,
         watchers_to_notify: &mut HashSet<Arc<Pin<Box<DnsWatcherSender>>>>,
     ) -> DnsRefreshQueueEntry {
         debug!(
@@ -224,15 +224,15 @@ impl DnsService {
         }
     }
 
-    /// Create a DnsWatcher instance which can be used to keep track of dns entry changes.
+    /// Create a `DnsWatcher` instance which can be used to keep track of dns entry changes.
     pub fn create_watcher(&self) -> DnsWatcher {
         DnsWatcher {
             cache: self.cache.clone(),
             sender: Arc::new(Pin::new(Box::new(DnsWatcherSender {
-                updated_names: Default::default(),
-                notify: Default::default(),
+                updated_names: Arc::default(),
+                notify: Arc::default(),
             }))),
-            current_watched_entries: Default::default(),
+            current_watched_entries: Mutex::default(),
         }
     }
 }
@@ -262,7 +262,7 @@ impl DnsWatcher {
         let cache = self.cache.read().await;
         let cache_entry = cache.resolve_if_cached(name).unwrap();
         cache_entry.watchers.write().await.remove(&self.sender.clone());
-        self.current_watched_entries.lock().await.remove(name.into());
+        self.current_watched_entries.lock().await.remove(name);
     }
 
     /// Clears the list of watched DNS entries.

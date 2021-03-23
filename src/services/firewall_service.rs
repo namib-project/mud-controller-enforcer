@@ -53,7 +53,7 @@ impl From<IpAddr> for RuleAddrEntry {
 }
 
 impl FirewallService {
-    /// Creates a new FirewallService instance with the given enforcer state and dns watcher (generated from the dns service).
+    /// Creates a new `FirewallService` instance with the given enforcer state and dns watcher (generated from the dns service).
     pub(crate) fn new(enforcer_state: Arc<RwLock<Enforcer>>, watcher: DnsWatcher) -> FirewallService {
         FirewallService {
             enforcer_state,

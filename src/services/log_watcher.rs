@@ -61,16 +61,23 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
     // create async runtime to run rpc client
     Builder::new_current_thread().enable_all().build()?.block_on(async {
         let mut enforcer = enforcer.write().await;
+        let ips_to_filter = enforcer
+            .config
+            .devices()
+            .iter()
+            .filter(|d| d.collect_data)
+            .flat_map(|d| {
+                Iterator::chain(
+                    d.ipv4.iter().map(ToString::to_string),
+                    d.ipv6.iter().map(ToString::to_string),
+                )
+            })
+            .collect::<Vec<_>>();
         debug!("acquired known devices");
         let lines = lines
             .filter(|l| {
                 if let Ok(l) = l {
-                    enforcer
-                        .config
-                        .devices()
-                        .iter()
-                        .filter(|d| d.collect_data)
-                        .any(|d| l.contains(&d.ip.to_string()))
+                    ips_to_filter.iter().any(|ip| l.contains(ip))
                 } else {
                     false
                 }
