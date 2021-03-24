@@ -4,7 +4,7 @@ services:
   namib_mud_controller:
     image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:postgres
     environment:
-      DATABASE_URL: postgres://namib:namib@localhost/namib_mud_controller
+      DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
     ports:
       - 8000:8000
       - 8734:8734
