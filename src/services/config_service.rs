@@ -10,7 +10,7 @@ pub enum ConfigKeys {
 
 /// Gets the config value by key from the database.
 pub async fn get_config_value<T: FromStr>(key: &str, pool: &DbConnection) -> Result<T> {
-    let entry = sqlx::query_as!(Config, "SELECT * FROM config WHERE key = ?", key)
+    let entry = sqlx::query_as!(Config, "SELECT * FROM config WHERE key = $1", key)
         .fetch_one(pool)
         .await?;
 
@@ -29,7 +29,7 @@ pub async fn get_all_config_data(pool: &DbConnection) -> Result<Vec<Config>> {
 pub async fn set_config_value<T: ToString>(key: &str, value: T, pool: &DbConnection) -> Result<()> {
     let val = value.to_string();
     let _ins_count = sqlx::query!(
-        "INSERT INTO config VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        "INSERT INTO config VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         key,
         val,
     )
@@ -39,10 +39,10 @@ pub async fn set_config_value<T: ToString>(key: &str, value: T, pool: &DbConnect
     Ok(())
 }
 
-pub async fn delete_config_key(key: &str, pool: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("DELETE FROM config WHERE key = ?", key)
+pub async fn delete_config_key(key: &str, pool: &DbConnection) -> Result<bool> {
+    let del_count = sqlx::query!("DELETE FROM config WHERE key = $1", key)
         .execute(pool)
         .await?;
 
-    Ok(del_count.rows_affected())
+    Ok(del_count.rows_affected() == 1)
 }

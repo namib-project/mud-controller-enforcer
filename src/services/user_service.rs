@@ -9,8 +9,15 @@ use crate::{
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
+    #[cfg(feature = "sqlite")]
     let usrs: Vec<_> =
-        sqlx::query!("select user_id, username, password, salt, cast(group_concat(name) as text) as roles, cast(group_concat(permissions) as text) as permissions from users u, users_roles m, roles r where u.id = m.user_id and r.id = m.role_id")
+        sqlx::query!("SELECT user_id, username, password, salt, CAST(group_concat(r.name) AS TEXT) AS roles, CAST(group_concat(r.permissions) AS TEXT) AS permissions FROM users u, users_roles m, roles r WHERE u.id = m.user_id AND r.id = m.role_id")
+            .fetch_all(conn)
+            .await?;
+
+    #[cfg(feature = "postgres")]
+    let usrs: Vec<_> =
+        sqlx::query!("SELECT user_id, username, password, salt, CAST(string_agg(r.name, ',') AS TEXT) AS roles, CAST(string_agg(r.permissions, ',') AS TEXT) AS permissions FROM users u, users_roles m, roles r WHERE u.id = m.user_id AND r.id = m.role_id GROUP BY m.user_id, u.id")
             .fetch_all(conn)
             .await?;
 
@@ -34,7 +41,7 @@ pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
 }
 
 pub async fn has_any_users(conn: &DbConnection) -> Result<bool> {
-    let usr_count = sqlx::query!("select count(*) as count from users")
+    let usr_count = sqlx::query!(r#"SELECT COUNT(*) AS "count!" FROM users"#)
         .fetch_one(conn)
         .await?
         .count;
@@ -42,7 +49,7 @@ pub async fn has_any_users(conn: &DbConnection) -> Result<bool> {
 }
 
 pub async fn find_by_id(id: i64, conn: &DbConnection) -> Result<User> {
-    let usr = sqlx::query_as!(UserDbo, "select * from users where id = ?", id)
+    let usr = sqlx::query_as!(UserDbo, "SELECT * FROM users WHERE id = $1", id)
         .fetch_one(conn)
         .await?;
 
@@ -50,7 +57,7 @@ pub async fn find_by_id(id: i64, conn: &DbConnection) -> Result<User> {
 }
 
 pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<User> {
-    let usr = sqlx::query_as!(UserDbo, "select * from users where username = ?", username)
+    let usr = sqlx::query_as!(UserDbo, "SELECT * FROM users WHERE username = $1", username)
         .fetch_one(conn)
         .await?;
 
@@ -60,7 +67,7 @@ pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<Use
 async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     let roles: Vec<RoleDbo> = sqlx::query_as!(
         RoleDbo,
-        "select * from roles where id in (select role_id from users_roles where user_id = ?)",
+        "SELECT * FROM roles WHERE id IN (SELECT role_id FROM users_roles WHERE user_id = $1)",
         usr.id
     )
     .fetch_all(conn)
@@ -80,30 +87,43 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
+    #[cfg(feature = "sqlite")]
     let result = sqlx::query!(
-        "insert into users (username, password, salt) values (?, ?, ?)",
+        "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
         user.username,
         user.password,
         user.salt
     )
     .execute(conn)
-    .await?;
+    .await?
+    .last_insert_rowid();
 
-    let user_count = sqlx::query!("select count(*) as count from users")
+    #[cfg(feature = "postgres")]
+    let result = sqlx::query!(
+        "INSERT INTO users (username, password, salt) VALUES ($1, $2, $3) RETURNING id",
+        user.username,
+        user.password,
+        user.salt
+    )
+    .fetch_one(conn)
+    .await?
+    .id;
+
+    let user_count = sqlx::query!(r#"SELECT COUNT(*) AS "count!" FROM users"#)
         .fetch_one(conn)
         .await?
         .count;
 
     if user_count == 1 {
-        role_service::role_add_to_user(conn, result.last_insert_rowid(), role_service::ROLE_ID_ADMIN).await?;
+        role_service::role_add_to_user(conn, result, role_service::ROLE_ID_ADMIN).await?;
     }
 
-    Ok(result.last_insert_rowid())
+    Ok(result)
 }
 
-pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
+pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "update users set username = ?, password = ?, salt = ? where id = ?",
+        "update users SET username = $1, password = $2, salt = $3 WHERE id = $4",
         user.username,
         user.password,
         user.salt,
@@ -112,15 +132,17 @@ pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
     .execute(conn)
     .await?;
 
-    Ok(upd_count.rows_affected())
+    Ok(upd_count.rows_affected() == 1)
 }
 
-pub async fn delete(id: i64, conn: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("delete from users where id = ?", id).execute(conn).await?;
+pub async fn delete(id: i64, conn: &DbConnection) -> Result<bool> {
+    let del_count = sqlx::query!("DELETE FROM users WHERE id = $1", id)
+        .execute(conn)
+        .await?;
 
-    Ok(del_count.rows_affected())
+    Ok(del_count.rows_affected() == 1)
 }
 
 pub async fn get_all_roles(conn: &DbConnection) -> Result<Vec<RoleDbo>> {
-    Ok(sqlx::query_as!(RoleDbo, "select * from roles").fetch_all(conn).await?)
+    Ok(sqlx::query_as!(RoleDbo, "SELECT * FROM roles").fetch_all(conn).await?)
 }

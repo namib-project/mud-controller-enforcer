@@ -2,7 +2,7 @@ mod lib;
 
 use std::{fs::File, io::Read};
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Timelike, Utc};
 
 use namib_mud_controller::{
     error::Result,
@@ -38,7 +38,7 @@ async fn test_update_outdated_profiles() -> Result<()> {
 
     //Puts expired Profile into the Database
     sqlx::query!(
-        "insert into mud_data (url, data, created_at, expiration) values (?, ?, ?, ?)",
+        "insert into mud_data (url, data, created_at, expiration) values ($1, $2, $3, $4)",
         mud_dbo.url,
         mud_dbo.data,
         mud_dbo.created_at,
@@ -69,11 +69,11 @@ async fn test_update_outdated_profiles() -> Result<()> {
     assert!(new_mud_data.expiration < higher_expiration);
 
     //returns the database to the state before the test
-    sqlx::query!("DELETE FROM mud_data WHERE url = ?", mud_dbo.url)
+    sqlx::query!("DELETE FROM mud_data WHERE url = $1", mud_dbo.url)
         .execute(&ctx.db_conn)
         .await?;
 
-    let is_delete: Option<MudDbo> = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = ?", mud_data.url)
+    let is_delete: Option<MudDbo> = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = $1", mud_data.url)
         .fetch_optional(&ctx.db_conn)
         .await?;
 
@@ -99,7 +99,7 @@ async fn test_update_valid_profiles() -> Result<()> {
     let mud_data: MudData =
         parse_mud(url.clone(), str_data.as_str()).unwrap_or_else(|_| panic!("Could not parse {}", PATH));
 
-    let mud_dbo = MudDbo {
+    let mut mud_dbo = MudDbo {
         url: url.to_owned(),
         //the profile content is modified from it's original state to distinguish it from the original
         data: serde_json::to_string(&mud_data)? + "Test",
@@ -110,7 +110,7 @@ async fn test_update_valid_profiles() -> Result<()> {
 
     //Puts active Profile into the Database
     sqlx::query!(
-        "insert into mud_data (url, data, created_at, expiration) values (?, ?, ?, ?)",
+        "insert into mud_data (url, data, created_at, expiration) values ($1, $2, $3, $4)",
         mud_dbo.url,
         mud_dbo.data,
         mud_dbo.created_at,
@@ -122,9 +122,15 @@ async fn test_update_valid_profiles() -> Result<()> {
     //function call
     update_outdated_profiles(&ctx.db_conn).await?;
 
-    let new_mud_data: MudDbo = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = $1", mud_data.url)
+    let mut new_mud_data: MudDbo = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = $1", mud_data.url)
         .fetch_one(&ctx.db_conn)
         .await?;
+
+    //postgres saves timestamps without nano
+    strip_nano(&mut new_mud_data.expiration);
+    strip_nano(&mut new_mud_data.created_at);
+    strip_nano(&mut mud_dbo.expiration);
+    strip_nano(&mut mud_dbo.created_at);
 
     //checks whether the expiration date has not been changed
     assert_eq!(new_mud_data.expiration, mud_dbo.expiration);
@@ -136,16 +142,9 @@ async fn test_update_valid_profiles() -> Result<()> {
     //checks whether the expiration date is after the current date
     assert!(new_mud_data.expiration > Utc::now().naive_utc());
 
-    //returns the database to the state before the test
-    sqlx::query!("DELETE FROM mud_data WHERE url = ?", mud_dbo.url)
-        .execute(&ctx.db_conn)
-        .await?;
-
-    let is_delete: Option<MudDbo> = sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = ?", mud_data.url)
-        .fetch_optional(&ctx.db_conn)
-        .await?;
-
-    //makes sure the tests changes to the database are gone
-    assert!(is_delete.is_none());
     Ok(())
+}
+
+fn strip_nano(ts: &mut NaiveDateTime) {
+    *ts = ts.with_nanosecond(0).unwrap();
 }

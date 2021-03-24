@@ -76,7 +76,7 @@ async fn delete_config(
     let mut deletion_map: HashMap<String, bool> = HashMap::new();
     for key in config_delete_dto.into_inner() {
         let value = config_service::delete_config_key(&key, &pool).await?;
-        deletion_map.insert(key, value != 0);
+        deletion_map.insert(key, value);
     }
 
     Ok(Json(deletion_map))

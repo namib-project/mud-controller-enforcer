@@ -3,8 +3,7 @@ use log::info;
 use namib_mud_controller::db::DbConnection;
 use sqlx::migrate;
 
-#[cfg(feature = "postgres")]
-use std::env;
+use url::Url;
 
 pub struct IntegrationTestContext {
     pub db_url: String,
@@ -24,11 +23,21 @@ impl IntegrationTestContext {
         let db_url = "sqlite::memory:".to_string();
 
         #[cfg(feature = "postgres")]
-        let db_url = format!(
-            "{}/{}",
-            env::var("DATABASE_URL").expect("Failed to load DB URL from .env"),
-            db_name
-        );
+        let db_url = {
+            let mut url = Url::parse(&std::env::var("DATABASE_URL").expect("Failed to load DB URL from .env")).unwrap();
+            let db_name = format!("__{}", db_name);
+            let conn = DbConnection::connect(url.as_str()).await.unwrap();
+            sqlx::query(&format!("DROP DATABASE IF EXISTS {}", db_name))
+                .execute(&conn)
+                .await
+                .unwrap();
+            sqlx::query(&format!("CREATE DATABASE {}", db_name))
+                .execute(&conn)
+                .await
+                .unwrap();
+            url.set_path(&db_name);
+            url.to_string()
+        };
 
         info!("Using DB {:?}", db_url);
 
@@ -53,15 +62,5 @@ impl IntegrationTestContext {
             db_name,
             db_conn,
         }
-    }
-}
-
-#[cfg(feature = "postgres")]
-impl Drop for IntegrationTestContext {
-    /// Removes/cleans the DB context
-    fn drop(&self) {
-        sqlx::query("DROP DATABASE " + self.db_name);
-
-        info!("Cleaned up database context");
     }
 }

@@ -42,6 +42,17 @@ test:
   script:
     - cargo test
 
+test-postgres:
+  stage: test
+  services:
+    - postgres
+  variables:
+    POSTGRES_USER: namib
+    POSTGRES_PASSWORD: namib
+    DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+  script:
+    - cargo test --no-default-features --features-postgres
+
 warnings:
   stage: test
   script:
@@ -85,8 +96,15 @@ build-release:
     - build
   only:
     - master
+    - feature/#59_kompatibel_mit_postgres_machen
+  services:
+    - postgres
+  variables:
+    POSTGRES_USER: namib
+    POSTGRES_PASSWORD: namib
+    DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
   script:
-    - cargo install --root ./install --path .
+    - cargo install --root ./install --path . --no-default-features --features postgres
     - apt-get install git-secret -y
     # download namib frontend
     - ./scripts/download_namib_frontend.sh
@@ -103,7 +121,6 @@ build-release:
       - install/bin
       - certs
       - static
-      - db.sqlite
 
 create-docker:
   stage: docker
@@ -115,10 +132,11 @@ create-docker:
     entrypoint: [ "" ]
   only:
     - master
+    - feature/#59_kompatibel_mit_postgres_machen
   before_script:
     - echo "Global before_script disabled"
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:postgres
 

@@ -2,8 +2,9 @@ version: "3"
 
 services:
   namib_mud_controller:
-    image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:latest
-    #image: controller
+    image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:postgres
+    environment:
+      DATABASE_URL: postgres://namib:namib@localhost/namib_mud_controller
     ports:
       - 8000:8000
       - 8734:8734
@@ -13,5 +14,8 @@ services:
     environment:
       POSTGRES_USER: namib
       POSTGRES_PASSWORD: namib
+      POSTGRES_DB: namib_mud_controller
+    volumes:
+      - ./data:/var/lib/postgresql/data
     ports:
       - 5432:5432
