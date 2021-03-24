@@ -68,8 +68,8 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
             .filter(|d| d.collect_data)
             .flat_map(|d| {
                 Iterator::chain(
-                    d.ipv4.iter().map(ToString::to_string),
-                    d.ipv6.iter().map(ToString::to_string),
+                    d.ipv4_addr.iter().map(ToString::to_string),
+                    d.ipv6_addr.iter().map(ToString::to_string),
                 )
             })
             .collect::<Vec<_>>();
