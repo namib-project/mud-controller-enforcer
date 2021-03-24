@@ -38,8 +38,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         None => {
             return FirewallDevice {
                 id: device.id,
-                ipv4: device.ipv4_addr,
-                ipv6: device.ipv6_addr,
+                ipv4_addr: device.ipv4_addr,
+                ipv6_addr: device.ipv6_addr,
                 rules: result,
                 collect_data: device.collect_info,
             }
@@ -109,8 +109,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
 
     FirewallDevice {
         id: device.id,
-        ipv4: device.ipv4_addr,
-        ipv6: device.ipv6_addr,
+        ipv4_addr: device.ipv4_addr,
+        ipv6_addr: device.ipv6_addr,
         rules: result,
         collect_data: device.collect_info,
     }
@@ -316,8 +316,8 @@ mod tests {
 
         let resulting_device = FirewallDevice {
             id: device.id,
-            ipv4: device.ipv4_addr,
-            ipv6: device.ipv6_addr,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
@@ -402,8 +402,8 @@ mod tests {
 
         let resulting_device = FirewallDevice {
             id: device.id,
-            ipv4: device.ipv4_addr,
-            ipv6: device.ipv6_addr,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
