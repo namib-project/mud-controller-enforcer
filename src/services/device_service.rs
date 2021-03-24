@@ -94,15 +94,14 @@ pub async fn find_by_mac_or_duid(
     duid: Option<String>,
     pool: &DbConnection,
 ) -> Result<Device> {
-    let mut device: Option<DeviceDbo> = None;
     if let Some(mac_addr) = mac_addr {
-        let mac_addr = mac_addr.to_string();
-        device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr)
+        let mac_addr_string = mac_addr.to_string();
+        let device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr_string)
             .fetch_optional(pool)
             .await?;
-    }
-    if let Some(device) = device {
-        return Ok(device.into());
+        if let Some(device) = device {
+            return Ok(device.into());
+        }
     }
     if let Some(duid) = duid {
         let device = sqlx::query_as!(DeviceDbo, "select * from devices where duid = ?", duid)
