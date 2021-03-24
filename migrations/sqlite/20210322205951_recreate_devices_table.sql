@@ -22,3 +22,5 @@ CREATE TABLE devices
 INSERT INTO devices (id, ipv4_addr, mac_addr, hostname, vendor_class, mud_url, last_interaction)
     SELECT id, ip_addr, mac_addr, hostname, vendor_class, mud_url, last_interaction
     FROM _old_devices;
+
+DROP TABLE _old_devices;
