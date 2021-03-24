@@ -6,7 +6,7 @@ use crate::{
     error,
     error::Result,
     routes::dtos::{RoleAssignDto, RoleDto, RoleUpdateDto},
-    services::role_service::{permission::Permission, role_service},
+    services::role_service::{self, Permission},
 };
 use actix_web::HttpResponse;
 use isahc::http::StatusCode;

@@ -80,7 +80,7 @@ pub async fn is_mud_used(url: &str, pool: &DbConnection) -> Result<bool> {
     Ok(device_using_mud.is_some())
 }
 
-/// This function return MudDboRefresh they only containing url and expiration
+/// This function return `MudDboRefresh` they only containing url and expiration
 /// to reduce payload.
 async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
     Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")

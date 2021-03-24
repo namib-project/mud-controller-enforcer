@@ -14,7 +14,7 @@ use crate::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
         UserConfigValueDto,
     },
-    services::{role_service::permission::Permission, user_config_service, user_service},
+    services::{role_service::Permission, user_config_service, user_service},
 };
 use actix_web::HttpResponse;
 
@@ -198,7 +198,7 @@ pub fn get_users_configs(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
 
     let mut user_configs_dto = vec![];
 
-    for uc in user_configs.into_iter() {
+    for uc in user_configs {
         user_configs_dto.push(UserConfigDto {
             key: uc.key,
             value: uc.value,
@@ -248,18 +248,16 @@ pub fn set_users_config(
         .fail()
     })?;
 
-    let _insert_result =
+    let insert_result =
         user_config_service::upsert_config_for_user(auth.sub, &key, &user_config_value_dto.value, pool.get_ref()).await;
 
-    let _insert_result = match _insert_result {
+    match insert_result {
         Ok(_) => (),
-        Err(_) => {
-            return error::ResponseError {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                message: None,
-            }
-            .fail()
-        },
+        Err(_) => error::ResponseError {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: None,
+        }
+        .fail()?,
     };
 
     Ok(HttpResponse::NoContent().finish())

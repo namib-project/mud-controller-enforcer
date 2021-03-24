@@ -25,7 +25,7 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
     merged_acls
 }
 
-pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
+pub fn create_configuration(version: String, devices: &[Device]) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
@@ -72,7 +72,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
             if let Some(dns_name) = &ace.matches.dnsname {
                 let route_network_remote_host = match dns_name.parse::<IpAddr>() {
                     Ok(addr) => NetworkConfig::new(Some(NetworkHost::Ip(addr)), None),
-                    _ => NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None),
+                    Err(_) => NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None),
                 };
 
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
