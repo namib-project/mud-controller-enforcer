@@ -97,8 +97,8 @@ impl FirewallRule {
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallDevice {
     pub id: i64,
-    pub ipv4: Option<Ipv4Addr>,
-    pub ipv6: Option<Ipv6Addr>,
+    pub ipv4_addr: Option<Ipv4Addr>,
+    pub ipv6_addr: Option<Ipv6Addr>,
     pub rules: Vec<FirewallRule>,
     pub collect_data: bool,
 }
@@ -123,13 +123,8 @@ impl EnforcerConfig {
     }
 
     /// Returns a reference to the firewall rules in this config
-    pub fn devices(&self) -> &Vec<FirewallDevice> {
+    pub fn devices(&self) -> &[FirewallDevice] {
         &self.devices
-    }
-
-    /// Returns a reference to the firewall rules in this config
-    pub fn devices_mut(&mut self) -> &mut Vec<FirewallDevice> {
-        &mut self.devices
     }
 
     pub fn secure_name(&self) -> &str {
