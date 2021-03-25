@@ -3,7 +3,7 @@
 
 use std::{fs::File, io};
 
-use tokio_serde::formats::Bincode;
+use tokio_serde::formats::Cbor;
 
 pub use crate::macaddr::*;
 
@@ -29,6 +29,6 @@ where
 
 /// Returns the codec used for RPC communication
 #[must_use]
-pub fn codec<Item, SinkItem>() -> fn() -> Bincode<Item, SinkItem> {
-    Bincode::default
+pub fn codec<Item, SinkItem>() -> fn() -> Cbor<Item, SinkItem> {
+    Cbor::default
 }

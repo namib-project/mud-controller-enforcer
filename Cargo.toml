@@ -6,8 +6,8 @@ edition = "2018"
 
 [dependencies]
 snafu = "0.6"
-tokio-serde = { version = "0.8", features = ["bincode"] }
-tarpc = "0.24"
+tokio-serde = { version = "0.8", features = ["cbor"], default-features = false }
+tarpc = { branch = "replace_u128_traceid", git = "https://github.com/namib-project/tarpc", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
