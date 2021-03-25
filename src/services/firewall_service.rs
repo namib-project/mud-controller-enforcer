@@ -22,9 +22,6 @@ use tokio::{
 ///
 /// @author Namib Group 3.
 
-/// The folder where the configuration file should be stored.
-const CONFIG_DIR: &str = "config";
-const SAVE_DIR: &str = "/tmp/.uci_namib";
 const TABLE_NAME: &str = "namib";
 const BASE_CHAIN_NAME: &str = "base_chain";
 

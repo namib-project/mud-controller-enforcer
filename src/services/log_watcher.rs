@@ -60,7 +60,7 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
     let lines = io::BufReader::new(File::open(tmp_path)?).lines();
     // create async runtime to run rpc client
     Builder::new_current_thread().enable_all().build()?.block_on(async {
-        let mut enforcer = enforcer.write().await;
+        let enforcer = enforcer.read().await;
         debug!("acquired known devices");
         let lines = lines
             .filter(|l| {

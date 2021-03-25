@@ -11,8 +11,8 @@ const RESOLVE_TIMEOUT: Duration = Duration::from_secs(3);
 const ADDRESS_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub fn discover_controllers(reg_type: &str) -> Result<impl Stream<Item=Result<ScopedSocketAddr>>> {
-    let result = async_dnssd::browse(reg_type)?
-        .timeout(SEARCH_TIMEOUT)?
+    let result = async_dnssd::browse(reg_type)
+        .timeout(SEARCH_TIMEOUT)
         .try_filter_map(|service| async move {
             let added = service.flags.contains(async_dnssd::BrowsedFlags::ADD);
 
@@ -30,7 +30,7 @@ pub fn discover_controllers(reg_type: &str) -> Result<impl Stream<Item=Result<Sc
                 return Ok(None);
             }
 
-            Ok(Some(service.resolve()?.timeout(RESOLVE_TIMEOUT)?))
+            Ok(Some(service.resolve().timeout(RESOLVE_TIMEOUT)))
         })
         .try_flatten()
         .try_filter_map(|r| async move {
@@ -39,7 +39,7 @@ pub fn discover_controllers(reg_type: &str) -> Result<impl Stream<Item=Result<Sc
                 r.interface, r.host_target, r.port, r
             );
 
-            Ok(Some(r.resolve_socket_address()?.timeout(ADDRESS_TIMEOUT)?))
+            Ok(Some(r.resolve_socket_address().timeout(ADDRESS_TIMEOUT)))
         })
         .try_flatten()
         .try_filter_map(|result| {
