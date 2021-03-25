@@ -18,6 +18,5 @@ COPY docker/run_mud_controller.sh run_mud_controller.sh
 COPY ./install/bin/namib_mud_controller namib_mud_controller
 COPY ./certs certs
 COPY ./static static
-COPY ./db.sqlite db.sqlite
 
 CMD ["/namib/run_mud_controller.sh"]

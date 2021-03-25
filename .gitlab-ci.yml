@@ -47,11 +47,12 @@ test-postgres:
   services:
     - postgres
   variables:
+    MIGRATION_DIRECTORY: migrations/postgres
     POSTGRES_USER: namib
     POSTGRES_PASSWORD: namib
     DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
   script:
-    - cargo test --no-default-features --features-postgres
+    - cargo test --no-default-features --features postgres
 
 warnings:
   stage: test
@@ -100,6 +101,7 @@ build-release:
   services:
     - postgres
   variables:
+    MIGRATION_DIRECTORY: migrations/postgres
     POSTGRES_USER: namib
     POSTGRES_PASSWORD: namib
     DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
