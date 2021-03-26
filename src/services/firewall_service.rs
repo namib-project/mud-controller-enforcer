@@ -10,7 +10,10 @@ use nftnl::{
 };
 #[cfg(feature = "nftables")]
 use std::ffi::CString;
-use std::{net::IpAddr, sync::Arc};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    sync::Arc,
+};
 use tokio::{
     select,
     sync::{Notify, RwLock},
@@ -49,6 +52,18 @@ enum RuleAddrEntry {
 impl From<IpAddr> for RuleAddrEntry {
     fn from(a: IpAddr) -> Self {
         RuleAddrEntry::AddrEntry(a)
+    }
+}
+
+impl From<Ipv4Addr> for RuleAddrEntry {
+    fn from(a: Ipv4Addr) -> Self {
+        RuleAddrEntry::AddrEntry(a.into())
+    }
+}
+
+impl From<Ipv6Addr> for RuleAddrEntry {
+    fn from(a: Ipv6Addr) -> Self {
+        RuleAddrEntry::AddrEntry(a.into())
     }
 }
 
@@ -131,42 +146,25 @@ impl FirewallService {
 
         // Iterate over all devices.
         for device in config.devices() {
-            for ip_addr in Iterator::chain(
-                device.ipv4_addr.into_iter().map(IpAddr::from),
-                device.ipv6_addr.into_iter().map(IpAddr::from),
-            ) {
-                // Create chain which is responsible for deciding how packets for/from this device will be treated.
-                let device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
-                batch.add(&device_chain, nftnl::MsgType::Add);
+            // Create chain which is responsible for deciding how packets for/from this device will be treated.
+            let device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
+            batch.add(&device_chain, nftnl::MsgType::Add);
 
+            if let Some(v4addr) = device.ipv4_addr {
                 // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
                 let mut device_jump_rule_src = Rule::new(&base_chain);
                 device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
                 let mut device_jump_rule_dst = Rule::new(&base_chain);
                 device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
                 // Match rule if source or target address is configured device.
-                match ip_addr {
-                    IpAddr::V4(v4addr) => {
-                        device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-                        device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
-                        device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
-                        device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
-                        device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-                        device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
-                        device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
-                        device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
-                    },
-                    IpAddr::V6(v6addr) => {
-                        device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-                        device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
-                        device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
-                        device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
-                        device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-                        device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
-                        device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
-                        device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
-                    },
-                }
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
                 // If these rules apply, jump to the chain responsible for handling this device.
                 device_jump_rule_src
                     .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
@@ -174,161 +172,195 @@ impl FirewallService {
                     .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
                 batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
                 batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+            }
+            if let Some(v6addr) = device.ipv6_addr {
+                // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
+                let mut device_jump_rule_src = Rule::new(&base_chain);
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                let mut device_jump_rule_dst = Rule::new(&base_chain);
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                // Match rule if source or target address is configured device.
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
+                // If these rules apply, jump to the chain responsible for handling this device.
+                device_jump_rule_src
+                    .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+                device_jump_rule_dst
+                    .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+                batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
+                batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+            }
 
-                // Iterate over device rules.
-                for rule_spec in &device.rules {
-                    // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
-                    // for the packet source or destination, create a vector of ip addresses for this identifier.
-                    let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
-                        Some(NetworkHost::Ip(ipaddr)) => {
-                            vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
-                        },
-                        // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
-                        // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-                        Some(NetworkHost::Hostname(dns_name)) => self
-                            .dns_watcher
-                            .resolve_and_watch(dns_name.as_str())
-                            .await
-                            .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
-                            .unwrap_or(Vec::new()),
-                        Some(NetworkHost::FirewallDevice) => vec![RuleAddrEntry::AddrEntry(ip_addr)],
-                        _ => vec![RuleAddrEntry::AnyAddr],
-                    };
-                    let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
-                        Some(NetworkHost::Ip(ipaddr)) => {
-                            vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
-                        },
-                        // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
-                        // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-                        Some(NetworkHost::Hostname(dns_name)) => self
-                            .dns_watcher
-                            .resolve_and_watch(dns_name.as_str())
-                            .await
-                            .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
-                            .unwrap_or(Vec::new()),
-                        Some(NetworkHost::FirewallDevice) => vec![RuleAddrEntry::AddrEntry(ip_addr)],
-                        _ => vec![RuleAddrEntry::AnyAddr],
-                    };
+            // Iterate over device rules.
+            for rule_spec in &device.rules {
+                // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
+                // for the packet source or destination, create a vector of ip addresses for this identifier.
+                let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
+                    Some(NetworkHost::Ip(ipaddr)) => {
+                        vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
+                    },
+                    // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
+                    // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
+                    Some(NetworkHost::Hostname(dns_name)) => self
+                        .dns_watcher
+                        .resolve_and_watch(dns_name.as_str())
+                        .await
+                        .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
+                        .unwrap_or(Vec::new()),
+                    Some(NetworkHost::FirewallDevice) => device
+                        .ipv4_addr
+                        .map(RuleAddrEntry::from)
+                        .into_iter()
+                        .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
+                        .collect(),
+                    _ => vec![RuleAddrEntry::AnyAddr],
+                };
+                let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
+                    Some(NetworkHost::Ip(ipaddr)) => {
+                        vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
+                    },
+                    // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
+                    // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
+                    Some(NetworkHost::Hostname(dns_name)) => self
+                        .dns_watcher
+                        .resolve_and_watch(dns_name.as_str())
+                        .await
+                        .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
+                        .unwrap_or(Vec::new()),
+                    Some(NetworkHost::FirewallDevice) => device
+                        .ipv4_addr
+                        .map(RuleAddrEntry::from)
+                        .into_iter()
+                        .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
+                        .collect(),
+                    _ => vec![RuleAddrEntry::AnyAddr],
+                };
 
-                    // Create a rule for each source/destination ip combination.
-                    // Ideally, we would instead used nftnl sets, but these currently have the limitation that they
-                    // can only either contain IPv4 or IPv6 addresses, not both. Also, nftnl-rs does not support anonymous
-                    // sets yet.
-                    for source_ip in &source_ips {
-                        for dest_ip in &dest_ips {
-                            let protocol_reference_ip;
-                            // Do not create rules which mix IPv4 and IPV6 addresses. Also, save at least one specified IP to match for protocol later on.
-                            if let &RuleAddrEntry::AddrEntry(saddr) = source_ip {
-                                if let RuleAddrEntry::AddrEntry(daddr) = dest_ip {
-                                    if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
-                                        continue;
-                                    }
+                // Create a rule for each source/destination ip combination.
+                // Ideally, we would instead used nftnl sets, but these currently have the limitation that they
+                // can only either contain IPv4 or IPv6 addresses, not both. Also, nftnl-rs does not support anonymous
+                // sets yet.
+                for source_ip in &source_ips {
+                    for dest_ip in &dest_ips {
+                        let protocol_reference_ip;
+                        // Do not create rules which mix IPv4 and IPV6 addresses. Also, save at least one specified IP to match for protocol later on.
+                        if let &RuleAddrEntry::AddrEntry(saddr) = source_ip {
+                            if let RuleAddrEntry::AddrEntry(daddr) = dest_ip {
+                                if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
+                                    continue;
                                 }
-                                protocol_reference_ip = Some(saddr);
-                            } else if let &RuleAddrEntry::AddrEntry(daddr) = dest_ip {
-                                protocol_reference_ip = Some(daddr);
-                            } else {
-                                protocol_reference_ip = None;
                             }
-                            // Create rule for current address combination.
-                            let mut current_rule = Rule::new(&device_chain);
-                            // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
-                            match protocol_reference_ip {
-                                Some(IpAddr::V4(_v4addr)) => {
-                                    // Match for protocol.
-                                    match rule_spec.protocol {
-                                        Protocol::Tcp => {
-                                            current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
-                                            current_rule.add_expr(&nft_expr!(cmp == "tcp"));
-                                        },
-                                        Protocol::Udp => {
-                                            current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
-                                            current_rule.add_expr(&nft_expr!(cmp == "udp"));
-                                        },
-                                        _ => {}, // TODO expand with further options (icmp, sctp)
-                                    }
-                                },
-                                Some(IpAddr::V6(_v6addr)) => {
-                                    match rule_spec.protocol {
-                                        Protocol::Tcp => {
-                                            current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
-                                            current_rule.add_expr(&nft_expr!(cmp == "tcp"));
-                                        },
-                                        Protocol::Udp => {
-                                            current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
-                                            current_rule.add_expr(&nft_expr!(cmp == "udp"));
-                                        },
-                                        _ => {}, // TODO expand with further options (icmp, sctp)
-                                    }
-                                },
-                                _ => {},
-                            }
-                            // Create expressions to match source IP.
-                            match source_ip {
-                                RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
-                                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
-                                    current_rule.add_expr(&nft_expr!(payload ipv4 saddr));
-                                    current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
-                                },
-                                RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
-                                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
-                                    current_rule.add_expr(&nft_expr!(payload ipv6 saddr));
-                                    current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
-                                },
-                                RuleAddrEntry::AnyAddr => {},
-                            }
-                            // Create expressions to match destination IP.
-                            match dest_ip {
-                                RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
-                                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
-                                    current_rule.add_expr(&nft_expr!(payload ipv4 daddr));
-                                    current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
-                                },
-                                RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
-                                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
-                                    current_rule.add_expr(&nft_expr!(payload ipv6 daddr));
-                                    current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
-                                },
-                                RuleAddrEntry::AnyAddr => {},
-                            }
-                            // Create expressions to match for port numbers.
-                            match rule_spec.protocol {
-                                Protocol::Tcp => {
-                                    if let Some(port) = &rule_spec.dst.port {
-                                        current_rule.add_expr(&nft_expr!(payload tcp dport));
-                                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                                    }
-                                    if let Some(port) = &rule_spec.src.port {
-                                        current_rule.add_expr(&nft_expr!(payload tcp dport));
-                                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                                    }
-                                },
-                                Protocol::Udp => {
-                                    if let Some(port) = &rule_spec.dst.port {
-                                        current_rule.add_expr(&nft_expr!(payload udp dport));
-                                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                                    }
-                                    if let Some(port) = &rule_spec.src.port {
-                                        current_rule.add_expr(&nft_expr!(payload udp dport));
-                                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                                    }
-                                },
-                                _ => {},
-                            }
-
-                            // Set verdict if current rule matches.
-                            match rule_spec.target {
-                                Target::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
-                                Target::Reject => current_rule
-                                    .add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited))),
-                                Target::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
-                            }
-                            batch.add(&current_rule, nftnl::MsgType::Add);
+                            protocol_reference_ip = Some(saddr);
+                        } else if let &RuleAddrEntry::AddrEntry(daddr) = dest_ip {
+                            protocol_reference_ip = Some(daddr);
+                        } else {
+                            protocol_reference_ip = None;
                         }
+                        // Create rule for current address combination.
+                        let mut current_rule = Rule::new(&device_chain);
+                        // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
+                        match protocol_reference_ip {
+                            Some(IpAddr::V4(_v4addr)) => {
+                                // Match for protocol.
+                                match rule_spec.protocol {
+                                    Protocol::Tcp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
+                                        current_rule.add_expr(&nft_expr!(cmp == "tcp"));
+                                    },
+                                    Protocol::Udp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
+                                        current_rule.add_expr(&nft_expr!(cmp == "udp"));
+                                    },
+                                    _ => {}, // TODO expand with further options (icmp, sctp)
+                                }
+                            },
+                            Some(IpAddr::V6(_v6addr)) => {
+                                match rule_spec.protocol {
+                                    Protocol::Tcp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
+                                        current_rule.add_expr(&nft_expr!(cmp == "tcp"));
+                                    },
+                                    Protocol::Udp => {
+                                        current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
+                                        current_rule.add_expr(&nft_expr!(cmp == "udp"));
+                                    },
+                                    _ => {}, // TODO expand with further options (icmp, sctp)
+                                }
+                            },
+                            _ => {},
+                        }
+                        // Create expressions to match source IP.
+                        match source_ip {
+                            RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv4 saddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
+                            },
+                            RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv6 saddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
+                            },
+                            RuleAddrEntry::AnyAddr => {},
+                        }
+                        // Create expressions to match destination IP.
+                        match dest_ip {
+                            RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv4 daddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
+                            },
+                            RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
+                                current_rule.add_expr(&nft_expr!(meta nfproto));
+                                current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                                current_rule.add_expr(&nft_expr!(payload ipv6 daddr));
+                                current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
+                            },
+                            RuleAddrEntry::AnyAddr => {},
+                        }
+                        // Create expressions to match for port numbers.
+                        match rule_spec.protocol {
+                            Protocol::Tcp => {
+                                if let Some(port) = &rule_spec.dst.port {
+                                    current_rule.add_expr(&nft_expr!(payload tcp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                                if let Some(port) = &rule_spec.src.port {
+                                    current_rule.add_expr(&nft_expr!(payload tcp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                            },
+                            Protocol::Udp => {
+                                if let Some(port) = &rule_spec.dst.port {
+                                    current_rule.add_expr(&nft_expr!(payload udp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                                if let Some(port) = &rule_spec.src.port {
+                                    current_rule.add_expr(&nft_expr!(payload udp dport));
+                                    current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
+                                }
+                            },
+                            _ => {},
+                        }
+
+                        // Set verdict if current rule matches.
+                        match rule_spec.target {
+                            Target::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
+                            Target::Reject => {
+                                current_rule.add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
+                            },
+                            Target::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
+                        }
+                        batch.add(&current_rule, nftnl::MsgType::Add);
                     }
                 }
             }
