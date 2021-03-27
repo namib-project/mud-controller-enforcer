@@ -77,7 +77,7 @@ pub async fn find_by_id(id: i64, fetch_mud: bool, pool: &DbConnection) -> Result
         .fetch_one(pool)
         .await?;
 
-    let device = Device::from(device);
+    let mut device = Device::from(device);
 
     if fetch_mud && device.mud_url.is_some() {
         device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
@@ -102,7 +102,7 @@ pub async fn find_by_ip(ip: &str, fetch_mud: bool, pool: &DbConnection) -> Resul
         device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
     }
 
-    Ok(device.into())
+    Ok(device)
 }
 
 pub async fn find_by_mac_or_duid(
@@ -111,20 +111,26 @@ pub async fn find_by_mac_or_duid(
     fetch_mud: bool,
     pool: &DbConnection,
 ) -> Result<Device> {
+    let mut device = None;
     if let Some(mac_addr) = mac_addr {
         let mac_addr_string = mac_addr.to_string();
-        let device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr_string)
+        device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr_string)
             .fetch_optional(pool)
             .await?;
-        if let Some(device) = device {
-            return Ok(device.into());
-        }
     }
-    if let Some(duid) = duid {
-        let device = sqlx::query_as!(DeviceDbo, "select * from devices where duid = ?", duid)
-            .fetch_one(pool)
+    if device.is_none() && duid.is_some() {
+        device = sqlx::query_as!(DeviceDbo, "select * from devices where duid = ?", duid)
+            .fetch_optional(pool)
             .await?;
-        Ok(device.into())
+    }
+    if let Some(device) = device {
+        let mut device = Device::from(device);
+
+        if fetch_mud && device.mud_url.is_some() {
+            device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
+        }
+
+        Ok(device)
     } else {
         Err(sqlx::error::Error::RowNotFound.into())
     }
