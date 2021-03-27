@@ -24,7 +24,7 @@ pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
 async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
     for mud_url in vec_url {
         log::debug!("Try to update url: {}", mud_url);
-        let updated_mud = get_or_fetch_mud(mud_url, db_pool).await?;
+        let updated_mud = get_or_fetch_mud(&mud_url, db_pool).await?;
         log::debug!("Updated mud profile: {:#?}", updated_mud);
     }
     Ok(())

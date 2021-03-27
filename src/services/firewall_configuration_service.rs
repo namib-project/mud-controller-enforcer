@@ -54,9 +54,10 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         },
     };
 
-    let merged_acls = match &mud_data.acl_override {
-        Some(acl_override) => merge_acls(&mud_data.acllist, acl_override),
-        None => (&mud_data.acllist).iter().collect::<Vec<&Acl>>(),
+    let merged_acls = if mud_data.acl_override.is_empty() {
+        mud_data.acllist.iter().collect()
+    } else {
+        merge_acls(&mud_data.acllist, &mud_data.acl_override)
     };
 
     for acl in &merged_acls {
@@ -291,7 +292,7 @@ mod tests {
                     },
                 }],
             }],
-            acl_override: Some(vec![Acl {
+            acl_override: vec![Acl {
                 name: "some_acl_name".to_string(),
                 packet_direction: AclDirection::ToDevice,
                 acl_type: AclType::IPV4,
@@ -307,7 +308,7 @@ mod tests {
                         destination_port: None,
                     },
                 }],
-            }]),
+            }],
         };
 
         let device = Device {
@@ -398,7 +399,7 @@ mod tests {
                     },
                 }],
             }],
-            acl_override: None,
+            acl_override: Vec::default(),
         };
 
         let device = Device {

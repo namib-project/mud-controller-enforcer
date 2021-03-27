@@ -77,7 +77,7 @@ pub async fn update_mud(
 
     // update the acl_override in mud_data
     let mut mud_data = serde_json::from_str::<MudData>(&mud_dbo.data)?;
-    mud_data.acl_override = mud_update_dto.into_inner().acl_override;
+    mud_data.acl_override = mud_update_dto.into_inner().acl_override.unwrap_or_default();
 
     // use the new mud_data in the existing mud_dbo
     mud_dbo.data = serde_json::to_string(&mud_data)?;
@@ -136,12 +136,14 @@ pub async fn create_mud(
 
     // Check if the mud_url is actually an url. It might be a custom user mud-profile
     if is_url(&mud_creation_dto.mud_url) {
-        let created_mud = mud_service::get_or_fetch_mud(mud_creation_dto.mud_url, &pool).await?;
+        let created_mud = mud_service::get_or_fetch_mud(&mud_creation_dto.mud_url, &pool).await?;
 
         Ok(Json(created_mud))
     } else {
-        let empty_mud =
-            mud_service::generate_empty_custom_mud_profile(&mud_creation_dto.mud_url, mud_creation_dto.acl_override);
+        let empty_mud = mud_service::generate_empty_custom_mud_profile(
+            &mud_creation_dto.mud_url,
+            mud_creation_dto.acl_override.unwrap_or_default(),
+        );
         let mud_dbo = MudDbo {
             url: mud_creation_dto.mud_url,
             data: serde_json::to_string(&empty_mud)?,

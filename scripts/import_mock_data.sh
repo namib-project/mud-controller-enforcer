@@ -2,6 +2,8 @@
 
 set -e
 
+# This adds 3 users admin, read and new_user all with password "namibnamib"
+
 function import() {
   local CMD=$1
   $CMD <<'EOF'
