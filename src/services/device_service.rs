@@ -10,7 +10,6 @@ use crate::{
 pub use futures::TryStreamExt;
 
 use namib_shared::{models::DhcpLeaseInformation, MacAddr};
-use sqlx::Done;
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
     let (device, update) = if let Ok(mut device) = find_by_mac_or_duid(

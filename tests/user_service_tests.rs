@@ -2,7 +2,7 @@ mod lib;
 
 use namib_mud_controller::{error::Result, models::User, services::user_service};
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_creating_admin_user() -> Result<()> {
     let ctx = lib::IntegrationTestContext::new("test_creating_admin_user").await;
 

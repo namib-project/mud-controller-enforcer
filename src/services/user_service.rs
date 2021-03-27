@@ -1,5 +1,3 @@
-use sqlx::Done;
-
 use crate::{
     db::DbConnection,
     error::Result,
