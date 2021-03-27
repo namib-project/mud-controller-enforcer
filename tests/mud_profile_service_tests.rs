@@ -10,7 +10,7 @@ use namib_mud_controller::{
     services::mud_service::{json_models, mud_profile_service::update_outdated_profiles, parser::parse_mud},
 };
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 //tests whether update_outdated_profiles() works on expired profiles. Dependent on external Service.
 async fn test_update_outdated_profiles() -> Result<()> {
     //Sets up an expired Amazon Echo profile
@@ -82,7 +82,7 @@ async fn test_update_outdated_profiles() -> Result<()> {
     Ok(())
 }
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 //tests whether update_outdated_profiles() doesn't modify profiles that aren't expired yet. Dependent on external Service.
 async fn test_update_valid_profiles() -> Result<()> {
     //Sets up a valid Amazon Echo profile
