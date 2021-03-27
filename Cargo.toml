@@ -15,11 +15,11 @@ actix-rt = "1.1"
 actix-files = "0.5"
 actix-cors = "0.5.4"
 actix-ratelimit = { version = "0.3.1", default-features = false, features = ["memory"] }
-sqlx = { version = "0.4", features = ["runtime-actix-rustls", "chrono"] }
+sqlx = { version = "0.5", features = ["runtime-tokio-rustls", "chrono"] }
 namib_shared = { tag = "0.4.4", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "0.4.14"
 env_logger = "0.8"
-tokio = { version = "1.2", features = ["full"] }
+tokio = { version = "1.4", features = ["full"] }
 async-dnssd = { branch = "fix_windows_build", git = "https://github.com/namib-project/rust-async-dnssd" }
 futures = "0.3"
 rustls = "0.19"
