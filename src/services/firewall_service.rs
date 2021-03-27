@@ -10,7 +10,10 @@ use nftnl::{
 };
 #[cfg(feature = "nftables")]
 use std::ffi::CString;
-use std::{net::IpAddr, sync::Arc};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    sync::Arc,
+};
 use tokio::{
     select,
     sync::{Notify, RwLock},
@@ -49,8 +52,20 @@ impl From<IpAddr> for RuleAddrEntry {
     }
 }
 
+impl From<Ipv4Addr> for RuleAddrEntry {
+    fn from(a: Ipv4Addr) -> Self {
+        RuleAddrEntry::AddrEntry(a.into())
+    }
+}
+
+impl From<Ipv6Addr> for RuleAddrEntry {
+    fn from(a: Ipv6Addr) -> Self {
+        RuleAddrEntry::AddrEntry(a.into())
+    }
+}
+
 impl FirewallService {
-    /// Creates a new FirewallService instance with the given enforcer state and dns watcher (generated from the dns service).
+    /// Creates a new `FirewallService` instance with the given enforcer state and dns watcher (generated from the dns service).
     pub(crate) fn new(enforcer_state: Arc<RwLock<Enforcer>>, watcher: DnsWatcher) -> FirewallService {
         FirewallService {
             enforcer_state,
@@ -132,41 +147,52 @@ impl FirewallService {
             let device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
             batch.add(&device_chain, nftnl::MsgType::Add);
 
-            // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
-            let mut device_jump_rule_src = Rule::new(&base_chain);
-            device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-            let mut device_jump_rule_dst = Rule::new(&base_chain);
-            device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-            // Match rule if source or target address is configured device.
-            match device.ip {
-                IpAddr::V4(v4addr) => {
-                    device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-                    device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
-                    device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
-                    device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
-                    device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
-                    device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
-                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
-                },
-                IpAddr::V6(v6addr) => {
-                    device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-                    device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
-                    device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
-                    device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
-                    device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
-                    device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
-                    device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
-                },
+            if let Some(v4addr) = device.ipv4_addr {
+                // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
+                let mut device_jump_rule_src = Rule::new(&base_chain);
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                let mut device_jump_rule_dst = Rule::new(&base_chain);
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                // Match rule if source or target address is configured device.
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
+                // If these rules apply, jump to the chain responsible for handling this device.
+                device_jump_rule_src
+                    .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+                device_jump_rule_dst
+                    .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+                batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
+                batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
             }
-            // If these rules apply, jump to the chain responsible for handling this device.
-            device_jump_rule_src
-                .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
-            device_jump_rule_dst
-                .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
-            batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
-            batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+            if let Some(v6addr) = device.ipv6_addr {
+                // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
+                let mut device_jump_rule_src = Rule::new(&base_chain);
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                let mut device_jump_rule_dst = Rule::new(&base_chain);
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                // Match rule if source or target address is configured device.
+                device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
+                device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
+                device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
+                device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
+                // If these rules apply, jump to the chain responsible for handling this device.
+                device_jump_rule_src
+                    .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+                device_jump_rule_dst
+                    .add_expr(&nft_expr!(verdict jump CString::new(format!("device_{}", device.id)).unwrap()));
+                batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
+                batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+            }
 
             // Iterate over device rules.
             for rule_spec in &device.rules {
@@ -184,7 +210,12 @@ impl FirewallService {
                         .await
                         .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
                         .unwrap_or(Vec::new()),
-                    Some(NetworkHost::FirewallDevice) => vec![RuleAddrEntry::AddrEntry(device.ip)],
+                    Some(NetworkHost::FirewallDevice) => device
+                        .ipv4_addr
+                        .map(RuleAddrEntry::from)
+                        .into_iter()
+                        .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
+                        .collect(),
                     _ => vec![RuleAddrEntry::AnyAddr],
                 };
                 let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
@@ -199,7 +230,12 @@ impl FirewallService {
                         .await
                         .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
                         .unwrap_or(Vec::new()),
-                    Some(NetworkHost::FirewallDevice) => vec![RuleAddrEntry::AddrEntry(device.ip)],
+                    Some(NetworkHost::FirewallDevice) => device
+                        .ipv4_addr
+                        .map(RuleAddrEntry::from)
+                        .into_iter()
+                        .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
+                        .collect(),
                     _ => vec![RuleAddrEntry::AnyAddr],
                 };
 
