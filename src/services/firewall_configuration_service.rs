@@ -327,10 +327,19 @@ mod tests {
 
         println!("{:#?}", x);
 
-        let resulting_device = FirewallDevice::new(
-            device.id,
-            device.ip_addr,
-            vec![
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+                Some(v4)
+            } else {
+                None
+            },
+            ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+                Some(v6)
+            } else {
+                None
+            },
+            rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
@@ -353,8 +362,8 @@ mod tests {
                     Target::Reject,
                 ),
             ],
-            false,
-        );
+            collect_data: false,
+        };
 
         assert!(x.eq(&resulting_device));
 
@@ -409,10 +418,19 @@ mod tests {
 
         println!("{:#?}", x);
 
-        let resulting_device = FirewallDevice::new(
-            device.id,
-            device.ip_addr,
-            vec![
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+                Some(v4)
+            } else {
+                None
+            },
+            ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+                Some(v6)
+            } else {
+                None
+            },
+            rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
@@ -435,8 +453,8 @@ mod tests {
                     Target::Reject,
                 ),
             ],
-            true,
-        );
+            collect_data: true,
+        };
 
         assert!(x.eq(&resulting_device));
 
