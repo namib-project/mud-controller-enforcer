@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
         },
     };
 
-    let (mut client, addr) = rpc::rpc_client::run().await?;
+    let (client, addr) = rpc::rpc_client::run().await?;
 
     // Restore enforcer config if persisted file could be restored, otherwise wait for the enforcer
     // to provide an initial configuration.

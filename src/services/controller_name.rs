@@ -22,7 +22,7 @@ pub(crate) fn apply_secure_name_config(secure_name: &str, controller_addr: Socke
         if let Err(revert_error) = uci.revert("dhcp") {
             error!("Error while reverting UCI configuration: {:?}", revert_error);
         }
-        Err(err)
+        Err(err.into())
     } else {
         Ok(())
     }

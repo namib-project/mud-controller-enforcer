@@ -46,7 +46,7 @@ mod unix {
         match serde_json::from_slice::<DhcpEvent>(inc_data.as_slice()) {
             Ok(dhcp_event) => {
                 debug!("Received DHCP event: {:?}", &dhcp_event);
-                let mut enforcer = enforcer.write().await;
+                let enforcer = enforcer.read().await;
                 enforcer
                     .client
                     .dhcp_request(current_rpc_context(), dhcp_event)

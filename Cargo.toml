@@ -7,20 +7,20 @@ default-run = "namib_enforcer"
 
 [features]
 default = ["uci", "nftables"]
-uci = ["libuci-sys", "libc"]
+uci = ["rust-uci", "libc"]
 nftables = ["nftnl", "mnl"]
 dnsmasq_hook = []
 
 [dependencies]
-namib_shared = { tag = "0.4.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+namib_shared = { tag = "0.4.4", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 tokio = { version = "1.2", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
 log = "0.4"
 env_logger = "0.8"
-async-dnssd = { tag = "0.5.0-rc.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git" }
+async-dnssd = { branch = "fix_windows_build", git = "https://github.com/namib-project/rust-async-dnssd" }
 futures = "0.3"
 tokio-native-tls = "0.3"
 tokio-util = "0.6"
-tarpc = { version = "0.24", features = ["full"] }
+tarpc = { branch = "replace_u128_traceid", git = "https://github.com/namib-project/tarpc", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 pin-project = "1.0"
 tokio-serde = "0.8"
@@ -38,7 +38,7 @@ regex = "1.4.2"
 serial_test = "0.5.1"
 
 [target.'cfg(unix)'.dependencies]
-libuci-sys = { tag = "1.0.0", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/libuci-sys.git", optional = true }
+rust-uci = { version = "0.1.0", optional = true }
 libc = { branch = "nftables-musl", git = "https://github.com/namib-project/libc.git", optional = true }
 nftnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/nftnl-rs.git", optional = true }
 mnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/mnl-rs.git", optional = true}

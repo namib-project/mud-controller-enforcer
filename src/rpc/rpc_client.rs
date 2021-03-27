@@ -1,7 +1,7 @@
 use std::{env, io, net::SocketAddr, sync::Arc};
 
 use futures::{pin_mut, prelude::*};
-use tarpc::{client, context, rpc, serde_transport};
+use tarpc::{client, context, serde_transport};
 use tokio::time::{sleep, Duration};
 
 use crate::services::controller_name::apply_secure_name_config;
@@ -128,8 +128,8 @@ async fn try_connect(
 
 /// Returns the context for the current request, or a default Context if no request is active.
 /// Copied and adapted based on tarpc/rpc/context.rs
-pub fn current_rpc_context() -> rpc::context::Context {
-    let mut rpc_context = rpc::context::current();
+pub fn current_rpc_context() -> tarpc::context::Context {
+    let mut rpc_context = tarpc::context::current();
     rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
     rpc_context
 }
