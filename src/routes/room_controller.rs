@@ -37,7 +37,13 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
 #[api_v2_operation(summary = "Get a room through the room id.")]
 async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__read)?;
-    let res = room_service::find_by_id(id.0, pool.get_ref()).await?;
+    let res = room_service::find_by_id(id.0, pool.get_ref()).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Room can not be found.")),
+        }
+        .fail()
+    })?;
     debug!("{:?}", res);
     Ok(Json(RoomDto::from(res)))
 }
@@ -51,12 +57,21 @@ async fn get_all_devices_inside_room(
     auth.require_permission(Permission::room__read)?;
     auth.require_permission(Permission::device__list)?;
     auth.require_permission(Permission::device__read)?;
+
+    room_service::find_by_id(id.0, pool.get_ref()).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Room can not be found.")),
+        }
+        .fail()
+    })?;
+
     let res = room_service::get_all_devices_inside_room(id.0, pool.get_ref())
         .await
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::NOT_FOUND,
-                message: None,
+                message: Some(format!("No devices found in the room.")),
             }
             .fail()
         })?;
@@ -64,7 +79,7 @@ async fn get_all_devices_inside_room(
     Ok(Json(res.into_iter().map(DeviceDto::from).collect()))
 }
 
-#[api_v2_operation(summary = "Creates a new room.")]
+#[api_v2_operation(summary = "Creates a new room. Color in hex e.g. {FFFFFF, 000000}")]
 async fn create_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -83,7 +98,7 @@ async fn create_room(
     if room_service::exists_room(room_creation_update_dto.name.clone(), pool.get_ref()).await? {
         error::ResponseError {
             status: StatusCode::CONFLICT,
-            message: Some(format!("Room already exists")),
+            message: Some(format!("Room already exists.")),
         }
         .fail()?
     }
@@ -94,7 +109,7 @@ async fn create_room(
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::NOT_FOUND,
-                message: None,
+                message: Some(format!("Could not insert room.")),
             }
             .fail()
         })?;
@@ -119,28 +134,28 @@ async fn update_room(
         .fail()
     })?;
 
-    if room_service::exists_room(room_creation_update_dto.name.clone(), pool.get_ref()).await? {
-        error::ResponseError {
-            status: StatusCode::CONFLICT,
-            message: Some(format!("Room already exists")),
-        }
-        .fail()?
-    }
-
     let find_room = room_service::find_by_id(id.0, pool.get_ref()).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: None,
+            message: Some(format!("Room can not be found.")),
         }
         .fail()
     })?;
+
+    if room_service::exists_room(room_creation_update_dto.name.clone(), pool.get_ref()).await? {
+        error::ResponseError {
+            status: StatusCode::CONFLICT,
+            message: Some(format!("Room already exists.")),
+        }
+        .fail()?
+    }
 
     room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, pool.get_ref())
         .await
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::BAD_REQUEST,
-                message: None,
+                message: Some(format!("Could not update room.")),
             }
             .fail()
         })?;
@@ -159,7 +174,7 @@ async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Pa
         }
         .fail()
     })?;
-
+    debug!("{:?}", find_room);
     room_service::delete_room(find_room.name, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
 }
