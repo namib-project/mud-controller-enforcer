@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
-#![allow(dead_code, clippy::module_name_repetitions)]
+#![allow(dead_code, clippy::module_name_repetitions, clippy::filter_map)]
 
 #[macro_use]
 extern crate log;
@@ -44,7 +44,8 @@ impl Enforcer {
 /// Persists a given enforcer configuration to the filesystem at the location specified by the `NAMIB_CONFIG_STATE_FILE`
 /// environment variable (or `DEFAULT_CONFIG_STATE_FILE` if the environment variable is not set).
 async fn persist_config(config: &EnforcerConfig) {
-    let config_state_path = env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or(String::from(DEFAULT_CONFIG_STATE_FILE));
+    let config_state_path =
+        env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or_else(|_| String::from(DEFAULT_CONFIG_STATE_FILE));
     let config_state_path = Path::new(config_state_path.as_str());
     if let Some(parent_dir) = config_state_path.parent() {
         fs::create_dir_all(&parent_dir)

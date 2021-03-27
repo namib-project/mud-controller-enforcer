@@ -71,7 +71,7 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                             enf.client = new_client;
                             enf.addr = addr;
                         }
-                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr.clone()) {
+                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr) {
                             error!("Error while applying new controller address: {:?}", e);
                         }
                     },
