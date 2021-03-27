@@ -1,7 +1,7 @@
 mod lib;
 use namib_mud_controller::{models::Config, services::config_service};
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_nothing() {
     let ctx = lib::IntegrationTestContext::new("get_nothing").await;
 
@@ -13,7 +13,7 @@ async fn get_nothing() {
     );
 }
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn set_get_something() {
     let ctx = lib::IntegrationTestContext::new("set_get_something").await;
 
@@ -28,7 +28,7 @@ async fn set_get_something() {
     );
 }
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn delete_something() {
     let ctx = lib::IntegrationTestContext::new("delete_something").await;
 
@@ -54,7 +54,7 @@ async fn delete_something() {
     );
 }
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_all() {
     let ctx = lib::IntegrationTestContext::new("get_all").await;
 
