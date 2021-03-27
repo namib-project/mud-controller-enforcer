@@ -10,7 +10,7 @@ ENV RUST_LOG=info,namib_mud_controller=debug \
 WORKDIR /namib
 
 RUN apt update \
-        && apt install -y avahi-daemon libavahi-compat-libdnssd1 \
+        && apt install -y avahi-daemon libavahi-compat-libdnssd1 postgresql-client \
         && rm -rf /var/lib/apt/lists/* \
         && mkdir acme
 

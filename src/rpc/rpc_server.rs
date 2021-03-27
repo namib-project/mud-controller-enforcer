@@ -3,9 +3,8 @@ use std::{env, net::SocketAddr, sync::Arc, thread};
 use futures::{future, StreamExt, TryStreamExt};
 use rustls::{RootCertStore, Session};
 use tarpc::{
-    context,
-    rpc::server::{BaseChannel, Channel, Handler},
-    server,
+    context, server,
+    server::{BaseChannel, Channel, Incoming},
 };
 use tokio_compat_02::FutureExt;
 
@@ -144,7 +143,7 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
                 ),
                 db_connection: pool.clone(),
             };
-            channel.respond_with(server.serve()).execute()
+            channel.requests().execute(server.serve())
         })
         // Max 10 channels.
         .buffer_unordered(10)
