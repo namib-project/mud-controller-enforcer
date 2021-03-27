@@ -35,7 +35,23 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
-        None => return FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info),
+        None => {
+            return FirewallDevice {
+                id: device.id,
+                ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+                    Some(v4)
+                } else {
+                    None
+                },
+                ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+                    Some(v6)
+                } else {
+                    None
+                },
+                rules: result,
+                collect_data: device.collect_info,
+            }
+        },
     };
 
     let merged_acls = match &mud_data.acl_override {
@@ -99,7 +115,21 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         Target::Reject,
     ));
 
-    FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info)
+    FirewallDevice {
+        id: device.id,
+        ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+            Some(v4)
+        } else {
+            None
+        },
+        ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+            Some(v6)
+        } else {
+            None
+        },
+        rules: result,
+        collect_data: device.collect_info,
+    }
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
