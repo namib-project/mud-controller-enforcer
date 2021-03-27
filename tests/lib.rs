@@ -3,8 +3,6 @@ use log::info;
 use namib_mud_controller::db::DbConnection;
 use sqlx::migrate;
 
-use url::Url;
-
 pub struct IntegrationTestContext {
     pub db_url: String,
     pub db_name: &'static str,
@@ -24,7 +22,8 @@ impl IntegrationTestContext {
 
         #[cfg(feature = "postgres")]
         let db_url = {
-            let mut url = Url::parse(&std::env::var("DATABASE_URL").expect("Failed to load DB URL from .env")).unwrap();
+            let mut url =
+                url::Url::parse(&std::env::var("DATABASE_URL").expect("Failed to load DB URL from .env")).unwrap();
             let db_name = format!("__{}", db_name);
             let conn = DbConnection::connect(url.as_str()).await.unwrap();
             sqlx::query(&format!("DROP DATABASE IF EXISTS {}", db_name))
