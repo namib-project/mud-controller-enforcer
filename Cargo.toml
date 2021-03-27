@@ -16,11 +16,11 @@ actix-files = "0.5"
 actix-cors = "0.5.4"
 actix-ratelimit = { version = "0.3.1", default-features = false, features = ["memory"] }
 sqlx = { version = "0.4", features = ["runtime-actix-rustls", "chrono"] }
-namib_shared = { tag = "0.4.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
-log = "0.4"
+namib_shared = { tag = "0.4.4", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+log = "0.4.14"
 env_logger = "0.8"
-tokio = { version = "1", features = ["full"] }
-async-dnssd = { tag = "0.5.0-rc.3", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/rust-async-dnssd.git" }
+tokio = { version = "1.2", features = ["full"] }
+async-dnssd = { branch = "fix_windows_build", git = "https://github.com/namib-project/rust-async-dnssd" }
 futures = "0.3"
 rustls = "0.19"
 rustls_18 = { version = "0.18", package = "rustls" }
@@ -28,7 +28,7 @@ reqwest = { version = "0.11", default-features = false, features = ["rustls-tls-
 tokio-rustls = "0.22"
 tokio-util = "0.6"
 tokio-serde = "0.8"
-tarpc = { version = "0.24", features = ["full"] }
+tarpc = { branch = "replace_u128_traceid", git = "https://github.com/namib-project/tarpc", features = ["full"] }
 pin-project = "1.0"
 rand = "0.8"
 rust-argon2 = "0.8"

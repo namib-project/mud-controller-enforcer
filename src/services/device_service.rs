@@ -13,8 +13,13 @@ use namib_shared::{models::DhcpLeaseInformation, MacAddr};
 use sqlx::Done;
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
-    let (device, update) = if let Ok(mut device) =
-        find_by_mac_or_duid(lease_info.mac_address, lease_info.duid().map(|d| d.to_string()), pool).await
+    let (device, update) = if let Ok(mut device) = find_by_mac_or_duid(
+        lease_info.mac_address,
+        lease_info.duid().map(|d| d.to_string()),
+        false,
+        pool,
+    )
+    .await
     {
         device.apply(lease_info);
         (device, true)
@@ -30,7 +35,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
     debug!("dhcp request device mud file: {:?}", device.mud_url);
 
     match &device.mud_url {
-        Some(url) => mud_service::get_or_fetch_mud(url.clone(), pool).await.ok(),
+        Some(url) => mud_service::get_or_fetch_mud(&url, pool).await.ok(),
         None => None,
     };
     if update {
@@ -53,7 +58,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
             let mut device_data = Device::from(device);
             device_data.mud_data = match device_data.mud_url.clone() {
                 Some(url) => {
-                    let data = get_or_fetch_mud(url.clone(), pool).await;
+                    let data = get_or_fetch_mud(&url, pool).await;
                     debug!("Get all devices: mud url {:?}: {:?}", url, data);
                     data.ok()
                 },
@@ -68,15 +73,21 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     Ok(devices_data)
 }
 
-pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
+pub async fn find_by_id(id: i64, fetch_mud: bool, pool: &DbConnection) -> Result<Device> {
     let device = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
         .fetch_one(pool)
         .await?;
 
-    Ok(Device::from(device))
+    let device = Device::from(device);
+
+    if fetch_mud && device.mud_url.is_some() {
+        device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
+    }
+
+    Ok(device)
 }
 
-pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
+pub async fn find_by_ip(ip: &str, fetch_mud: bool, pool: &DbConnection) -> Result<Device> {
     let device = sqlx::query_as!(
         DeviceDbo,
         "select * from devices where ipv4_addr = ? or ipv6_addr = ?",
@@ -86,12 +97,19 @@ pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
     .fetch_one(pool)
     .await?;
 
+    let mut device = Device::from(device);
+
+    if fetch_mud && device.mud_url.is_some() {
+        device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
+    }
+
     Ok(device.into())
 }
 
 pub async fn find_by_mac_or_duid(
     mac_addr: Option<MacAddr>,
     duid: Option<String>,
+    fetch_mud: bool,
     pool: &DbConnection,
 ) -> Result<Device> {
     if let Some(mac_addr) = mac_addr {
