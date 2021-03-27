@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr, sync::Arc, thread};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use futures::{future, StreamExt, TryStreamExt};
 use rustls::{RootCertStore, Session};
@@ -18,7 +18,6 @@ use crate::{
 
 use super::tls_serde_transport;
 use crate::services::{acme_service::CertId, log_service};
-use std::thread::JoinHandle;
 
 #[derive(Clone)]
 pub struct RPCServer {
@@ -72,17 +71,6 @@ impl RPC for RPCServer {
         );
         log_service::add_new_logs(self.client_id, logs, &self.db_connection).await
     }
-}
-
-pub fn run_in_tokio(conn: DbConnection) -> JoinHandle<()> {
-    thread::spawn(move || {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("could not construct tokio runtime")
-            .block_on(listen(conn))
-            .expect("failed running rpc server")
-    })
 }
 
 pub async fn listen(pool: DbConnection) -> Result<()> {

@@ -1,5 +1,4 @@
 use crate::{db::DbConnection, error::Result, models::UserConfig};
-use sqlx::Done;
 
 pub async fn get_all_configs_for_user(user_id: i64, conn: &DbConnection) -> Result<Vec<UserConfig>> {
     Ok(

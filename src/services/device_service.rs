@@ -10,7 +10,6 @@ use crate::{
 pub use futures::TryStreamExt;
 
 use namib_shared::models::DhcpLeaseInformation;
-use sqlx::Done;
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
     let mut dhcp_device_data = Device::from(lease_info);
