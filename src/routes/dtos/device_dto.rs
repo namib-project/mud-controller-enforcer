@@ -2,7 +2,7 @@
 
 use crate::{
     error::Result,
-    models::{Device, DeviceType, MudData},
+    models::{Device, DeviceType, MudData, Room},
 };
 use chrono::{NaiveDateTime, Utc};
 use namib_shared::{mac, MacAddr};
@@ -19,6 +19,7 @@ pub struct DeviceDto {
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
     pub clipart: Option<String>,
+    pub room: Option<Room>,
     #[serde(rename = "type")]
     pub type_: DeviceType,
 }
@@ -36,6 +37,7 @@ impl From<Device> for DeviceDto {
             last_interaction: d.last_interaction,
             mud_data: d.mud_data,
             clipart: d.clipart,
+            room: d.room,
             type_,
         }
     }
@@ -73,6 +75,7 @@ impl DeviceCreationUpdateDto {
             last_interaction: Utc::now().naive_local(),
             mud_data: None,
             clipart: self.clipart.clone(),
+            room: None,
         })
     }
 

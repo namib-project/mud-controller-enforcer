@@ -1,4 +1,4 @@
-use crate::models::mud_models::MudData;
+use crate::models::{mud_models::MudData, Room};
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
 use paperclip::actix::Apiv2Schema;
@@ -14,6 +14,7 @@ pub struct DeviceDbo {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
+    pub room_id: Option<i64>,
     pub clipart: Option<String>,
 }
 
@@ -28,6 +29,7 @@ pub struct Device {
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
+    pub room: Option<Room>,
     pub clipart: Option<String>,
 }
 
@@ -51,8 +53,8 @@ impl Device {
     }
 }
 
-impl From<DeviceDbo> for Device {
-    fn from(device: DeviceDbo) -> Device {
+impl Device {
+    pub fn from_dbo(device: DeviceDbo, room: Option<Room>) -> Device {
         Device {
             id: device.id,
             ip_addr: device.ip_addr.parse::<std::net::IpAddr>().expect("Is valid ip addr"),
@@ -65,6 +67,7 @@ impl From<DeviceDbo> for Device {
             collect_info: device.collect_info,
             last_interaction: device.last_interaction,
             mud_data: None,
+            room,
             clipart: device.clipart,
         }
     }
@@ -82,6 +85,7 @@ impl From<DhcpLeaseInformation> for Device {
             collect_info: false,
             last_interaction: Local::now().naive_local(),
             mud_data: None,
+            room: None,
             clipart: None,
         }
     }
