@@ -125,7 +125,7 @@ pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
     Ok(upd_count.rows_affected())
 }
 
-pub async fn update_basic(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
+pub async fn update_username(id: i64, user: &User, conn: &DbConnection) -> Result<u64> {
     let upd_count = sqlx::query!("update users set username = ? where id = ?", user.username, id)
         .execute(conn)
         .await?;
