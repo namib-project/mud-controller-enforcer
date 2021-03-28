@@ -2,7 +2,7 @@
 
 use crate::{
     error::Result,
-    models::{Device, MudData, Room},
+    models::{Device, DeviceType, MudData, Room},
 };
 use chrono::{NaiveDateTime, Utc};
 use namib_shared::{mac, MacAddr};
@@ -20,10 +20,13 @@ pub struct DeviceDto {
     pub mud_data: Option<MudData>,
     pub clipart: Option<String>,
     pub room: Option<Room>,
+    #[serde(rename = "type")]
+    pub type_: DeviceType,
 }
 
 impl From<Device> for DeviceDto {
     fn from(d: Device) -> Self {
+        let type_ = d.get_type();
         DeviceDto {
             id: d.id,
             ip_addr: d.ip_addr.to_string(),
@@ -35,6 +38,7 @@ impl From<Device> for DeviceDto {
             mud_data: d.mud_data,
             clipart: d.clipart,
             room: d.room,
+            type_,
         }
     }
 }

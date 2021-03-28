@@ -3,7 +3,10 @@ use chrono::Utc;
 use crate::{
     db::DbConnection,
     error::Result,
-    services::{firewall_configuration_service::update_config_version, mud_service::*},
+    services::{
+        firewall_configuration_service::update_config_version,
+        mud_service::{get_all_mud_expiration, get_or_fetch_mud},
+    },
 };
 
 pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
@@ -21,7 +24,7 @@ pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
 async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
     for mud_url in vec_url {
         log::debug!("Try to update url: {}", mud_url);
-        let updated_mud = get_or_fetch_mud(mud_url, db_pool).await?;
+        let updated_mud = get_or_fetch_mud(&mud_url, db_pool).await?;
         log::debug!("Updated mud profile: {:#?}", updated_mud);
     }
     Ok(())

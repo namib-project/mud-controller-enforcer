@@ -1,10 +1,8 @@
-use sqlx::Done;
-
 use crate::{
     db::DbConnection,
     error::Result,
     models::{RoleDbo, User, UserDbo},
-    services::role_service::role_service,
+    services::role_service,
 };
 
 // Database methods

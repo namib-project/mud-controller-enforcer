@@ -25,7 +25,7 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
     merged_acls
 }
 
-pub fn create_configuration(version: String, devices: Vec<Device>) -> EnforcerConfig {
+pub fn create_configuration(version: String, devices: &[Device]) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
@@ -35,12 +35,29 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
-        None => return FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info),
+        None => {
+            return FirewallDevice {
+                id: device.id,
+                ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+                    Some(v4)
+                } else {
+                    None
+                },
+                ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+                    Some(v6)
+                } else {
+                    None
+                },
+                rules: result,
+                collect_data: device.collect_info,
+            }
+        },
     };
 
-    let merged_acls = match &mud_data.acl_override {
-        Some(acl_override) => merge_acls(&mud_data.acllist, acl_override),
-        None => (&mud_data.acllist).iter().collect::<Vec<&Acl>>(),
+    let merged_acls = if mud_data.acl_override.is_empty() {
+        mud_data.acllist.iter().collect()
+    } else {
+        merge_acls(&mud_data.acllist, &mud_data.acl_override)
     };
 
     for acl in &merged_acls {
@@ -64,7 +81,7 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
             if let Some(dns_name) = &ace.matches.dnsname {
                 let route_network_remote_host = match dns_name.parse::<IpAddr>() {
                     Ok(addr) => NetworkConfig::new(Some(NetworkHost::Ip(addr)), None),
-                    _ => NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None),
+                    Err(_) => NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None),
                 };
 
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
@@ -99,7 +116,21 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         Target::Reject,
     ));
 
-    FirewallDevice::new(device.id, device.ip_addr, result, device.collect_info)
+    FirewallDevice {
+        id: device.id,
+        ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+            Some(v4)
+        } else {
+            None
+        },
+        ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+            Some(v6)
+        } else {
+            None
+        },
+        rules: result,
+        collect_data: device.collect_info,
+    }
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
@@ -261,7 +292,7 @@ mod tests {
                     },
                 }],
             }],
-            acl_override: Some(vec![Acl {
+            acl_override: vec![Acl {
                 name: "some_acl_name".to_string(),
                 packet_direction: AclDirection::ToDevice,
                 acl_type: AclType::IPV4,
@@ -277,7 +308,7 @@ mod tests {
                         destination_port: None,
                     },
                 }],
-            }]),
+            }],
         };
 
         let device = Device {
@@ -298,10 +329,19 @@ mod tests {
 
         println!("{:#?}", x);
 
-        let resulting_device = FirewallDevice::new(
-            device.id,
-            device.ip_addr,
-            vec![
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+                Some(v4)
+            } else {
+                None
+            },
+            ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+                Some(v6)
+            } else {
+                None
+            },
+            rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
@@ -324,8 +364,8 @@ mod tests {
                     Target::Reject,
                 ),
             ],
-            false,
-        );
+            collect_data: false,
+        };
 
         assert!(x.eq(&resulting_device));
 
@@ -360,7 +400,7 @@ mod tests {
                     },
                 }],
             }],
-            acl_override: None,
+            acl_override: Vec::default(),
         };
 
         let device = Device {
@@ -381,10 +421,19 @@ mod tests {
 
         println!("{:#?}", x);
 
-        let resulting_device = FirewallDevice::new(
-            device.id,
-            device.ip_addr,
-            vec![
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
+                Some(v4)
+            } else {
+                None
+            },
+            ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
+                Some(v6)
+            } else {
+                None
+            },
+            rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
@@ -407,8 +456,8 @@ mod tests {
                     Target::Reject,
                 ),
             ],
-            true,
-        );
+            collect_data: true,
+        };
 
         assert!(x.eq(&resulting_device));
 

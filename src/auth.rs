@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::{error, error::Result, services::role_service::permission::Permission};
+use crate::{error, error::Result, services::role_service::Permission};
 use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};

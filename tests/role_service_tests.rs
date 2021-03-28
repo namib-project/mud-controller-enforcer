@@ -3,10 +3,10 @@ use namib_mud_controller::{
     error::{Error, Result},
     models::User,
     routes::dtos::RoleUpdateDto,
-    services::{role_service::role_service, user_service},
+    services::{role_service, user_service},
 };
 
-#[actix_rt::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_inserting_role_mappings() -> Result<()> {
     let ctx = lib::IntegrationTestContext::new("test_inserting_role_mappings").await;
     let user_id = user_service::insert(User::new("admin".to_string(), "pass")?, &ctx.db_conn).await?;

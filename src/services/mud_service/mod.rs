@@ -6,7 +6,6 @@ use crate::{
     error::Result,
     models::{Acl, MudData, MudDbo, MudDboRefresh},
 };
-use sqlx::Done;
 use url::Url;
 
 pub mod json_models;
@@ -80,7 +79,7 @@ pub async fn is_mud_used(url: &str, pool: &DbConnection) -> Result<bool> {
     Ok(device_using_mud.is_some())
 }
 
-/// This function return MudDboRefresh they only containing url and expiration
+/// This function return `MudDboRefresh` they only containing url and expiration
 /// to reduce payload.
 async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
     Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
@@ -93,9 +92,9 @@ async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh
 /// If it exists, uses existing data from DB
 /// This function is mainly used in the `RPCServer`, where it's used to save Device's MUD-URLs which are being sent via DHCP
 /// Local MUD-Profiles can be loaded *BUT NOT CREATED* through this function, since they have an expiration far far in the future
-pub async fn get_or_fetch_mud(url: String, pool: &DbConnection) -> Result<MudData> {
+pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
-    let existing_mud = get_mud(&url, pool).await;
+    let existing_mud = get_mud(url, pool).await;
 
     if let Some(mud) = existing_mud {
         if mud.expiration > Utc::now().naive_utc() {
@@ -106,14 +105,14 @@ pub async fn get_or_fetch_mud(url: String, pool: &DbConnection) -> Result<MudDat
     }
 
     // wenn nicht: fetch
-    let mud_json = fetch_mud(url.as_str()).await?;
+    let mud_json = fetch_mud(url).await?;
 
     // ruf parse_mud auf
-    let data = parser::parse_mud(url.clone(), mud_json.as_str())?;
+    let data = parser::parse_mud(url.to_string(), mud_json.as_str())?;
 
     // speichern in db
     let mud = MudDbo {
-        url: url.clone(),
+        url: url.to_string(),
         data: serde_json::to_string(&data)?,
         created_at: Utc::now().naive_utc(),
         expiration: data.expiration.naive_utc(),
@@ -143,7 +142,7 @@ pub fn is_url(url: &str) -> bool {
 }
 
 /// Generates an empty MUD-Profile for custom local usage
-pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Option<Vec<Acl>>) -> MudData {
+pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Vec<Acl>) -> MudData {
     MudData {
         url: url.to_string(),
         masa_url: None,

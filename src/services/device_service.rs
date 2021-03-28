@@ -15,7 +15,7 @@ use crate::{
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
     let mut dhcp_device_data = Device::from(lease_info);
-    let update = if let Ok(device) = find_by_ip(dhcp_device_data.ip_addr, pool).await {
+    let update = if let Ok(device) = find_by_ip(dhcp_device_data.ip_addr, false, pool).await {
         dhcp_device_data.id = device.id;
         dhcp_device_data.collect_info = device.collect_info;
         dhcp_device_data.room = device.room;
@@ -31,7 +31,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
     debug!("dhcp request device mud file: {:?}", dhcp_device_data.mud_url);
 
     match &dhcp_device_data.mud_url {
-        Some(url) => mud_service::get_or_fetch_mud(url.clone(), pool).await.ok(),
+        Some(url) => mud_service::get_or_fetch_mud(&url, pool).await.ok(),
         None => None,
     };
     if update {
@@ -58,7 +58,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
             let mut device_data = Device::from_dbo(device, room);
             device_data.mud_data = match device_data.mud_url.clone() {
                 Some(url) => {
-                    let data = get_or_fetch_mud(url.clone(), pool).await;
+                    let data = get_or_fetch_mud(&url, pool).await;
                     debug!("Get all devices: mud url {:?}: {:?}", url, data);
                     data.ok()
                 },
@@ -85,7 +85,7 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
     Ok(Device::from_dbo(device, room))
 }
 
-pub async fn find_by_ip(ip_addr: std::net::IpAddr, pool: &DbConnection) -> Result<Device> {
+pub async fn find_by_ip(ip_addr: std::net::IpAddr, fetch_mud: bool, pool: &DbConnection) -> Result<Device> {
     let ip_addr = ip_addr.to_string();
     let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "select * from devices where ip_addr = ?", ip_addr)
         .fetch_one(pool)
@@ -95,7 +95,13 @@ pub async fn find_by_ip(ip_addr: std::net::IpAddr, pool: &DbConnection) -> Resul
         Some(id) => Some(room_service::find_by_id(id, pool).await?),
         None => None,
     };
-    Ok(Device::from_dbo(device, room))
+    let mut device = Device::from_dbo(device, room);
+
+    if fetch_mud && device.mud_url.is_some() {
+        device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
+    }
+
+    Ok(device)
 }
 
 pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<u64> {

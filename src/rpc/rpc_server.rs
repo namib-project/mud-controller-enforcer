@@ -1,11 +1,10 @@
-use std::{env, net::SocketAddr, sync::Arc, thread};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use futures::{future, StreamExt, TryStreamExt};
 use rustls::{RootCertStore, Session};
 use tarpc::{
-    context,
-    rpc::server::{BaseChannel, Channel, Handler},
-    server,
+    context, server,
+    server::{BaseChannel, Channel, Incoming},
 };
 use tokio_compat_02::FutureExt;
 
@@ -19,7 +18,6 @@ use crate::{
 
 use super::tls_serde_transport;
 use crate::services::{acme_service::CertId, log_service};
-use std::thread::JoinHandle;
 
 #[derive(Clone)]
 pub struct RPCServer {
@@ -42,7 +40,7 @@ impl RPC for RPCServer {
                 .compat()
                 .await
                 .unwrap_or_default();
-            let new_config = firewall_configuration_service::create_configuration(current_config_version, devices);
+            let new_config = firewall_configuration_service::create_configuration(current_config_version, &devices);
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }
@@ -73,17 +71,6 @@ impl RPC for RPCServer {
         );
         log_service::add_new_logs(self.client_id, logs, &self.db_connection).await
     }
-}
-
-pub fn run_in_tokio(conn: DbConnection) -> JoinHandle<()> {
-    thread::spawn(move || {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("could not construct tokio runtime")
-            .block_on(listen(conn))
-            .expect("failed running rpc server")
-    })
 }
 
 pub async fn listen(pool: DbConnection) -> Result<()> {
@@ -144,7 +131,7 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
                 ),
                 db_connection: pool.clone(),
             };
-            channel.respond_with(server.serve()).execute()
+            channel.requests().execute(server.serve())
         })
         // Max 10 channels.
         .buffer_unordered(10)

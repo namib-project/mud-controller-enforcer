@@ -7,7 +7,7 @@ use crate::{
     db::DbConnection,
     error::Result,
     routes::dtos::ConfigQueryDto,
-    services::{config_service, role_service::permission::Permission},
+    services::{config_service, role_service::Permission},
 };
 use std::collections::HashMap;
 
