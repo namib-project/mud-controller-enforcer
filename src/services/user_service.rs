@@ -28,18 +28,9 @@ from
             username: usr.username,
             password: usr.password,
             salt: usr.salt,
-            roles: usr
-                .roles
-                .map(|r| r.split(',').map(ToOwned::to_owned).collect())
-                .unwrap_or_default(),
-            roles_ids: usr
-                .roles_ids
-                .map(|r| r.split(',').map(|s| s.parse::<i64>().unwrap()).collect())
-                .unwrap_or_default(),
-            permissions: usr
-                .permissions
-                .map(|p| p.split(',').map(ToOwned::to_owned).collect())
-                .unwrap_or_default(),
+            roles: usr.roles.split(",").map(ToOwned::to_owned).collect(),
+            roles_ids: usr.roles_ids.split(",").map(|s| s.parse::<i64>().unwrap()).collect(),
+            permissions: usr.permissions.split(",").map(ToOwned::to_owned).collect(),
         })
         .collect())
 }

@@ -4,18 +4,12 @@ use isahc::http::StatusCode;
 use paperclip::actix::{api_v2_operation, web, web::Json};
 use validator::{HasLen, Validate};
 
-use crate::{
-    auth::AuthToken,
-    db::DbConnection,
-    error,
-    error::Result,
-    services::role_service::{permission::Permission, role_service},
-};
+use crate::{auth::AuthToken, db::DbConnection, error, error::Result, services::role_service::permission::Permission};
 
 use crate::{
     models::User,
     routes::dtos::{MgmCreateUserDto, MgmRoleInfoDto, MgmUpdateUserBasicDto, MgmUserDto, RoleDto},
-    services::user_service,
+    services::{role_service, user_service},
 };
 use actix_web::HttpResponse;
 
