@@ -1,6 +1,7 @@
 use crate::models::mud_models::MudData;
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
+use paperclip::actix::Apiv2Schema;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone)]
@@ -16,7 +17,7 @@ pub struct DeviceDbo {
     pub clipart: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Device {
     pub id: i64,
     pub ip_addr: IpAddr,
@@ -28,6 +29,26 @@ pub struct Device {
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
     pub clipart: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceType {
+    Managed,
+    Detecting,
+    Unknown,
+}
+
+impl Device {
+    pub fn get_type(&self) -> DeviceType {
+        if self.mud_url.is_some() {
+            DeviceType::Managed
+        } else if self.collect_info {
+            DeviceType::Detecting
+        } else {
+            DeviceType::Unknown
+        }
+    }
 }
 
 impl From<DeviceDbo> for Device {
@@ -55,7 +76,7 @@ impl From<DhcpLeaseInformation> for Device {
             id: 0,
             mac_addr: lease_info.mac_address,
             ip_addr: lease_info.ip_addr(),
-            hostname: lease_info.old_hostname.unwrap_or_default(),
+            hostname: lease_info.hostname.unwrap_or_default(),
             vendor_class: "".to_string(),
             mud_url: lease_info.mud_url,
             collect_info: false,

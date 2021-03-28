@@ -1,5 +1,4 @@
 use crate::{db::DbConnection, error, error::Result, models::Config};
-use sqlx::Done;
 use std::str::FromStr;
 
 #[derive(strum::AsRefStr)]
