@@ -13,7 +13,7 @@ use crate::{
     error,
     error::Result,
     routes::dtos::{DeviceDto, RoomCreationUpdateDto, RoomDto},
-    services::{role_service::permission::Permission, room_service},
+    services::{role_service::Permission, room_service},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -29,7 +29,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoomDto>>> {
     auth.require_permission(Permission::room__list)?;
     auth.require_permission(Permission::room__read)?;
-    let res = room_service::get_all_rooms(pool.get_ref()).await?;
+    let res = room_service::get_all_rooms(&pool).await?;
     debug!("{:?}", res);
     Ok(Json(res.into_iter().map(RoomDto::from).collect()))
 }
@@ -37,7 +37,7 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
 #[api_v2_operation(summary = "Get a room through the room id.")]
 async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__read)?;
-    let res = room_service::find_by_id(id.0, pool.get_ref()).await.or_else(|_| {
+    let res = room_service::find_by_id(id.into_inner(), &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some(format!("Room can not be found.")),
@@ -58,7 +58,7 @@ async fn get_all_devices_inside_room(
     auth.require_permission(Permission::device__list)?;
     auth.require_permission(Permission::device__read)?;
 
-    room_service::find_by_id(id.0, pool.get_ref()).await.or_else(|_| {
+    room_service::find_by_id(id.0, &&pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some(format!("Room can not be found.")),
@@ -66,7 +66,7 @@ async fn get_all_devices_inside_room(
         .fail()
     })?;
 
-    let res = room_service::get_all_devices_inside_room(id.0, pool.get_ref())
+    let res = room_service::get_all_devices_inside_room(id.0, &pool)
         .await
         .or_else(|_| {
             error::ResponseError {
@@ -95,7 +95,7 @@ async fn create_room(
         .fail()
     })?;
 
-    if room_service::exists_room(room_creation_update_dto.name.clone(), pool.get_ref()).await? {
+    if room_service::exists_room(room_creation_update_dto.name.clone(), &pool).await? {
         error::ResponseError {
             status: StatusCode::CONFLICT,
             message: Some(format!("Room already exists.")),
@@ -103,8 +103,8 @@ async fn create_room(
         .fail()?
     }
 
-    room_service::insert_room(&room_creation_update_dto.to_room(0)?, pool.get_ref()).await?;
-    let res = room_service::find_by_name(room_creation_update_dto.name.to_owned(), pool.get_ref())
+    room_service::insert_room(&room_creation_update_dto.to_room(0)?, &pool).await?;
+    let res = room_service::find_by_name(room_creation_update_dto.name.to_owned(), &pool)
         .await
         .or_else(|_| {
             error::ResponseError {
@@ -134,7 +134,7 @@ async fn update_room(
         .fail()
     })?;
 
-    let find_room = room_service::find_by_id(id.0, pool.get_ref()).await.or_else(|_| {
+    let find_room = room_service::find_by_id(id.0, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some(format!("Room can not be found.")),
@@ -142,7 +142,7 @@ async fn update_room(
         .fail()
     })?;
 
-    if room_service::exists_room(room_creation_update_dto.name.clone(), pool.get_ref()).await? {
+    if room_service::exists_room(room_creation_update_dto.name.clone(), &pool).await? {
         error::ResponseError {
             status: StatusCode::CONFLICT,
             message: Some(format!("Room already exists.")),
@@ -150,7 +150,7 @@ async fn update_room(
         .fail()?
     }
 
-    room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, pool.get_ref())
+    room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, &pool)
         .await
         .or_else(|_| {
             error::ResponseError {

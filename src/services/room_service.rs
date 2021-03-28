@@ -3,19 +3,17 @@ use crate::{
     error::Result,
     models::{Device, DeviceDbo, Room},
 };
-pub use futures::TryStreamExt;
-use sqlx::Done;
 
 ///returns all rooms from the database
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let room_data = sqlx::query_as!(Room, "select * from rooms").fetch_all(pool).await?;
+    let room_data = sqlx::query_as!(Room, "SELECT * FROM rooms").fetch_all(pool).await?;
 
     Ok(room_data)
 }
 
 ///returns room by id from the database
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "select * from rooms where room_id = ?", id)
+    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE room_id = $1", id)
         .fetch_one(pool)
         .await?;
 
@@ -24,7 +22,7 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
 
 ///returns room by name from the database
 pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT room_id, name, color FROM rooms WHERE name= ?", name)
+    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE name = $1", name)
         .fetch_one(pool)
         .await?;
 
@@ -34,7 +32,7 @@ pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Room> {
 ///updates a room with a new name and color in the database
 pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
     let upd_count = sqlx::query!(
-        "update rooms set name = ?, color = ? where room_id = ?",
+        "UPDATE rooms SET name = $1, color = $2 WHERE room_id = $3",
         room.name,
         room.color,
         room.room_id
@@ -49,7 +47,7 @@ pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
 pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> Result<Vec<Device>> {
     let room = find_by_id(room_id, pool).await?;
 
-    let device_dbo: Vec<DeviceDbo> = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE room_id = ?", room_id,)
+    let device_dbo: Vec<DeviceDbo> = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE room_id = $1", room_id)
         .fetch_all(pool)
         .await?;
 
@@ -61,7 +59,7 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 
 ///Creates a new room with a given name and color in the database
 pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
-    let insert = sqlx::query!("insert into rooms (name, color) values (?, ?)", room.name, room.color,)
+    let insert = sqlx::query!("INSERT INTO rooms (name, color) VALUES ($1, $2)", room.name, room.color)
         .execute(pool)
         .await?;
 
@@ -79,10 +77,10 @@ pub async fn delete_room(name: String, pool: &DbConnection) -> Result<u64> {
 ///Checks if room is available.
 pub async fn exists_room(name: String, pool: &DbConnection) -> Result<bool> {
     Ok(
-        sqlx::query!("SELECT count(name) AS name FROM rooms WHERE name = ?", name)
+        sqlx::query!("SELECT count(name) AS count FROM rooms WHERE name = $1", name)
             .fetch_one(pool)
             .await?
-            .name
+            .count
             > 0,
     )
 }

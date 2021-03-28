@@ -54,7 +54,7 @@ impl Device {
 }
 
 impl Device {
-    pub(crate) fn from_dbo(device: DeviceDbo, room: Option<Room>) -> Device {
+    pub fn from_dbo(device: DeviceDbo, room: Option<Room>) -> Device {
         Device {
             id: device.id,
             ip_addr: device.ip_addr.parse::<std::net::IpAddr>().expect("Is valid ip addr"),
