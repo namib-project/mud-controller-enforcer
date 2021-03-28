@@ -9,10 +9,19 @@ use crate::{
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
-    let usrs: Vec<_> =
-        sqlx::query!("select user_id, username, password, salt, cast(group_concat(name) as text) as roles, cast(group_concat(permissions) as text) as permissions from users u, users_roles m, roles r where u.id = m.user_id and r.id = m.role_id")
-            .fetch_all(conn)
-            .await?;
+    let usrs = sqlx::query!(
+"select
+	u.id as user_id
+	, username
+	, password
+	, salt
+	, cast((select group_concat(name) from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as roles
+	, cast((select group_concat(role_id) from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as roles_ids
+	, cast((select group_concat(permissions) from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as permissions
+from
+	users u")
+        .fetch_all(conn)
+        .await?;
 
     Ok(usrs
         .into_iter()
@@ -24,6 +33,10 @@ pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
             roles: usr
                 .roles
                 .map(|r| r.split(',').map(ToOwned::to_owned).collect())
+                .unwrap_or_default(),
+            roles_ids: usr
+                .roles_ids
+                .map(|r| r.split(',').map(|s| s.parse::<i64>().unwrap()).collect())
                 .unwrap_or_default(),
             permissions: usr
                 .permissions
@@ -66,7 +79,7 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     .fetch_all(conn)
     .await?;
 
-    Ok(User {
+    let mut user = User {
         id: usr.id,
         username: usr.username,
         password: usr.password,
@@ -75,8 +88,16 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
             .iter()
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
             .collect(),
-        roles: roles.into_iter().map(|r| r.name).collect(),
-    })
+        roles: vec![],
+        roles_ids: vec![],
+    };
+
+    for role in roles.iter() {
+        user.roles.push(role.name.clone());
+        user.roles_ids.push(role.id);
+    }
+
+    Ok(user)
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
