@@ -12,7 +12,7 @@ ENV DATABASE_URL=sqlite:db.sqlite \
 WORKDIR /namib
 
 RUN apt update \
-        && apt install -y avahi-daemon libavahi-compat-libdnssd1 libsqlite3-0 sqlite3 \
+        && apt install -y avahi-daemon libavahi-compat-libdnssd1 libsqlite3-0 sqlite3 ca-certificates \
         && rm -rf /var/lib/apt/lists/* \
         && mkdir acme
 
