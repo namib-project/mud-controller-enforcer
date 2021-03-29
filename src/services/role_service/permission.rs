@@ -57,7 +57,21 @@ pub enum Permission {
     /// mud/delete
     #[strum(serialize = "mud/create")]
     mud__create,
-
+    /// user/management/list
+    #[strum(serialize = "user/management/list")]
+    user__management__list,
+    /// user/management/read
+    #[strum(serialize = "user/management/read")]
+    user__management__read,
+    /// user/management/write
+    #[strum(serialize = "user/management/write")]
+    user__management__write,
+    /// user/management/create
+    #[strum(serialize = "user/management/create")]
+    user__management__create,
+    /// user/management/delete
+    #[strum(serialize = "user/management/delete")]
+    user__management__delete,
     /// room/list
     #[strum(serialize = "room/list")]
     room__list,

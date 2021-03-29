@@ -76,6 +76,7 @@ fn app(conn: DbConnection) -> Result<()> {
                 .wrap_api()
                 .service(web::scope("/status").configure(routes::status_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
+                .service(web::scope("/management/users").configure(routes::users_management_controller::init))
                 .service(web::scope("/devices").configure(routes::device_controller::init))
                 .service(web::scope("/mud").configure(routes::mud_controller::init))
                 .service(web::scope("/config").configure(routes::config_controller::init))
@@ -116,6 +117,5 @@ async fn main() -> Result<()> {
     let r = try_join!(rpc_server_task, job_task, actix_task)?;
     r.0?;
     r.2?;
-
     Ok(())
 }

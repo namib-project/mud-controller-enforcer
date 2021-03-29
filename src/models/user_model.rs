@@ -26,6 +26,7 @@ pub struct User {
     #[serde(skip_serializing)]
     pub salt: Vec<u8>,
     pub roles: Vec<String>,
+    pub roles_ids: Vec<i64>,
     pub permissions: Vec<String>,
 }
 
@@ -48,6 +49,7 @@ impl User {
             password: User::hash_password(password, &salt)?,
             salt,
             roles: Vec::new(),
+            roles_ids: Vec::new(),
             permissions: Vec::new(),
         })
     }
