@@ -16,7 +16,7 @@ actix-files = "0.5"
 actix-cors = "0.5.4"
 actix-ratelimit = { version = "0.3.1", default-features = false, features = ["memory"] }
 sqlx = { version = "0.5", features = ["runtime-tokio-rustls", "chrono"] }
-namib_shared = { tag = "0.4.4", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+namib_shared = { tag = "0.4.5", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "0.4.14"
 env_logger = "0.8"
 tokio = { version = "1.4", features = ["full"] }
@@ -28,6 +28,7 @@ reqwest = { version = "0.11", default-features = false, features = ["rustls-tls-
 tokio-rustls = "0.22"
 tokio-util = "0.6"
 tokio-serde = "0.8"
+tokio-stream = { version = "0.1", features = ["net"] }
 tarpc = { branch = "replace_u128_traceid", git = "https://github.com/namib-project/tarpc", features = ["full"] }
 pin-project = "1.0"
 rand = "0.8"

@@ -21,8 +21,7 @@ use namib_mud_controller::{
     db,
     db::DbConnection,
     error::Result,
-    routes,
-    rpc::rpc_server,
+    routes, rpc_server,
     services::{acme_service, job_service},
     VERSION,
 };
