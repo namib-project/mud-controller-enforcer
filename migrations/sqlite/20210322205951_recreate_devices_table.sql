@@ -16,11 +16,12 @@ CREATE TABLE devices
     last_interaction DATETIME NOT NULL,
     clipart          TEXT,
     collect_info     BOOLEAN  NOT NULL DEFAULT FALSE,
+    room_id          INTEGER REFERENCES rooms (room_id) ON DELETE SET NULL ON UPDATE NO ACTION,
     UNIQUE (mac_addr, duid)
 );
 
 INSERT INTO devices (id, ipv4_addr, mac_addr, hostname, vendor_class, mud_url, last_interaction)
-    SELECT id, ip_addr, mac_addr, hostname, vendor_class, mud_url, last_interaction
-    FROM _old_devices;
+SELECT id, ip_addr, mac_addr, hostname, vendor_class, mud_url, last_interaction
+FROM _old_devices;
 
 DROP TABLE _old_devices;

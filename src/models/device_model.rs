@@ -1,4 +1,9 @@
-use crate::models::mud_models::MudData;
+use crate::{
+    db::DbConnection,
+    error::Result,
+    models::{mud_models::MudData, Room},
+    services::{mud_service, room_service},
+};
 use chrono::{NaiveDateTime, Utc};
 use namib_shared::{
     mac,
@@ -6,7 +11,10 @@ use namib_shared::{
     MacAddr,
 };
 use paperclip::actix::Apiv2Schema;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    ops::Deref,
+};
 
 #[derive(Debug, Clone)]
 pub struct DeviceDbo {
@@ -21,6 +29,7 @@ pub struct DeviceDbo {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
+    pub room_id: Option<i64>,
     pub clipart: Option<String>,
 }
 
@@ -37,8 +46,24 @@ pub struct Device {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
-    pub mud_data: Option<MudData>,
+    pub room_id: Option<i64>,
     pub clipart: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeviceWithRefs {
+    pub inner: Device,
+    pub room: Option<Room>,
+    pub mud_data: Option<MudData>,
+}
+
+impl Deref for DeviceWithRefs {
+    type Target = Device;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
@@ -59,6 +84,22 @@ impl Device {
             DeviceType::Unknown
         }
     }
+
+    pub async fn load_refs(self, conn: &DbConnection) -> Result<DeviceWithRefs> {
+        let room = match self.room_id {
+            Some(room_id) => Some(room_service::find_by_id(room_id, conn).await?),
+            None => None,
+        };
+        let mud_data = match &self.mud_url {
+            Some(mud_url) => Some(mud_service::get_or_fetch_mud(&mud_url, conn).await?),
+            None => None,
+        };
+        Ok(DeviceWithRefs {
+            inner: self,
+            room,
+            mud_data,
+        })
+    }
 }
 
 impl From<DeviceDbo> for Device {
@@ -75,16 +116,16 @@ impl From<DeviceDbo> for Device {
             hostname: device.hostname,
             vendor_class: device.vendor_class,
             mud_url: device.mud_url,
-            mud_data: None,
             collect_info: device.collect_info,
             last_interaction: device.last_interaction,
+            room_id: device.room_id,
             clipart: device.clipart,
         }
     }
 }
 
 impl Device {
-    pub fn new(lease_info: DhcpLeaseInformation) -> Self {
+    pub fn new(lease_info: DhcpLeaseInformation, collect_info: bool) -> Self {
         Self {
             id: 0,
             name: None,
@@ -107,9 +148,9 @@ impl Device {
             hostname: lease_info.hostname.unwrap_or_default(),
             vendor_class: "".to_string(),
             mud_url: lease_info.mud_url,
-            collect_info: false,
+            collect_info,
             last_interaction: Utc::now().naive_utc(),
-            mud_data: None,
+            room_id: None,
             clipart: None,
         }
     }

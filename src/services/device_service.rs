@@ -1,46 +1,30 @@
+use namib_shared::models::DhcpLeaseInformation;
+
 use crate::{
     db::DbConnection,
-    error::{Error, Result},
+    error::Result,
     models::{Device, DeviceDbo},
-    services::{
-        config_service, config_service::ConfigKeys, firewall_configuration_service, mud_service,
-        mud_service::get_or_fetch_mud, neo4jthings_service,
-    },
+    services::{config_service, config_service::ConfigKeys, firewall_configuration_service, neo4jthings_service},
 };
-pub use futures::TryStreamExt;
 
-use namib_shared::{models::DhcpLeaseInformation, MacAddr};
+use crate::models::DeviceWithRefs;
+use namib_shared::MacAddr;
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
-    let (device, update) = if let Ok(mut device) = find_by_mac_or_duid(
-        lease_info.mac_address,
-        lease_info.duid().map(|d| d.to_string()),
-        false,
-        pool,
-    )
-    .await
+    debug!("dhcp request device mud file: {:?}", lease_info.mud_url);
+
+    if let Ok(mut device) =
+        find_by_mac_or_duid(lease_info.mac_address, lease_info.duid().map(|d| d.to_string()), pool).await
     {
         device.apply(lease_info);
-        (device, true)
+        update_device(&device.load_refs(pool).await?, pool).await.unwrap();
     } else {
-        let mut device = Device::new(lease_info);
-        device.collect_info = device.mud_url.is_none()
+        let collect_info = lease_info.mud_url.is_none()
             && config_service::get_config_value(ConfigKeys::CollectDeviceData.as_ref(), pool)
                 .await
                 .unwrap_or(false);
-        (device, false)
-    };
-
-    debug!("dhcp request device mud file: {:?}", device.mud_url);
-
-    match &device.mud_url {
-        Some(url) => mud_service::get_or_fetch_mud(&url, pool).await.ok(),
-        None => None,
-    };
-    if update {
-        update_device(&device, pool).await.unwrap();
-    } else {
-        insert_device(&device, pool).await.unwrap();
+        let device = Device::new(lease_info, collect_info);
+        insert_device(&device.load_refs(pool).await?, pool).await.unwrap();
     }
 
     firewall_configuration_service::update_config_version(pool).await?;
@@ -49,44 +33,22 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
 }
 
 pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
-    let devices = sqlx::query_as!(DeviceDbo, "select * from devices").fetch(pool);
-
-    let devices_data = devices
-        .err_into::<Error>()
-        .and_then(|device| async {
-            let mut device_data = Device::from(device);
-            device_data.mud_data = match device_data.mud_url.clone() {
-                Some(url) => {
-                    let data = get_or_fetch_mud(&url, pool).await;
-                    debug!("Get all devices: mud url {:?}: {:?}", url, data);
-                    data.ok()
-                },
-                None => None,
-            };
-
-            Ok(device_data)
-        })
-        .try_collect::<Vec<Device>>()
+    let devices = sqlx::query_as!(DeviceDbo, "select * from devices")
+        .fetch_all(pool)
         .await?;
 
-    Ok(devices_data)
+    Ok(devices.into_iter().map(Device::from).collect())
 }
 
-pub async fn find_by_id(id: i64, fetch_mud: bool, pool: &DbConnection) -> Result<Device> {
-    let device = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
+pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
+    let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
         .fetch_one(pool)
         .await?;
 
-    let mut device = Device::from(device);
-
-    if fetch_mud && device.mud_url.is_some() {
-        device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
-    }
-
-    Ok(device)
+    Ok(Device::from(device))
 }
 
-pub async fn find_by_ip(ip: &str, fetch_mud: bool, pool: &DbConnection) -> Result<Device> {
+pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
     let device = sqlx::query_as!(
         DeviceDbo,
         "select * from devices where ipv4_addr = ? or ipv6_addr = ?",
@@ -96,19 +58,12 @@ pub async fn find_by_ip(ip: &str, fetch_mud: bool, pool: &DbConnection) -> Resul
     .fetch_one(pool)
     .await?;
 
-    let mut device = Device::from(device);
-
-    if fetch_mud && device.mud_url.is_some() {
-        device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
-    }
-
-    Ok(device)
+    Ok(Device::from(device))
 }
 
 pub async fn find_by_mac_or_duid(
     mac_addr: Option<MacAddr>,
     duid: Option<String>,
-    fetch_mud: bool,
     pool: &DbConnection,
 ) -> Result<Device> {
     let mut device = None;
@@ -124,24 +79,19 @@ pub async fn find_by_mac_or_duid(
             .await?;
     }
     if let Some(device) = device {
-        let mut device = Device::from(device);
-
-        if fetch_mud && device.mud_url.is_some() {
-            device.mud_data = Some(mud_service::get_or_fetch_mud(device.mud_url.as_ref().unwrap(), pool).await?);
-        }
-
-        Ok(device)
+        Ok(Device::from(device))
     } else {
         Err(sqlx::error::Error::RowNotFound.into())
     }
 }
 
-pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<i64> {
+pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) -> Result<i64> {
     let ipv4_addr = device_data.ipv4_addr.map(|ip| ip.to_string());
     let ipv6_addr = device_data.ipv6_addr.map(|ip| ip.to_string());
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
+
     let ins_count = sqlx::query!(
-        "insert into devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, clipart) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "insert into devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         device_data.name,
         ipv4_addr,
         ipv6_addr,
@@ -152,6 +102,7 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
         device_data.mud_url,
         device_data.collect_info,
         device_data.last_interaction,
+        device_data.room_id,
         device_data.clipart,
     )
     .execute(pool)
@@ -159,19 +110,20 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
 
     if device_data.collect_info {
         // add the device in the background as it may take some time
-        tokio::spawn(neo4jthings_service::add_device(device_data.clone()));
+        tokio::spawn(neo4jthings_service::add_device(device_data.inner.clone()));
     }
 
     Ok(ins_count.last_insert_rowid())
 }
 
-pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<bool> {
+pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) -> Result<bool> {
     let ipv4_addr = device_data.ipv4_addr.map(|ip| ip.to_string());
     let ipv6_addr = device_data.ipv6_addr.map(|ip| ip.to_string());
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
+
     let upd_count = sqlx::query!(
-        "update devices set name = ?, ipv4_addr = ?, ipv6_addr = ?, mac_addr = ?, duid = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ?, clipart = ? where id = ?",
-          device_data.name,
+        "update devices set name = ?, ipv4_addr = ?, ipv6_addr = ?, mac_addr = ?, duid = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ?, room_id = ?, clipart = ? where id = ?",
+        device_data.name,
         ipv4_addr,
         ipv6_addr,
         mac_addr,
@@ -181,6 +133,7 @@ pub async fn update_device(device_data: &Device, pool: &DbConnection) -> Result<
         device_data.mud_url,
         device_data.collect_info,
         device_data.last_interaction,
+        device_data.room_id,
         device_data.clipart,
         device_data.id,
     )
