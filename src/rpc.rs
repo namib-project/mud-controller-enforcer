@@ -3,7 +3,7 @@
 use crate::{firewall_config::EnforcerConfig, models::DhcpEvent};
 
 #[tarpc::service]
-pub trait RPC {
+pub trait NamibRpc {
     async fn heartbeat(version: Option<String>) -> Option<EnforcerConfig>;
     async fn dhcp_request(event: DhcpEvent);
     async fn send_logs(logs: Vec<String>);

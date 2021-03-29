@@ -28,7 +28,6 @@ where
 }
 
 /// Returns the codec used for RPC communication
-#[must_use]
-pub fn codec<Item, SinkItem>() -> fn() -> Cbor<Item, SinkItem> {
-    Cbor::default
+pub fn codec<Item, SinkItem>() -> Cbor<Item, SinkItem> {
+    Cbor::default()
 }
