@@ -16,6 +16,10 @@ RUN apt update \
         && rm -rf /var/lib/apt/lists/* \
         && mkdir acme
 
+COPY ./docker/QuoVadis_Global_SSL_ICA_G3.crt /usr/local/share/ca-certificates/QuoVadis_Global_SSL_ICA_G3.crt
+
+RUN update-ca-certificates
+
 COPY docker/run_mud_controller.sh run_mud_controller.sh
 COPY ./install/bin/namib_mud_controller namib_mud_controller
 COPY ./certs certs
