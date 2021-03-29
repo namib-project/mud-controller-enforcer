@@ -17,16 +17,15 @@ use paperclip::actix::{
     api_v2_operation, web,
     web::{HttpResponse, Json},
 };
-use std::net::IpAddr;
 use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));
     cfg.route("", web::post().to(create_device));
-    cfg.route("/{ip}", web::get().to(get_device));
-    cfg.route("/{ip}", web::put().to(update_device));
-    cfg.route("/{ip}", web::delete().to(delete_device));
-    cfg.route("/{ip}/guesses", web::get().to(guess_thing));
+    cfg.route("/{id}", web::get().to(get_device));
+    cfg.route("/{id}", web::put().to(update_device));
+    cfg.route("/{id}", web::delete().to(delete_device));
+    cfg.route("/{id}/guesses", web::get().to(guess_thing));
 }
 
 #[api_v2_operation]
@@ -45,10 +44,10 @@ async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
 }
 
 #[api_v2_operation]
-async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<Json<DeviceDto>> {
+async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__read)?;
 
-    let device = find_device(&ip, &pool).await?;
+    let device = find_device(id.into_inner(), &pool).await?;
 
     Ok(Json(DeviceDto::from(device.load_refs(&pool).await?)))
 }
@@ -74,10 +73,9 @@ async fn create_device(
             .await
             .unwrap_or(false);
     let device = device_creation_update_dto.into_inner().into_device(collect_info)?;
-    device_service::insert_device(&device, &pool).await?;
+    let id = device_service::insert_device(&device.load_refs(&pool).await?, &pool).await?;
 
-    let created_device = find_device(&device.ip_addr.to_string(), &pool).await?;
-
+    let created_device = find_device(id, &pool).await?;
     Ok(Json(DeviceDto::from(created_device.load_refs(&pool).await?)))
 }
 
@@ -85,7 +83,7 @@ async fn create_device(
 async fn update_device(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
-    ip: web::Path<String>,
+    id: web::Path<i64>,
     device_creation_update_dto: Json<DeviceCreationUpdateDto>,
 ) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__write)?;
@@ -98,37 +96,31 @@ async fn update_device(
         .fail()
     })?;
 
-    let existing_device = find_device(&ip, &pool).await?;
+    let mut device = find_device(id.into_inner(), &pool).await?;
 
     let mud_url_from_guess = device_creation_update_dto.mud_url_from_guess.unwrap_or(false);
 
-    let updated_device = device_creation_update_dto
-        .into_inner()
-        .merge(existing_device)
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::BAD_REQUEST,
-                message: Some("Invalid IP/MAC address in update body specified".to_string()),
-            }
-            .fail()
-        })?;
-    device_service::update_device(&updated_device, &pool).await?;
+    device_creation_update_dto.into_inner().apply_to(&mut device);
+
+    let device_with_refs = device.load_refs(&pool).await?;
+
+    device_service::update_device(&device_with_refs, &pool).await?;
 
     // if the mud_url was chosen from the guesses, notify the neo4jthings service
-    if mud_url_from_guess && updated_device.mud_url.is_some() {
-        let mac_addr = updated_device.mac_addr.map(|m| m.to_string()).unwrap();
-        let mud_url = updated_device.mud_url.clone().unwrap();
-        tokio::spawn(neo4jthings_service::describe_thing(mac_addr, mud_url));
+    if mud_url_from_guess && device_with_refs.mud_url.is_some() {
+        let mac_or_duid = device_with_refs.mac_or_duid();
+        let mud_url = device_with_refs.mud_url.clone().unwrap();
+        tokio::spawn(neo4jthings_service::describe_thing(mac_or_duid, mud_url));
     }
 
-    Ok(Json(DeviceDto::from(updated_device.load_refs(&pool).await?)))
+    Ok(Json(DeviceDto::from(device_with_refs)))
 }
 
 #[api_v2_operation]
-async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<HttpResponse> {
+async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<HttpResponse> {
     auth.require_permission(Permission::device__delete)?;
 
-    let existing_device = find_device(&ip, &pool).await?;
+    let existing_device = find_device(id.into_inner(), &pool).await?;
 
     device_service::delete_device(existing_device.id, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
@@ -138,11 +130,11 @@ async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::
 async fn guess_thing(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
-    ip: web::Path<String>,
+    id: web::Path<i64>,
 ) -> Result<Json<Vec<GuessDto>>> {
     auth.require_permission(Permission::device__read)?;
 
-    let device = find_device(&ip, &pool).await?;
+    let device = find_device(id.into_inner(), &pool).await?;
 
     let guesses = neo4jthings_service::guess_thing(device).await?;
 
@@ -150,22 +142,11 @@ async fn guess_thing(
 }
 
 /// Helper method for finding a device with a given ip, or returning a 404 error if not found.
-async fn find_device(ip_addr: &str, pool: &DbConnection) -> Result<Device> {
-    device_service::find_by_ip(parse_ip(ip_addr)?, pool).await.or_else(|_| {
+async fn find_device(id: i64, pool: &DbConnection) -> Result<Device> {
+    device_service::find_by_id(id, pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: Some("No device with this IP found".to_string()),
-        }
-        .fail()
-    })
-}
-
-/// Helper method for parsing a given ip address string into the corresponding struct
-fn parse_ip(ip: &str) -> Result<IpAddr> {
-    ip.parse().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: Some("Invalid IP address".to_string()),
+            message: Some("No device with this Id found".to_string()),
         }
         .fail()
     })

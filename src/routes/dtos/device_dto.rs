@@ -11,8 +11,11 @@ use paperclip::actix::Apiv2Schema;
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceDto {
     pub id: i64,
-    pub ip_addr: String,
+    pub name: Option<String>,
+    pub ipv4_addr: Option<String>,
+    pub ipv6_addr: Option<String>,
     pub mac_addr: Option<String>,
+    pub duid: Option<String>,
     pub hostname: String,
     pub vendor_class: String,
     pub mud_url: Option<String>,
@@ -29,8 +32,11 @@ impl From<DeviceWithRefs> for DeviceDto {
         let type_ = d.get_type();
         DeviceDto {
             id: d.id,
-            ip_addr: d.ip_addr.to_string(),
+            ipv4_addr: d.ipv4_addr.map(|ip| ip.to_string()),
+            ipv6_addr: d.ipv6_addr.map(|ip| ip.to_string()),
             mac_addr: d.mac_addr.map(|m| m.to_string()),
+            name: d.inner.name,
+            duid: d.inner.duid,
             hostname: d.inner.hostname,
             vendor_class: d.inner.vendor_class,
             mud_url: d.inner.mud_url,
@@ -45,8 +51,11 @@ impl From<DeviceWithRefs> for DeviceDto {
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceCreationUpdateDto {
-    pub ip_addr: String,
+    pub name: Option<String>,
+    pub ipv4_addr: Option<String>,
+    pub ipv6_addr: Option<String>,
     pub mac_addr: Option<String>,
+    pub duid: Option<String>,
     pub hostname: Option<String>,
     pub vendor_class: Option<String>,
     pub mud_url: Option<String>,
@@ -63,12 +72,14 @@ impl DeviceCreationUpdateDto {
             None => None,
             Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
         };
-        let ip_addr = self.ip_addr.parse::<std::net::IpAddr>()?;
 
         Ok(Device {
             id: 0,
+            name: None,
             mac_addr,
-            ip_addr,
+            duid: self.duid,
+            ipv4_addr: self.ipv4_addr.and_then(|ip| ip.parse().ok()),
+            ipv6_addr: self.ipv6_addr.and_then(|ip| ip.parse().ok()),
             hostname: self.hostname.unwrap_or_else(|| "".to_string()),
             vendor_class: self.vendor_class.unwrap_or_else(|| "".to_string()),
             mud_url: self.mud_url,
@@ -79,9 +90,9 @@ impl DeviceCreationUpdateDto {
         })
     }
 
-    pub fn merge(self, mut device: Device) -> Result<Device> {
-        if self.mud_url.is_some() {
-            device.mud_url = self.mud_url;
+    pub fn apply_to(self, device: &mut Device) {
+        if let Some(mud_url) = self.mud_url {
+            device.mud_url = Some(mud_url);
         }
         if let Some(hostname) = self.hostname {
             device.hostname = hostname;
@@ -92,7 +103,6 @@ impl DeviceCreationUpdateDto {
         if let Some(room_id) = self.room_id {
             device.room_id = Some(room_id);
         }
-        Ok(device)
     }
 }
 

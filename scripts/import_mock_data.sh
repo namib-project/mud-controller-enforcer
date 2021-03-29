@@ -11,7 +11,7 @@ function import() {
     ('https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '{}', '2021-03-27T14:20:00', '1970-01-01T00:00:00'),
     ('https://iotanalytics.unsw.edu.au/mud/augustdoorbellcamMud.json', '{}', '2021-03-27T14:20:00', '1970-01-01T00:00:00'),
     ('https://iotanalytics.unsw.edu.au/mud/belkincameraMud.json', '{}', '2021-03-27T14:20:00', '1970-01-01T00:00:00');
-  INSERT INTO devices (ip_addr, mac_addr, hostname, clipart, vendor_class, mud_url, last_interaction, collect_info) VALUES
+  INSERT INTO devices (ipv4_addr, mac_addr, hostname, clipart, vendor_class, mud_url, last_interaction, collect_info) VALUES
     ('192.168.1.101', '2b:7d:c4:83:85:1e', 'Device 1', 'resources/clipart/cloud.svg', 'Manufacturer 1', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
     ('192.168.1.102', '7d:1a:51:55:5a:4e', 'Device 2', 'resources/clipart/lamp.svg', 'Manufacturer 2', 'https://iotanalytics.unsw.edu.au/mud/augustdoorbellcamMud.json', '2021-03-26T16:43:00', false),
     ('192.168.1.103', 'a3:89:dd:c0:41:6e', 'Device 3', 'resources/clipart/lightning.svg', '', NULL, '2021-03-25T16:43:00', true),
