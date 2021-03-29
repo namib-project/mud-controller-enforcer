@@ -7,6 +7,9 @@ set -e
 function import() {
   local CMD=$1
   $CMD <<'EOF'
+  INSERT INTO rooms (name, color) VALUES
+    ('Küche', '0xFF6200EE'),
+    ('Flur', '0xFFCF6679');
   INSERT INTO mud_data (url, data, created_at, expiration) VALUES
     ('https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '{}', '2021-03-27T14:20:00', '1970-01-01T00:00:00'),
     ('https://iotanalytics.unsw.edu.au/mud/augustdoorbellcamMud.json', '{}', '2021-03-27T14:20:00', '1970-01-01T00:00:00'),
@@ -20,6 +23,10 @@ function import() {
     ('192.168.1.106', 'b1:3a:ba:55:56:62', 'Device 6', 'resources/clipart/phone_iphone.svg', 'Manufacturer 4', 'https://iotanalytics.unsw.edu.au/mud/belkincameraMud.json', '2021-03-27T14:20:00', false),
     ('192.168.1.107', '0c:24:3d:50:6d:fe', 'Device 7', 'resources/clipart/router.svg', 'Manufacturer 4', NULL, '2021-03-27T14:20:00', false),
     ('192.168.1.108', '25:f0:f0:0c:20:28', 'Device 8', 'resources/clipart/speaker.svg', 'Manufacturer 5', NULL, '2021-03-27T14:20:00', true);
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Küche') WHERE mac_addr = '2b:7d:c4:83:85:1e';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Flur') WHERE mac_addr = '7d:1a:51:55:5a:4e';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Küche') WHERE mac_addr = 'ce:cf:88:01:2c:2e';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Flur') WHERE mac_addr = 'b1:3a:ba:55:56:62';
   INSERT INTO users (username, password, salt) VALUES
     ('admin', '$argon2i$v=19$m=4096,t=3,p=1$SOG5O7ZAUZ6elXQZMHF55K7KUjftvXqQwWS1SUhJKW0$eyE76g3JUALKvM5xgsccQhh8fB1hsRV4pIeWxVOtl8M', '48E1B93BB640519E9E957419307179E4AECA5237EDBD7A90C164B5494849296D'),
     ('reader', '$argon2i$v=19$m=4096,t=3,p=1$OP4TABHMAKSSP5re6J7ciiuI58u9iWSKBoVv2m55bMA$P+0/apaZHvO1zuF8T1pvrts9YR8zzuKUxs+IlZHodpU', '38FE130011CC00A4923F9ADEE89EDC8A2B88E7CBBD89648A06856FDA6E796CC0'),
