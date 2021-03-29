@@ -14,7 +14,7 @@ use crate::{
     services::{controller_name::apply_secure_name_config, firewall_service::FirewallService},
 };
 use error::Result;
-use namib_shared::{firewall_config::EnforcerConfig, rpc::RPCClient};
+use namib_shared::{firewall_config::EnforcerConfig, rpc::NamibRpcClient};
 use std::{env, net::SocketAddr, path::Path, thread};
 use tokio::sync::RwLock;
 
@@ -28,7 +28,7 @@ mod uci;
 const DEFAULT_CONFIG_STATE_FILE: &str = "/etc/namib/state.json";
 
 pub struct Enforcer {
-    pub client: RPCClient,
+    pub client: NamibRpcClient,
     pub addr: SocketAddr,
     pub config: EnforcerConfig,
 }

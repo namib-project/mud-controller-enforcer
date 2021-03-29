@@ -5,7 +5,7 @@ use tarpc::{client, context, serde_transport};
 use tokio::time::{sleep, Duration};
 
 use crate::services::controller_name::apply_secure_name_config;
-use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::RPCClient};
+use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::NamibRpcClient};
 
 use crate::{error::Result, services::firewall_service::FirewallService, Enforcer};
 
@@ -24,7 +24,7 @@ use tokio_native_tls::{
 };
 use tokio_util::codec::LengthDelimitedCodec;
 
-pub async fn run() -> Result<(RPCClient, SocketAddr)> {
+pub async fn run() -> Result<(NamibRpcClient, SocketAddr)> {
     let identity = {
         // set client auth cert
         let mut vec = Vec::new();
@@ -99,7 +99,7 @@ async fn try_connect(
     dns_name: &'static str,
     identity: Identity,
     ca: Certificate,
-) -> Result<Option<(RPCClient, SocketAddr)>> {
+) -> Result<Option<(NamibRpcClient, SocketAddr)>> {
     debug!("trying to connect to address {:?}", addr);
 
     // ip6 geht anscheinend nicht
@@ -118,10 +118,10 @@ async fn try_connect(
     let framed_io = LengthDelimitedCodec::builder()
         .max_frame_length(50 * 1024 * 1024)
         .new_framed(tls_connector.connect(dns_name, tcp_stream).await?);
-    let transport = serde_transport::new(framed_io, codec()());
+    let transport = serde_transport::new(framed_io, codec());
 
     Ok(Some((
-        RPCClient::new(client::Config::default(), transport).spawn()?,
+        NamibRpcClient::new(client::Config::default(), transport).spawn()?,
         addr,
     )))
 }
