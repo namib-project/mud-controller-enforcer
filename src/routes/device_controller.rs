@@ -12,12 +12,12 @@ use crate::{
     },
 };
 use actix_web::http::StatusCode;
+use futures::{stream, StreamExt, TryStreamExt};
 use paperclip::actix::{
     api_v2_operation, web,
     web::{HttpResponse, Json},
 };
 use std::net::IpAddr;
-use tokio::runtime::Builder;
 use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -35,16 +35,22 @@ async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
     auth.require_permission(Permission::device__read)?;
 
     let devices = device_service::get_all_devices(&pool).await?;
-    Ok(Json(devices.into_iter().map(DeviceDto::from).collect()))
+    Ok(Json(
+        stream::iter(devices)
+            .then(|d| d.load_refs(&pool))
+            .map_ok(DeviceDto::from)
+            .try_collect()
+            .await?,
+    ))
 }
 
 #[api_v2_operation]
 async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__read)?;
 
-    let device = find_device(&ip, true, &pool).await?;
+    let device = find_device(&ip, &pool).await?;
 
-    Ok(Json(DeviceDto::from(device)))
+    Ok(Json(DeviceDto::from(device.load_refs(&pool).await?)))
 }
 
 #[api_v2_operation]
@@ -70,9 +76,9 @@ async fn create_device(
     let device = device_creation_update_dto.into_inner().into_device(collect_info)?;
     device_service::insert_device(&device, &pool).await?;
 
-    let created_device = find_device(&device.ip_addr.to_string(), true, &pool).await?;
+    let created_device = find_device(&device.ip_addr.to_string(), &pool).await?;
 
-    Ok(Json(DeviceDto::from(created_device)))
+    Ok(Json(DeviceDto::from(created_device.load_refs(&pool).await?)))
 }
 
 #[api_v2_operation]
@@ -92,7 +98,7 @@ async fn update_device(
         .fail()
     })?;
 
-    let existing_device = find_device(&ip, false, &pool).await?;
+    let existing_device = find_device(&ip, &pool).await?;
 
     let mud_url_from_guess = device_creation_update_dto.mud_url_from_guess.unwrap_or(false);
 
@@ -112,23 +118,17 @@ async fn update_device(
     if mud_url_from_guess && updated_device.mud_url.is_some() {
         let mac_addr = updated_device.mac_addr.map(|m| m.to_string()).unwrap();
         let mud_url = updated_device.mud_url.clone().unwrap();
-        actix_rt::spawn(async move {
-            Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(neo4jthings_service::describe_thing(mac_addr, mud_url))
-        });
+        tokio::spawn(neo4jthings_service::describe_thing(mac_addr, mud_url));
     }
 
-    Ok(Json(DeviceDto::from(updated_device)))
+    Ok(Json(DeviceDto::from(updated_device.load_refs(&pool).await?)))
 }
 
 #[api_v2_operation]
 async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, ip: web::Path<String>) -> Result<HttpResponse> {
     auth.require_permission(Permission::device__delete)?;
 
-    let existing_device = find_device(&ip, false, &pool).await?;
+    let existing_device = find_device(&ip, &pool).await?;
 
     device_service::delete_device(existing_device.id, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
@@ -142,27 +142,22 @@ async fn guess_thing(
 ) -> Result<Json<Vec<GuessDto>>> {
     auth.require_permission(Permission::device__read)?;
 
-    let device = find_device(&ip, false, &pool).await?;
+    let device = find_device(&ip, &pool).await?;
 
-    let guesses = Builder::new_current_thread()
-        .enable_all()
-        .build()?
-        .block_on(neo4jthings_service::guess_thing(device))?;
+    let guesses = neo4jthings_service::guess_thing(device).await?;
 
     Ok(Json(guesses))
 }
 
 /// Helper method for finding a device with a given ip, or returning a 404 error if not found.
-async fn find_device(ip_addr: &str, fetch_mud: bool, pool: &DbConnection) -> Result<Device> {
-    device_service::find_by_ip(parse_ip(ip_addr)?, fetch_mud, pool)
-        .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::NOT_FOUND,
-                message: Some("No device with this IP found".to_string()),
-            }
-            .fail()
-        })
+async fn find_device(ip_addr: &str, pool: &DbConnection) -> Result<Device> {
+    device_service::find_by_ip(parse_ip(ip_addr)?, pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("No device with this IP found".to_string()),
+        }
+        .fail()
+    })
 }
 
 /// Helper method for parsing a given ip address string into the corresponding struct

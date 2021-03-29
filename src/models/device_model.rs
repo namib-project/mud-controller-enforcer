@@ -1,8 +1,13 @@
-use crate::models::mud_models::MudData;
+use crate::{
+    db::DbConnection,
+    error::Result,
+    models::{mud_models::MudData, Room},
+    services::{mud_service, room_service},
+};
 use chrono::{Local, NaiveDateTime};
 use namib_shared::{mac, models::DhcpLeaseInformation, MacAddr};
 use paperclip::actix::Apiv2Schema;
-use std::net::IpAddr;
+use std::{net::IpAddr, ops::Deref};
 
 #[derive(Debug, Clone)]
 pub struct DeviceDbo {
@@ -14,6 +19,7 @@ pub struct DeviceDbo {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
+    pub room_id: Option<i64>,
     pub clipart: Option<String>,
 }
 
@@ -27,8 +33,24 @@ pub struct Device {
     pub mud_url: Option<String>,
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
-    pub mud_data: Option<MudData>,
+    pub room_id: Option<i64>,
     pub clipart: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeviceWithRefs {
+    pub inner: Device,
+    pub room: Option<Room>,
+    pub mud_data: Option<MudData>,
+}
+
+impl Deref for DeviceWithRefs {
+    type Target = Device;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
@@ -49,6 +71,22 @@ impl Device {
             DeviceType::Unknown
         }
     }
+
+    pub async fn load_refs(self, conn: &DbConnection) -> Result<DeviceWithRefs> {
+        let room = match self.room_id {
+            Some(room_id) => Some(room_service::find_by_id(room_id, conn).await?),
+            None => None,
+        };
+        let mud_data = match &self.mud_url {
+            Some(mud_url) => Some(mud_service::get_or_fetch_mud(&mud_url, conn).await?),
+            None => None,
+        };
+        Ok(DeviceWithRefs {
+            inner: self,
+            room,
+            mud_data,
+        })
+    }
 }
 
 impl From<DeviceDbo> for Device {
@@ -64,7 +102,7 @@ impl From<DeviceDbo> for Device {
             mud_url: device.mud_url,
             collect_info: device.collect_info,
             last_interaction: device.last_interaction,
-            mud_data: None,
+            room_id: device.room_id,
             clipart: device.clipart,
         }
     }
@@ -81,7 +119,7 @@ impl From<DhcpLeaseInformation> for Device {
             mud_url: lease_info.mud_url,
             collect_info: false,
             last_interaction: Local::now().naive_local(),
-            mud_data: None,
+            room_id: None,
             clipart: None,
         }
     }

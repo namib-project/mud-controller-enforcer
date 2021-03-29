@@ -1,12 +1,11 @@
 use std::{env, net::SocketAddr, sync::Arc};
 
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{future, stream, StreamExt, TryStreamExt};
 use rustls::{RootCertStore, Session};
 use tarpc::{
     context, server,
     server::{BaseChannel, Channel, Incoming},
 };
-use tokio_compat_02::FutureExt;
 
 use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::RPC};
 
@@ -37,10 +36,15 @@ impl RPC for RPCServer {
         if Some(&current_config_version) != version.as_ref() {
             debug!("Client has outdated version. Starting update...");
             let devices = device_service::get_all_devices(&self.db_connection)
-                .compat()
                 .await
                 .unwrap_or_default();
-            let new_config = firewall_configuration_service::create_configuration(current_config_version, &devices);
+            let init_devices: Vec<_> = stream::iter(devices)
+                .then(|d| d.load_refs(&self.db_connection))
+                .try_collect()
+                .await
+                .unwrap_or_default();
+            let new_config =
+                firewall_configuration_service::create_configuration(current_config_version, &init_devices);
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }

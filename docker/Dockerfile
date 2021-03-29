@@ -12,9 +12,13 @@ ENV DATABASE_URL=sqlite:db.sqlite \
 WORKDIR /namib
 
 RUN apt update \
-        && apt install -y avahi-daemon libavahi-compat-libdnssd1 libsqlite3-0 sqlite3 \
+        && apt install -y avahi-daemon libavahi-compat-libdnssd1 libsqlite3-0 sqlite3 ca-certificates \
         && rm -rf /var/lib/apt/lists/* \
         && mkdir acme
+
+COPY ./docker/QuoVadis_Global_SSL_ICA_G3.crt /usr/local/share/ca-certificates/QuoVadis_Global_SSL_ICA_G3.crt
+
+RUN update-ca-certificates
 
 COPY docker/run_mud_controller.sh run_mud_controller.sh
 COPY ./install/bin/namib_mud_controller namib_mud_controller

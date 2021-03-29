@@ -2,7 +2,7 @@
 
 use crate::{
     error::Result,
-    models::{Device, DeviceType, MudData},
+    models::{Device, DeviceType, DeviceWithRefs, MudData, Room},
 };
 use chrono::{NaiveDateTime, Utc};
 use namib_shared::{mac, MacAddr};
@@ -19,23 +19,25 @@ pub struct DeviceDto {
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
     pub clipart: Option<String>,
+    pub room: Option<Room>,
     #[serde(rename = "type")]
     pub type_: DeviceType,
 }
 
-impl From<Device> for DeviceDto {
-    fn from(d: Device) -> Self {
+impl From<DeviceWithRefs> for DeviceDto {
+    fn from(d: DeviceWithRefs) -> Self {
         let type_ = d.get_type();
         DeviceDto {
             id: d.id,
             ip_addr: d.ip_addr.to_string(),
             mac_addr: d.mac_addr.map(|m| m.to_string()),
-            hostname: d.hostname,
-            vendor_class: d.vendor_class,
-            mud_url: d.mud_url,
-            last_interaction: d.last_interaction,
+            hostname: d.inner.hostname,
+            vendor_class: d.inner.vendor_class,
+            mud_url: d.inner.mud_url,
+            last_interaction: d.inner.last_interaction,
             mud_data: d.mud_data,
-            clipart: d.clipart,
+            clipart: d.inner.clipart,
+            room: d.room,
             type_,
         }
     }
@@ -52,6 +54,7 @@ pub struct DeviceCreationUpdateDto {
     pub last_interaction: Option<NaiveDateTime>,
     #[validate(length(max = 512))]
     pub clipart: Option<String>,
+    pub room_id: Option<i64>,
 }
 
 impl DeviceCreationUpdateDto {
@@ -71,21 +74,23 @@ impl DeviceCreationUpdateDto {
             mud_url: self.mud_url,
             collect_info,
             last_interaction: Utc::now().naive_local(),
-            mud_data: None,
             clipart: self.clipart.clone(),
+            room_id: self.room_id,
         })
     }
 
     pub fn merge(self, mut device: Device) -> Result<Device> {
         if self.mud_url.is_some() {
             device.mud_url = self.mud_url;
-            device.mud_data = None;
         }
         if let Some(hostname) = self.hostname {
             device.hostname = hostname;
         }
         if let Some(vendor_class) = self.vendor_class {
             device.vendor_class = vendor_class;
+        }
+        if let Some(room_id) = self.room_id {
+            device.room_id = Some(room_id);
         }
         Ok(device)
     }
