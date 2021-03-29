@@ -15,6 +15,7 @@ use crate::{
     routes::dtos::{DeviceDto, RoomCreationUpdateDto, RoomDto},
     services::{role_service::Permission, room_service},
 };
+use futures::{stream, StreamExt, TryStreamExt};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_rooms));
@@ -40,7 +41,7 @@ async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<
     let res = room_service::find_by_id(id.into_inner(), &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: Some(format!("Room can not be found.")),
+            message: Some("Room can not be found.".to_string()),
         }
         .fail()
     })?;
@@ -61,7 +62,7 @@ async fn get_all_devices_inside_room(
     room_service::find_by_id(id.0, &&pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: Some(format!("Room can not be found.")),
+            message: Some("Room can not be found.".to_string()),
         }
         .fail()
     })?;
@@ -71,12 +72,18 @@ async fn get_all_devices_inside_room(
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::NOT_FOUND,
-                message: Some(format!("No devices found in the room.")),
+                message: Some("No devices found in the room.".to_string()),
             }
             .fail()
         })?;
     debug!("{:?}", res);
-    Ok(Json(res.into_iter().map(DeviceDto::from).collect()))
+    Ok(Json(
+        stream::iter(res)
+            .then(|d| d.load_refs(&pool))
+            .map_ok(DeviceDto::from)
+            .try_collect()
+            .await?,
+    ))
 }
 
 #[api_v2_operation(summary = "Creates a new room. Color in hex e.g. {FFFFFF, 000000}")]
@@ -98,18 +105,18 @@ async fn create_room(
     if room_service::exists_room(room_creation_update_dto.name.clone(), &pool).await? {
         error::ResponseError {
             status: StatusCode::CONFLICT,
-            message: Some(format!("Room already exists.")),
+            message: Some("Room already exists.".to_string()),
         }
         .fail()?
     }
 
     room_service::insert_room(&room_creation_update_dto.to_room(0)?, &pool).await?;
-    let res = room_service::find_by_name(room_creation_update_dto.name.to_owned(), &pool)
+    let res = room_service::find_by_name(room_creation_update_dto.name.clone(), &pool)
         .await
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::NOT_FOUND,
-                message: Some(format!("Could not insert room.")),
+                message: Some("Could not insert room.".to_string()),
             }
             .fail()
         })?;
@@ -137,7 +144,7 @@ async fn update_room(
     let find_room = room_service::find_by_id(id.0, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: Some(format!("Room can not be found.")),
+            message: Some("Room can not be found.".to_string()),
         }
         .fail()
     })?;
@@ -145,7 +152,7 @@ async fn update_room(
     if room_service::exists_room(room_creation_update_dto.name.clone(), &pool).await? {
         error::ResponseError {
             status: StatusCode::CONFLICT,
-            message: Some(format!("Room already exists.")),
+            message: Some("Room already exists.".to_string()),
         }
         .fail()?
     }
@@ -155,7 +162,7 @@ async fn update_room(
         .or_else(|_| {
             error::ResponseError {
                 status: StatusCode::BAD_REQUEST,
-                message: Some(format!("Could not update room.")),
+                message: Some("Could not update room.".to_string()),
             }
             .fail()
         })?;

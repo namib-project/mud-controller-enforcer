@@ -45,16 +45,11 @@ pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
 
 ///returns all devices that are associated with a given room from the database
 pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> Result<Vec<Device>> {
-    let room = find_by_id(room_id, pool).await?;
-
     let device_dbo: Vec<DeviceDbo> = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE room_id = $1", room_id)
         .fetch_all(pool)
         .await?;
 
-    Ok(device_dbo
-        .into_iter()
-        .map(|d| Device::from_dbo(d, Some(room.clone())))
-        .collect())
+    Ok(device_dbo.into_iter().map(Device::from).collect())
 }
 
 ///Creates a new room with a given name and color in the database

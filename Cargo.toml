@@ -54,6 +54,5 @@ clokwerk = "0.3"
 acme-lib = "0.8"
 get_if_addrs = "0.5"
 url = "2"
-tokio-compat-02 = "0.2"
 backoff = { version = "0.3", features = ["tokio"] }
 neo4jthings-api = { path = "neo4jthings-api" }
