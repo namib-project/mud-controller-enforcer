@@ -28,9 +28,9 @@ from
             username: usr.username,
             password: usr.password,
             salt: usr.salt,
-            roles: usr.roles.split(",").map(ToOwned::to_owned).collect(),
-            roles_ids: usr.roles_ids.split(",").map(|s| s.parse::<i64>().unwrap()).collect(),
-            permissions: usr.permissions.split(",").map(ToOwned::to_owned).collect(),
+            roles: usr.roles.split(',').map(ToOwned::to_owned).collect(),
+            roles_ids: usr.roles_ids.split(',').map(|s| s.parse::<i64>().unwrap()).collect(),
+            permissions: usr.permissions.split(',').map(ToOwned::to_owned).collect(),
         })
         .collect())
 }

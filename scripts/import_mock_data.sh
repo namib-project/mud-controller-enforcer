@@ -21,8 +21,15 @@ function import() {
     ('192.168.1.104', 'e3:0e:d6:03:92:c3', 'Device 4', 'resources/clipart/laptop.svg', 'Manufacturer 1', NULL, '2021-03-24T16:43:00', false),
     ('192.168.1.105', 'ce:cf:88:01:2c:2e', 'Device 5', 'resources/clipart/music_note_beamed.svg', 'Manufacturer 3', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
     ('192.168.1.106', 'b1:3a:ba:55:56:62', 'Device 6', 'resources/clipart/phone_iphone.svg', 'Manufacturer 4', 'https://iotanalytics.unsw.edu.au/mud/belkincameraMud.json', '2021-03-27T14:20:00', false),
-    ('192.168.1.107', '0c:24:3d:50:6d:fe', 'Device 7', 'resources/clipart/router.svg', 'Manufacturer 4', NULL, '2021-03-27T14:20:00', false),
-    ('192.168.1.108', '25:f0:f0:0c:20:28', 'Device 8', 'resources/clipart/speaker.svg', 'Manufacturer 5', NULL, '2021-03-27T14:20:00', true);
+    ('192.168.1.107', '0c:24:3d:50:6d:fe', 'Device 7', 'resources/clipart/router.svg', 'Manufacturer 4', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.108', '25:f0:f0:0c:20:28', 'Device 8', 'resources/clipart/speaker.svg', 'Manufacturer 5', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.109', '25:f0:f0:0c:20:29', 'Device 9', 'resources/clipart/speaker.svg', 'Manufacturer 6', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.110', '25:f0:f0:0c:20:30', 'Device 10', 'resources/clipart/speaker.svg', 'Manufacturer 7', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.111', '25:f0:f0:0c:20:31', 'Device 11', 'resources/clipart/speaker.svg', 'Manufacturer 8', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.112', '25:f0:f0:0c:20:32', 'Device 12', 'resources/clipart/speaker.svg', 'Manufacturer 9', 'https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.113', '25:f0:f0:0c:20:33', 'Device 13', 'resources/clipart/speaker.svg', 'Manufacturer 10', 'https://iotanalytics.unsw.edu.au/mud/belkincameraMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.114', '25:f0:f0:0c:20:34', 'Device 14', 'resources/clipart/speaker.svg', 'Manufacturer 11', 'https://iotanalytics.unsw.edu.au/mud/augustdoorbellcamMud.json', '2021-03-27T14:20:00', false),
+    ('192.168.1.115', '25:f0:f0:0c:20:35', 'Device 15', 'resources/clipart/speaker.svg', 'Manufacturer 12', 'https://iotanalytics.unsw.edu.au/mud/augustdoorbellcamMud.json', '2021-03-27T14:20:00', false);
   UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Küche') WHERE mac_addr = '2b:7d:c4:83:85:1e';
   UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Flur') WHERE mac_addr = '7d:1a:51:55:5a:4e';
   UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = 'Küche') WHERE mac_addr = 'ce:cf:88:01:2c:2e';
