@@ -4,11 +4,143 @@ use std::{fs::File, io::Read};
 
 use chrono::{Duration, Utc};
 
+use actix_web::web;
 use namib_mud_controller::{
+    auth::AuthToken,
     error::Result,
     models::{MudData, MudDbo},
+    routes::{dtos::MudCreationDto, mud_controller},
     services::mud_service::{json_models, mud_profile_service::update_outdated_profiles, parser::parse_mud},
 };
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_create_mud() -> Result<()> {
+    let ctx = lib::IntegrationTestContext::new("test_create_mud").await;
+
+    mud_controller::create_mud(
+        web::Data::new(ctx.db_conn),
+        AuthToken::generate_access_token(1, "admin".to_string(), vec!["**".to_string()]),
+        web::Json(MudCreationDto {
+            mud_url: "Some Mud".to_string(),
+            acl_override: Some(
+                serde_json::from_str(
+                    r#"[
+  {
+    "acl_type": "IPV4",
+    "name": "from-ipv4-amazonecho",
+    "packet_direction": "FromDevice",
+    "ace": [
+      {
+        "name": "from-ipv4-amazonecho-1",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": "FromDevice",
+          "dnsname": "softwareupdates.amazon.com",
+          "protocol": { "name": "Protocol", "num": 6 },
+          "destination_port": { "single": 443 },
+          "source_port": null
+        }
+      },
+      {
+        "name": "from-ipv4-amazonecho-2",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": null,
+          "dnsname": "3.north-america.pool.ntp.org",
+          "protocol": { "name": "Protocol", "num": 17 },
+          "destination_port": { "single": 123 },
+          "source_port": null
+        }
+      }
+    ]
+  },
+  {
+    "acl_type": "IPV6",
+    "name": "from-ethernet-amazonecho",
+    "packet_direction": "FromDevice",
+    "ace": [
+      {
+        "name": "from-ethernet-amazonecho-0",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": null,
+          "dnsname": null,
+          "protocol": null,
+          "destination_port": null,
+          "source_port": null
+        }
+      },
+      {
+        "name": "from-ethernet-amazonecho-1",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": null,
+          "dnsname": null,
+          "protocol": null,
+          "destination_port": null,
+          "source_port": null
+        }
+      }
+    ]
+  },
+  {
+    "acl_type": "IPV4",
+    "name": "to-ipv4-amazonecho",
+    "packet_direction": "ToDevice",
+    "ace": [
+      {
+        "name": "to-ipv4-amazonecho-0",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": null,
+          "dnsname": "3.north-america.pool.ntp.org",
+          "protocol": { "name": "Protocol", "num": 17 },
+          "destination_port": null,
+          "source_port": { "single": 123 }
+        }
+      },
+      {
+        "name": "to-ipv4-amazonecho-1",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": null,
+          "dnsname": "ntp-g7g.amazon.com",
+          "protocol": { "name": "Protocol", "num": 17 },
+          "destination_port": null,
+          "source_port": { "single": 123 }
+        }
+      },
+      {
+        "name": "to-ipv4-amazonecho-2",
+        "action": "Accept",
+        "matches": {
+          "address_mask": null,
+          "direction_initiated": null,
+          "dnsname": "api.amazonalexa.com",
+          "protocol": { "name": "Protocol", "num": 6 },
+          "destination_port": null,
+          "source_port": { "single": 443 }
+        }
+      }
+    ]
+  }
+]
+"#,
+                )
+                .unwrap(),
+            ),
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
 
 #[tokio::test(flavor = "multi_thread")]
 //tests whether update_outdated_profiles() works on expired profiles. Dependent on external Service.
