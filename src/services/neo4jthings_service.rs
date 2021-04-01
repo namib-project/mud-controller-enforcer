@@ -12,6 +12,7 @@ lazy_static! {
     /// The configuration for connecting to the neo4jthings service.
     /// We could configure the base_url here too
     static ref N4JT_CONFIG: Configuration = Configuration {
+        base_path: env::var("NEO4JTHINGS_URL").unwrap_or_else(|_| "http://localhost:7000"),
         basic_auth: Some((
             env::var("NEO4JTHINGS_USER").expect("NEO4JTHINGS_USER env missing"),
             Some(env::var("NEO4JTHINGS_PASS").expect("NEO4JTHINGS_PASS env missing"))
