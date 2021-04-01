@@ -1,7 +1,7 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{RoleDbo, User, UserDbo},
+    models::{Role, RoleDbo, User, UserDbo},
     services::role_service,
 };
 
@@ -28,11 +28,29 @@ from
             username: usr.username,
             password: usr.password,
             salt: usr.salt,
-            roles: usr.roles.split(",").map(ToOwned::to_owned).collect(),
-            roles_ids: usr.roles_ids.split(",").map(|s| s.parse::<i64>().unwrap()).collect(),
-            permissions: usr.permissions.split(",").map(ToOwned::to_owned).collect(),
+            roles: get_roles(&usr.roles_ids, &usr.roles),
+            permissions: usr.permissions.split(',').map(ToOwned::to_owned).collect(),
         })
         .collect())
+}
+
+fn get_roles(ids: &str, names: &str) -> Vec<Role> {
+    let mut res = Vec::new();
+    let mut id_iter = ids.split(',');
+    let mut name_iter = names.split(',');
+    loop {
+        res.push(Role {
+            id: match id_iter.next().and_then(|id| id.parse().ok()) {
+                Some(id) => id,
+                None => break,
+            },
+            name: match name_iter.next() {
+                Some(name) => name.to_string(),
+                None => break,
+            },
+        });
+    }
+    res
 }
 
 pub async fn has_any_users(conn: &DbConnection) -> Result<bool> {
@@ -68,7 +86,7 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     .fetch_all(conn)
     .await?;
 
-    let mut user = User {
+    let user = User {
         id: usr.id,
         username: usr.username,
         password: usr.password,
@@ -77,14 +95,8 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
             .iter()
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
             .collect(),
-        roles: vec![],
-        roles_ids: vec![],
+        roles: roles.into_iter().map(Role::from).collect(),
     };
-
-    for role in roles.iter() {
-        user.roles.push(role.name.clone());
-        user.roles_ids.push(role.id);
-    }
 
     Ok(user)
 }

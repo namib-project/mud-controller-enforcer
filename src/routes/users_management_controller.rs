@@ -8,7 +8,7 @@ use crate::{auth::AuthToken, db::DbConnection, error, error::Result, services::r
 
 use crate::{
     models::User,
-    routes::dtos::{MgmCreateUserDto, MgmRoleInfoDto, MgmUpdateUserBasicDto, MgmUserDto},
+    routes::dtos::{MgmCreateUserDto, MgmUpdateUserBasicDto, MgmUserDto},
     services::{role_service, user_service},
 };
 use actix_web::HttpResponse;
@@ -27,13 +27,13 @@ pub async fn get_all_users(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
 
     let mut all_users: Vec<MgmUserDto> = vec![];
 
-    for user in user_service::get_all(pool.get_ref()).await?.iter() {
+    for user in user_service::get_all(pool.get_ref()).await? {
         debug!(">user> {:?}", user);
         all_users.push(MgmUserDto {
             user_id: user.id,
-            username: user.username.clone(),
-            roles: get_user_roles(user.roles.clone(), user.roles_ids.clone()).await?,
-            permissions: user.permissions.clone(),
+            username: user.username,
+            roles: user.roles,
+            permissions: user.permissions,
         });
     }
 
@@ -104,14 +104,13 @@ pub async fn update_user_by_id(
         }
     }
 
-    let mut user_db = user_service::find_by_id(user_id.clone(), pool.get_ref()).await?;
+    let user_db = user_service::find_by_id(user_id.clone(), pool.get_ref()).await?;
     let mut user = User {
         id: user_id.clone(),
         username: update_user_dto.username.clone(),
         password: user_db.password,
         salt: user_db.salt,
         roles: vec![],
-        roles_ids: vec![],
         permissions: vec![],
     };
 
@@ -120,22 +119,6 @@ pub async fn update_user_by_id(
     if update_user_dto.password.length() > 0 {
         user.password = User::hash_password(&update_user_dto.password, &user.salt)?;
         user_service::update_password(user.id, &user, pool.get_ref()).await?;
-    }
-
-    if match auth.require_permission(Permission::role__assign) {
-        Ok(_) => true,
-        Err(_) => false,
-    } {
-        for role_id in update_user_dto.roles_ids.iter() {
-            if user_db.roles_ids.contains(role_id) {
-                match user_db.roles_ids.iter().position(|id| id == role_id) {
-                    None => -1,
-                    Some(idx) => user_db.roles_ids.remove(idx),
-                };
-            } else {
-                role_service::role_add_to_user(pool.get_ref(), user_id.clone(), *role_id).await?;
-            }
-        }
     }
 
     Ok(HttpResponse::NoContent().finish())
@@ -160,22 +143,7 @@ async fn get_user_from_service(pool: &DbConnection, user_id: i64) -> Result<MgmU
     Ok(MgmUserDto {
         user_id: user.id,
         username: user.username,
-        roles: get_user_roles(user.roles, user.roles_ids).await?,
+        roles: user.roles,
         permissions: user.permissions,
     })
-}
-
-async fn get_user_roles(user_roles_names: Vec<String>, user_roles_ids: Vec<i64>) -> Result<Vec<MgmRoleInfoDto>> {
-    let mut user_roles: Vec<MgmRoleInfoDto> = vec![];
-    let mut i = 0;
-
-    for user_role_name in user_roles_names.iter() {
-        user_roles.push(MgmRoleInfoDto {
-            id: user_roles_ids[i],
-            name: user_role_name.clone(),
-        });
-        i += 1;
-    }
-
-    Ok(user_roles)
 }

@@ -60,7 +60,6 @@ pub struct DeviceCreationUpdateDto {
     pub vendor_class: Option<String>,
     pub mud_url: Option<String>,
     pub mud_url_from_guess: Option<bool>,
-    pub last_interaction: Option<NaiveDateTime>,
     #[validate(length(max = 512))]
     pub clipart: Option<String>,
     pub room_id: Option<i64>,
@@ -91,6 +90,15 @@ impl DeviceCreationUpdateDto {
     }
 
     pub fn apply_to(self, device: &mut Device) {
+        if let Some(name) = self.name {
+            device.name = Some(name);
+        }
+        if let Some(v4) = self.ipv4_addr {
+            device.ipv4_addr = v4.parse().ok();
+        }
+        if let Some(v6) = self.ipv6_addr {
+            device.ipv6_addr = v6.parse().ok();
+        }
         if let Some(mud_url) = self.mud_url {
             device.mud_url = Some(mud_url);
         }
@@ -100,8 +108,17 @@ impl DeviceCreationUpdateDto {
         if let Some(vendor_class) = self.vendor_class {
             device.vendor_class = vendor_class;
         }
+        if let Some(clipart) = self.clipart {
+            device.clipart = Some(clipart);
+        }
         if let Some(room_id) = self.room_id {
             device.room_id = Some(room_id);
+        }
+        if let Some(mac_addr) = self.mac_addr {
+            device.mac_addr = mac_addr.parse::<mac::MacAddr>().ok().map(MacAddr::from);
+        }
+        if let Some(duid) = self.duid {
+            device.duid = Some(duid);
         }
     }
 }

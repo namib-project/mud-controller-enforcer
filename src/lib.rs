@@ -26,7 +26,7 @@ pub mod db;
 pub mod error;
 pub mod models;
 pub mod routes;
-pub mod rpc;
+pub mod rpc_server;
 pub mod services;
 
 #[cfg(not(debug_assertions))]

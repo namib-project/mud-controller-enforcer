@@ -9,7 +9,7 @@ use namib_mud_controller::{
     controller::app,
     db::DbConnection,
     error::Result,
-    models::User,
+    models::{Role, User},
     routes::dtos::{DeviceDto, LoginDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto},
     services::{role_service::ROLE_ID_ADMIN, user_service},
 };
@@ -23,8 +23,7 @@ use tokio::time::{sleep, Duration};
 pub struct UserResult {
     pub id: i64,
     pub username: String,
-    pub roles: Vec<String>,
-    pub roles_ids: Vec<i64>,
+    pub roles: Vec<Role>,
     pub permissions: Vec<String>,
 }
 
@@ -37,10 +36,9 @@ async fn test_signup() -> Result<()> {
     let result: UserResult = assert_get_successful(&client, format!("http://{}/users/me", server_addr).as_str()).await;
     info!("{:?}", result);
     assert_eq!(result.username, "admin");
-    assert_eq!(result.roles[0], "admin");
+    assert_eq!(result.roles[0].name, "admin");
+    assert_eq!(result.roles[0].id, ROLE_ID_ADMIN);
     assert_eq!(result.roles.len(), 1);
-    assert_eq!(result.roles_ids[0], ROLE_ID_ADMIN);
-    assert_eq!(result.roles_ids.len(), 1);
     assert_eq!(result.permissions[0], "**");
     assert_eq!(result.permissions.len(), 1);
 

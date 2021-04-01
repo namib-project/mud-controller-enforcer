@@ -25,9 +25,23 @@ pub struct User {
     pub password: String,
     #[serde(skip_serializing)]
     pub salt: Vec<u8>,
-    pub roles: Vec<String>,
-    pub roles_ids: Vec<i64>,
+    pub roles: Vec<Role>,
     pub permissions: Vec<String>,
+}
+
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
+pub struct Role {
+    pub id: i64,
+    pub name: String,
+}
+
+impl From<RoleDbo> for Role {
+    fn from(role: RoleDbo) -> Self {
+        Self {
+            id: role.id,
+            name: role.name,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -49,7 +63,6 @@ impl User {
             password: User::hash_password(password, &salt)?,
             salt,
             roles: Vec::new(),
-            roles_ids: Vec::new(),
             permissions: Vec::new(),
         })
     }

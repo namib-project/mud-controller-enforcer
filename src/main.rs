@@ -17,13 +17,13 @@ use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
+use lazy_static::LazyStatic;
 use namib_mud_controller::{
     controller::app,
     db,
     db::DbConnection,
     error::Result,
-    routes,
-    rpc::rpc_server,
+    routes, rpc_server,
     services::{acme_service, job_service},
     VERSION,
 };
@@ -34,6 +34,9 @@ use std::{
     time::Duration,
 };
 use tokio::try_join;
+
+const DEFAULT_HTTP_PORT: u16 = 8000;
+const DEFAULT_HTTPS_PORT: u16 = 9000;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
@@ -53,8 +56,22 @@ async fn main() -> Result<()> {
         app(
             conn,
             end_signal_rec,
-            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8000).into(),
-            Some(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9000).into()),
+            SocketAddrV4::new(
+                Ipv4Addr::new(0, 0, 0, 0),
+                env::var("HTTP_PORT")
+                    .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTP_PORT))
+                    .unwrap_or(DEFAULT_HTTP_PORT),
+            )
+            .into(),
+            Some(
+                SocketAddrV4::new(
+                    Ipv4Addr::new(0, 0, 0, 0),
+                    env::var("HTTPS_PORT")
+                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTPS_PORT))
+                        .unwrap_or(DEFAULT_HTTPS_PORT),
+                )
+                .into(),
+            ),
             None,
             None,
         )

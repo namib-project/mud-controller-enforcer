@@ -3,20 +3,24 @@ use crate::{
     db::DbConnection,
     error::Result,
     routes,
-    rpc::rpc_server,
     services::{acme_service, job_service},
     VERSION,
 };
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
-use actix_web::{middleware, App, HttpServer};
+use actix_web::{dev::Service, middleware, App, HttpServer};
 use dotenv::dotenv;
+use lazy_static::{lazy_static, LazyStatic};
 use paperclip::actix::{web, OpenApiExt};
 use std::{env, net::SocketAddr, ops::Deref, rc::Rc, time::Duration};
 use tokio::{
     select,
     sync::{oneshot, oneshot::Sender},
 };
+
+lazy_static! {
+    static ref RT: tokio::runtime::Handle = tokio::runtime::Handle::current();
+}
 
 pub fn app(
     conn: DbConnection,
@@ -26,6 +30,7 @@ pub fn app(
     worker_count: Option<usize>,
     finished_startup_sender: Option<oneshot::Sender<()>>,
 ) -> Result<()> {
+    LazyStatic::initialize(&RT);
     actix_rt::System::new("main").block_on(async move {
         let mut server = HttpServer::new(move || {
             let cors = Cors::default()
@@ -68,6 +73,13 @@ pub fn app(
                 .wrap(cors)
                 .wrap(middleware::Logger::default())
                 .wrap(rate_limiter)
+                .wrap_fn(|req, srv| {
+                    let fut = srv.call(req);
+                    async {
+                        let _hand = RT.enter();
+                        fut.await
+                    }
+                })
                 .wrap_api()
                 .service(web::scope("/status").configure(routes::status_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
