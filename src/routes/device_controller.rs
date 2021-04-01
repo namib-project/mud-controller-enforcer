@@ -8,7 +8,7 @@ use crate::{
     models::Device,
     routes::dtos::{DeviceCreationUpdateDto, DeviceDto, GuessDto},
     services::{
-        config_service, config_service::ConfigKeys, device_service, neo4jthings_service, role_service::Permission,
+        config_service, config_service::ConfigKeys, device_service, neo4things_service, role_service::Permission,
     },
 };
 use actix_web::http::StatusCode;
@@ -110,7 +110,7 @@ async fn update_device(
     if mud_url_from_guess && device_with_refs.mud_url.is_some() {
         let mac_or_duid = device_with_refs.mac_or_duid();
         let mud_url = device_with_refs.mud_url.clone().unwrap();
-        tokio::spawn(neo4jthings_service::describe_thing(mac_or_duid, mud_url));
+        tokio::spawn(neo4things_service::describe_thing(mac_or_duid, mud_url));
     }
 
     Ok(Json(DeviceDto::from(device_with_refs)))
@@ -136,7 +136,7 @@ async fn guess_thing(
 
     let device = find_device(id.into_inner(), &pool).await?;
 
-    let guesses = neo4jthings_service::guess_thing(device).await?;
+    let guesses = neo4things_service::guess_thing(device).await?;
 
     Ok(Json(guesses))
 }

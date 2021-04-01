@@ -1,7 +1,7 @@
 use crate::{
     db::DbConnection,
     error::{none_error, Result},
-    services::{acme_service::CertId, device_service, neo4jthings_service},
+    services::{acme_service::CertId, device_service, neo4things_service},
 };
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 use lazy_static::lazy_static;
@@ -33,7 +33,7 @@ async fn parse_log_line(line: &str, conn: &DbConnection) -> Result<()> {
     info!("Received dns request: {} {} {}", date_time, ip, domain);
     let device = device_service::find_by_ip(&ip.to_string(), conn).await?;
     // add the device connection in the background as it may take some time
-    tokio::spawn(neo4jthings_service::add_device_connection(device, domain.to_string()));
+    tokio::spawn(neo4things_service::add_device_connection(device, domain.to_string()));
     Ok(())
 }
 

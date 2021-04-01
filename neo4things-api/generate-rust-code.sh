@@ -6,7 +6,7 @@ rm -rf generated/src
 
 URL=http://localhost:7000
 
-PACKAGE_NAME=neo4jthings-api
+PACKAGE_NAME=neo4things-api
 
 APIS=(
   Thing
@@ -31,6 +31,7 @@ MODELS=(
   PaginatedMudByManufacturerList
   MUDJson
   PaginatedMUDJsonList
+  Generator
 )
 
 if [[ "$1" == "new" ]]; then

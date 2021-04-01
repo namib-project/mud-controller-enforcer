@@ -11,7 +11,7 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/test
 
-  neo4jthings:
+  neo4things:
     image: gitlab.informatik.uni-bremen.de:5005/namib/gruppe-1-legacy-nodes/neo4things:master
     entrypoint:
       - sh

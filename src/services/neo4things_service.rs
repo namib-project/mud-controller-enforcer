@@ -1,7 +1,7 @@
 use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
 use backoff::{backoff::Backoff, future::retry, ExponentialBackoff};
 use lazy_static::lazy_static;
-use neo4jthings_api::{
+use neo4things_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Description, Thing},
 };
@@ -11,11 +11,11 @@ use tokio::time::Duration;
 lazy_static! {
     /// The configuration for connecting to the neo4jthings service.
     /// We could configure the base_url here too
-    static ref N4JT_CONFIG: Configuration = Configuration {
-        base_path: env::var("NEO4JTHINGS_URL").unwrap_or_else(|_| "http://localhost:7000"),
+    static ref N4T_CONFIG: Configuration = Configuration {
+        base_path: env::var("NEO4THINGS_URL").expect("NEO4THINGS_URL env missing"),
         basic_auth: Some((
-            env::var("NEO4JTHINGS_USER").expect("NEO4JTHINGS_USER env missing"),
-            Some(env::var("NEO4JTHINGS_PASS").expect("NEO4JTHINGS_PASS env missing"))
+            env::var("NEO4THINGS_USER").expect("NEO4THINGS_USER env missing"),
+            Some(env::var("NEO4THINGS_PASS").expect("NEO4THINGS_PASS env missing"))
         )),
         user_agent: Some(format!("namib_mud_controller {}", VERSION)),
         ..Default::default()
@@ -29,7 +29,7 @@ pub async fn add_device(device: Device) {
     debug!("adding device to neo4jthings: {}", identifier);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_create(
-            &*N4JT_CONFIG,
+            &N4T_CONFIG,
             Thing {
                 serial: device.id.to_string(),
                 mac_addr: identifier.clone(),
@@ -55,7 +55,7 @@ pub async fn add_device_connection(device: Device, connection: String) {
     debug!("adding device connection to neo4jthings: {} {}", identifier, connection);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_connections_create(
-            &*N4JT_CONFIG,
+            &N4T_CONFIG,
             &identifier,
             Acl {
                 name: connection.clone(),
@@ -79,9 +79,9 @@ pub async fn add_device_connection(device: Device, connection: String) {
 /// This operation should be run directly, since we are interested in the results.
 pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
     let identifier = device.mac_or_duid();
-    let result = mud_api::mud_guess_thing_list(&*N4JT_CONFIG, &identifier, None)
+    let result = mud_api::mud_guess_thing_list(&N4T_CONFIG, &identifier, None)
         .await
-        .or_else(|e| error::Neo4jThingsError { message: e.to_string() }.fail())?;
+        .or_else(|e| error::Neo4ThingsError { message: e.to_string() }.fail())?;
 
     Ok(result
         .results
@@ -101,7 +101,7 @@ pub async fn describe_thing(mac_or_duid: String, mud_url: String) {
     debug!("describing thing to neo4jthings: {} {}", mac_or_duid, mud_url);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_describe_create(
-            &*N4JT_CONFIG,
+            &N4T_CONFIG,
             &mac_or_duid,
             Description {
                 mud_url: mud_url.clone(),

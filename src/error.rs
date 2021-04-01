@@ -96,8 +96,8 @@ pub enum Error {
         source: reqwest::Error,
         backtrace: Backtrace,
     },
-    #[snafu(display("Neo4jThingsError {}", message), visibility(pub))]
-    Neo4jThingsError { message: String, backtrace: Backtrace },
+    #[snafu(display("Neo4ThingsError {}", message), visibility(pub))]
+    Neo4ThingsError { message: String, backtrace: Backtrace },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

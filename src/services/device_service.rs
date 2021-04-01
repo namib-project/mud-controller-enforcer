@@ -4,7 +4,7 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{Device, DeviceDbo},
-    services::{config_service, config_service::ConfigKeys, firewall_configuration_service, neo4jthings_service},
+    services::{config_service, config_service::ConfigKeys, firewall_configuration_service, neo4things_service},
 };
 
 use crate::models::DeviceWithRefs;
@@ -110,7 +110,7 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
 
     if device_data.collect_info {
         // add the device in the background as it may take some time
-        tokio::spawn(neo4jthings_service::add_device(device_data.inner.clone()));
+        tokio::spawn(neo4things_service::add_device(device_data.inner.clone()));
     }
 
     Ok(ins_count.last_insert_rowid())

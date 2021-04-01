@@ -1,5 +1,5 @@
 [package]
-name = "neo4jthings-api"
+name = "neo4things-api"
 version = "1.0.0"
 authors = ["OpenAPI Generator team and contributors"]
 edition = "2018"
