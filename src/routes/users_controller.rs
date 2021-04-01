@@ -9,7 +9,7 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    models::User,
+    models::{User, SALT_LENGTH},
     routes::dtos::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
         UserConfigValueDto,
@@ -17,6 +17,7 @@ use crate::{
     services::{role_service::Permission, user_config_service, user_service},
 };
 use actix_web::HttpResponse;
+use rand::{rngs::OsRng, Rng};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/signup", web::post().to(signup));
@@ -25,7 +26,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/me", web::get().to(get_me));
     cfg.route("/me", web::post().to(update_me));
     cfg.route("/password", web::post().to(update_password));
-    cfg.route("/roles", web::get().to(get_roles));
     cfg.route("/configs", web::get().to(get_users_configs));
     cfg.route("/configs/{key}", web::get().to(get_users_config));
     cfg.route("/configs/{key}", web::post().to(set_users_config));
@@ -165,31 +165,16 @@ pub fn update_password(
         .fail()
     })?;
 
-    user.password = User::hash_password(&update_password_dto.new_password, &user.salt)?;
+    let mut salt = vec![0u8; SALT_LENGTH];
+    OsRng::default().fill(salt.as_mut_slice());
+    user.password = User::hash_password(&update_password_dto.new_password, &salt)?;
+    user.salt = salt;
 
     user_service::update_password(user.id, &user, pool.get_ref()).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
     }))
-}
-
-#[api_v2_operation(summary = "Retrieve all roles")]
-pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
-    auth.require_permission(Permission::role__list)?;
-
-    let roles = user_service::get_all_roles(pool.get_ref()).await?;
-
-    Ok(Json(
-        roles
-            .into_iter()
-            .map(|r| RoleDto {
-                id: r.id,
-                name: r.name,
-                permissions: r.permissions.split(',').map(ToOwned::to_owned).collect(),
-            })
-            .collect(),
-    ))
 }
 
 #[api_v2_operation(summary = "Gets the config variables of the user")]

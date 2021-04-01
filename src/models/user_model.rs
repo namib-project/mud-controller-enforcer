@@ -7,7 +7,7 @@ use snafu::ensure;
 
 use crate::{error, error::Result};
 
-const SALT_LENGTH: usize = 32;
+pub const SALT_LENGTH: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct UserDbo {

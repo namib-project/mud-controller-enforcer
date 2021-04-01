@@ -174,8 +174,7 @@ async fn test_pw_update() -> Result<()> {
     .unwrap();
 
     assert_ne!(before_state.password, after_state.password);
-    // TODO Must not necessarily be updated, but would be nice.
-    //assert_ne!(before_state.salt, after_state.salt);
+    assert_ne!(before_state.salt, after_state.salt);
 
     let login_dto = LoginDto {
         username: "admin".to_string(),
