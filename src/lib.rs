@@ -21,6 +21,7 @@ extern crate serde_derive;
 extern crate validator;
 
 pub mod auth;
+pub mod controller;
 pub mod db;
 pub mod error;
 pub mod models;
