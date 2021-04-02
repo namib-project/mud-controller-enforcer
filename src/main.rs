@@ -15,20 +15,24 @@
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
-use actix_web::{middleware, App, HttpServer};
+use actix_web::{dev::Service, middleware, App, HttpServer};
 use dotenv::dotenv;
+use lazy_static::{lazy_static, LazyStatic};
 use namib_mud_controller::{
     db,
     db::DbConnection,
     error::Result,
-    routes,
-    rpc::rpc_server,
+    routes, rpc_server,
     services::{acme_service, job_service},
     VERSION,
 };
 use paperclip::actix::{web, OpenApiExt};
 use std::{env, time::Duration};
 use tokio::try_join;
+
+lazy_static! {
+    static ref RT: tokio::runtime::Handle = tokio::runtime::Handle::current();
+}
 
 fn app(conn: DbConnection) -> Result<()> {
     actix_rt::System::new("main").block_on(async move {
@@ -73,13 +77,22 @@ fn app(conn: DbConnection) -> Result<()> {
                 .wrap(cors)
                 .wrap(middleware::Logger::default())
                 .wrap(rate_limiter)
+                .wrap_fn(|req, srv| {
+                    let fut = srv.call(req);
+                    async {
+                        let _hand = RT.enter();
+                        fut.await
+                    }
+                })
                 .wrap_api()
                 .service(web::scope("/status").configure(routes::status_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
+                .service(web::scope("/management/users").configure(routes::users_management_controller::init))
                 .service(web::scope("/devices").configure(routes::device_controller::init))
                 .service(web::scope("/mud").configure(routes::mud_controller::init))
                 .service(web::scope("/config").configure(routes::config_controller::init))
                 .service(web::scope("/roles").configure(routes::role_manager_controller::init))
+                .service(web::scope("/rooms").configure(routes::room_controller::init))
                 .with_json_spec_at("/api/spec")
                 .build()
                 .service(
@@ -88,8 +101,17 @@ fn app(conn: DbConnection) -> Result<()> {
                         .redirect_to_slash_directory(),
                 )
         })
-        .bind("0.0.0.0:8000")?
-        .bind_rustls("0.0.0.0:9000", acme_service::server_config())?
+        .bind(format!(
+            "0.0.0.0:{}",
+            env::var("HTTP_PORT").unwrap_or_else(|_| "8000".to_string())
+        ))?
+        .bind_rustls(
+            format!(
+                "0.0.0.0:{}",
+                env::var("HTTPS_PORT").unwrap_or_else(|_| "9000".to_string())
+            ),
+            acme_service::server_config(),
+        )?
         .run()
         .await?;
 
@@ -110,11 +132,11 @@ async fn main() -> Result<()> {
     // Starts a new job that updates the expired profiles at regular intervals.
     let job_task = tokio::task::spawn(job_service::start_jobs(conn.clone()));
 
+    LazyStatic::initialize(&RT);
     let actix_task = tokio::task::spawn_blocking(move || app(conn));
 
     let r = try_join!(rpc_server_task, job_task, actix_task)?;
     r.0?;
     r.2?;
-
     Ok(())
 }

@@ -1,20 +1,21 @@
 use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
 use backoff::{backoff::Backoff, future::retry, ExponentialBackoff};
 use lazy_static::lazy_static;
-use neo4jthings_api::{
+use neo4things_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Description, Thing},
 };
-use std::{env, net::IpAddr};
+use std::env;
 use tokio::time::Duration;
 
 lazy_static! {
     /// The configuration for connecting to the neo4jthings service.
     /// We could configure the base_url here too
-    static ref N4JT_CONFIG: Configuration = Configuration {
+    static ref N4T_CONFIG: Configuration = Configuration {
+        base_path: env::var("NEO4THINGS_URL").expect("NEO4THINGS_URL env missing"),
         basic_auth: Some((
-            env::var("NEO4JTHINGS_USER").expect("NEO4JTHINGS_USER env missing"),
-            Some(env::var("NEO4JTHINGS_PASS").expect("NEO4JTHINGS_PASS env missing"))
+            env::var("NEO4THINGS_USER").expect("NEO4THINGS_USER env missing"),
+            Some(env::var("NEO4THINGS_PASS").expect("NEO4THINGS_PASS env missing"))
         )),
         user_agent: Some(format!("namib_mud_controller {}", VERSION)),
         ..Default::default()
@@ -24,21 +25,18 @@ lazy_static! {
 /// Add a device in the neo4jthings service.
 /// This operation should be run in the background as it is failsafe.
 pub async fn add_device(device: Device) {
-    debug!("adding device to neo4jthings: {}", device.ip_addr);
+    let identifier = device.mac_or_duid();
+    debug!("adding device to neo4jthings: {}", identifier);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_create(
-            &*N4JT_CONFIG,
+            &N4T_CONFIG,
             Thing {
-                serial: device.mac_addr.unwrap().to_string(),
-                mac_addr: device.mac_addr.unwrap().to_string(),
-                ipv4_addr: match device.ip_addr {
-                    IpAddr::V4(addr) => addr.to_string(),
-                    IpAddr::V6(_) => "0.0.0.0".to_string(), // TODO blank not allowed?
-                },
-                ipv6_addr: match device.ip_addr {
-                    IpAddr::V4(addr) => addr.to_ipv6_mapped().to_string(), // TODO blank not allowed?
-                    IpAddr::V6(addr) => addr.to_string(),
-                },
+                serial: device.id.to_string(),
+                mac_addr: identifier.clone(),
+                ipv4_addr: device
+                    .ipv4_addr
+                    .map_or_else(|| "0.0.0.0".to_string(), |ip| ip.to_string()),
+                ipv6_addr: device.ipv6_addr.map_or_else(|| "::".to_string(), |ip| ip.to_string()),
                 hostname: device.hostname.to_string(),
             },
         )
@@ -53,21 +51,15 @@ pub async fn add_device(device: Device) {
 /// Add a connection to a device in the neo4jthings service.
 /// This operation should be run in the background as it is failsafe.
 pub async fn add_device_connection(device: Device, connection: String) {
-    debug!(
-        "adding device connection to neo4jthings: {} {}",
-        device.ip_addr, connection
-    );
+    let identifier = device.mac_or_duid();
+    debug!("adding device connection to neo4jthings: {} {}", identifier, connection);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_connections_create(
-            &*N4JT_CONFIG,
-            &device.mac_addr.unwrap().to_string(), // TODO: duid
+            &N4T_CONFIG,
+            &identifier,
             Acl {
                 name: connection.clone(),
-                _type: if device.ip_addr.is_ipv4() {
-                    "4t".to_string()
-                } else {
-                    "6t".to_string()
-                },
+                _type: "4t".to_string(), // TODO 6t ?
                 acl_dns: connection.clone(),
                 port: vec![],
                 direction_initiated: "from-device".to_string(),
@@ -86,9 +78,10 @@ pub async fn add_device_connection(device: Device, connection: String) {
 /// Query the neo4jthings service for possible mud-urls that match a given device.
 /// This operation should be run directly, since we are interested in the results.
 pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
-    let result = mud_api::mud_guess_thing_list(&*N4JT_CONFIG, &device.mac_addr.unwrap().to_string(), None)
+    let identifier = device.mac_or_duid();
+    let result = mud_api::mud_guess_thing_list(&N4T_CONFIG, &identifier, None)
         .await
-        .or_else(|e| error::Neo4jThingsError { message: e.to_string() }.fail())?;
+        .or_else(|e| error::Neo4ThingsError { message: e.to_string() }.fail())?;
 
     Ok(result
         .results
@@ -102,17 +95,17 @@ pub async fn guess_thing(device: Device) -> Result<Vec<GuessDto>> {
         .collect())
 }
 
-/// Notify the neo4jthings service that a mud_url was chosen for a given device.
+/// Notify the neo4jthings service that a `mud_url` was chosen for a given device.
 /// This operation should be run in the background as it is failsafe.
-pub async fn describe_thing(mac_addr: String, mud_url: String) {
-    debug!("describing thing to neo4jthings: {} {}", mac_addr, mud_url);
+pub async fn describe_thing(mac_or_duid: String, mud_url: String) {
+    debug!("describing thing to neo4jthings: {} {}", mac_or_duid, mud_url);
     if let Err(e) = retry(backoff_policy(), || async {
         Ok(thing_api::thing_describe_create(
-            &*N4JT_CONFIG,
-            &mac_addr, // TODO: duid
+            &N4T_CONFIG,
+            &mac_or_duid,
             Description {
                 mud_url: mud_url.clone(),
-                mac_addr: mac_addr.clone(),
+                mac_addr: mac_or_duid.clone(),
             },
         )
         .await?)

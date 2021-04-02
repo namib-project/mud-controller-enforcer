@@ -1,23 +1,40 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{RoleDbo, User, UserDbo},
+    models::{Role, RoleDbo, User, UserDbo},
     services::role_service,
 };
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
     #[cfg(feature = "sqlite")]
-    let usrs: Vec<_> =
-        sqlx::query!("SELECT user_id, username, password, salt, CAST(group_concat(r.name) AS TEXT) AS roles, CAST(group_concat(r.permissions) AS TEXT) AS permissions FROM users u, users_roles m, roles r WHERE u.id = m.user_id AND r.id = m.role_id")
-            .fetch_all(conn)
-            .await?;
-
+    let usrs = sqlx::query!(
+"select
+	u.id as user_id
+	, username
+	, password
+	, salt
+	, cast((select group_concat(name) from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as roles
+	, cast((select group_concat(role_id) from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as roles_ids
+	, cast((select group_concat(permissions) from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as permissions
+from
+	users u")
+        .fetch_all(conn)
+        .await?;
     #[cfg(feature = "postgres")]
-    let usrs: Vec<_> =
-        sqlx::query!("SELECT user_id, username, password, salt, CAST(string_agg(r.name, ',') AS TEXT) AS roles, CAST(string_agg(r.permissions, ',') AS TEXT) AS permissions FROM users u, users_roles m, roles r WHERE u.id = m.user_id AND r.id = m.role_id GROUP BY m.user_id, u.id")
-            .fetch_all(conn)
-            .await?;
+        let usrs =  sqlx::query!(
+r#"select
+	u.id as user_id
+	, username
+	, password
+	, salt
+	, cast((select string_agg(name, ',') from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles) as text) as "roles!"
+	, cast((select string_agg(role_id::text, ',') from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles_ids) as text) as "roles_ids!"
+	, cast((select string_agg(permissions, ',') from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as permissions) as text) as "permissions!"
+from
+	users u"#)
+        .fetch_all(conn)
+        .await?;
 
     Ok(usrs
         .into_iter()
@@ -26,16 +43,29 @@ pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
             username: usr.username,
             password: usr.password,
             salt: usr.salt,
-            roles: usr
-                .roles
-                .map(|r| r.split(',').map(ToOwned::to_owned).collect())
-                .unwrap_or_default(),
-            permissions: usr
-                .permissions
-                .map(|p| p.split(',').map(ToOwned::to_owned).collect())
-                .unwrap_or_default(),
+            roles: get_roles(&usr.roles_ids, &usr.roles),
+            permissions: usr.permissions.split(',').map(ToOwned::to_owned).collect(),
         })
         .collect())
+}
+
+fn get_roles(ids: &str, names: &str) -> Vec<Role> {
+    let mut res = Vec::new();
+    let mut id_iter = ids.split(',');
+    let mut name_iter = names.split(',');
+    loop {
+        res.push(Role {
+            id: match id_iter.next().and_then(|id| id.parse().ok()) {
+                Some(id) => id,
+                None => break,
+            },
+            name: match name_iter.next() {
+                Some(name) => name.to_string(),
+                None => break,
+            },
+        });
+    }
+    res
 }
 
 pub async fn has_any_users(conn: &DbConnection) -> Result<bool> {
@@ -71,7 +101,7 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     .fetch_all(conn)
     .await?;
 
-    Ok(User {
+    let user = User {
         id: usr.id,
         username: usr.username,
         password: usr.password,
@@ -80,8 +110,10 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
             .iter()
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
             .collect(),
-        roles: roles.into_iter().map(|r| r.name).collect(),
-    })
+        roles: roles.into_iter().map(Role::from).collect(),
+    };
+
+    Ok(user)
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
@@ -123,6 +155,27 @@ pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
         "update users SET username = $1, password = $2, salt = $3 WHERE id = $4",
         user.username,
+        user.password,
+        user.salt,
+        id
+    )
+    .execute(conn)
+    .await?;
+
+    Ok(upd_count.rows_affected() == 1)
+}
+
+pub async fn update_username(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
+    let upd_count = sqlx::query!("UPDATE users SET username = $1 where id = $2", user.username, id)
+        .execute(conn)
+        .await?;
+
+    Ok(upd_count.rows_affected() == 1)
+}
+
+pub async fn update_password(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
+    let upd_count = sqlx::query!(
+        "UPDATE users SET password = $1, salt = $2 where id = $3",
         user.password,
         user.salt,
         id

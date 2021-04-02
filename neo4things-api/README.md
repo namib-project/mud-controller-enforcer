@@ -1,4 +1,4 @@
-# Neo4jThings Service
+# Neo4Things Service
 
 ## Start with Docker
 

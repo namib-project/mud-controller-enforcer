@@ -2,7 +2,7 @@
 
 use crate::{
     error::Result,
-    models::{Device, DeviceType, MudData},
+    models::{Device, DeviceType, DeviceWithRefs, MudData, Room},
 };
 use chrono::{NaiveDateTime, Utc};
 use namib_shared::{mac, MacAddr};
@@ -11,31 +11,39 @@ use paperclip::actix::Apiv2Schema;
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceDto {
     pub id: i64,
-    pub ip_addr: String,
+    pub name: Option<String>,
+    pub ipv4_addr: Option<String>,
+    pub ipv6_addr: Option<String>,
     pub mac_addr: Option<String>,
+    pub duid: Option<String>,
     pub hostname: String,
     pub vendor_class: String,
     pub mud_url: Option<String>,
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
     pub clipart: Option<String>,
+    pub room: Option<Room>,
     #[serde(rename = "type")]
     pub type_: DeviceType,
 }
 
-impl From<Device> for DeviceDto {
-    fn from(d: Device) -> Self {
+impl From<DeviceWithRefs> for DeviceDto {
+    fn from(d: DeviceWithRefs) -> Self {
         let type_ = d.get_type();
         DeviceDto {
             id: d.id,
-            ip_addr: d.ip_addr.to_string(),
+            ipv4_addr: d.ipv4_addr.map(|ip| ip.to_string()),
+            ipv6_addr: d.ipv6_addr.map(|ip| ip.to_string()),
             mac_addr: d.mac_addr.map(|m| m.to_string()),
-            hostname: d.hostname,
-            vendor_class: d.vendor_class,
-            mud_url: d.mud_url,
-            last_interaction: d.last_interaction,
+            name: d.inner.name,
+            duid: d.inner.duid,
+            hostname: d.inner.hostname,
+            vendor_class: d.inner.vendor_class,
+            mud_url: d.inner.mud_url,
+            last_interaction: d.inner.last_interaction,
             mud_data: d.mud_data,
-            clipart: d.clipart,
+            clipart: d.inner.clipart,
+            room: d.room,
             type_,
         }
     }
@@ -43,15 +51,18 @@ impl From<Device> for DeviceDto {
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceCreationUpdateDto {
-    pub ip_addr: String,
+    pub name: Option<String>,
+    pub ipv4_addr: Option<String>,
+    pub ipv6_addr: Option<String>,
     pub mac_addr: Option<String>,
+    pub duid: Option<String>,
     pub hostname: Option<String>,
     pub vendor_class: Option<String>,
     pub mud_url: Option<String>,
     pub mud_url_from_guess: Option<bool>,
-    pub last_interaction: Option<NaiveDateTime>,
     #[validate(length(max = 512))]
     pub clipart: Option<String>,
+    pub room_id: Option<i64>,
 }
 
 impl DeviceCreationUpdateDto {
@@ -60,26 +71,36 @@ impl DeviceCreationUpdateDto {
             None => None,
             Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
         };
-        let ip_addr = self.ip_addr.parse::<std::net::IpAddr>()?;
 
         Ok(Device {
             id: 0,
+            name: None,
             mac_addr,
-            ip_addr,
+            duid: self.duid,
+            ipv4_addr: self.ipv4_addr.and_then(|ip| ip.parse().ok()),
+            ipv6_addr: self.ipv6_addr.and_then(|ip| ip.parse().ok()),
             hostname: self.hostname.unwrap_or_else(|| "".to_string()),
             vendor_class: self.vendor_class.unwrap_or_else(|| "".to_string()),
             mud_url: self.mud_url,
             collect_info,
             last_interaction: Utc::now().naive_local(),
-            mud_data: None,
             clipart: self.clipart.clone(),
+            room_id: self.room_id,
         })
     }
 
-    pub fn merge(self, mut device: Device) -> Result<Device> {
-        if self.mud_url.is_some() {
-            device.mud_url = self.mud_url;
-            device.mud_data = None;
+    pub fn apply_to(self, device: &mut Device) {
+        if let Some(name) = self.name {
+            device.name = Some(name);
+        }
+        if let Some(v4) = self.ipv4_addr {
+            device.ipv4_addr = v4.parse().ok();
+        }
+        if let Some(v6) = self.ipv6_addr {
+            device.ipv6_addr = v6.parse().ok();
+        }
+        if let Some(mud_url) = self.mud_url {
+            device.mud_url = Some(mud_url);
         }
         if let Some(hostname) = self.hostname {
             device.hostname = hostname;
@@ -87,7 +108,18 @@ impl DeviceCreationUpdateDto {
         if let Some(vendor_class) = self.vendor_class {
             device.vendor_class = vendor_class;
         }
-        Ok(device)
+        if let Some(clipart) = self.clipart {
+            device.clipart = Some(clipart);
+        }
+        if let Some(room_id) = self.room_id {
+            device.room_id = Some(room_id);
+        }
+        if let Some(mac_addr) = self.mac_addr {
+            device.mac_addr = mac_addr.parse::<mac::MacAddr>().ok().map(MacAddr::from);
+        }
+        if let Some(duid) = self.duid {
+            device.duid = Some(duid);
+        }
     }
 }
 

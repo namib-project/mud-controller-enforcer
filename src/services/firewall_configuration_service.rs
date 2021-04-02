@@ -1,7 +1,7 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AceProtocol, Acl, AclDirection, Device},
+    models::{AceAction, AceProtocol, Acl, AclDirection, DeviceWithRefs},
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
@@ -25,12 +25,12 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
     merged_acls
 }
 
-pub fn create_configuration(version: String, devices: &[Device]) -> EnforcerConfig {
+pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> EnforcerConfig {
     let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 
-pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
+pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
     let mut index = 0;
     let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
@@ -38,16 +38,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
         None => {
             return FirewallDevice {
                 id: device.id,
-                ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
-                    Some(v4)
-                } else {
-                    None
-                },
-                ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
-                    Some(v6)
-                } else {
-                    None
-                },
+                ipv4_addr: device.ipv4_addr,
+                ipv6_addr: device.ipv6_addr,
                 rules: result,
                 collect_data: device.collect_info,
             }
@@ -118,16 +110,8 @@ pub fn convert_device_to_fw_rules(device: &Device) -> FirewallDevice {
 
     FirewallDevice {
         id: device.id,
-        ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
-            Some(v4)
-        } else {
-            None
-        },
-        ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
-            Some(v6)
-        } else {
-            None
-        },
+        ipv4_addr: device.ipv4_addr,
+        ipv6_addr: device.ipv6_addr,
         rules: result,
         collect_data: device.collect_info,
     }
@@ -311,17 +295,24 @@ mod tests {
             }],
         };
 
-        let device = Device {
-            id: 0,
-            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
-            ip_addr: "127.0.0.1".parse().unwrap(),
-            hostname: "".to_string(),
-            vendor_class: "".to_string(),
-            mud_url: Some("http://example.com/mud_url.json".to_string()),
+        let device = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "127.0.0.1".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("http://example.com/mud_url.json".to_string()),
+                last_interaction: Utc::now().naive_local(),
+                collect_info: false,
+                clipart: None,
+                room_id: None,
+            },
             mud_data: Some(mud_data),
-            last_interaction: Utc::now().naive_local(),
-            collect_info: false,
-            clipart: None,
+            room: None,
         };
 
         let x = convert_device_to_fw_rules(&device);
@@ -330,16 +321,8 @@ mod tests {
 
         let resulting_device = FirewallDevice {
             id: device.id,
-            ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
-                Some(v4)
-            } else {
-                None
-            },
-            ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
-                Some(v6)
-            } else {
-                None
-            },
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
@@ -402,17 +385,24 @@ mod tests {
             acl_override: Vec::default(),
         };
 
-        let device = Device {
-            id: 0,
-            mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
-            ip_addr: "127.0.0.1".parse().unwrap(),
-            hostname: "".to_string(),
-            vendor_class: "".to_string(),
-            mud_url: Some("http://example.com/mud_url.json".to_string()),
-            collect_info: true,
+        let device = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "127.0.0.1".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("http://example.com/mud_url.json".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_local(),
+                clipart: None,
+                room_id: None,
+            },
             mud_data: Some(mud_data),
-            last_interaction: Utc::now().naive_local(),
-            clipart: None,
+            room: None,
         };
 
         let x = convert_device_to_fw_rules(&device);
@@ -421,16 +411,8 @@ mod tests {
 
         let resulting_device = FirewallDevice {
             id: device.id,
-            ipv4_addr: if let IpAddr::V4(v4) = device.ip_addr {
-                Some(v4)
-            } else {
-                None
-            },
-            ipv6_addr: if let IpAddr::V6(v6) = device.ip_addr {
-                Some(v6)
-            } else {
-                None
-            },
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),

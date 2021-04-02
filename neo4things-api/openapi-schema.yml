@@ -463,7 +463,7 @@ paths:
   /manager/things:
     get:
       operationId: manager_things_list
-      description: Returns a List of all Things, which are managed by a specific Manager
+      description: Returns a list of all Things, which are managed by a specific Manager
       parameters:
       - in: query
         name: mac-addr
@@ -506,6 +506,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -555,6 +556,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -660,6 +662,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -709,6 +712,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -937,6 +941,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -968,12 +973,42 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedMUDList'
+          description: ''
+  /mud/generate:
+    post:
+      operationId: mud_generate_create
+      description: Create New Mud from pcap data
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Generator'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Generator'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Generator'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Generator'
           description: ''
   /mud/guessThing:
     get:
@@ -1198,6 +1233,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -1247,6 +1283,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -1336,6 +1373,35 @@ paths:
       responses:
         '204':
           description: No response body
+  /pcap/:
+    post:
+      operationId: pcap_create
+      description: Create New Mud from pcap data
+      tags:
+      - pcap
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Generator'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Generator'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Generator'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Generator'
+          description: ''
   /service/:
     get:
       operationId: service_list
@@ -1352,6 +1418,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -1401,6 +1468,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -1493,7 +1561,7 @@ paths:
   /thing/:
     get:
       operationId: thing_list
-      description: API endpoint that allows NetworkCards to be edited or viewed.
+      description: API endpoint that allows Things to be edited or viewed.
       parameters:
       - name: page
         required: false
@@ -1515,7 +1583,7 @@ paths:
           description: ''
     post:
       operationId: thing_create
-      description: API endpoint that allows NetworkCards to be edited or viewed.
+      description: API endpoint that allows Things to be edited or viewed.
       tags:
       - thing
       requestBody:
@@ -1543,7 +1611,7 @@ paths:
   /thing/{mac_addr}/:
     get:
       operationId: thing_retrieve
-      description: API endpoint that allows NetworkCards to be edited or viewed.
+      description: API endpoint that allows Things to be edited or viewed.
       parameters:
       - in: path
         name: mac_addr
@@ -1564,7 +1632,7 @@ paths:
           description: ''
     put:
       operationId: thing_update
-      description: API endpoint that allows NetworkCards to be edited or viewed.
+      description: API endpoint that allows Things to be edited or viewed.
       parameters:
       - in: path
         name: mac_addr
@@ -1597,7 +1665,7 @@ paths:
           description: ''
     patch:
       operationId: thing_partial_update
-      description: API endpoint that allows NetworkCards to be edited or viewed.
+      description: API endpoint that allows Things to be edited or viewed.
       parameters:
       - in: path
         name: mac_addr
@@ -1629,7 +1697,7 @@ paths:
           description: ''
     delete:
       operationId: thing_destroy
-      description: API endpoint that allows NetworkCards to be edited or viewed.
+      description: API endpoint that allows Things to be edited or viewed.
       parameters:
       - in: path
         name: mac_addr
@@ -2021,7 +2089,7 @@ components:
           maxLength: 50
         timestamp:
           type: string
-          format: date-time
+          readOnly: true
           nullable: true
       required:
       - acl_dns
@@ -2044,6 +2112,32 @@ components:
       required:
       - mac_addr
       - mud_url
+    Generator:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+        gateway_mac:
+          type: string
+          maxLength: 17
+        gateway_ipv4:
+          type: string
+        gateway_ipv6:
+          type: string
+        device_name:
+          type: string
+          maxLength: 64
+        device_mac:
+          type: string
+          maxLength: 17
+      required:
+      - device_mac
+      - device_name
+      - file
+      - gateway_ipv4
+      - gateway_ipv6
+      - gateway_mac
     Group:
       type: object
       properties:
@@ -2484,7 +2578,7 @@ components:
           maxLength: 64
         mac_addr:
           type: string
-          maxLength: 17
+          maxLength: 32
           minLength: 10
         ipv4_addr:
           type: string
@@ -2541,7 +2635,7 @@ components:
           maxLength: 64
         mac_addr:
           type: string
-          maxLength: 17
+          maxLength: 32
           minLength: 10
         ipv4_addr:
           type: string
