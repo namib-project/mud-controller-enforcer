@@ -8,7 +8,7 @@ pub struct RoomDto {
     pub id: i64,
     #[validate(length(max = 50))]
     pub name: String,
-    #[validate(length(max = 6))]
+    #[validate(length(max = 10))]
     pub color: String,
 }
 
@@ -26,7 +26,7 @@ impl From<Room> for RoomDto {
 pub struct RoomCreationUpdateDto {
     #[validate(length(max = 50))]
     pub name: String,
-    #[validate(length(max = 6))]
+    #[validate(length(max = 10))]
     pub color: String,
 }
 
