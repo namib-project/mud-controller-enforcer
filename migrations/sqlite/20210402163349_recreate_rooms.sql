@@ -1,4 +1,8 @@
 -- Add migration script here
+PRAGMA foreign_keys=off;
+
+BEGIN TRANSACTION;
+
 ALTER TABLE rooms
     RENAME TO _old_rooms;
 
@@ -14,3 +18,7 @@ INSERT INTO rooms (room_id, name, color)
     FROM _old_rooms;
 
 DROP TABLE _old_rooms;
+
+COMMIT;
+
+PRAGMA foreign_keys=on;
