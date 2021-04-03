@@ -30,6 +30,7 @@ services:
     tty: true
     cap_add:
       - NET_ADMIN
+      - NET_RAW
     ports:
       - 5480:80
     networks:
