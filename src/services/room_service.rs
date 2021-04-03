@@ -21,7 +21,7 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
 }
 
 ///returns room by name from the database
-pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Room> {
+pub async fn find_by_name(name: &str, pool: &DbConnection) -> Result<Room> {
     let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE name = $1", name)
         .fetch_one(pool)
         .await?;
@@ -30,7 +30,7 @@ pub async fn find_by_name(name: String, pool: &DbConnection) -> Result<Room> {
 }
 
 ///updates a room with a new name and color in the database
-pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
+pub async fn update(room: &Room, pool: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
         "UPDATE rooms SET name = $1, color = $2 WHERE room_id = $3",
         room.name,
@@ -40,7 +40,7 @@ pub async fn update(room: &Room, pool: &DbConnection) -> Result<u64> {
     .execute(pool)
     .await?;
 
-    Ok(upd_count.rows_affected())
+    Ok(upd_count.rows_affected() == 1)
 }
 
 ///returns all devices that are associated with a given room from the database
@@ -62,20 +62,10 @@ pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
 }
 
 ///Deletes a room with a given name from database
-pub async fn delete_room(name: String, pool: &DbConnection) -> Result<u64> {
+pub async fn delete_room(name: &str, pool: &DbConnection) -> Result<u64> {
     let del_count = sqlx::query!("delete from rooms where name = ?", name)
         .execute(pool)
         .await?;
 
     Ok(del_count.rows_affected())
-}
-///Checks if room is available.
-pub async fn exists_room(name: String, pool: &DbConnection) -> Result<bool> {
-    Ok(
-        sqlx::query!("SELECT count(name) AS count FROM rooms WHERE name = $1", name)
-            .fetch_one(pool)
-            .await?
-            .count
-            > 0,
-    )
 }

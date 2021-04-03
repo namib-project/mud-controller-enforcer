@@ -5,6 +5,7 @@ use paperclip::actix::{
     api_v2_operation, web,
     web::{HttpResponse, Json},
 };
+use snafu::ensure;
 use validator::Validate;
 
 use crate::{
@@ -102,7 +103,10 @@ async fn create_room(
         .fail()
     })?;
 
-    if room_service::exists_room(room_creation_update_dto.name.clone(), &pool).await? {
+    if room_service::find_by_name(&room_creation_update_dto.name, &pool)
+        .await
+        .is_ok()
+    {
         error::ResponseError {
             status: StatusCode::CONFLICT,
             message: Some("Room already exists.".to_string()),
@@ -110,16 +114,15 @@ async fn create_room(
         .fail()?
     }
 
-    room_service::insert_room(&room_creation_update_dto.to_room(0)?, &pool).await?;
-    let res = room_service::find_by_name(room_creation_update_dto.name.clone(), &pool)
-        .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::NOT_FOUND,
-                message: Some("Could not insert room.".to_string()),
-            }
-            .fail()
-        })?;
+    let room = room_creation_update_dto.into_inner().into_room(0);
+    room_service::insert_room(&room, &pool).await?;
+    let res = room_service::find_by_name(&room.name, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("Could not insert room.".to_string()),
+        }
+        .fail()
+    })?;
     debug!("{:?}", res);
     Ok(Json(RoomDto::from(res)))
 }
@@ -141,15 +144,15 @@ async fn update_room(
         .fail()
     })?;
 
-    let find_room = room_service::find_by_id(id.0, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::NOT_FOUND,
-            message: Some("Room can not be found.".to_string()),
-        }
-        .fail()
-    })?;
+    let room = room_creation_update_dto.into_inner().into_room(id.0);
 
-    if room_service::exists_room(room_creation_update_dto.name.clone(), &pool).await? {
+    debug!("{:?}", room);
+
+    if room_service::find_by_name(&room.name, &pool)
+        .await
+        .map_or(id.0, |room| room.room_id)
+        != id.0
+    {
         error::ResponseError {
             status: StatusCode::CONFLICT,
             message: Some("Room already exists.".to_string()),
@@ -157,17 +160,23 @@ async fn update_room(
         .fail()?
     }
 
-    room_service::update(&room_creation_update_dto.to_room(find_room.room_id)?, &pool)
-        .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::BAD_REQUEST,
-                message: Some("Could not update room.".to_string()),
-            }
-            .fail()
-        })?;
-    debug!("{:?}", find_room);
-    Ok(Json(RoomDto::from(find_room)))
+    let updated = room_service::update(&room, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: Some("Could not update room.".to_string()),
+        }
+        .fail()
+    })?;
+
+    ensure!(
+        updated,
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("Room can not be found.".to_string()),
+        }
+    );
+
+    Ok(Json(RoomDto::from(room)))
 }
 
 #[api_v2_operation(summary = "Deletes a room.")]
@@ -182,6 +191,6 @@ async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Pa
         .fail()
     })?;
     debug!("{:?}", find_room);
-    room_service::delete_room(find_room.name, &pool).await?;
+    room_service::delete_room(&find_room.name, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
 }
