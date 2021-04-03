@@ -5,6 +5,7 @@ acme/
 static/app
 docker/data
 docker/neo4j
+docker/acme
 
 # Created by https://www.toptal.com/developers/gitignore/api/rust,vscode,intellij,eclipse,sublimetext,git
 # Edit at https://www.toptal.com/developers/gitignore?templates=rust,vscode,intellij,eclipse,sublimetext,git

@@ -3,10 +3,13 @@ version: "3"
 services:
   namib_mud_controller:
     image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:latest
-    #image: controller
+    volumes:
+      - ./acme:/namib/acme
     ports:
       - 8000:8000
       - 8734:8734
+    networks:
+      - lan
 
   postgres:
     image: postgres
@@ -15,11 +18,20 @@ services:
       POSTGRES_PASSWORD: namib
     ports:
       - 5432:5432
+    networks:
+      - lan
 
   namib_enforcer:
     image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
+    tty: true
+    cap_add:
+      - NET_ADMIN
     ports:
       - 5480:80
+    networks:
+      lan:
+      wan:
+        priority: 100
 
   neo4j:
     image: neo4j
@@ -30,6 +42,8 @@ services:
       - ./neo4j/data:/data
     environment:
       - NEO4J_AUTH=neo4j/test
+    networks:
+      - lan
 
   neo4things:
     image: gitlab.informatik.uni-bremen.de:5005/namib/gruppe-1-legacy-nodes/neo4things:master
@@ -50,3 +64,9 @@ services:
       NEO4J_PORT: 7687
       NEO4J_BOLT_URL: bolt://neo4j:test@neo4j:7687
       SECRET_KEY: asecret
+    networks:
+      - lan
+
+networks:
+  wan:
+  lan:
