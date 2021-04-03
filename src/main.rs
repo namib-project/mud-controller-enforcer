@@ -70,7 +70,7 @@ async fn persist_config(config: &EnforcerConfig) {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<()> {
     dotenv().ok();
     env_logger::init();
