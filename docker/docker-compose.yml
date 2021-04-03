@@ -23,6 +23,10 @@ services:
 
   namib_enforcer:
     image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
+    command:
+      - sh
+      - -c
+      - rm -f /etc/uci-defaults/xxx_config && exec /sbin/init
     tty: true
     cap_add:
       - NET_ADMIN
@@ -30,8 +34,21 @@ services:
       - 5480:80
     networks:
       lan:
-      wan:
         priority: 100
+      wan:
+
+  dhcp_client:
+    image: debian
+    command:
+      - sh
+      - -c
+      - >
+        apt-get update && apt-get install -y isc-dhcp-client &&
+        echo 'option mudurl code 161 = text;' >> /etc/dhcp/dhclient.conf &&
+        echo 'send mudurl "https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json";' >> /etc/dhcp/dhclient.conf &&
+        dhclient -1 -4 -d
+    networks:
+      - lan
 
   neo4j:
     image: neo4j
@@ -69,4 +86,8 @@ services:
 
 networks:
   wan:
+    driver: macvlan
+    driver_opts:
+      parent: eth0
   lan:
+    driver: bridge
