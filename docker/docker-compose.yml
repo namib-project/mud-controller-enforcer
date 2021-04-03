@@ -37,8 +37,23 @@ services:
         priority: 100
       wan:
 
+  add_mock_data:
+    image: docker
+    depends_on:
+      - namib_mud_controller
+    command:
+      - sh
+      - -c
+      - echo 2 | sh /import_mock_data.sh
+    privileged: true
+    volumes:
+      - ../scripts/import_mock_data.sh:/import_mock_data.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
   dhcp_client:
     image: debian
+    depends_on:
+      - namib_enforcer
     command:
       - sh
       - -c
@@ -86,8 +101,6 @@ services:
 
 networks:
   wan:
-    driver: macvlan
-    driver_opts:
-      parent: eth0
+    driver: bridge
   lan:
     driver: bridge
