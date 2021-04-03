@@ -90,31 +90,31 @@ binary:
 
 openwrt_package_x86_64:
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:x86_64-19.07.6
+  image: openwrtorg/sdk:x86_64-19.07.7
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
 
 openwrt_package_bcm2708: # raspberry v1
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:brcm2708-bcm2708-19.07.6
+  image: openwrtorg/sdk:brcm2708-bcm2708-19.07.7
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
 
 openwrt_package_bcm2710: # raspberry v3
   extends: .openwrt_package_base
-  image: openwrtorg/sdk:brcm2708-bcm2710-19.07.6
+  image: openwrtorg/sdk:brcm2708-bcm2710-19.07.7
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
 openwrt_package_bcm2710_snapshot: # raspberry v3
   extends: .openwrt_package_base
-  image: openwrtorg/sdk@sha256:4034164a5897dc582551485fc16fabc9b1c8c46dfd3345969d5e5b9f3b03a4de # :bcm27xx-bcm2710-snapshot
+  image: openwrtorg/sdk@sha256:6ba8ab7d4e4fa1f1f183fb1ea4dbdd4d6277eb88e2e6fc91b5e2df7feea8edfc # :bcm27xx-bcm2710-snapshot
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
 openwrt_package_bcm2711_snapshot: # raspberry v4
   extends: .openwrt_package_base
-  image: openwrtorg/sdk@sha256:7228f2e05d1aec799eac81ceedc1632d5bf12f1cc744ca7e2c6b8f85b17d34c5 # :bcm27xx-bcm2711-snapshot
+  image: openwrtorg/sdk@sha256:a99ca882665737bc107a3ae3d93762902d324dad4a39f6793e018f2e65d19817 # :bcm27xx-bcm2711-snapshot
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
