@@ -126,7 +126,7 @@ async fn main() -> Result<()> {
     };
     apply_secure_name_config(&config.secure_name(), addr)?;
 
-    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, config, addr }));
+    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, addr, config }));
 
     let mut dns_service = services::dns::DnsService::new().unwrap();
 

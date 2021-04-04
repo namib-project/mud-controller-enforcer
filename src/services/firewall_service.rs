@@ -103,7 +103,11 @@ impl FirewallService {
         self.convert_config_to_nftnl_commands(&mut batch, &config).await?;
         let batch = batch.finalize();
         // TODO proper error handling
-        send_and_process(&batch).unwrap();
+        if crate::services::skip_send_and_process() {
+            warn!("skipping send and process of nft batch");
+        } else {
+            send_and_process(&batch).unwrap();
+        }
 
         Ok(())
     }
