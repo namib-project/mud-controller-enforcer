@@ -4,6 +4,7 @@ stages:
   - docs
   - binary
   - imagebuilder
+  - docker
 
 image: rust:latest
 
@@ -145,8 +146,8 @@ openwrt_package_bcm2711_snapshot: # raspberry v4
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl
-    - mv ${CI_PROJECT_DIR}/openwrt/config.diff .config
-    - mv ${CI_PROJECT_DIR}/openwrt ./package/namib
+    - mv ${CI_PROJECT_DIR}/openwrt_package/config.diff .config
+    - mv ${CI_PROJECT_DIR}/openwrt_package ./package/namib
     - mkdir package/namib/src
     - cp -r ${CI_PROJECT_DIR} package/namib/src/namib_enforcer
     - make defconfig
@@ -160,13 +161,88 @@ openwrt_package_bcm2711_snapshot: # raspberry v4
       - output
     when: always
 
-imagebuilder:
+build_image_x86_64:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:x86-64-19.07.7 # - statt _ wie im sdk...
+  needs:
+    - openwrt_package_x86_64
+  variables:
+    DNSMASQ_JOB: build_ipk_x86_19.07
+
+build_image_bcm2708:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:brcm2708-bcm2708-19.07.7 # rpi 1
+  needs:
+    - openwrt_package_bcm2708
+  variables:
+    DNSMASQ_JOB: build_ipk_bcm2708_19.07
+    PROFILE: rpi
+
+build_image_bcm2710:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:brcm2708-bcm2710-19.07.7 # rpi 3
+  needs:
+    - openwrt_package_bcm2710
+  variables:
+    DNSMASQ_JOB: build_ipk_bcm2710_19.07
+    PROFILE: rpi-3
+
+build_image_bcm2710_snapshot:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder@sha256:081403dccdd3028ddaba7565285f103b6cad2cca65ac42746cc3b99872f72a9b # :bcm27xx-bcm2710-snapshot # rpi 3
+  needs:
+    - openwrt_package_bcm2710_snapshot
+  variables:
+    DNSMASQ_JOB: build_ipk_bcm2710_snapshot
+    PROFILE: rpi-3
+    EXTRA_PACKAGES: brcmfmac-firmware-43430-sdio-rpi-3b brcmfmac-firmware-43455-sdio-rpi-3b-plus -cypress-nvram-43430-sdio-rpi-3b -cypress-nvram-43455-sdio-rpi-3b-plus
+  allow_failure: true
+
+build_image_bcm2711_snapshot:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder@sha256:805d22c6159ad0f407cfc3fbc850d093fca25abcd6abfb55bfbaaed9ee0d1681 # :bcm27xx-bcm2711-snapshot # rpi 4
+  needs:
+    - openwrt_package_bcm2711_snapshot
+  variables:
+    DNSMASQ_JOB: build_ipk_bcm2711_snapshot
+    PROFILE: rpi-4
+  allow_failure: true
+
+.openwrt_image_base:
   stage: imagebuilder
-  only:
-    - master
-  trigger:
-    include:
-      - project: namib/mud-controller-enforcer/controller-enforcer-metaproject
-        ref: master
-        file: .gitlab-ci.imagebuilder.yml
-    strategy: depend
+  script:
+    - cd /home/build/openwrt
+    - cp -r ${CI_PROJECT_DIR}/openwrt_image/files files
+    # copy the IPKs created by the needed build jobs
+    - mkdir -p packages
+    - 'curl -Ssf -o artifacts.zip -H "JOB-TOKEN: $CI_JOB_TOKEN" https://gitlab.informatik.uni-bremen.de/api/v4/projects/namib%2fmud-controller-enforcer%2fdnsmasq/jobs/artifacts/master/download?job=$DNSMASQ_JOB'
+    - unzip artifacts.zip && rm artifacts.zip
+    - cp openwrt/ipk/dnsmasq-full_*.ipk packages/
+    - cp ${CI_PROJECT_DIR}/output/namib_*.ipk packages/
+    - grep imagebuilder repositories.conf || echo "src imagebuilder file:packages" >> repositories.conf
+    - make _check_keys package_index || true # this is necessary for snapshot
+    # build the openwrt image with our packages
+    - make image PROFILE=$PROFILE PACKAGES="dnsmasq-full namib luci nano -dnsmasq -odhcpd-ipv6only $EXTRA_PACKAGES" FILES=files
+    - mkdir ${CI_PROJECT_DIR}/image
+    # x86 puts it under bin, bcm under build_dir ...
+    - cp bin/targets/*/*/openwrt-*-combined-*.img.gz ${CI_PROJECT_DIR}/image || true
+    - cp build_dir/target-*/linux-*/tmp/openwrt-*-factory.img.gz ${CI_PROJECT_DIR}/image || true
+    - cp -r build_dir/target-x86_64_musl/root-x86 ${CI_PROJECT_DIR}/rootfs || true
+  artifacts:
+    paths:
+      - image
+      - rootfs
+
+build_openwrt_docker:
+  stage: docker
+  image: docker
+  tags:
+    - namib
+    - privileged
+  needs:
+    - build_image_x86_64
+  script:
+    - mkdir -p ~/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"namib_enforcer\",\"password\":\"$CI_DEPLOY_TOKEN\"}}}" > ~/.docker/config.json
+    - docker build . -f openwrt_image/Dockerfile -t gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
+    - docker push gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer

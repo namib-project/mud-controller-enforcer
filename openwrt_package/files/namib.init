@@ -10,7 +10,7 @@ start_service() {
         procd_open_instance
         procd_set_param command "$PROG"
         procd_set_param env NAMIB_SYSTEM=1
-        procd_append_param env RUST_LOG=info
+        procd_append_param env RUST_LOG=info,namib_enforcer=debug
         procd_append_param env NAMIB_CA_CERT=/etc/namib/ca.pem
         procd_append_param env NAMIB_IDENTITY=/etc/namib/identity.pfx
         procd_set_param respawn

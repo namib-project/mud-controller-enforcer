@@ -60,7 +60,7 @@ pub async fn run() -> Result<(NamibRpcClient, SocketAddr)> {
 pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<FirewallService>) {
     loop {
         {
-            let mut enf = enforcer.write().await;
+            let enf = enforcer.read().await;
             let version = Some(enf.config.version().into());
             let heartbeat: io::Result<Option<EnforcerConfig>> = enf.client.heartbeat(context::current(), version).await;
             match heartbeat {
@@ -68,11 +68,10 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                     ErrorKind::ConnectionReset => {
                         error!("RPC Server connection reset, trying to reconnect... ({:?})", error);
                         if let Ok((new_client, addr)) = run().await {
+                            drop(enf);
+                            let mut enf = enforcer.write().await;
                             enf.client = new_client;
                             enf.addr = addr;
-                        }
-                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr) {
-                            error!("Error while applying new controller address: {:?}", e);
                         }
                     },
                     _ => {
@@ -81,6 +80,11 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                 },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
+                    if enf.config.secure_name() != config.secure_name() {
+                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr) {
+                            error!("Error while applying new controller address: {:?}", e);
+                        }
+                    }
                     drop(enf);
                     // Apply new config and notify firewall service.
                     enforcer.write().await.apply_new_config(config).await;
