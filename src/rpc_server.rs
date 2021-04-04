@@ -6,7 +6,7 @@ use tarpc::{
     context, serde_transport,
     serde_transport::Transport,
     server,
-    server::{BaseChannel, Channel, Incoming},
+    server::{BaseChannel, Channel},
 };
 
 use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::NamibRpc};
@@ -127,10 +127,8 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
         .inspect_err(|err| warn!("Failed to accept {:?}", err))
         .filter_map(|r| future::ready(r.ok()))
         .map(BaseChannel::with_defaults)
-        // limit to 1 connection per ip
-        .max_channels_per_key(1, |t| get_streams(t).0.peer_addr().unwrap().ip())
         .map(|channel| {
-            let streams = get_streams(channel.as_ref());
+            let streams = get_streams(&channel);
             let server = NamibRpcServer {
                 client_ip: streams.0.peer_addr().unwrap(),
                 // the fingerprint of a certificate is the sha1 of its entire bytes encoded in DER

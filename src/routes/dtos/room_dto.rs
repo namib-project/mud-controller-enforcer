@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use crate::{error::Result, models::Room};
+use crate::models::Room;
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema, PartialEq)]
@@ -31,11 +31,11 @@ pub struct RoomCreationUpdateDto {
 }
 
 impl RoomCreationUpdateDto {
-    pub fn to_room(&self, id: i64) -> Result<Room> {
-        Ok(Room {
+    pub fn into_room(self, id: i64) -> Room {
+        Room {
             room_id: id,
-            name: self.name.clone(),
-            color: self.color.clone(),
-        })
+            name: self.name,
+            color: self.color,
+        }
     }
 }

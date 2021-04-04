@@ -28,7 +28,7 @@ pub async fn add_device(device: Device) {
     let identifier = device.mac_or_duid();
     debug!("adding device to neo4jthings: {}", identifier);
     if let Err(e) = retry(backoff_policy(), || async {
-        Ok(thing_api::thing_create(
+        match thing_api::thing_create(
             &N4T_CONFIG,
             Thing {
                 serial: device.id.to_string(),
@@ -40,7 +40,14 @@ pub async fn add_device(device: Device) {
                 hostname: device.hostname.to_string(),
             },
         )
-        .await?)
+        .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                warn!("Error while adding thing {:?}", e);
+                Err(backoff::Error::Transient(e))
+            },
+        }
     })
     .await
     {
