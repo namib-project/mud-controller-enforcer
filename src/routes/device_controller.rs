@@ -7,9 +7,7 @@ use crate::{
     error::Result,
     models::Device,
     routes::dtos::{DeviceCreationUpdateDto, DeviceDto, GuessDto},
-    services::{
-        config_service, config_service::ConfigKeys, device_service, neo4things_service, role_service::Permission,
-    },
+    services::{device_service, neo4things_service, role_service::Permission},
 };
 use actix_web::http::StatusCode;
 use futures::{stream, StreamExt, TryStreamExt};
@@ -68,9 +66,8 @@ async fn create_device(
         .fail()
     })?;
 
-    let device = device_creation_update_dto
-        .into_inner()
-        .into_device(device_creation_update_dto.mud_url.is_none())?;
+    let collect_info = device_creation_update_dto.mud_url.is_none();
+    let device = device_creation_update_dto.into_inner().into_device(collect_info)?;
     let id = device_service::insert_device(&device.load_refs(&pool).await?, &pool).await?;
 
     let created_device = find_device(id, &pool).await?;
