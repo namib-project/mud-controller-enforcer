@@ -68,11 +68,9 @@ async fn create_device(
         .fail()
     })?;
 
-    let collect_info = device_creation_update_dto.mud_url.is_none()
-        && config_service::get_config_value(ConfigKeys::CollectDeviceData.as_ref(), &pool)
-            .await
-            .unwrap_or(false);
-    let device = device_creation_update_dto.into_inner().into_device(collect_info)?;
+    let device = device_creation_update_dto
+        .into_inner()
+        .into_device(device_creation_update_dto.mud_url.is_none())?;
     let id = device_service::insert_device(&device.load_refs(&pool).await?, &pool).await?;
 
     let created_device = find_device(id, &pool).await?;
