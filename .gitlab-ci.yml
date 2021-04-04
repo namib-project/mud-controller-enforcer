@@ -31,6 +31,7 @@ default:
   tags:
     - linux
     - docker
+  retry: 2
 
 build:
   stage: build
@@ -97,6 +98,32 @@ build-release:
     - build
   only:
     - master
+  script:
+    - cargo install --root ./install --path .
+    - apt-get install git-secret -y
+    # download namib frontend
+    - ./scripts/download_namib_frontend.sh
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
+    - cd ..
+    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
+    - git fetch origin && git checkout origin/master -f
+    - git secret reveal
+    - cd certs
+    - ./gen_server_cert.sh namib-ca
+  artifacts:
+    paths:
+      - install/bin
+      - certs
+      - static
+      - db.sqlite
+
+build-release-postgres:
+  stage: release
+  needs:
+    - build
+  only:
+    - master
     - feature/#59_kompatibel_mit_postgres_machen
   services:
     - postgres
@@ -134,9 +161,24 @@ create-docker:
     entrypoint: [ "" ]
   only:
     - master
+  before_script: []
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
+
+create-docker-postgres:
+  stage: docker
+  needs:
+    - build-release-postgres
+  cache: {}
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  only:
+    - master
     - feature/#59_kompatibel_mit_postgres_machen
-  before_script:
-    - echo "Global before_script disabled"
+  before_script: []
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json

@@ -9,16 +9,16 @@ use crate::{
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
     #[cfg(feature = "sqlite")]
     let usrs = sqlx::query!(
-"select
+r#"select
 	u.id as user_id
 	, username
 	, password
 	, salt
-	, cast((select group_concat(name) from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as roles
-	, cast((select group_concat(role_id) from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as roles_ids
-	, cast((select group_concat(permissions) from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as text) as permissions
+	, (select group_concat(name) from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as "roles: Option<String>"
+	, (select group_concat(role_id) from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as "roles_ids: Option<String>"
+	, (select group_concat(permissions) from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as "permissions: Option<String>"
 from
-	users u")
+	users u"#)
         .fetch_all(conn)
         .await?;
     #[cfg(feature = "postgres")]
@@ -28,9 +28,9 @@ r#"select
 	, username
 	, password
 	, salt
-	, cast((select string_agg(name, ',') from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles) as text) as "roles!"
-	, cast((select string_agg(role_id::text, ',') from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles_ids) as text) as "roles_ids!"
-	, cast((select string_agg(permissions, ',') from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as permissions) as text) as "permissions!"
+	, (select string_agg(name, ',') from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles) as roles
+	, (select string_agg(role_id::text, ',') from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles_ids) as roles_ids
+	, (select string_agg(permissions, ',') from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as permissions) as permissions
 from
 	users u"#)
         .fetch_all(conn)
@@ -43,8 +43,14 @@ from
             username: usr.username,
             password: usr.password,
             salt: usr.salt,
-            roles: get_roles(&usr.roles_ids, &usr.roles),
-            permissions: usr.permissions.split(',').map(ToOwned::to_owned).collect(),
+            roles: get_roles(&usr.roles_ids.unwrap_or_default(), &usr.roles.unwrap_or_default()),
+            permissions: usr
+                .permissions
+                .unwrap_or_default()
+                .split(',')
+                .filter(|p| !p.is_empty())
+                .map(ToOwned::to_owned)
+                .collect(),
         })
         .collect())
 }
