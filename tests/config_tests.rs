@@ -44,7 +44,7 @@ async fn delete_something() {
 
     assert_eq!(
         config_service::delete_config_key("some", &ctx.db_conn).await.unwrap(),
-        1
+        true
     );
     assert!(
         config_service::get_config_value::<String>("some", &ctx.db_conn)

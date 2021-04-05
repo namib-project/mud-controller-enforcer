@@ -15,8 +15,8 @@ pub mod parser;
 /// Writes the `MudDbo` to the database.
 /// Upserts data by `MudDbo::url`
 pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
-    let _ins_count = sqlx::query!(
-        "INSERT INTO mud_data (url, data, created_at, expiration) VALUES (?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET data = excluded.data, created_at = excluded.created_at, expiration = excluded.expiration",
+    sqlx::query!(
+        "INSERT INTO mud_data (url, data, created_at, expiration) VALUES ($1, $2, $3, $4) ON CONFLICT(url) DO UPDATE SET data = excluded.data, created_at = excluded.created_at, expiration = excluded.expiration",
         mud_profile.url,
         mud_profile.data,
         mud_profile.created_at,
@@ -25,14 +25,13 @@ pub async fn upsert_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()>
         .execute(pool)
         .await?;
 
-    // Ok(ins_count.rows_affected())
     Ok(())
 }
 
 /// Creates MUD Profile using `MudDbo` Data
 pub async fn create_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()> {
     let _ins_count = sqlx::query!(
-        "INSERT INTO mud_data (url, data, created_at, expiration) VALUES (?, ?, ?, ?)",
+        "INSERT INTO mud_data (url, data, created_at, expiration) VALUES ($1, $2, $3, $4)",
         mud_profile.url,
         mud_profile.data,
         mud_profile.created_at,
@@ -46,7 +45,7 @@ pub async fn create_mud(mud_profile: &MudDbo, pool: &DbConnection) -> Result<()>
 
 /// Returns the MUD-Profile if it exists
 pub async fn get_mud(url: &str, pool: &DbConnection) -> Option<MudDbo> {
-    sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = ?", url)
+    sqlx::query_as!(MudDbo, "SELECT * FROM mud_data WHERE url = $1", url)
         .fetch_optional(pool)
         .await
         .ok()?
@@ -62,17 +61,17 @@ pub async fn get_all_muds(pool: &DbConnection) -> Result<Vec<MudDbo>> {
 }
 
 /// Deletes a MUD-Profile using the MUD-URL/-Name
-pub async fn delete_mud(url: &str, pool: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("DELETE FROM mud_data WHERE url = ?", url)
+pub async fn delete_mud(url: &str, pool: &DbConnection) -> Result<bool> {
+    let del_count = sqlx::query!("DELETE FROM mud_data WHERE url = $1", url)
         .execute(pool)
         .await?;
 
-    Ok(del_count.rows_affected())
+    Ok(del_count.rows_affected() == 1)
 }
 
 /// Checks if a Device is using the MUD-Profile
 pub async fn is_mud_used(url: &str, pool: &DbConnection) -> Result<bool> {
-    let device_using_mud = sqlx::query!("SELECT * FROM devices WHERE mud_url = ?", url)
+    let device_using_mud = sqlx::query!("SELECT * FROM devices WHERE mud_url = $1", url)
         .fetch_optional(pool)
         .await?;
 
@@ -82,7 +81,7 @@ pub async fn is_mud_used(url: &str, pool: &DbConnection) -> Result<bool> {
 /// This function return `MudDboRefresh` they only containing url and expiration
 /// to reduce payload.
 async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh>> {
-    Ok(sqlx::query_as!(MudDboRefresh, "select url, expiration from mud_data")
+    Ok(sqlx::query_as!(MudDboRefresh, "SELECT url, expiration FROM mud_data")
         .fetch_all(pool)
         .await?)
 }

@@ -44,7 +44,7 @@ EOF
 }
 
 if [ "$1" == "docker" ]; then
-  if command -v sqlite3; then
+  if [ -f "db.sqlite" ]; then
     import "sqlite3 db.sqlite"
   else
     import "psql postgresql://namib:namib@postgres/namib_mud_controller"

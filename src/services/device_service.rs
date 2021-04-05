@@ -33,7 +33,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
 }
 
 pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
-    let devices = sqlx::query_as!(DeviceDbo, "select * from devices")
+    let devices = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices")
         .fetch_all(pool)
         .await?;
 
@@ -41,7 +41,7 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
 }
 
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
-    let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "select * from devices where id = ?", id)
+    let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE id = $1", id)
         .fetch_one(pool)
         .await?;
 
@@ -51,7 +51,7 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
 pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
     let device = sqlx::query_as!(
         DeviceDbo,
-        "select * from devices where ipv4_addr = ? or ipv6_addr = ?",
+        "SELECT * FROM devices WHERE ipv4_addr = $1 OR ipv6_addr = $2",
         ip,
         ip
     )
@@ -69,12 +69,12 @@ pub async fn find_by_mac_or_duid(
     let mut device = None;
     if let Some(mac_addr) = mac_addr {
         let mac_addr_string = mac_addr.to_string();
-        device = sqlx::query_as!(DeviceDbo, "select * from devices where mac_addr = ?", mac_addr_string)
+        device = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE mac_addr = $1", mac_addr_string)
             .fetch_optional(pool)
             .await?;
     }
     if device.is_none() && duid.is_some() {
-        device = sqlx::query_as!(DeviceDbo, "select * from devices where duid = ?", duid)
+        device = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE duid = $1", duid)
             .fetch_optional(pool)
             .await?;
     }
@@ -90,8 +90,9 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
     let ipv6_addr = device_data.ipv6_addr.map(|ip| ip.to_string());
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
 
-    let ins_count = sqlx::query!(
-        "insert into devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    #[cfg(feature = "sqlite")]
+    let result = sqlx::query!(
+        "INSERT INTO devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
         device_data.name,
         ipv4_addr,
         ipv6_addr,
@@ -106,14 +107,35 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
         device_data.clipart,
     )
     .execute(pool)
-    .await?;
+    .await?
+    .last_insert_rowid();
+
+    #[cfg(feature = "postgres")]
+    let result = sqlx::query!(
+        "INSERT INTO devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+        device_data.name,
+        ipv4_addr,
+        ipv6_addr,
+        mac_addr,
+        device_data.duid,
+        device_data.hostname,
+        device_data.vendor_class,
+        device_data.mud_url,
+        device_data.collect_info,
+        device_data.last_interaction,
+        device_data.room_id,
+        device_data.clipart,
+    )
+    .fetch_one(pool)
+    .await?
+    .id;
 
     if device_data.collect_info {
         // add the device in the background as it may take some time
         tokio::spawn(neo4things_service::add_device(device_data.inner.clone()));
     }
 
-    Ok(ins_count.last_insert_rowid())
+    Ok(result)
 }
 
 pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) -> Result<bool> {
@@ -122,7 +144,7 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
 
     let upd_count = sqlx::query!(
-        "update devices set name = ?, ipv4_addr = ?, ipv6_addr = ?, mac_addr = ?, duid = ?, hostname = ?, vendor_class = ?, mud_url = ?, collect_info = ?, last_interaction = ?, room_id = ?, clipart = ? where id = ?",
+        "UPDATE DEVICES SET name = $1, ipv4_addr = $2, ipv6_addr = $3, mac_addr = $4, duid = $5, hostname = $6, vendor_class = $7, mud_url = $8, collect_info = $9, last_interaction = $10, room_id = $11, clipart = $12 where id = $13",
         device_data.name,
         ipv4_addr,
         ipv6_addr,
@@ -135,7 +157,7 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
         device_data.last_interaction,
         device_data.room_id,
         device_data.clipart,
-        device_data.id,
+        device_data.id
     )
     .execute(pool)
     .await?;
@@ -144,7 +166,7 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
 }
 
 pub async fn delete_device(id: i64, pool: &DbConnection) -> Result<bool> {
-    let del_count = sqlx::query!("delete from devices where id = ?", id)
+    let del_count = sqlx::query!("DELETE FROM devices WHERE id = $1", id)
         .execute(pool)
         .await?;
 

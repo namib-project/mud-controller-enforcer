@@ -63,7 +63,7 @@ pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
 
 ///Deletes a room with a given name from database
 pub async fn delete_room(name: &str, pool: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("delete from rooms where name = ?", name)
+    let del_count = sqlx::query!("DELETE FROM rooms WHERE name = $1", name)
         .execute(pool)
         .await?;
 
