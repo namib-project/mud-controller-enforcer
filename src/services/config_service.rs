@@ -4,6 +4,7 @@ use std::str::FromStr;
 #[derive(strum::AsRefStr)]
 pub enum ConfigKeys {
     CollectDeviceData,
+    AllowUserSignup,
     Version,
 }
 

@@ -14,9 +14,12 @@ use crate::{
         LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
         UserConfigValueDto,
     },
-    services::{role_service::Permission, user_config_service, user_service},
+    services::{
+        config_service, config_service::ConfigKeys, role_service::Permission, user_config_service, user_service,
+    },
 };
 use actix_web::HttpResponse;
+use snafu::ensure;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/signup", web::post().to(signup));
@@ -34,6 +37,16 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 
 #[api_v2_operation(summary = "Register a new user")]
 pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) -> Result<Json<SuccessDto>> {
+    ensure!(
+        config_service::get_config_value(ConfigKeys::AllowUserSignup.as_ref(), &pool)
+            .await
+            .unwrap_or(false),
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: "Signup is not enabled".to_string(),
+        }
+    );
+
     signup_dto.validate().or_else(|_| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
