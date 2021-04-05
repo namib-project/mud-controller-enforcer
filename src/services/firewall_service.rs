@@ -140,7 +140,7 @@ impl FirewallService {
         // Create base chain. This base chain is the entry point for the firewall table and will redirect all
         // packets corresponding to a configured device in the firewall config to its separate chain.
         let mut base_chain = Chain::new(&CString::new(BASE_CHAIN_NAME).unwrap(), &table);
-        base_chain.set_hook(nftnl::Hook::In, 0);
+        base_chain.set_hook(nftnl::Hook::Forward, 0);
         // If a device is not one of the configured devices, accept packets by default.
         base_chain.set_policy(nftnl::Policy::Accept);
         batch.add(&base_chain, nftnl::MsgType::Add);

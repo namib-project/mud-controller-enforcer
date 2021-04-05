@@ -8,7 +8,7 @@ default-run = "namib_enforcer"
 [features]
 default = ["uci", "nftables"]
 uci = ["rust-uci", "libc"]
-nftables = ["nftnl", "mnl"]
+nftables = ["nftnl", "mnl", "libc"]
 dnsmasq_hook = []
 
 [dependencies]
