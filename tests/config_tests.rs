@@ -58,6 +58,26 @@ async fn delete_something() {
 async fn get_all() {
     let ctx = lib::IntegrationTestContext::new("get_all").await;
 
+    let mut expected_config = config_service::get_all_config_data(&ctx.db_conn).await.unwrap();
+    expected_config.append(&mut vec![
+        Config {
+            key: "some".to_string(),
+            value: "thing".to_string(),
+        },
+        Config {
+            key: "stackoverflow".to_string(),
+            value: "saves lives & our sanity".to_string(),
+        },
+        Config {
+            key: "actix_with".to_string(),
+            value: "sqlx".to_string(),
+        },
+        Config {
+            key: "longest_german_word".to_string(),
+            value: "Rinderkennzeichnungsfleischetikettierungsüberwachungsaufgabenübertragungsgesetz".to_string(),
+        },
+    ]);
+
     config_service::set_config_value("some", "thing", &ctx.db_conn)
         .await
         .unwrap();
@@ -80,23 +100,6 @@ async fn get_all() {
 
     assert_eq!(
         config_service::get_all_config_data(&ctx.db_conn).await.unwrap(),
-        vec![
-            Config {
-                key: "some".to_string(),
-                value: "thing".to_string()
-            },
-            Config {
-                key: "stackoverflow".to_string(),
-                value: "saves lives & our sanity".to_string()
-            },
-            Config {
-                key: "actix_with".to_string(),
-                value: "sqlx".to_string()
-            },
-            Config {
-                key: "longest_german_word".to_string(),
-                value: "Rinderkennzeichnungsfleischetikettierungsüberwachungsaufgabenübertragungsgesetz".to_string()
-            }
-        ]
+        expected_config
     );
 }

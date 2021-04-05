@@ -93,6 +93,8 @@ async fn update_device(
 
     let mut device = find_device(id.into_inner(), &pool).await?;
 
+    let collect_info_before = device.collect_info;
+
     let mud_url_from_guess = device_creation_update_dto.mud_url_from_guess.unwrap_or(false);
 
     device_creation_update_dto.into_inner().apply_to(&mut device);
@@ -106,6 +108,9 @@ async fn update_device(
         let mac_or_duid = device_with_refs.mac_or_duid();
         let mud_url = device_with_refs.mud_url.clone().unwrap();
         tokio::spawn(neo4things_service::describe_thing(mac_or_duid, mud_url));
+    } else if device_with_refs.collect_info && !collect_info_before {
+        // add the device in the background as it may take some time
+        tokio::spawn(neo4things_service::add_device(device_with_refs.inner.clone()));
     }
 
     Ok(Json(DeviceDto::from(device_with_refs)))

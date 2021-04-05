@@ -63,6 +63,7 @@ pub struct DeviceCreationUpdateDto {
     #[validate(length(max = 512))]
     pub clipart: Option<String>,
     pub room_id: Option<i64>,
+    pub collect_info: Option<bool>,
 }
 
 impl DeviceCreationUpdateDto {
@@ -82,7 +83,7 @@ impl DeviceCreationUpdateDto {
             hostname: self.hostname.unwrap_or_else(|| "".to_string()),
             vendor_class: self.vendor_class.unwrap_or_else(|| "".to_string()),
             mud_url: self.mud_url,
-            collect_info,
+            collect_info: self.collect_info.unwrap_or(collect_info),
             last_interaction: Utc::now().naive_local(),
             clipart: self.clipart.clone(),
             room_id: self.room_id,
@@ -119,6 +120,9 @@ impl DeviceCreationUpdateDto {
         }
         if let Some(duid) = self.duid {
             device.duid = Some(duid);
+        }
+        if let Some(collect_info) = self.collect_info {
+            device.collect_info = collect_info;
         }
     }
 }

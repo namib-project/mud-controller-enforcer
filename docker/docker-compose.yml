@@ -78,6 +78,21 @@ services:
     networks:
       - lan
 
+  dhcp_client_2:
+    image: debian
+    depends_on:
+      - namib_enforcer
+    profiles:
+      - tools
+    command:
+      - sh
+      - -c
+      - >
+        apt-get update && apt-get install -y isc-dhcp-client &&
+        dhclient -1 -4 -d
+    networks:
+      - lan
+
   neo4j:
     image: neo4j
     ports:
