@@ -199,26 +199,35 @@ pub async fn create_authorized_http_client(server_addr: &SocketAddr) -> (Client,
     )
 }
 
-pub async fn assert_post_successful<B: Serialize+?Sized, O: DeserializeOwned>(
+pub async fn assert_post_status_deserialize<B: Serialize+?Sized, O: DeserializeOwned>(
     client: &Client,
     url: &str,
     body: &B,
+    status_code: StatusCode,
 ) -> O {
     let req_result = client.post(url).json(body).send().await.unwrap();
-    assert_eq!(req_result.status(), StatusCode::OK);
+    assert_eq!(req_result.status(), status_code);
     req_result.json().await.unwrap()
 }
 
-pub async fn assert_post_failure<B: Serialize+?Sized>(client: &Client, url: &str, body: &B, status_code: StatusCode) {
+pub async fn assert_post_status<B: Serialize+?Sized>(client: &Client, url: &str, body: &B, status_code: StatusCode) {
     assert_eq!(client.post(url).json(body).send().await.unwrap().status(), status_code)
 }
 
-pub async fn assert_get_successful<O: DeserializeOwned>(client: &Client, url: &str) -> O {
+pub async fn assert_delete_status(client: &Client, url: &str, status_code: StatusCode) {
+    assert_eq!(client.delete(url).send().await.unwrap().status(), status_code)
+}
+
+pub async fn assert_get_status_deserialize<O: DeserializeOwned>(
+    client: &Client,
+    url: &str,
+    status_code: StatusCode,
+) -> O {
     let req_result = client.get(url).send().await.unwrap();
-    assert_eq!(req_result.status(), StatusCode::OK);
+    assert_eq!(req_result.status(), status_code);
     req_result.json().await.unwrap()
 }
 
-pub async fn assert_get_failure(client: &Client, url: &str, status_code: StatusCode) {
+pub async fn assert_get_status(client: &Client, url: &str, status_code: StatusCode) {
     assert_eq!(client.get(url).send().await.unwrap().status(), status_code)
 }
