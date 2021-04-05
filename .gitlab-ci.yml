@@ -60,6 +60,7 @@ warnings:
   script:
     - rustup toolchain install nightly --component clippy --no-self-update
     - cargo +nightly clippy -- -D warnings
+  retry: 0
   allow_failure: true
 
 formatting:

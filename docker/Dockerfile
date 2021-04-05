@@ -21,8 +21,9 @@ COPY ./docker/QuoVadis_Global_SSL_ICA_G3.crt /usr/local/share/ca-certificates/Qu
 
 RUN update-ca-certificates
 
-COPY docker/run_mud_controller.sh run_mud_controller.sh
+COPY docker/run_mud_controller.sh db.sqlite* ./
 COPY ./install/bin/namib_mud_controller namib_mud_controller
-COPY ./certs ./static db.sqlite* ./
+COPY ./certs certs
+COPY ./static static
 
 CMD ["/namib/run_mud_controller.sh"]

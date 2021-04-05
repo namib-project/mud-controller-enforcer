@@ -1,10 +1,11 @@
-version: "3"
+version: "3.8"
 
 services:
   namib_mud_controller:
     image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:postgres
     environment:
       DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+    restart: always
     volumes:
       - ./acme:/namib/acme
     ports:
@@ -49,6 +50,8 @@ services:
     image: docker
     depends_on:
       - namib_mud_controller
+    profiles:
+      - tools
     command:
       - sh
       - -c
@@ -62,6 +65,8 @@ services:
     image: debian
     depends_on:
       - namib_enforcer
+    profiles:
+      - tools
     command:
       - sh
       - -c
