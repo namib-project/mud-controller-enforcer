@@ -24,14 +24,14 @@ lazy_static! {
 
 /// Add a device in the neo4jthings service.
 /// This operation should be run in the background as it is failsafe.
-pub async fn add_device(device: Device) {
+pub async fn add_device(id: i64, device: Device) {
     let identifier = device.mac_or_duid();
     debug!("adding device to neo4jthings: {}", identifier);
     if let Err(e) = retry(backoff_policy(), || async {
         match thing_api::thing_create(
             &N4T_CONFIG,
             Thing {
-                serial: device.id.to_string(),
+                serial: id.to_string(),
                 mac_addr: identifier.clone(),
                 ipv4_addr: device
                     .ipv4_addr

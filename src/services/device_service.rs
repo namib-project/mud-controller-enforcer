@@ -27,8 +27,6 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
         insert_device(&device.load_refs(pool).await?, pool).await.unwrap();
     }
 
-    firewall_configuration_service::update_config_version(pool).await?;
-
     Ok(())
 }
 
@@ -132,8 +130,10 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
 
     if device_data.collect_info {
         // add the device in the background as it may take some time
-        tokio::spawn(neo4things_service::add_device(device_data.inner.clone()));
+        tokio::spawn(neo4things_service::add_device(result, device_data.inner.clone()));
     }
+
+    firewall_configuration_service::update_config_version(pool).await?;
 
     Ok(result)
 }
@@ -162,6 +162,8 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
     .execute(pool)
     .await?;
 
+    firewall_configuration_service::update_config_version(pool).await?;
+
     Ok(upd_count.rows_affected() == 1)
 }
 
@@ -169,6 +171,8 @@ pub async fn delete_device(id: i64, pool: &DbConnection) -> Result<bool> {
     let del_count = sqlx::query!("DELETE FROM devices WHERE id = $1", id)
         .execute(pool)
         .await?;
+
+    firewall_configuration_service::update_config_version(pool).await?;
 
     Ok(del_count.rows_affected() == 1)
 }

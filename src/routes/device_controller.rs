@@ -110,7 +110,10 @@ async fn update_device(
         tokio::spawn(neo4things_service::describe_thing(mac_or_duid, mud_url));
     } else if device_with_refs.collect_info && !collect_info_before {
         // add the device in the background as it may take some time
-        tokio::spawn(neo4things_service::add_device(device_with_refs.inner.clone()));
+        tokio::spawn(neo4things_service::add_device(
+            device_with_refs.id,
+            device_with_refs.inner.clone(),
+        ));
     }
 
     Ok(Json(DeviceDto::from(device_with_refs)))
