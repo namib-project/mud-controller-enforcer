@@ -145,7 +145,7 @@ openwrt_package_bcm2711_snapshot: # raspberry v4
   script:
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
-    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl
+    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl nftables
     - mv ${CI_PROJECT_DIR}/openwrt_package/config.diff .config
     - mv ${CI_PROJECT_DIR}/openwrt_package ./package/namib
     - mkdir package/namib/src
