@@ -3,7 +3,7 @@ use std::env;
 use crate::{
     db::DbConnection,
     error,
-    error::{Error, Result},
+    error::{Result},
     services::{role_service::Permission, user_service},
 };
 use actix_web::{dev, error::ErrorUnauthorized, web, FromRequest, HttpRequest};
@@ -118,10 +118,7 @@ impl FromRequest for AuthToken {
             Some(auth) => {
                 let pool = req.app_data::<web::Data<DbConnection>>().unwrap();
                 let runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-                match runtime.block_on(user_service::update_last_interaction_stamp(auth.sub, pool)) {
-                    Ok(_) => {},
-                    Err(_) => {},
-                }
+                runtime.block_on(user_service::update_last_interaction_stamp(auth.sub, pool)).is_ok();
                 return future::ok(auth);
             },
             None => future::err(ErrorUnauthorized("Unauthorized")),
