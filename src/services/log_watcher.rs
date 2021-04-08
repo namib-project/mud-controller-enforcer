@@ -56,7 +56,9 @@ pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
 
 fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path) -> Result<()> {
     debug!("reading dnsmasq log file");
-    fs::rename(path, tmp_path)?;
+    // it is possible to lose a logline here, but we cannot lock the file either
+    fs::copy(path, tmp_path)?;
+    fs::File::open(path)?.set_len(0)?;
     let lines = io::BufReader::new(File::open(tmp_path)?).lines();
     // create async runtime to run rpc client
     Builder::new_current_thread().enable_all().build()?.block_on(async {
@@ -82,7 +84,10 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
                     false
                 }
             })
-            .collect::<io::Result<_>>()?;
+            .collect::<io::Result<Vec<_>>>()?;
+        if lines.is_empty() {
+            return Ok(());
+        }
         enforcer
             .client
             .send_logs(rpc_client::current_rpc_context(), lines)
