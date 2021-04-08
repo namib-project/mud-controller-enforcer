@@ -10,7 +10,8 @@
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
     clippy::must_use_candidate,
-    clippy::missing_panics_doc
+    clippy::missing_panics_doc,
+    clippy::cast_possible_truncation
 )]
 
 use actix_cors::Cors;
@@ -44,6 +45,9 @@ fn app(conn: DbConnection) -> Result<()> {
                         || origin
                             .as_bytes()
                             .starts_with(format!("https://{}", *acme_service::DOMAIN).as_bytes())
+                        || origin
+                            .as_bytes()
+                            .starts_with(format!("http://{}", *acme_service::DOMAIN).as_bytes())
                 })
                 .allow_any_method()
                 .allow_any_header()

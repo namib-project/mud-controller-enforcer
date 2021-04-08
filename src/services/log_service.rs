@@ -16,7 +16,10 @@ lazy_static! {
 }
 
 async fn parse_log_line(line: &str, conn: &DbConnection) -> Result<()> {
-    let m = LOG_FORMAT.captures(line).ok_or_else(none_error)?;
+    let m = match LOG_FORMAT.captures(line) {
+        Some(m) => m,
+        None => return Ok(()),
+    };
     let month = MONTHS.find(&m[1]).ok_or_else(none_error)? / 3 + 1;
     let day_of_month: u32 = m[2].parse()?;
     // dnsmasq logs don't contain the year, so assume the current year

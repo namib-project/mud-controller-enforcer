@@ -127,6 +127,7 @@ fn backoff_policy() -> ExponentialBackoff {
     let mut eb = ExponentialBackoff {
         initial_interval: Duration::from_secs(10),
         max_interval: Duration::from_secs(60),
+        max_elapsed_time: Some(Duration::from_secs(60 * 15)),
         ..Default::default()
     };
     eb.reset();

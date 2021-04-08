@@ -10,7 +10,8 @@
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
     clippy::must_use_candidate,
-    clippy::missing_panics_doc
+    clippy::missing_panics_doc,
+    clippy::cast_possible_truncation
 )]
 
 #[macro_use]

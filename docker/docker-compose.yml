@@ -3,6 +3,8 @@ version: "3.8"
 services:
   namib_mud_controller:
     image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:postgres
+    depends_on:
+      - postgres
     environment:
       DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
     restart: always
@@ -107,6 +109,8 @@ services:
 
   neo4things:
     image: gitlab.informatik.uni-bremen.de:5005/namib/gruppe-1-legacy-nodes/neo4things:master
+    depends_on:
+      - neo4j
     entrypoint:
       - sh
       - -c
