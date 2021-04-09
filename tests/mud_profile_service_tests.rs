@@ -10,7 +10,7 @@ use namib_mud_controller::{
     error::Result,
     models::{MudData, MudDbo},
     routes::{dtos::MudCreationDto, mud_controller},
-    services::mud_service::{json_models, mud_profile_service::update_outdated_profiles, parser::parse_mud},
+    services::mud_service::{json_models, parser::parse_mud, update_outdated_profiles},
 };
 
 #[tokio::test(flavor = "multi_thread")]
