@@ -1,4 +1,4 @@
-pub mod permission;
-pub mod service;
+mod permission;
+mod service;
 pub use permission::*;
 pub use service::*;

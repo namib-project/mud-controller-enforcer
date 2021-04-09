@@ -21,11 +21,11 @@ async fn test_inserting_role_mappings() -> Result<()> {
 
     // try inserting relation with role_id that doesn't exist
     // this should result in a DatabaseError
-    match role_service::role_add_to_user(&ctx.db_conn, user_id, 37).await {
+    match role_service::add_role_to_user(&ctx.db_conn, user_id, 37).await {
         Err(Error::DatabaseError { .. }) => {},
         _ => panic!(),
     }
 
     // this should work though
-    role_service::role_add_to_user(&ctx.db_conn, user_id, role.id).await
+    role_service::add_role_to_user(&ctx.db_conn, user_id, role.id).await
 }

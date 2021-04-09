@@ -67,6 +67,13 @@ impl User {
         })
     }
 
+    pub fn update_password(&mut self, password: &str) -> Result<()> {
+        self.salt = vec![0u8; SALT_LENGTH];
+        OsRng::default().fill(self.salt.as_mut_slice());
+        self.password = User::hash_password(password, &self.salt)?;
+        Ok(())
+    }
+
     pub fn verify_password(&self, password: &str) -> Result<()> {
         let result = argon2::verify_encoded(self.password.as_ref(), password.as_ref())?;
         ensure!(result, error::PasswordVerifyError {});

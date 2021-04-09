@@ -14,19 +14,15 @@ use std::net::IpAddr;
 
 pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
-    let mut merged_acls: Vec<&Acl> = override_with.iter().collect();
-    let mut filtered_original_acls = original
+    original
         .iter()
         .filter(|x| !override_keys.contains(&x.name.as_str()))
-        .collect::<Vec<&Acl>>();
-
-    merged_acls.append(&mut filtered_original_acls);
-
-    merged_acls
+        .chain(override_with.iter())
+        .collect()
 }
 
 pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> EnforcerConfig {
-    let rules: Vec<FirewallDevice> = devices.iter().map(move |d| convert_device_to_fw_rules(d)).collect();
+    let rules = devices.iter().map(|d| convert_device_to_fw_rules(d)).collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 

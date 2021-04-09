@@ -62,8 +62,7 @@ impl NamibRpc for NamibRpcServer {
 
         // TODO: Handle different dhcp event lease types (currently handles everything as "add")
         let lease_info = match dhcp_event {
-            DhcpEvent::LeaseAdded { lease_info, .. } => lease_info,
-            DhcpEvent::ExistingLeaseUpdate { lease_info, .. } => lease_info,
+            DhcpEvent::LeaseAdded { lease_info, .. } | DhcpEvent::ExistingLeaseUpdate { lease_info, .. } => lease_info,
             _ => return,
         };
 

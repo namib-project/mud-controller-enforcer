@@ -55,9 +55,9 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
         .fail()
     })?;
 
-    let user = User::new(signup_dto.username.clone(), signup_dto.password.as_str())?;
+    let user = User::new(signup_dto.0.username, &signup_dto.0.password)?;
 
-    user_service::insert(user, pool.get_ref()).await?;
+    user_service::insert(user, &pool).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
@@ -74,7 +74,7 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
         .fail()
     })?;
 
-    let user = user_service::find_by_username(login_dto.username.as_ref(), pool.get_ref())
+    let user = user_service::find_by_username(&login_dto.username, &pool)
         .await
         .or_else(|_| {
             error::ResponseError {
@@ -84,7 +84,7 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
             .fail()
         })?;
 
-    User::verify_password(&user, login_dto.password.as_ref()).or_else(|_| {
+    user.verify_password(&login_dto.password).or_else(|_| {
         error::ResponseError {
             status: StatusCode::UNAUTHORIZED,
             message: None,
@@ -103,7 +103,7 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 
 #[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.")]
 pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<TokenDto>> {
-    let user = user_service::find_by_id(auth.sub, pool.get_ref()).await.or_else(|_| {
+    let user = user_service::find_by_id(auth.sub, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: None,
@@ -122,7 +122,7 @@ pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
 
 #[api_v2_operation(summary = "Retrieve information about the logged-in user")]
 pub async fn get_me(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<User>> {
-    let user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
+    let user = user_service::find_by_id(auth.sub, &pool).await?;
 
     Ok(Json(user))
 }
@@ -141,13 +141,13 @@ pub fn update_me(
         .fail()
     })?;
 
-    let mut user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
+    let mut user = user_service::find_by_id(auth.sub, &pool).await?;
 
     if let Some(username) = &update_user_dto.username {
         user.username = username.clone();
     }
 
-    user_service::update(user.id, &user, pool.get_ref()).await?;
+    user_service::update(&user, &pool).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
@@ -168,9 +168,9 @@ pub fn update_password(
         .fail()
     })?;
 
-    let mut user = user_service::find_by_id(auth.sub, pool.get_ref()).await?;
+    let mut user = user_service::find_by_id(auth.sub, &pool).await?;
 
-    User::verify_password(&user, &update_password_dto.old_password).or_else(|_| {
+    user.verify_password(&update_password_dto.old_password).or_else(|_| {
         error::ResponseError {
             status: StatusCode::UNAUTHORIZED,
             message: None,
@@ -180,7 +180,7 @@ pub fn update_password(
 
     user.password = User::hash_password(&update_password_dto.new_password, &user.salt)?;
 
-    user_service::update_password(user.id, &user, pool.get_ref()).await?;
+    user_service::update_password(&user, &pool).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
@@ -191,7 +191,7 @@ pub fn update_password(
 pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
     auth.require_permission(Permission::role__list)?;
 
-    let roles = user_service::get_all_roles(pool.get_ref()).await?;
+    let roles = user_service::get_all_roles(&pool).await?;
 
     Ok(Json(
         roles
@@ -207,7 +207,7 @@ pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<
 
 #[api_v2_operation(summary = "Gets the config variables of the user")]
 pub fn get_users_configs(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<UserConfigDto>>> {
-    let user_configs = user_config_service::get_all_configs_for_user(auth.sub, pool.get_ref()).await?;
+    let user_configs = user_config_service::get_all_configs_for_user(auth.sub, &pool).await?;
 
     let mut user_configs_dto = vec![];
 
@@ -227,7 +227,7 @@ pub fn get_users_config(
     key: web::Path<String>,
     auth: AuthToken,
 ) -> Result<Json<UserConfigDto>> {
-    let user_config_db = user_config_service::get_config_for_user(auth.sub, &key, pool.get_ref()).await;
+    let user_config_db = user_config_service::get_config_for_user(auth.sub, &key, &pool).await;
 
     let user_config_db = match user_config_db {
         Ok(user_config) => user_config,
@@ -261,17 +261,7 @@ pub fn set_users_config(
         .fail()
     })?;
 
-    let insert_result =
-        user_config_service::upsert_config_for_user(auth.sub, &key, &user_config_value_dto.value, pool.get_ref()).await;
-
-    match insert_result {
-        Ok(_) => (),
-        Err(_) => error::ResponseError {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            message: None,
-        }
-        .fail()?,
-    };
+    user_config_service::upsert_config_for_user(auth.sub, &key, &user_config_value_dto.value, &pool).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -282,7 +272,7 @@ pub fn delete_users_config(
     auth: AuthToken,
     key: web::Path<String>,
 ) -> Result<HttpResponse> {
-    user_config_service::delete_config_for_user(auth.sub, &key, pool.get_ref()).await?;
+    user_config_service::delete_config_for_user(auth.sub, &key, &pool).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }

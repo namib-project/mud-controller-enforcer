@@ -87,7 +87,7 @@ pub fn permissions_get_all() -> Result<Vec<String>> {
     Ok(Permission::iter().map(|p| p.to_string()).collect())
 }
 
-pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
+pub async fn add_role_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
     sqlx::query!(
         "INSERT INTO users_roles (user_id, role_id) VALUES ($1, $2)",
         user_id,
