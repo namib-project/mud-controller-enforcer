@@ -99,6 +99,14 @@ fn app(conn: DbConnection) -> Result<()> {
                 .service(web::scope("/rooms").configure(routes::room_controller::init))
                 .with_json_spec_at("/api/spec")
                 .build()
+                .route(
+                    "/",
+                    web::to(|| {
+                        web::HttpResponse::PermanentRedirect()
+                            .header("Location", "/app")
+                            .finish()
+                    }),
+                )
                 .service(
                     actix_files::Files::new("/", "static")
                         .index_file("index.html")

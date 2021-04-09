@@ -175,7 +175,7 @@ pub fn update_certs() -> Result<()> {
 /// Get the tls server config for actix
 pub fn server_config() -> ServerConfig {
     // create the certificate in the background, it doesn't have to be immediatly present for ActiX to start.
-    actix_rt::spawn(async {
+    tokio::task::spawn_blocking(|| {
         if let Err(e) = update_certs() {
             warn!("Failed to update certificates: {:?}", e);
         }
@@ -188,16 +188,13 @@ pub fn server_config() -> ServerConfig {
 /// Returns the secure dns name for this controller.
 /// Will return `None` if no certificate has been issued yet, or the domain is not resolved to be this controller's ip.
 pub fn secure_name() -> Option<String> {
-    if let Ok(g) = ACME_CERTIFIED_KEY.read() {
-        if g.is_some() {
-            drop(g);
-            if let Ok(ifs) = get_if_addrs() {
-                if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
-                    for resolved in resolved {
-                        for interf in &ifs {
-                            if interf.ip() == resolved.ip() {
-                                return Some(DOMAIN.to_string());
-                            }
+    if let Ok(Some(_)) = ACCOUNT.certificate(&DOMAIN) {
+        if let Ok(ifs) = get_if_addrs() {
+            if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
+                for resolved in resolved {
+                    for interf in &ifs {
+                        if interf.ip() == resolved.ip() {
+                            return Some(DOMAIN.to_string());
                         }
                     }
                 }
