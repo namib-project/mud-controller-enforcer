@@ -1,11 +1,10 @@
 use std::env;
 
 use crate::{error, error::Result, services::role_service::Permission};
-use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
+use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
 use glob::Pattern;
-use isahc::http::StatusCode;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};

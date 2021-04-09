@@ -1,5 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 
+use crate::error::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use paperclip::{
     actix::Apiv2Schema,
@@ -21,6 +22,12 @@ pub struct MudDbo {
     pub data: String,
     pub created_at: NaiveDateTime,
     pub expiration: NaiveDateTime,
+}
+
+impl MudDbo {
+    pub fn parse_data(&self) -> Result<MudData> {
+        Ok(serde_json::from_str::<MudData>(self.data.as_str())?)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]

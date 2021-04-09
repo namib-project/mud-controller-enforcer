@@ -1,6 +1,6 @@
 use crate::{
     db::DbConnection,
-    services::{acme_service, mud_service::mud_profile_service},
+    services::{acme_service, mud_service},
 };
 use clokwerk::{Scheduler, TimeUnits};
 use std::time::Duration;
@@ -14,7 +14,7 @@ pub async fn start_jobs(conn: DbConnection) {
     scheduler.every(1.hour()).run(move || {
         let conn = conn.clone();
         tokio::spawn(async move {
-            if let Err(e) = mud_profile_service::update_outdated_profiles(&conn).await {
+            if let Err(e) = mud_service::update_outdated_profiles(&conn).await {
                 warn!("Failed to update outdated profiles: {:?}", e);
             }
         });

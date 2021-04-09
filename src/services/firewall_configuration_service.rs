@@ -22,7 +22,11 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
 }
 
 pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> EnforcerConfig {
-    let rules = devices.iter().map(|d| convert_device_to_fw_rules(d)).collect();
+    let rules = devices
+        .iter()
+        .filter(|d| d.ipv4_addr.is_some() || d.ipv6_addr.is_some())
+        .map(|d| convert_device_to_fw_rules(d))
+        .collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 
@@ -120,8 +124,10 @@ pub async fn get_config_version(pool: &DbConnection) -> String {
 }
 
 pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
-    let old_config_version = get_config_value(ConfigKeys::Version.as_ref(), pool).await.unwrap_or(0);
-    set_config_value(ConfigKeys::Version.as_ref(), old_config_version + 1, pool).await?;
+    let old_config_version = get_config_value(ConfigKeys::Version.as_ref(), pool)
+        .await
+        .unwrap_or(0u64);
+    set_config_value(ConfigKeys::Version.as_ref(), old_config_version.wrapping_add(1), pool).await?;
     Ok(())
 }
 

@@ -145,6 +145,7 @@ pub fn update_certs() -> Result<()> {
             .read_to_end(&mut ca)?;
         // send the httpchallenge token to the service.
         let response = reqwest::blocking::ClientBuilder::new()
+            .tls_built_in_root_certs(false)
             .add_root_certificate(Certificate::from_pem(&ca)?)
             .identity(Identity::from_pem(&certs)?)
             .build()?

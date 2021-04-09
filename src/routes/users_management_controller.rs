@@ -1,6 +1,5 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use isahc::http::StatusCode;
 use paperclip::actix::{api_v2_operation, web, web::Json};
 use validator::Validate;
 
@@ -11,7 +10,7 @@ use crate::{
     routes::dtos::{MgmCreateUserDto, MgmUpdateUserBasicDto},
     services::{role_service, user_service},
 };
-use actix_web::HttpResponse;
+use actix_web::{http::StatusCode, HttpResponse};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/", web::get().to(get_all_users));

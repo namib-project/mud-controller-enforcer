@@ -1,6 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use isahc::http::StatusCode;
 use paperclip::actix::{api_v2_operation, web, web::Json};
 use validator::Validate;
 
@@ -18,7 +17,7 @@ use crate::{
         config_service, config_service::ConfigKeys, role_service::Permission, user_config_service, user_service,
     },
 };
-use actix_web::HttpResponse;
+use actix_web::{http::StatusCode, HttpResponse};
 use snafu::ensure;
 
 pub fn init(cfg: &mut web::ServiceConfig) {

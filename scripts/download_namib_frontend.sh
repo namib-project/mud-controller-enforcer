@@ -2,7 +2,7 @@
 
 set -e
 
-cd $(dirname $(realpath $0))/../static
+cd $(dirname $0)/../static
 
 function extract() {
   rm -rf app

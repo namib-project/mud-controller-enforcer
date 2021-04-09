@@ -8,8 +8,7 @@ use crate::{
     routes::dtos::{RoleAssignDto, RoleDto, RoleUpdateDto},
     services::role_service::{self, Permission},
 };
-use actix_web::HttpResponse;
-use isahc::http::StatusCode;
+use actix_web::{http::StatusCode, HttpResponse};
 use paperclip::actix::{api_v2_operation, web, web::Json};
 use validator::Validate;
 

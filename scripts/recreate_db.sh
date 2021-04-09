@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-cd $(dirname $(realpath $0))/..
+cd $(dirname $0)/..
 
 MIGRATION_DIRECTORY=${MIGRATION_DIRECTORY:-migrations/sqlite}
 

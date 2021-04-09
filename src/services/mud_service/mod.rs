@@ -1,15 +1,15 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
-use isahc::AsyncReadResponseExt;
 
 use crate::{
     db::DbConnection,
     error::Result,
     models::{Acl, MudData, MudDbo, MudDboRefresh},
+    services::{firewall_configuration_service::update_config_version, mud_service::fetch::fetch_mud},
 };
 use url::Url;
 
+mod fetch;
 pub mod json_models;
-pub mod mud_profile_service;
 pub mod parser;
 
 /// Writes the `MudDbo` to the database.
@@ -93,13 +93,14 @@ async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh
 /// Local MUD-Profiles can be loaded *BUT NOT CREATED* through this function, since they have an expiration far far in the future
 pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData> {
     // lookup datenbank ob schon existiert und nicht abgelaufen
-    let existing_mud = get_mud(url, pool).await;
+    let mut acl_override = Vec::default();
 
-    if let Some(mud) = existing_mud {
-        if mud.expiration > Utc::now().naive_utc() {
-            if let Ok(mud) = serde_json::from_str::<MudData>(mud.data.as_str()) {
-                return Ok(mud);
+    if let Some(mud) = get_mud(url, pool).await {
+        if let Ok(mud_data) = mud.parse_data() {
+            if mud.expiration > Utc::now().naive_utc() {
+                return Ok(mud_data);
             }
+            acl_override = mud_data.acl_override;
         }
     }
 
@@ -107,7 +108,8 @@ pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData>
     let mud_json = fetch_mud(url).await?;
 
     // ruf parse_mud auf
-    let data = parser::parse_mud(url.to_string(), mud_json.as_str())?;
+    let mut data = parser::parse_mud(url.to_string(), mud_json.as_str())?;
+    data.acl_override = acl_override;
 
     // speichern in db
     let mud = MudDbo {
@@ -123,16 +125,6 @@ pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData>
 
     // return muddata
     Ok(data)
-}
-
-/// Basic HTTP(S)-GET wrapper to fetch MUD-URL Data
-async fn fetch_mud(url: &str) -> Result<String> {
-    let request = isahc::Request::builder()
-        .uri(url)
-        //.ssl_options(isahc::config::SslOption::DANGER_ACCEPT_INVALID_CERTS)
-        .body(())
-        .unwrap();
-    Ok(isahc::send_async(request).await?.text().await?)
 }
 
 /// Checks if the given string is an URL. Used to check if the MUD-Profile being created is local or needs to be fetched.
@@ -159,4 +151,28 @@ pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Vec<Acl>) -> M
 /// Generates an expiration date, which is far in the future. Mainly used for custom local MUD-Profiles
 pub fn get_custom_mud_expiration() -> DateTime<Utc> {
     Utc.from_utc_datetime(&NaiveDate::from_ymd(2060, 1, 31).and_hms(0, 0, 0))
+}
+
+pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
+    debug!("Update outdated profiles");
+    let mud_data = get_all_mud_expiration(&db_pool).await?;
+    let mud_vec: Vec<String> = mud_data
+        .into_iter()
+        .filter(|mud| mud.expiration < Utc::now().naive_utc())
+        .map(|mud| mud.url)
+        .collect();
+    if mud_vec.is_empty() {
+        return Ok(());
+    }
+    update_mud_urls(mud_vec, &db_pool).await?;
+    update_config_version(&db_pool).await
+}
+
+async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {
+    for mud_url in vec_url {
+        debug!("Try to update url: {}", mud_url);
+        let updated_mud = get_or_fetch_mud(&mud_url, db_pool).await?;
+        debug!("Updated mud profile: {:#?}", updated_mud);
+    }
+    Ok(())
 }

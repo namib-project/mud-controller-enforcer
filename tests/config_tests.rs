@@ -1,5 +1,28 @@
 mod lib;
-use namib_mud_controller::{models::Config, services::config_service};
+use namib_mud_controller::{
+    models::Config,
+    services::{config_service, config_service::ConfigKeys, firewall_configuration_service},
+};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_version() {
+    let ctx = lib::IntegrationTestContext::new("test_version").await;
+
+    config_service::set_config_value(ConfigKeys::Version.as_ref(), u64::MAX, &ctx.db_conn)
+        .await
+        .unwrap();
+
+    firewall_configuration_service::update_config_version(&ctx.db_conn)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        config_service::get_config_value::<u64>(ConfigKeys::Version.as_ref(), &ctx.db_conn)
+            .await
+            .unwrap(),
+        0
+    );
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_nothing() {
