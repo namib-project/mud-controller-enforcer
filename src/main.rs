@@ -36,7 +36,7 @@ lazy_static! {
 }
 
 fn app(conn: DbConnection) -> Result<()> {
-    actix_rt::System::new("main").block_on(async move {
+    actix_web::rt::System::new("main").block_on(async move {
         HttpServer::new(move || {
             let cors = Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {

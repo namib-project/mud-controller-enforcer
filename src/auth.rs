@@ -47,7 +47,7 @@ impl AuthToken {
 
     pub fn require_permission(&self, permission: Permission) -> Result<()> {
         for perm in &self.permissions {
-            if Pattern::new(perm)?.matches(&*permission.to_string()) {
+            if Pattern::new(perm)?.matches(permission.as_ref()) {
                 return Ok(());
             }
         }
