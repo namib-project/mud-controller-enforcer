@@ -4,6 +4,7 @@ use crate::{
     models::{Role, RoleDbo, User, UserDbo},
     services::role_service,
 };
+use chrono::Utc;
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
@@ -14,6 +15,7 @@ r#"select
 	, username
 	, password
 	, salt
+	, last_interaction
 	, (select group_concat(name) from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as "roles: Option<String>"
 	, (select group_concat(role_id) from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as "roles_ids: Option<String>"
 	, (select group_concat(permissions) from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as "permissions: Option<String>"
@@ -28,6 +30,7 @@ r#"select
 	, username
 	, password
 	, salt
+	, last_interaction
 	, (select string_agg(name, ',') from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles) as roles
 	, (select string_agg(role_id::text, ',') from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as roles_ids) as roles_ids
 	, (select string_agg(permissions, ',') from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id) as permissions) as permissions
@@ -43,6 +46,7 @@ from
             username: usr.username,
             password: usr.password,
             salt: usr.salt,
+            last_interaction: usr.last_interaction,
             roles: get_roles(&usr.roles_ids.unwrap_or_default(), &usr.roles.unwrap_or_default()),
             permissions: usr
                 .permissions
@@ -112,6 +116,7 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
         username: usr.username,
         password: usr.password,
         salt: usr.salt,
+        last_interaction: usr.last_interaction,
         permissions: roles
             .iter()
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
@@ -202,4 +207,13 @@ pub async fn delete(id: i64, conn: &DbConnection) -> Result<bool> {
 
 pub async fn get_all_roles(conn: &DbConnection) -> Result<Vec<RoleDbo>> {
     Ok(sqlx::query_as!(RoleDbo, "SELECT * FROM roles").fetch_all(conn).await?)
+}
+
+pub async fn update_last_interaction_stamp(id: i64, conn: &DbConnection) -> Result<bool> {
+    let utc_now = Utc::now().naive_utc();
+    let upd_count = sqlx::query!("UPDATE users SET last_interaction = $1 where id = $2", utc_now, id)
+        .execute(conn)
+        .await?;
+
+    Ok(upd_count.rows_affected() == 1)
 }

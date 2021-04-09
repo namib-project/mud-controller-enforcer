@@ -1,7 +1,12 @@
 use std::env;
 
-use crate::{error, error::Result, services::role_service::Permission};
-use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
+use crate::{
+    db::DbConnection,
+    error,
+    error::{Error, Result},
+    services::{role_service::Permission, user_service},
+};
+use actix_web::{dev, error::ErrorUnauthorized, web, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
 use glob::Pattern;
@@ -110,7 +115,15 @@ impl FromRequest for AuthToken {
     /// if invalid => will fail request with Unauthorized
     fn from_request(req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
         match extract_auth_from_request(req) {
-            Some(auth) => future::ok(auth),
+            Some(auth) => {
+                let pool = req.app_data::<web::Data<DbConnection>>().unwrap();
+                let runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
+                match runtime.block_on(user_service::update_last_interaction_stamp(auth.sub, pool)) {
+                    Ok(_) => {},
+                    Err(_) => {},
+                }
+                return future::ok(auth);
+            },
             None => future::err(ErrorUnauthorized("Unauthorized")),
         }
     }

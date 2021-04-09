@@ -6,6 +6,7 @@ use rand::{rngs::OsRng, Rng};
 use snafu::ensure;
 
 use crate::{error, error::Result};
+use chrono::NaiveDateTime;
 
 const SALT_LENGTH: usize = 32;
 
@@ -15,6 +16,7 @@ pub struct UserDbo {
     pub username: String,
     pub password: String,
     pub salt: Vec<u8>,
+    pub last_interaction: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -25,6 +27,7 @@ pub struct User {
     pub password: String,
     #[serde(skip_serializing)]
     pub salt: Vec<u8>,
+    pub last_interaction: NaiveDateTime,
     pub roles: Vec<Role>,
     pub permissions: Vec<String>,
 }
@@ -57,11 +60,14 @@ impl User {
         let mut salt = vec![0u8; SALT_LENGTH];
         OsRng::default().fill(salt.as_mut_slice());
 
+        let utc_now = chrono::Utc::now().naive_utc();
+
         Ok(Self {
             id: 0,
             username,
             password: User::hash_password(password, &salt)?,
             salt,
+            last_interaction: utc_now,
             roles: Vec::new(),
             permissions: Vec::new(),
         })

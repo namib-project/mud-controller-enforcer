@@ -105,11 +105,13 @@ pub async fn update_user_by_id(
     }
 
     let user_db = user_service::find_by_id(user_id.clone(), pool.get_ref()).await?;
+    let utc_now = chrono::Utc::now().naive_utc();
     let mut user = User {
         id: user_id.clone(),
         username: update_user_dto.username.clone(),
         password: user_db.password,
         salt: user_db.salt,
+        last_interaction: utc_now,
         roles: vec![],
         permissions: vec![],
     };
