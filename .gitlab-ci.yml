@@ -239,6 +239,8 @@ build_image_bcm2711_snapshot:
 build_openwrt_docker:
   stage: docker
   image: docker
+  only:
+    - master
   tags:
     - namib
     - privileged
