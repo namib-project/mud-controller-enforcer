@@ -85,6 +85,8 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
             .collect::<io::Result<_>>()?;
         enforcer
             .client
+            .as_ref()
+            .expect("RPC client of enforcer must be initialised before starting log watcher.")
             .send_logs(rpc_client::current_rpc_context(), lines)
             .await
     })?;

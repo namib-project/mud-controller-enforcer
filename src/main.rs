@@ -28,8 +28,8 @@ mod uci;
 const DEFAULT_CONFIG_STATE_FILE: &str = "/etc/namib/state.json";
 
 pub struct Enforcer {
-    pub client: NamibRpcClient,
-    pub addr: SocketAddr,
+    pub client: Option<NamibRpcClient>,
+    pub addr: Option<SocketAddr>,
     pub config: EnforcerConfig,
 }
 
@@ -107,32 +107,56 @@ async fn main() -> Result<()> {
         },
     };
 
-    let (client, addr) = rpc::rpc_client::run().await?;
-
     // Restore enforcer config if persisted file could be restored, otherwise wait for the enforcer
     // to provide an initial configuration.
-    let config = if let Some(config) = config {
+    // Create enforcer instance with provided RPC Client if initial config has been retrieved, with no RPC Client (yet) otherwise.
+    let enforcer = if let Some(config) = config {
         info!("Successfully restored last persisted config");
-        config
+        Arc::new(RwLock::new(Enforcer {
+            client: None,
+            addr: None,
+            config,
+        }))
     } else {
         info!("Retrieving initial config from NAMIB Controller");
+        let (client, addr) = rpc::rpc_client::run().await?;
         let config = client
             .heartbeat(current_rpc_context(), None)
             .await?
             .expect("no initial config sent from controller");
         persist_config(&config).await;
         info!("Successfully retrieved initial configuration from NAMIB controller");
-        config
+        Arc::new(RwLock::new(Enforcer {
+            client: Some(client),
+            addr: Some(addr),
+            config,
+        }))
     };
-    apply_secure_name_config(&config.secure_name(), addr)?;
 
-    let enforcer: Arc<RwLock<Enforcer>> = Arc::new(RwLock::new(Enforcer { client, addr, config }));
-
+    // Instantiate DNS resolver service.
     let mut dns_service = services::dns::DnsService::new().unwrap();
 
+    // Instantiate firewall service with DNS watcher.
     let watcher = dns_service.create_watcher();
     let fw_service = Arc::new(FirewallService::new(enforcer.clone(), watcher));
     fw_service.apply_current_config().await?;
+
+    // If the RPC client was not already retrieved while getting the initial config, get it now.
+    if enforcer.read().await.client.is_none() {
+        let (client, addr) = rpc::rpc_client::run().await?;
+        let mut enf_lock = enforcer.write().await;
+        enf_lock.client = Some(client);
+        enf_lock.addr = Some(addr);
+    }
+
+    // Enforcer is now guaranteed to have an RPC client and a server address.
+    {
+        let enforcer_read_lock = enforcer.read().await;
+        apply_secure_name_config(
+            &enforcer_read_lock.config.secure_name(),
+            enforcer_read_lock.addr.unwrap(),
+        )?;
+    }
 
     let heartbeat_task = rpc::rpc_client::heartbeat(enforcer.clone(), fw_service.clone());
 

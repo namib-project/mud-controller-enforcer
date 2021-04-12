@@ -20,6 +20,13 @@ mod unix {
 
     /// Listens for DHCP events supplied by the dnsmasq hook script and call relevant handle function.
     pub async fn listen_for_dhcp_events(enforcer: Arc<RwLock<Enforcer>>) {
+        debug!("Starting DHCP event listener");
+        enforcer
+            .read()
+            .await
+            .client
+            .as_ref()
+            .expect("RPC client of enforcer must be initialised before starting DHCP event watcher.");
         match std::fs::remove_file("/tmp/namib_dhcp.sock") {
             Ok(_) => Ok(()),
             Err(e) => match e.kind() {
@@ -49,6 +56,8 @@ mod unix {
                 let enforcer = enforcer.read().await;
                 enforcer
                     .client
+                    .as_ref()
+                    .expect("RPC client of enforcer must be initialised before starting DHCP event watcher.")
                     .dhcp_request(current_rpc_context(), dhcp_event)
                     .await
                     .unwrap();

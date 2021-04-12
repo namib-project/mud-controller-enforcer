@@ -1,5 +1,4 @@
 use core::pin::Pin;
-use regex::internal::Inst;
 use std::{
     cmp::{max, Ordering},
     collections::{BinaryHeap, HashMap, HashSet},
