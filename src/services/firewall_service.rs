@@ -102,11 +102,12 @@ impl FirewallService {
         self.dns_watcher.clear_watched_names().await;
         self.convert_config_to_nftnl_commands(&mut batch, &config).await?;
         let batch = batch.finalize();
-        // TODO proper error handling
         if crate::services::skip_send_and_process() {
             warn!("skipping send and process of nft batch");
         } else {
-            send_and_process(&batch).unwrap();
+            if let Err(e) = send_and_process(&batch) {
+                warn!("Error sending firewall configuration to netfilter: {:?}", e);
+            }
         }
 
         Ok(())
