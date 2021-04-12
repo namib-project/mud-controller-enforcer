@@ -211,6 +211,8 @@ build_image_bcm2711_snapshot:
 .openwrt_image_base:
   stage: imagebuilder
   before_script: []
+  only:
+    - master
   script:
     - cd /home/build/openwrt
     - cp -r ${CI_PROJECT_DIR}/openwrt_image/files files
