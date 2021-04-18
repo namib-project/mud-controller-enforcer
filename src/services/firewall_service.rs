@@ -6,10 +6,13 @@ use std::{
 };
 
 #[cfg(feature = "nftables")]
-use namib_shared::firewall_config::{EnforcerConfig, Protocol, RuleTargetHost, Verdict};
+use namib_shared::{
+    firewall_config::{Protocol, RuleTargetHost, Verdict},
+    EnforcerConfig,
+};
 #[cfg(feature = "nftables")]
 use nftnl::{
-    expr::{IcmpCode, RejectionType, Verdict},
+    expr::{IcmpCode, RejectionType, Verdict as VerdictExpr},
     nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
 };
 use tokio::{
@@ -356,9 +359,8 @@ impl FirewallService {
                         // Set verdict if current rule matches.
                         match rule_spec.verdict {
                             Verdict::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
-                            Verdict::Reject => {
-                                current_rule.add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
-                            },
+                            Verdict::Reject => current_rule
+                                .add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited))),
                             Verdict::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
                         }
                         batch.add(&current_rule, nftnl::MsgType::Add);
