@@ -1,4 +1,4 @@
-use crate::MacAddr;
+use crate::macaddr::SerdeMacAddr;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -128,13 +128,14 @@ pub struct DhcpLeaseInformation {
     pub lease_expiry: LeaseExpiryTime,
     pub time_remaining: Duration,
     pub receiver_interface: Option<String>,
-    pub mac_address: Option<MacAddr>,
+    pub mac_address: Option<SerdeMacAddr>,
     pub mud_url: Option<String>,
     pub tags: Vec<String>,
     pub hostname: Option<String>,
 }
 
 impl DhcpLeaseInformation {
+    /// Return the `Ipv4` or `Ipv6` address of this Dhcp Lease
     pub fn ip_addr(&self) -> IpAddr {
         match &self.version_specific_information {
             DhcpLeaseVersionSpecificInformation::V4(info) => info.ip_addr.into(),
@@ -142,6 +143,7 @@ impl DhcpLeaseInformation {
         }
     }
 
+    /// Return the `DUID` that is contained in `DHCPv6` requests
     pub fn duid(&self) -> Option<&Duid> {
         match &self.version_specific_information {
             DhcpLeaseVersionSpecificInformation::V6(info) => Some(&info.duid),

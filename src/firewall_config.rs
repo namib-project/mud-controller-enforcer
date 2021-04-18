@@ -8,11 +8,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// This file represent the config for firewall on openwrt.
 ///
-/// Created on 11.11.2020.
-///
 /// @author Namib Group 3.
 
-/// Represent the name of the Config.
+/// Represents a name of a Rule.
 #[derive(Eq, PartialEq, Clone, Debug, Hash, Deserialize, Serialize)]
 pub struct RuleName(String);
 
@@ -23,26 +21,28 @@ impl RuleName {
     }
 }
 
+/// Represents a target host for a firewall rule
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
-pub enum NetworkHost {
+pub enum RuleTargetHost {
     Ip(IpAddr),
     Hostname(String),
     FirewallDevice,
 }
 
-/// Struct for src and dest configs
+/// Represents a src or dst target for a firewall rule
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
-pub struct NetworkConfig {
-    pub host: Option<NetworkHost>,
+pub struct RuleTarget {
+    pub host: Option<RuleTargetHost>,
     pub port: Option<String>,
 }
 
-impl NetworkConfig {
-    pub fn new(host: Option<NetworkHost>, port: Option<String>) -> NetworkConfig {
-        NetworkConfig { host, port }
+impl RuleTarget {
+    pub fn new(host: Option<RuleTargetHost>, port: Option<String>) -> RuleTarget {
+        RuleTarget { host, port }
     }
 }
 
+/// Protocols that a rule should apply to.
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum Protocol {
     Tcp,
@@ -50,34 +50,33 @@ pub enum Protocol {
     All,
 }
 
-/// Enum for the target: ACCEPT, REJECT and DROP.
+/// Verdict that the firewall shall perform for a given rule.
 #[derive(Eq, Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub enum Target {
+pub enum Verdict {
     Accept,
     Reject,
     Drop,
 }
 
-/// This struct contains the main configuration which is needed for firewall rules.
+/// A single firewall rule entry.
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
     pub rule_name: RuleName,
-    pub src: NetworkConfig,
-    pub dst: NetworkConfig,
+    pub src: RuleTarget,
+    pub dst: RuleTarget,
     pub protocol: Protocol,
-    pub target: Target,
+    pub verdict: Verdict,
 }
 
 impl FirewallRule {
-    /// Create a new `ConfigFirewall`.
-    /// Takes `RuleName`, `EnRoute` with `EnNetwork`, `Protocol` and `EnTarget`.
-    pub fn new(rule_name: RuleName, src: NetworkConfig, dst: NetworkConfig, protocol: Protocol, target: Target) -> FirewallRule {
+    /// Create a new `FirewallRule`.
+    pub fn new(rule_name: RuleName, src: RuleTarget, dst: RuleTarget, protocol: Protocol, verdict: Verdict) -> FirewallRule {
         FirewallRule {
             rule_name,
             src,
             dst,
             protocol,
-            target,
+            verdict,
         }
     }
 
@@ -94,6 +93,7 @@ impl FirewallRule {
     }
 }
 
+/// Represents a device that is regulated by the firewall.
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallDevice {
     pub id: i64,
@@ -101,33 +101,4 @@ pub struct FirewallDevice {
     pub ipv6_addr: Option<Ipv6Addr>,
     pub rules: Vec<FirewallRule>,
     pub collect_data: bool,
-}
-
-/// Stores a set of firewall rules and a config version
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct EnforcerConfig {
-    version: String,
-    devices: Vec<FirewallDevice>,
-    secure_name: String,
-}
-
-impl EnforcerConfig {
-    /// Construct a new firewall config with the given version and firewall rules
-    pub fn new(version: String, devices: Vec<FirewallDevice>, secure_name: String) -> Self {
-        EnforcerConfig { version, devices, secure_name }
-    }
-
-    /// Returns the version of this config
-    pub fn version(&self) -> &str {
-        &self.version
-    }
-
-    /// Returns a reference to the firewall rules in this config
-    pub fn devices(&self) -> &[FirewallDevice] {
-        &self.devices
-    }
-
-    pub fn secure_name(&self) -> &str {
-        &self.secure_name
-    }
 }

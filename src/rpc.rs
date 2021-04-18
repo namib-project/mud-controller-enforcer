@@ -1,7 +1,11 @@
 #![allow(clippy::large_enum_variant)]
 
-use crate::{firewall_config::EnforcerConfig, models::DhcpEvent};
+use crate::{models::DhcpEvent, EnforcerConfig};
 
+/// This is the interface for communication between enforcer & controller
+///
+/// All types implementing `serde::Serializable` can be transferred,
+/// however function calls can only be made by the enforcer.
 #[tarpc::service]
 pub trait NamibRpc {
     async fn heartbeat(version: Option<String>) -> Option<EnforcerConfig>;
