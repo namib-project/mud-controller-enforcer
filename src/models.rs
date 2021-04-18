@@ -96,7 +96,14 @@ impl ToString for Duid {
             Duid::En(c) => (String::from("00:02"), c),
             Duid::Ll(c) => (String::from("00:03"), c),
             Duid::Uuid(c) => (String::from("00:04"), c),
-            Duid::Other(t, c) => (format!("{}:{}", hex::encode(slice::from_ref(&t[0])), hex::encode(slice::from_ref(&t[1]))), c),
+            Duid::Other(t, c) => (
+                format!(
+                    "{}:{}",
+                    hex::encode(slice::from_ref(&t[0])),
+                    hex::encode(slice::from_ref(&t[1]))
+                ),
+                c,
+            ),
         };
         for b in c {
             result.push_str(format!(":{}", hex::encode(slice::from_ref(b))).as_str());

@@ -1,10 +1,10 @@
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
 #![allow(clippy::must_use_candidate, clippy::default_trait_access)]
 
+use serde::{Deserialize, Serialize};
 use tokio_serde::formats::Cbor;
 
 use crate::firewall_config::FirewallDevice;
-use serde::{Deserialize, Serialize};
 
 pub mod firewall_config;
 pub mod macaddr;

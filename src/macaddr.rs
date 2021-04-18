@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-
 use core::fmt;
+
 pub use macaddr::*;
+use serde::{Deserialize, Serialize};
 
 /// A serializable `MacAddr` for rpc communication
 ///

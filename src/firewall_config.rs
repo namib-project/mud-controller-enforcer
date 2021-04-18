@@ -1,10 +1,10 @@
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// This file represent the config for firewall on openwrt.
 ///
@@ -70,7 +70,13 @@ pub struct FirewallRule {
 
 impl FirewallRule {
     /// Create a new `FirewallRule`.
-    pub fn new(rule_name: RuleName, src: RuleTarget, dst: RuleTarget, protocol: Protocol, verdict: Verdict) -> FirewallRule {
+    pub fn new(
+        rule_name: RuleName,
+        src: RuleTarget,
+        dst: RuleTarget,
+        protocol: Protocol,
+        verdict: Verdict,
+    ) -> FirewallRule {
         FirewallRule {
             rule_name,
             src,
