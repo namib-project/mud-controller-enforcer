@@ -1,6 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use crate::error::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use paperclip::{
     actix::Apiv2Schema,
@@ -9,6 +8,8 @@ use paperclip::{
         schema::Apiv2Schema,
     },
 };
+
+use crate::error::Result;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MudDboRefresh {
@@ -138,8 +139,9 @@ pub enum AclDirection {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn expect_port_json() {

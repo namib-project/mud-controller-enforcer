@@ -1,12 +1,14 @@
-use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
+use std::env;
+
 use backoff::{backoff::Backoff, future::retry, ExponentialBackoff};
 use lazy_static::lazy_static;
 use neo4things_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Description, Thing},
 };
-use std::env;
 use tokio::time::Duration;
+
+use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
 
 lazy_static! {
     /// The configuration for connecting to the neo4jthings service.

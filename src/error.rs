@@ -1,10 +1,11 @@
 #![allow(clippy::pub_enum_variant_names, clippy::module_name_repetitions)]
 
 use actix_web::http::StatusCode;
-use namib_shared::mac::ParseError;
+use namib_shared::macaddr::ParseError;
 use paperclip::actix::{api_v2_errors, web::HttpResponse};
 use snafu::{Backtrace, Snafu};
 
+/// Represents any error that can occur during runtime
 #[api_v2_errors(code = 401, code = 403, code = 500)]
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -100,6 +101,7 @@ pub enum Error {
     MudFileInvalid { backtrace: Backtrace },
 }
 
+/// A failable action
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn none_error() -> Error {

@@ -1,5 +1,12 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use actix_web::http::StatusCode;
+use chrono::Utc;
+use paperclip::actix::{
+    api_v2_operation, web,
+    web::{HttpResponse, Json},
+};
+
 use crate::{
     auth::AuthToken,
     db::DbConnection,
@@ -8,12 +15,6 @@ use crate::{
     models::{MudData, MudDbo},
     routes::dtos::{MudCreationDto, MudQueryDto, MudUpdateDto, MudUpdateQueryDto},
     services::{firewall_configuration_service, mud_service, mud_service::is_url, role_service::Permission},
-};
-use actix_web::http::StatusCode;
-use chrono::Utc;
-use paperclip::actix::{
-    api_v2_operation, web,
-    web::{HttpResponse, Json},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {

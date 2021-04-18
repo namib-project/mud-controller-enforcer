@@ -7,7 +7,7 @@ use crate::{
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
-    #[cfg(feature = "sqlite")]
+    #[cfg(not(feature = "postgres"))]
     let usrs = sqlx::query!(
 r#"select
 	u.id as user_id
@@ -123,7 +123,7 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
-    #[cfg(feature = "sqlite")]
+    #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
         user.username,

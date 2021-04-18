@@ -1,3 +1,5 @@
+use paperclip::actix::{api_v2_operation, web, web::Json};
+
 use crate::{
     db::DbConnection,
     error::Result,
@@ -5,7 +7,6 @@ use crate::{
     services::{acme_service, config_service, config_service::ConfigKeys, user_service},
     VERSION,
 };
-use paperclip::actix::{api_v2_operation, web, web::Json};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_status));

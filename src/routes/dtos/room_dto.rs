@@ -1,7 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use crate::models::Room;
 use paperclip::actix::Apiv2Schema;
+
+use crate::models::Room;
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema, PartialEq)]
 pub struct RoomDto {

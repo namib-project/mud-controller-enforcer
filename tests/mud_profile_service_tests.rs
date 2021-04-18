@@ -2,9 +2,8 @@ mod lib;
 
 use std::{fs::File, io::Read};
 
-use chrono::{Duration, NaiveDateTime, Timelike, Utc};
-
 use actix_web::web;
+use chrono::{Duration, NaiveDateTime, Timelike, Utc};
 use namib_mud_controller::{
     auth::AuthToken,
     error::Result,

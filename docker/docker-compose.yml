@@ -39,8 +39,6 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
-    environment:
-      SKIP_SEND_AND_PROCESS: 1
     ports:
       - 5480:80
     networks:

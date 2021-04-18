@@ -1,3 +1,10 @@
+use std::net::IpAddr;
+
+use namib_shared::{
+    firewall_config::{FirewallDevice, FirewallRule, Protocol, RuleName, RuleTarget, RuleTargetHost, Verdict},
+    EnforcerConfig,
+};
+
 use crate::{
     db::DbConnection,
     error::Result,
@@ -7,10 +14,6 @@ use crate::{
         config_service::{get_config_value, set_config_value, ConfigKeys},
     },
 };
-use namib_shared::firewall_config::{
-    EnforcerConfig, FirewallDevice, FirewallRule, NetworkConfig, NetworkHost, Protocol, RuleName, Target,
-};
-use std::net::IpAddr;
 
 pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
@@ -65,15 +68,15 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
                 },
             };
             let target = match ace.action {
-                AceAction::Accept => Target::Accept,
-                AceAction::Deny => Target::Reject,
+                AceAction::Accept => Verdict::Accept,
+                AceAction::Deny => Verdict::Reject,
             };
 
-            let route_network_fw_device = NetworkConfig::new(Some(NetworkHost::FirewallDevice), None);
+            let route_network_fw_device = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None);
             if let Some(dns_name) = &ace.matches.dnsname {
                 let route_network_remote_host = match dns_name.parse::<IpAddr>() {
-                    Ok(addr) => NetworkConfig::new(Some(NetworkHost::Ip(addr)), None),
-                    Err(_) => NetworkConfig::new(Some(NetworkHost::Hostname(dns_name.clone())), None),
+                    Ok(addr) => RuleTarget::new(Some(RuleTargetHost::Ip(addr)), None),
+                    Err(_) => RuleTarget::new(Some(RuleTargetHost::Hostname(dns_name.clone())), None),
                 };
 
                 let (route_network_src, route_network_dest) = match acl.packet_direction {
@@ -94,18 +97,18 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
     }
     result.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", index)),
-        NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
-        NetworkConfig::new(None, None),
+        RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+        RuleTarget::new(None, None),
         Protocol::All,
-        Target::Reject,
+        Verdict::Reject,
     ));
     index += 1;
     result.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", index)),
-        NetworkConfig::new(None, None),
-        NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+        RuleTarget::new(None, None),
+        RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
         Protocol::All,
-        Target::Reject,
+        Verdict::Reject,
     ));
 
     FirewallDevice {
@@ -134,12 +137,10 @@ pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-
     use namib_shared::mac;
 
-    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
-
     use super::*;
+    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
 
     #[test]
     fn test_acl_merging() -> Result<()> {
@@ -328,24 +329,24 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
-                    NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
-                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::Udp,
-                    Target::Reject,
+                    Verdict::Reject,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
-                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
-                    NetworkConfig::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
                     Protocol::All,
-                    Target::Reject,
+                    Verdict::Reject,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
-                    NetworkConfig::new(None, None),
-                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
-                    Target::Reject,
+                    Verdict::Reject,
                 ),
             ],
             collect_data: false,
@@ -418,24 +419,24 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
-                    NetworkConfig::new(Some(NetworkHost::Hostname(String::from("www.example.test"))), None),
-                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::Tcp,
-                    Target::Accept,
+                    Verdict::Accept,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
-                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
-                    NetworkConfig::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
                     Protocol::All,
-                    Target::Reject,
+                    Verdict::Reject,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
-                    NetworkConfig::new(None, None),
-                    NetworkConfig::new(Some(NetworkHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
-                    Target::Reject,
+                    Verdict::Reject,
                 ),
             ],
             collect_data: true,

@@ -17,7 +17,7 @@ impl IntegrationTestContext {
         dotenv().ok();
         env_logger::try_init().ok();
 
-        #[cfg(feature = "sqlite")]
+        #[cfg(not(feature = "postgres"))]
         let db_url = "sqlite::memory:".to_string();
 
         #[cfg(feature = "postgres")]
@@ -44,7 +44,7 @@ impl IntegrationTestContext {
             .await
             .expect("Couldn't establish connection pool for database");
 
-        #[cfg(feature = "sqlite")]
+        #[cfg(not(feature = "postgres"))]
         migrate!("migrations/sqlite")
             .run(&db_conn)
             .await

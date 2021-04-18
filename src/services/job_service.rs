@@ -1,10 +1,12 @@
+use std::time::Duration;
+
+use clokwerk::{Scheduler, TimeUnits};
+use tokio::time::sleep;
+
 use crate::{
     db::DbConnection,
     services::{acme_service, mud_service},
 };
-use clokwerk::{Scheduler, TimeUnits};
-use std::time::Duration;
-use tokio::time::sleep;
 
 /// Create new job scheduler that update the expired mud profiles.
 /// conn is the current database connection.

@@ -1,9 +1,11 @@
-use crate::{error, error::Result};
+use std::time::Duration;
+
 use encoding_rs::{CoderResult, Encoding, UTF_8};
 use mime::Mime;
 use reqwest::redirect::Policy;
 use snafu::ensure;
-use std::time::Duration;
+
+use crate::{error, error::Result};
 
 const TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;

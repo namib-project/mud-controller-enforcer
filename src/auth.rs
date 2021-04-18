@@ -1,6 +1,5 @@
 use std::env;
 
-use crate::{error, error::Result, services::role_service::Permission};
 use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
@@ -8,6 +7,8 @@ use glob::Pattern;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
+
+use crate::{error, error::Result, services::role_service::Permission};
 
 static HEADER_PREFIX: &str = "Bearer ";
 

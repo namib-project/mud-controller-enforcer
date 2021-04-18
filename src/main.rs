@@ -1,4 +1,4 @@
-#![warn(clippy::all, clippy::style, clippy::pedantic)]
+#![warn(clippy::all, clippy::pedantic)]
 #![allow(
     dead_code,
     clippy::manual_range_contains,
@@ -7,12 +7,12 @@
     clippy::default_trait_access,
     clippy::similar_names,
     clippy::redundant_else,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
     clippy::must_use_candidate,
     clippy::cast_possible_truncation,
     clippy::option_if_let_else
 )]
+
+use std::{env, time::Duration};
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
@@ -28,7 +28,6 @@ use namib_mud_controller::{
     VERSION,
 };
 use paperclip::actix::{web, OpenApiExt};
-use std::{env, time::Duration};
 use tokio::try_join;
 
 lazy_static! {
@@ -37,6 +36,15 @@ lazy_static! {
 
 fn app(conn: DbConnection) -> Result<()> {
     actix_web::rt::System::new("main").block_on(async move {
+        let http_port = env::var("HTTP_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(8000u16);
+        let https_port = env::var("HTTPS_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(9000u16);
+        let tls_config = acme_service::server_config();
         HttpServer::new(move || {
             let cors = Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {
@@ -113,17 +121,10 @@ fn app(conn: DbConnection) -> Result<()> {
                         .redirect_to_slash_directory(),
                 )
         })
-        .bind(format!(
-            "0.0.0.0:{}",
-            env::var("HTTP_PORT").unwrap_or_else(|_| "8000".to_string())
-        ))?
-        .bind_rustls(
-            format!(
-                "0.0.0.0:{}",
-                env::var("HTTPS_PORT").unwrap_or_else(|_| "9000".to_string())
-            ),
-            acme_service::server_config(),
-        )?
+        .bind(("::", http_port))?
+        .bind(("0.0.0.0", http_port))?
+        .bind_rustls(("::", https_port), tls_config.clone())?
+        .bind_rustls(("0.0.0.0", https_port), tls_config)?
         .run()
         .await?;
 

@@ -1,6 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
+use actix_web::{http::StatusCode, HttpResponse};
 use paperclip::actix::{api_v2_operation, web, web::Json};
+use snafu::ensure;
 use validator::Validate;
 
 use crate::{
@@ -17,8 +19,6 @@ use crate::{
         config_service, config_service::ConfigKeys, role_service::Permission, user_config_service, user_service,
     },
 };
-use actix_web::{http::StatusCode, HttpResponse};
-use snafu::ensure;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/signup", web::post().to(signup));

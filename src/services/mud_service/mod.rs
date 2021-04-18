@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use url::Url;
 
 use crate::{
     db::DbConnection,
@@ -6,7 +7,6 @@ use crate::{
     models::{Acl, MudData, MudDbo, MudDboRefresh},
     services::{firewall_configuration_service::update_config_version, mud_service::fetch::fetch_mud},
 };
-use url::Url;
 
 mod fetch;
 pub mod json_models;

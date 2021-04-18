@@ -1,16 +1,18 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use actix_web::{http::StatusCode, HttpResponse};
 use paperclip::actix::{api_v2_operation, web, web::Json};
 use validator::Validate;
 
-use crate::{auth::AuthToken, db::DbConnection, error, error::Result, services::role_service::Permission};
-
 use crate::{
+    auth::AuthToken,
+    db::DbConnection,
+    error,
+    error::Result,
     models::User,
     routes::dtos::{MgmCreateUserDto, MgmUpdateUserBasicDto},
-    services::{role_service, user_service},
+    services::{role_service, role_service::Permission, user_service},
 };
-use actix_web::{http::StatusCode, HttpResponse};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/", web::get().to(get_all_users));

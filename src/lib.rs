@@ -1,4 +1,4 @@
-#![warn(clippy::all, clippy::style, clippy::pedantic)]
+#![warn(clippy::all, clippy::pedantic)]
 #![allow(
     dead_code,
     clippy::manual_range_contains,
@@ -7,8 +7,6 @@
     clippy::default_trait_access,
     clippy::similar_names,
     clippy::redundant_else,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
     clippy::must_use_candidate,
     clippy::cast_possible_truncation,
     clippy::option_if_let_else
@@ -28,6 +26,7 @@ pub mod models;
 pub mod routes;
 pub mod rpc_server;
 pub mod services;
+pub mod util;
 
 #[cfg(not(debug_assertions))]
 const GIT_BRANCH: &str = env!("CI_COMMIT_REF_SLUG");

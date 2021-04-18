@@ -3,35 +3,34 @@ name = "namib_mud_controller"
 version = "0.0.1"
 authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
+resolver = "2"
 
 [features]
-default = ["sqlite"]
+default = ["sqlx/sqlite"]
 postgres = ["sqlx/postgres"]
-sqlite = ["sqlx/sqlite"]
 
 [dependencies]
 actix-web = { version = "^3.3.2", features = ["rustls"] }
 actix-files = "^0.5.0"
 actix-cors = "^0.5.4"
 actix-ratelimit = { version = "^0.3.1", default-features = false, features = ["memory"] }
-sqlx = { version = "^0.5.1", features = ["runtime-tokio-rustls", "chrono", "offline"] }
-namib_shared = { tag = "0.4.6", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+sqlx = { version = "^0.5.2", features = ["runtime-tokio-rustls", "chrono", "offline"] }
+namib_shared = { tag = "0.5.1", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "^0.4.14"
 env_logger = "^0.8.3"
-tokio = { version = "^1.4.0", features = ["full"] }
+tokio = { version = "^1.5.0", features = ["rt-multi-thread", "fs", "macros"] }
 async-dnssd = { branch = "fix_windows_build", git = "https://github.com/namib-project/rust-async-dnssd" }
-futures = "^0.3.13"
-rustls = "^0.19.0"
+futures = "^0.3.14"
+rustls = "^0.19.1"
 rustls_18 = { version = "^0.18.1", package = "rustls" }
-reqwest = { version = "^0.11.2", default-features = false, features = ["rustls-tls-native-roots", "blocking", "gzip"] }
+reqwest = { version = "^0.11.3", default-features = false, features = ["rustls-tls-native-roots", "blocking", "gzip"] }
 mime = "^0.3.16"
 encoding_rs = "^0.8.28"
 tokio-rustls = "^0.22.0"
-tokio-util = "^0.6.5"
+tokio-util = "^0.6.6"
 tokio-serde = "^0.8.0"
 tokio-stream = { version = "^0.1.5", features = ["net"] }
-tarpc = { branch = "replace_u128_traceid", git = "https://github.com/namib-project/tarpc", features = ["full"] }
-pin-project = "^1.0.6"
+pin-project = "^1.0.7"
 rand = "^0.8.3"
 rust-argon2 = "^0.8.3"
 serde = { version = "^1.0.125", features = ["derive"] }

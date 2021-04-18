@@ -1,15 +1,13 @@
-use namib_shared::models::DhcpLeaseInformation;
+use std::net::{Ipv4Addr, Ipv6Addr};
+
+use namib_shared::{macaddr::SerdeMacAddr, models::DhcpLeaseInformation};
 
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{Device, DeviceDbo},
+    models::{Device, DeviceDbo, DeviceWithRefs},
     services::{config_service, config_service::ConfigKeys, firewall_configuration_service, neo4things_service},
 };
-
-use crate::models::DeviceWithRefs;
-use namib_shared::MacAddr;
-use std::net::{Ipv4Addr, Ipv6Addr};
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
     debug!("dhcp request device mud file: {:?}", lease_info.mud_url);
@@ -84,7 +82,7 @@ pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
 }
 
 pub async fn find_by_mac_or_duid(
-    mac_addr: Option<MacAddr>,
+    mac_addr: Option<SerdeMacAddr>,
     duid: Option<String>,
     pool: &DbConnection,
 ) -> Result<Device> {
@@ -112,7 +110,7 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
     let ipv6_addr = device_data.ipv6_addr.map(|ip| ip.to_string());
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
 
-    #[cfg(feature = "sqlite")]
+    #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
         device_data.name,

@@ -1,5 +1,6 @@
-use crate::{db::DbConnection, error, error::Result, models::Config};
 use std::str::FromStr;
+
+use crate::{db::DbConnection, error, error::Result, models::Config};
 
 #[derive(strum::AsRefStr)]
 pub enum ConfigKeys {

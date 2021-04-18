@@ -1,5 +1,13 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use actix_web::http::StatusCode;
+use futures::{stream, StreamExt, TryStreamExt};
+use paperclip::actix::{
+    api_v2_operation, web,
+    web::{HttpResponse, Json},
+};
+use validator::Validate;
+
 use crate::{
     auth::AuthToken,
     db::DbConnection,
@@ -9,13 +17,6 @@ use crate::{
     routes::dtos::{DeviceCreationUpdateDto, DeviceDto, GuessDto},
     services::{device_service, neo4things_service, role_service::Permission},
 };
-use actix_web::http::StatusCode;
-use futures::{stream, StreamExt, TryStreamExt};
-use paperclip::actix::{
-    api_v2_operation, web,
-    web::{HttpResponse, Json},
-};
-use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));

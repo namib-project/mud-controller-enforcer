@@ -1,5 +1,9 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use actix_web::{http::StatusCode, HttpResponse};
+use paperclip::actix::{api_v2_operation, web, web::Json};
+use validator::Validate;
+
 use crate::{
     auth::AuthToken,
     db::DbConnection,
@@ -8,9 +12,6 @@ use crate::{
     routes::dtos::{RoleAssignDto, RoleDto, RoleUpdateDto},
     services::role_service::{self, Permission},
 };
-use actix_web::{http::StatusCode, HttpResponse};
-use paperclip::actix::{api_v2_operation, web, web::Json};
-use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/", web::get().to(get_roles));

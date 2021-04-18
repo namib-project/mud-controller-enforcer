@@ -1,8 +1,14 @@
-use crate::error::{self, Result};
+use std::{
+    env, fmt,
+    fs::File,
+    io::Read,
+    net::ToSocketAddrs,
+    sync::{Arc, RwLock},
+};
+
 use acme_lib::{create_rsa_key, persist::FilePersist, Account, Directory, DirectoryUrl};
 use get_if_addrs::get_if_addrs;
 use lazy_static::lazy_static;
-use namib_shared::open_file_with;
 use regex::{Captures, Regex};
 use reqwest::{Certificate, Identity};
 use rustls_18::{
@@ -11,12 +17,10 @@ use rustls_18::{
 };
 use sha3::{Digest, Sha3_224};
 use snafu::ensure;
-use std::{
-    env, fmt,
-    fs::File,
-    io::Read,
-    net::ToSocketAddrs,
-    sync::{Arc, RwLock},
+
+use crate::{
+    error::{self, Result},
+    util::open_file_with,
 };
 
 /// `CertId` contains the url-safe base64-encoded sha1-hash of a certificate and may be regarded as a unique identifier for a Namib service.
