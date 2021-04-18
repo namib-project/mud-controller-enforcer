@@ -1,6 +1,7 @@
 *.pem
 *.pfx
 !certs/namib-ca.pem
+state.json
 
 config
 

@@ -4,6 +4,7 @@ version = "0.0.1"
 authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
 edition = "2018"
 default-run = "namib_enforcer"
+resolver = "2"
 
 [features]
 default = ["uci", "nftables"]
@@ -12,15 +13,14 @@ nftables = ["nftnl", "mnl", "libc"]
 dnsmasq_hook = []
 
 [dependencies]
-namib_shared = { tag = "0.4.6", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
-tokio = { version = "1.2", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
+namib_shared = { tag = "0.5.1", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+tokio = { version = "1.5", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
 log = "0.4"
 env_logger = "0.8"
 async-dnssd = { branch = "fix_windows_build", git = "https://github.com/namib-project/rust-async-dnssd" }
 futures = "0.3"
 tokio-native-tls = "0.3"
 tokio-util = "0.6"
-tarpc = { branch = "replace_u128_traceid", git = "https://github.com/namib-project/tarpc", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 pin-project = "1.0"
 tokio-serde = "0.8"
@@ -29,13 +29,12 @@ dotenv = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
 serde_json = "1.0"
-trust-dns-resolver = "0.20.0"
+trust-dns-resolver = "0.20"
 notify = "4"
-macaddr = { version = "1.0.1", features = ["serde_std"] }
-regex = "1.4.2"
+regex = "1.4"
 
 [dev-dependencies]
-serial_test = "0.5.1"
+serial_test = "0.5"
 
 [target.'cfg(unix)'.dependencies]
 rust-uci = { version = "0.1.0", optional = true }

@@ -1,13 +1,14 @@
-use core::pin::Pin;
 use std::{
     cmp::{max, Ordering},
     collections::{BinaryHeap, HashMap, HashSet},
     hash::{Hash, Hasher},
     net::IpAddr,
     ops::{Add, Deref},
+    pin::Pin,
     sync::Arc,
     time::Instant,
 };
+
 use tokio::sync::{Mutex, Notify, RwLock, RwLockWriteGuard};
 use trust_dns_resolver::{
     config::LookupIpStrategy, error::ResolveError, lookup_ip::LookupIp, AsyncResolver, TokioAsyncResolver,

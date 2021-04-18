@@ -1,11 +1,12 @@
-use crate::{error::Result, services::is_system_mode, uci::Uci};
 use std::net::SocketAddr;
+
+use crate::{error::Result, services::is_system_mode, uci::Uci};
 
 /// The folder where the configuration file should be stored.
 const CONFIG_DIR: &str = "config";
 const SAVE_DIR: &str = "/tmp/.uci_namib";
 
-pub(crate) fn apply_secure_name_config(secure_name: &str, controller_addr: SocketAddr) -> Result<()> {
+pub fn apply_secure_name_config(secure_name: &str, controller_addr: SocketAddr) -> Result<()> {
     let mut uci = Uci::new()?;
     if !is_system_mode() {
         uci.set_config_dir(CONFIG_DIR)?;

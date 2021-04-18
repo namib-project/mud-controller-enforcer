@@ -10,10 +10,9 @@ use std::{
 };
 
 use notify::{DebouncedEvent, RecursiveMode, Watcher};
+use tokio::{runtime::Builder, sync::RwLock};
 
 use crate::{error::Result, rpc::rpc_client, services, Enforcer};
-
-use tokio::{runtime::Builder, sync::RwLock};
 
 pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
     debug!("Starting dnsmasq.log watcher");
