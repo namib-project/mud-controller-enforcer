@@ -1,7 +1,7 @@
 edition = "2018"
 
 # Maximum width of each line
-max_width = 180
+max_width = 120
 
 # Use field initialize shorthand if possible.
 use_field_init_shorthand = true
@@ -13,10 +13,10 @@ match_block_trailing_comma = true
 error_on_line_overflow = false
 
 # Merge multiple imports into a single nested import.
-merge_imports = true
+imports_granularity = "Crate"
 
 # Reorder impl items. type and const are put first, then macros and methods.
 reorder_impl_items = true
 
 # Determines if + or = are wrapped in spaces in the punctuation of types
-type_punctuation_density="Compressed"
+type_punctuation_density = "Compressed"

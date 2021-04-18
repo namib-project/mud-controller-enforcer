@@ -11,6 +11,8 @@ pub mod macaddr;
 pub mod models;
 pub mod rpc;
 
+pub use tarpc;
+
 /// Returns the codec used for RPC communication
 pub fn codec<Item, SinkItem>() -> Cbor<Item, SinkItem> {
     Cbor::default()
@@ -27,7 +29,11 @@ pub struct EnforcerConfig {
 impl EnforcerConfig {
     /// Construct a new firewall config with the given version and firewall rules
     pub fn new(version: String, devices: Vec<FirewallDevice>, secure_name: String) -> Self {
-        EnforcerConfig { version, devices, secure_name }
+        EnforcerConfig {
+            version,
+            devices,
+            secure_name,
+        }
     }
 
     /// Returns the version of this config
