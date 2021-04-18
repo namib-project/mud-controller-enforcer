@@ -1,12 +1,14 @@
-use crate::macaddr::SerdeMacAddr;
-use chrono::{DateTime, FixedOffset};
-use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     slice,
     time::Duration,
 };
+
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
+
+use crate::macaddr::SerdeMacAddr;
 
 /// Represents a DHCP event provided by the DHCP server.
 ///
