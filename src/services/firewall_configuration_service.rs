@@ -137,7 +137,7 @@ pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use namib_shared::mac;
+    use namib_shared::macaddr::MacAddr;
 
     use super::*;
     use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
@@ -302,7 +302,7 @@ mod tests {
             inner: Device {
                 id: 0,
                 name: None,
-                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
                 duid: None,
                 ipv4_addr: "127.0.0.1".parse().ok(),
                 ipv6_addr: None,
@@ -392,7 +392,7 @@ mod tests {
             inner: Device {
                 id: 0,
                 name: None,
-                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<mac::MacAddr>().unwrap().into()),
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
                 duid: None,
                 ipv4_addr: "127.0.0.1".parse().ok(),
                 ipv6_addr: None,
