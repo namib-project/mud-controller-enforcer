@@ -51,6 +51,9 @@ async fn test_signup() -> Result<()> {
         "admin", 
         ROLE_ID_ADMIN
     ).fetch_one(&ctx.db_conn).await.unwrap().count;
+    #[cfg(feature = "postgres")]
+    assert_eq!(user_count.unwrap(), 1);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(user_count, 1);
 
     ctx.stop_test_server().await?;
@@ -79,6 +82,9 @@ async fn test_signup_missing_username() -> Result<()> {
         .await
         .unwrap()
         .count;
+    #[cfg(feature = "postgres")]
+    assert_eq!(user_count.unwrap(), 0);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(user_count, 0);
 
     ctx.stop_test_server().await?;
@@ -107,6 +113,9 @@ async fn test_signup_missing_password() -> Result<()> {
         .await
         .unwrap()
         .count;
+    #[cfg(feature = "postgres")]
+    assert_eq!(user_count.unwrap(), 0);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(user_count, 0);
 
     ctx.stop_test_server().await?;
@@ -136,6 +145,9 @@ async fn test_signup_already_created() -> Result<()> {
         .await
         .unwrap()
         .count;
+    #[cfg(feature = "postgres")]
+    assert_eq!(user_count.unwrap(), 0);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(user_count, 0);
 
     ctx.stop_test_server().await?;
@@ -313,7 +325,13 @@ async fn test_username_update() -> Result<()> {
     .unwrap()
     .count;
 
+    #[cfg(feature = "postgres")]
+    assert_eq!(old_name_count.unwrap(), 0);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(old_name_count, 0);
+    #[cfg(feature = "postgres")]
+    assert_eq!(new_name_count.unwrap(), 1);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(new_name_count, 1);
 
     let login_dto = LoginDto {
@@ -378,6 +396,9 @@ async fn test_username_update_none() -> Result<()> {
     .unwrap()
     .count;
 
+    #[cfg(feature = "postgres")]
+    assert_eq!(old_name_count.unwrap(), 1);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(old_name_count, 1);
 
     let login_dto = LoginDto {
@@ -582,6 +603,9 @@ async fn test_user_config_add_multiple_entries() -> Result<()> {
     .await
     .unwrap()
     .count;
+    #[cfg(feature = "postgres")]
+    assert_eq!(db_configs_count.unwrap(), 2);
+    #[cfg(not(feature = "postgres"))]
     assert_eq!(db_configs_count, 2);
 
     let db_config_1 = sqlx::query_as!(
