@@ -171,7 +171,7 @@ pub async fn update(user: &User, conn: &DbConnection) -> Result<bool> {
     Ok(upd_count.rows_affected() == 1)
 }
 
-pub async fn update_username(id: i64, username: &String, conn: &DbConnection) -> Result<bool> {
+pub async fn update_username(id: i64, username: &str, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!("UPDATE users SET username = $1 where id = $2", username, id)
         .execute(conn)
         .await?;
@@ -179,7 +179,7 @@ pub async fn update_username(id: i64, username: &String, conn: &DbConnection) ->
     Ok(upd_count.rows_affected() == 1)
 }
 
-pub async fn update_password(id: i64, password: &String, conn: &DbConnection) -> Result<bool> {
+pub async fn update_password(id: i64, password: &str, conn: &DbConnection) -> Result<bool> {
     let salt = User::generate_salt();
     let password = User::hash_password(&password, &salt)?;
     let upd_count = sqlx::query!(

@@ -14,7 +14,7 @@
 
 use std::{
     env,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
+    net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs},
     ops::DerefMut,
 };
 
@@ -74,11 +74,16 @@ async fn main() -> Result<()> {
         conn,
         vec![
             SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), http_port).into(),
-            SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), http_port, 0, 0).into(),
+            ("::", http_port).to_socket_addrs().unwrap().into_iter().next().unwrap(),
         ],
         vec![
             SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), https_port).into(),
-            SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), https_port, 0, 0).into(),
+            ("::", https_port)
+                .to_socket_addrs()
+                .unwrap()
+                .into_iter()
+                .next()
+                .unwrap(),
         ],
         None,
     )

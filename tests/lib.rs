@@ -2,7 +2,6 @@
 use std::env;
 use std::net::SocketAddr;
 
-use actix_web::web::block;
 use dotenv::dotenv;
 use futures::executor::block_on;
 #[cfg(feature = "postgres")]
