@@ -109,13 +109,13 @@ openwrt_package_bcm2710: # raspberry v3
 
 openwrt_package_bcm2710_snapshot: # raspberry v3
   extends: .openwrt_package_base
-  image: openwrtorg/sdk@sha256:6ba8ab7d4e4fa1f1f183fb1ea4dbdd4d6277eb88e2e6fc91b5e2df7feea8edfc # :bcm27xx-bcm2710-snapshot
+  image: openwrtorg/sdk@sha256:d4dcd1b0c0e80030a7989ff02f911b9b0873ea6997288bb6ef16f738892e2d3d # :bcm27xx-bcm2710-21.02-snapshot
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
 openwrt_package_bcm2711_snapshot: # raspberry v4
   extends: .openwrt_package_base
-  image: openwrtorg/sdk@sha256:a99ca882665737bc107a3ae3d93762902d324dad4a39f6793e018f2e65d19817 # :bcm27xx-bcm2711-snapshot
+  image: openwrtorg/sdk@sha256:2973097d0db2bf533ee075d654d83227bc77e7af530785fe9fe680b2d9b43fa6 # :bcm27xx-bcm2711-21.02-snapshot
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
@@ -189,7 +189,7 @@ build_image_bcm2710:
 
 build_image_bcm2710_snapshot:
   extends: .openwrt_image_base
-  image: openwrtorg/imagebuilder@sha256:081403dccdd3028ddaba7565285f103b6cad2cca65ac42746cc3b99872f72a9b # :bcm27xx-bcm2710-snapshot # rpi 3
+  image: openwrtorg/imagebuilder@sha256:fefebe6f944034a1f2915458f7ea4422fe23066fc97a6f96b88200d049bb578f # :bcm27xx-bcm2710-snapshot # rpi 3
   needs:
     - openwrt_package_bcm2710_snapshot
   variables:
@@ -200,7 +200,7 @@ build_image_bcm2710_snapshot:
 
 build_image_bcm2711_snapshot:
   extends: .openwrt_image_base
-  image: openwrtorg/imagebuilder@sha256:805d22c6159ad0f407cfc3fbc850d093fca25abcd6abfb55bfbaaed9ee0d1681 # :bcm27xx-bcm2711-snapshot # rpi 4
+  image: openwrtorg/imagebuilder@sha256:bf6a044901a5c90c02b519dd5c0eda3619a207ad1379f073f1886d178bc06dc2 # :bcm27xx-bcm2711-snapshot # rpi 4
   needs:
     - openwrt_package_bcm2711_snapshot
   variables:
