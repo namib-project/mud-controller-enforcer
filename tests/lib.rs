@@ -4,7 +4,9 @@ use std::net::SocketAddr;
 
 use dotenv::dotenv;
 use futures::executor::block_on;
-use log::{debug, error, info};
+#[cfg(feature = "postgres")]
+use log::error;
+use log::{debug, info};
 use namib_mud_controller::{
     controller::ControllerAppWrapper,
     db::DbConnection,
@@ -122,10 +124,12 @@ impl Drop for IntegrationTestContext {
             block_on(self.stop_test_server()).unwrap();
             info!("Stopped HTTP server");
         }
-        sqlx::query(("DROP DATABASE ".to_owned() + self.db_name).as_str())
+        if let Err(e) = sqlx::query(("DROP DATABASE ".to_owned() + self.db_name).as_str())
             .execute(&self.db_conn)
             .await
-            .unwrap_or_else(|e| error!("Error while dropping database {}: {:?}", self.db_name, e));
+        {
+            error!("Error while dropping database {}: {:?}", self.db_name, e)
+        }
         info!("Cleaned up database context");
     }
 }
