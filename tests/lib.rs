@@ -2,6 +2,7 @@
 use std::env;
 use std::net::SocketAddr;
 
+use actix_web::web::block;
 use dotenv::dotenv;
 use futures::executor::block_on;
 #[cfg(feature = "postgres")]
@@ -123,6 +124,9 @@ impl Drop for IntegrationTestContext {
         if self.server_instance.is_some() {
             block_on(self.stop_test_server()).unwrap();
             info!("Stopped HTTP server");
+        }
+        if let Err(e) = block_on(sqlx::query(("DISCONNECT ALL").execute(&self.db_conn))) {
+            error!("Error while dropping database {}: {:?}", self.db_name, e)
         }
         if let Err(e) =
             block_on(sqlx::query(("DROP DATABASE __".to_owned() + self.db_name).as_str()).execute(&self.db_conn))
