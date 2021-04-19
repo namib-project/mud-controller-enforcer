@@ -2,6 +2,8 @@ pub mod acl;
 pub use self::acl::Acl;
 pub mod description;
 pub use self::description::Description;
+pub mod generator;
+pub use self::generator::Generator;
 pub mod mud;
 pub use self::mud::Mud;
 pub mod mud_by_manufacturer;

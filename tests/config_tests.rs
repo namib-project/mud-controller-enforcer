@@ -1,5 +1,28 @@
 mod lib;
-use namib_mud_controller::{models::Config, services::config_service};
+use namib_mud_controller::{
+    models::Config,
+    services::{config_service, config_service::ConfigKeys, firewall_configuration_service},
+};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_version() {
+    let ctx = lib::IntegrationTestContext::new("test_version").await;
+
+    config_service::set_config_value(ConfigKeys::Version.as_ref(), u64::MAX, &ctx.db_conn)
+        .await
+        .unwrap();
+
+    firewall_configuration_service::update_config_version(&ctx.db_conn)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        config_service::get_config_value::<u64>(ConfigKeys::Version.as_ref(), &ctx.db_conn)
+            .await
+            .unwrap(),
+        0
+    );
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_nothing() {
@@ -44,7 +67,7 @@ async fn delete_something() {
 
     assert_eq!(
         config_service::delete_config_key("some", &ctx.db_conn).await.unwrap(),
-        1
+        true
     );
     assert!(
         config_service::get_config_value::<String>("some", &ctx.db_conn)
@@ -57,6 +80,26 @@ async fn delete_something() {
 #[tokio::test(flavor = "multi_thread")]
 async fn get_all() {
     let ctx = lib::IntegrationTestContext::new("get_all").await;
+
+    let mut expected_config = config_service::get_all_config_data(&ctx.db_conn).await.unwrap();
+    expected_config.append(&mut vec![
+        Config {
+            key: "some".to_string(),
+            value: "thing".to_string(),
+        },
+        Config {
+            key: "stackoverflow".to_string(),
+            value: "saves lives & our sanity".to_string(),
+        },
+        Config {
+            key: "actix_with".to_string(),
+            value: "sqlx".to_string(),
+        },
+        Config {
+            key: "longest_german_word".to_string(),
+            value: "Rinderkennzeichnungsfleischetikettierungsüberwachungsaufgabenübertragungsgesetz".to_string(),
+        },
+    ]);
 
     config_service::set_config_value("some", "thing", &ctx.db_conn)
         .await
@@ -80,23 +123,6 @@ async fn get_all() {
 
     assert_eq!(
         config_service::get_all_config_data(&ctx.db_conn).await.unwrap(),
-        vec![
-            Config {
-                key: "some".to_string(),
-                value: "thing".to_string()
-            },
-            Config {
-                key: "stackoverflow".to_string(),
-                value: "saves lives & our sanity".to_string()
-            },
-            Config {
-                key: "actix_with".to_string(),
-                value: "sqlx".to_string()
-            },
-            Config {
-                key: "longest_german_word".to_string(),
-                value: "Rinderkennzeichnungsfleischetikettierungsüberwachungsaufgabenübertragungsgesetz".to_string()
-            }
-        ]
+        expected_config
     );
 }

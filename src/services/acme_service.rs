@@ -1,8 +1,14 @@
-use crate::error::{self, Result};
+use std::{
+    env, fmt,
+    fs::File,
+    io::Read,
+    net::ToSocketAddrs,
+    sync::{Arc, RwLock},
+};
+
 use acme_lib::{create_rsa_key, persist::FilePersist, Account, Directory, DirectoryUrl};
 use get_if_addrs::get_if_addrs;
 use lazy_static::lazy_static;
-use namib_shared::open_file_with;
 use regex::{Captures, Regex};
 use reqwest::{Certificate, Identity};
 use rustls_18::{
@@ -11,12 +17,10 @@ use rustls_18::{
 };
 use sha3::{Digest, Sha3_224};
 use snafu::ensure;
-use std::{
-    env, fmt,
-    fs::File,
-    io::Read,
-    net::ToSocketAddrs,
-    sync::{Arc, RwLock},
+
+use crate::{
+    error::{self, Result},
+    util::open_file_with,
 };
 
 /// `CertId` contains the url-safe base64-encoded sha1-hash of a certificate and may be regarded as a unique identifier for a Namib service.
@@ -145,6 +149,7 @@ pub fn update_certs() -> Result<()> {
             .read_to_end(&mut ca)?;
         // send the httpchallenge token to the service.
         let response = reqwest::blocking::ClientBuilder::new()
+            .tls_built_in_root_certs(false)
             .add_root_certificate(Certificate::from_pem(&ca)?)
             .identity(Identity::from_pem(&certs)?)
             .build()?
@@ -175,7 +180,7 @@ pub fn update_certs() -> Result<()> {
 /// Get the tls server config for actix
 pub fn server_config() -> ServerConfig {
     // create the certificate in the background, it doesn't have to be immediatly present for ActiX to start.
-    actix_rt::spawn(async {
+    tokio::task::spawn_blocking(|| {
         if let Err(e) = update_certs() {
             warn!("Failed to update certificates: {:?}", e);
         }
@@ -188,16 +193,13 @@ pub fn server_config() -> ServerConfig {
 /// Returns the secure dns name for this controller.
 /// Will return `None` if no certificate has been issued yet, or the domain is not resolved to be this controller's ip.
 pub fn secure_name() -> Option<String> {
-    if let Ok(g) = ACME_CERTIFIED_KEY.read() {
-        if g.is_some() {
-            drop(g);
-            if let Ok(ifs) = get_if_addrs() {
-                if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
-                    for resolved in resolved {
-                        for interf in &ifs {
-                            if interf.ip() == resolved.ip() {
-                                return Some(DOMAIN.to_string());
-                            }
+    if let Ok(Some(_)) = ACCOUNT.certificate(&DOMAIN) {
+        if let Ok(ifs) = get_if_addrs() {
+            if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
+                for resolved in resolved {
+                    for interf in &ifs {
+                        if interf.ip() == resolved.ip() {
+                            return Some(DOMAIN.to_string());
                         }
                     }
                 }

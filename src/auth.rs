@@ -1,14 +1,14 @@
 use std::env;
 
-use crate::{error, error::Result, services::role_service::Permission};
-use actix_web::{dev, error::ErrorUnauthorized, FromRequest, HttpRequest};
+use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
 use glob::Pattern;
-use isahc::http::StatusCode;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
+
+use crate::{error, error::Result, services::role_service::Permission};
 
 static HEADER_PREFIX: &str = "Bearer ";
 
@@ -47,7 +47,7 @@ impl AuthToken {
 
     pub fn require_permission(&self, permission: Permission) -> Result<()> {
         for perm in &self.permissions {
-            if Pattern::new(perm)?.matches(&*permission.to_string()) {
+            if Pattern::new(perm)?.matches(permission.as_ref()) {
                 return Ok(());
             }
         }

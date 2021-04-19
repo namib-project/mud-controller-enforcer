@@ -1,12 +1,14 @@
-use crate::{
-    db::DbConnection,
-    error::{none_error, Result},
-    services::{acme_service::CertId, device_service, neo4jthings_service},
-};
+use std::net::IpAddr;
+
 use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::net::IpAddr;
+
+use crate::{
+    db::DbConnection,
+    error::{none_error, Result},
+    services::{acme_service::CertId, device_service, neo4things_service},
+};
 
 const MONTHS: &str = "JanFebMarAprMayJunJulAugSepOctNovDec";
 
@@ -16,7 +18,10 @@ lazy_static! {
 }
 
 async fn parse_log_line(line: &str, conn: &DbConnection) -> Result<()> {
-    let m = LOG_FORMAT.captures(line).ok_or_else(none_error)?;
+    let m = match LOG_FORMAT.captures(line) {
+        Some(m) => m,
+        None => return Ok(()),
+    };
     let month = MONTHS.find(&m[1]).ok_or_else(none_error)? / 3 + 1;
     let day_of_month: u32 = m[2].parse()?;
     // dnsmasq logs don't contain the year, so assume the current year
@@ -33,7 +38,7 @@ async fn parse_log_line(line: &str, conn: &DbConnection) -> Result<()> {
     info!("Received dns request: {} {} {}", date_time, ip, domain);
     let device = device_service::find_by_ip(&ip.to_string(), conn).await?;
     // add the device connection in the background as it may take some time
-    tokio::spawn(neo4jthings_service::add_device_connection(device, domain.to_string()));
+    tokio::spawn(neo4things_service::add_device_connection(device, domain.to_string()));
     Ok(())
 }
 

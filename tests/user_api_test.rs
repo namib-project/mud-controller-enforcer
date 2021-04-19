@@ -1,12 +1,16 @@
 mod lib;
+use std::thread;
+
+use actix_web::{
+    dev::Service,
+    rt::{spawn, Arbiter},
+    web::head,
+};
+use futures::TryFutureExt;
 use lib::{
     assert_delete_status, assert_get_status, assert_get_status_deserialize, assert_post_status,
     assert_post_status_deserialize,
 };
-
-use actix_rt::{spawn, Arbiter};
-use actix_web::{dev::Service, web::head};
-use futures::TryFutureExt;
 use log::{debug, info};
 use namib_mud_controller::{
     controller::app,
@@ -22,7 +26,6 @@ use namib_mud_controller::{
 use reqwest::{header::HeaderMap, Client, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::json;
-use std::thread;
 use tokio::time::{sleep, Duration};
 
 #[derive(Debug, Deserialize, Clone)]

@@ -1,5 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use std::collections::HashMap;
+
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
 use crate::{
@@ -9,7 +11,6 @@ use crate::{
     routes::dtos::ConfigQueryDto,
     services::{config_service, role_service::Permission},
 };
-use std::collections::HashMap;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_configs));
@@ -76,7 +77,7 @@ async fn delete_config(
     let mut deletion_map: HashMap<String, bool> = HashMap::new();
     for key in config_delete_dto.into_inner() {
         let value = config_service::delete_config_key(&key, &pool).await?;
-        deletion_map.insert(key, value != 0);
+        deletion_map.insert(key, value);
     }
 
     Ok(Json(deletion_map))

@@ -1,11 +1,14 @@
 #[cfg(feature = "postgres")]
 use std::env;
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    str::FromStr,
+    sync::Arc,
+};
 
 use dotenv::dotenv;
-use log::{debug, error, info};
-use sqlx::migrate;
-
 use futures::executor::block_on;
+use log::{debug, error, info};
 use namib_mud_controller::{
     controller::app,
     db::DbConnection,
@@ -15,11 +18,7 @@ use namib_mud_controller::{
 use reqwest::{header::HeaderMap, Client, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{Backtrace, GenerateBacktrace};
-use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    str::FromStr,
-    sync::Arc,
-};
+use sqlx::{migrate, sqlite::SqliteConnectOptions};
 use tokio::{
     sync::{
         oneshot::{Receiver, Sender},
@@ -46,15 +45,28 @@ impl IntegrationTestContext {
         dotenv().ok();
         env_logger::try_init().ok();
 
-        #[cfg(feature = "sqlite")]
-        let db_url = format!("sqlite:{}?mode=memory", db_name);
+        #[cfg(not(feature = "postgres"))]
+        let db_url = "sqlite::memory:".to_string();
+        // No longer supported as of sqlx 0.5.X
+        //let db_url = format!("sqlite:{}?mode=memory", db_name);
 
         #[cfg(feature = "postgres")]
-        let db_url = format!(
-            "{}/{}",
-            env::var("DATABASE_URL").expect("Failed to load DB URL from .env"),
-            db_name
-        );
+        let db_url = {
+            let mut url =
+                url::Url::parse(&std::env::var("DATABASE_URL").expect("Failed to load DB URL from .env")).unwrap();
+            let db_name = format!("__{}", db_name);
+            let conn = DbConnection::connect(url.as_str()).await.unwrap();
+            sqlx::query(&format!("DROP DATABASE IF EXISTS {}", db_name))
+                .execute(&conn)
+                .await
+                .unwrap();
+            sqlx::query(&format!("CREATE DATABASE {}", db_name))
+                .execute(&conn)
+                .await
+                .unwrap();
+            url.set_path(&db_name);
+            url.to_string()
+        };
 
         info!("Using DB {:?}", db_url);
 
@@ -62,7 +74,7 @@ impl IntegrationTestContext {
             .await
             .expect("Couldn't establish connection pool for database");
 
-        #[cfg(feature = "sqlite")]
+        #[cfg(not(feature = "postgres"))]
         migrate!("migrations/sqlite")
             .run(&db_conn)
             .await
@@ -93,8 +105,8 @@ impl IntegrationTestContext {
             app(
                 conn,
                 end_signal_rec,
-                server_addr.clone(),
-                None,
+                vec![server_addr.clone()],
+                Vec::new(),
                 Some(2),
                 Some(startup_complete_send),
             )

@@ -1,5 +1,6 @@
-use crate::models::Acl;
 use paperclip::actix::Apiv2Schema;
+
+use crate::models::Acl;
 
 #[derive(Deserialize, Apiv2Schema)]
 pub struct MudQueryDto {

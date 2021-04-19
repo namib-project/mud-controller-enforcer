@@ -198,7 +198,7 @@ pub async fn thing_connections_list(configuration: &configuration::Configuration
     }
 }
 
-/// API endpoint that allows NetworkCards to be edited or viewed.
+/// API endpoint that allows Things to be edited or viewed.
 pub async fn thing_create(configuration: &configuration::Configuration, thing: crate::models::Thing) -> Result<crate::models::Thing, Error<ThingCreateError>> {
 
     let local_var_client = &configuration.client;
@@ -261,7 +261,7 @@ pub async fn thing_describe_create(configuration: &configuration::Configuration,
     }
 }
 
-/// API endpoint that allows NetworkCards to be edited or viewed.
+/// API endpoint that allows Things to be edited or viewed.
 pub async fn thing_destroy(configuration: &configuration::Configuration, mac_addr: &str) -> Result<(), Error<ThingDestroyError>> {
 
     let local_var_client = &configuration.client;
@@ -291,7 +291,7 @@ pub async fn thing_destroy(configuration: &configuration::Configuration, mac_add
     }
 }
 
-/// API endpoint that allows NetworkCards to be edited or viewed.
+/// API endpoint that allows Things to be edited or viewed.
 pub async fn thing_list(configuration: &configuration::Configuration, page: Option<i32>) -> Result<crate::models::PaginatedThingList, Error<ThingListError>> {
 
     let local_var_client = &configuration.client;
@@ -358,7 +358,7 @@ pub async fn thing_mac_list(configuration: &configuration::Configuration, mac_ad
     }
 }
 
-/// API endpoint that allows NetworkCards to be edited or viewed.
+/// API endpoint that allows Things to be edited or viewed.
 pub async fn thing_partial_update(configuration: &configuration::Configuration, mac_addr: &str, patched_thing: Option<crate::models::PatchedThing>) -> Result<crate::models::Thing, Error<ThingPartialUpdateError>> {
 
     let local_var_client = &configuration.client;
@@ -389,7 +389,7 @@ pub async fn thing_partial_update(configuration: &configuration::Configuration, 
     }
 }
 
-/// API endpoint that allows NetworkCards to be edited or viewed.
+/// API endpoint that allows Things to be edited or viewed.
 pub async fn thing_retrieve(configuration: &configuration::Configuration, mac_addr: &str) -> Result<crate::models::Thing, Error<ThingRetrieveError>> {
 
     let local_var_client = &configuration.client;
@@ -453,7 +453,7 @@ pub async fn thing_services_list(configuration: &configuration::Configuration, m
     }
 }
 
-/// API endpoint that allows NetworkCards to be edited or viewed.
+/// API endpoint that allows Things to be edited or viewed.
 pub async fn thing_update(configuration: &configuration::Configuration, mac_addr: &str, thing: crate::models::Thing) -> Result<crate::models::Thing, Error<ThingUpdateError>> {
 
     let local_var_client = &configuration.client;

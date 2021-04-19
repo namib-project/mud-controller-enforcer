@@ -1,3 +1,7 @@
+use std::io;
+
+use strum::IntoEnumIterator;
+
 use crate::{
     db::DbConnection,
     error::Result,
@@ -5,27 +9,38 @@ use crate::{
     routes::dtos::{RoleDto, RoleUpdateDto},
     services::role_service::permission::Permission,
 };
-use std::io;
-use strum::IntoEnumIterator;
 
 pub const ROLE_ID_ADMIN: i64 = 0;
 pub const ROLE_ID_GUEST: i64 = 1;
 
 pub async fn role_create(conn: &DbConnection, role: RoleUpdateDto) -> Result<RoleDto> {
     let permissions_vec = role.permissions.join(",");
+
+    #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO roles (name, permissions) VALUES (?, ?)",
         role.name,
         permissions_vec,
     )
     .execute(conn)
-    .await?;
+    .await?
+    .last_insert_rowid();
 
-    role_get(conn, result.last_insert_rowid()).await
+    #[cfg(feature = "postgres")]
+    let result = sqlx::query!(
+        "INSERT INTO roles (name, permissions) VALUES ($1, $2) RETURNING id",
+        role.name,
+        permissions_vec,
+    )
+    .fetch_one(conn)
+    .await?
+    .id;
+
+    role_get(conn, result).await
 }
 
 pub async fn role_get(conn: &DbConnection, role_id: i64) -> Result<RoleDto> {
-    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = ?", role_id)
+    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = $1", role_id)
         .fetch_one(conn)
         .await?;
 
@@ -39,7 +54,7 @@ pub async fn role_get(conn: &DbConnection, role_id: i64) -> Result<RoleDto> {
 pub async fn role_update(conn: &DbConnection, role_id: i64, updated_role: RoleUpdateDto) -> Result<bool> {
     let permissions_vec: String = updated_role.permissions.join(",");
     let result = sqlx::query!(
-        "UPDATE roles SET name = ?, permissions = ? WHERE id = ?",
+        "UPDATE roles SET name = $1, permissions = $2 WHERE id = $3",
         updated_role.name,
         permissions_vec,
         role_id,
@@ -51,7 +66,7 @@ pub async fn role_update(conn: &DbConnection, role_id: i64, updated_role: RoleUp
 }
 
 pub async fn role_delete(conn: &DbConnection, role_id: i64) -> Result<bool> {
-    let del_count = sqlx::query!("DELETE FROM roles WHERE id = ?", role_id)
+    let del_count = sqlx::query!("DELETE FROM roles WHERE id = $1", role_id)
         .execute(conn)
         .await?;
 
@@ -74,9 +89,9 @@ pub fn permissions_get_all() -> Result<Vec<String>> {
     Ok(Permission::iter().map(|p| p.to_string()).collect())
 }
 
-pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
+pub async fn add_role_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
     sqlx::query!(
-        "INSERT INTO users_roles (user_id, role_id) VALUES (?, ?)",
+        "INSERT INTO users_roles (user_id, role_id) VALUES ($1, $2)",
         user_id,
         role_id,
     )
@@ -87,12 +102,12 @@ pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -
 }
 
 pub async fn role_delete_from_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
-    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = ?", role_id,)
+    let role_db = sqlx::query_as!(RoleDbo, "SELECT * FROM roles WHERE id = $1", role_id,)
         .fetch_one(conn)
         .await?;
 
     sqlx::query!(
-        "DELETE FROM users_roles WHERE user_id = ? and role_id = ?",
+        "DELETE FROM users_roles WHERE user_id = $1 and role_id = $2",
         role_db.id,
         user_id
     )

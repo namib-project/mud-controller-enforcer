@@ -1,4 +1,4 @@
-#![warn(clippy::all, clippy::style, clippy::pedantic)]
+#![warn(clippy::all, clippy::pedantic)]
 #![allow(
     dead_code,
     clippy::manual_range_contains,
@@ -7,11 +7,16 @@
     clippy::default_trait_access,
     clippy::similar_names,
     clippy::redundant_else,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
     clippy::must_use_candidate,
-    clippy::missing_panics_doc
+    clippy::cast_possible_truncation,
+    clippy::option_if_let_else
 )]
+
+use std::{
+    env,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
+    time::Duration,
+};
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
@@ -28,11 +33,6 @@ use namib_mud_controller::{
     VERSION,
 };
 use paperclip::actix::{web, OpenApiExt};
-use std::{
-    env,
-    net::{Ipv4Addr, SocketAddrV4},
-    time::Duration,
-};
 use tokio::try_join;
 
 const DEFAULT_HTTP_PORT: u16 = 8000;
@@ -56,14 +56,25 @@ async fn main() -> Result<()> {
         app(
             conn,
             end_signal_rec,
-            SocketAddrV4::new(
-                Ipv4Addr::new(0, 0, 0, 0),
-                env::var("HTTP_PORT")
-                    .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTP_PORT))
-                    .unwrap_or(DEFAULT_HTTP_PORT),
-            )
-            .into(),
-            Some(
+            vec![
+                SocketAddrV4::new(
+                    Ipv4Addr::new(0, 0, 0, 0),
+                    env::var("HTTP_PORT")
+                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTP_PORT))
+                        .unwrap_or(DEFAULT_HTTP_PORT),
+                )
+                .into(),
+                SocketAddrV6::new(
+                    Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0),
+                    env::var("HTTP_PORT")
+                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTPS_PORT))
+                        .unwrap_or(DEFAULT_HTTPS_PORT),
+                    0,
+                    0,
+                )
+                .into(),
+            ],
+            vec![
                 SocketAddrV4::new(
                     Ipv4Addr::new(0, 0, 0, 0),
                     env::var("HTTPS_PORT")
@@ -71,7 +82,16 @@ async fn main() -> Result<()> {
                         .unwrap_or(DEFAULT_HTTPS_PORT),
                 )
                 .into(),
-            ),
+                SocketAddrV6::new(
+                    Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0),
+                    env::var("HTTPS_PORT")
+                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTPS_PORT))
+                        .unwrap_or(DEFAULT_HTTPS_PORT),
+                    0,
+                    0,
+                )
+                .into(),
+            ],
             None,
             None,
         )

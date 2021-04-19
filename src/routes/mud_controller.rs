@@ -1,5 +1,12 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use actix_web::http::StatusCode;
+use chrono::Utc;
+use paperclip::actix::{
+    api_v2_operation, web,
+    web::{HttpResponse, Json},
+};
+
 use crate::{
     auth::AuthToken,
     db::DbConnection,
@@ -7,13 +14,7 @@ use crate::{
     error::Result,
     models::{MudData, MudDbo},
     routes::dtos::{MudCreationDto, MudQueryDto, MudUpdateDto, MudUpdateQueryDto},
-    services::{mud_service, mud_service::is_url, role_service::Permission},
-};
-use actix_web::http::StatusCode;
-use chrono::Utc;
-use paperclip::actix::{
-    api_v2_operation, web,
-    web::{HttpResponse, Json},
+    services::{firewall_configuration_service, mud_service, mud_service::is_url, role_service::Permission},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -46,8 +47,8 @@ pub async fn get_muds(
             mud_service::get_all_muds(&pool)
                 .await?
                 .iter()
-                .map(|mud_dbo| serde_json::from_str(&mud_dbo.data))
-                .collect::<serde_json::Result<_>>()?,
+                .map(MudDbo::parse_data)
+                .collect::<Result<_>>()?,
         ))
     }
 }
@@ -70,13 +71,16 @@ pub async fn update_mud(
     })?;
 
     // update the acl_override in mud_data
-    let mut mud_data = serde_json::from_str::<MudData>(&mud_dbo.data)?;
+    let mut mud_data = mud_dbo.parse_data()?;
     mud_data.acl_override = mud_update_dto.into_inner().acl_override.unwrap_or_default();
 
     // use the new mud_data in the existing mud_dbo
     mud_dbo.data = serde_json::to_string(&mud_data)?;
 
     mud_service::upsert_mud(&mud_dbo, &pool).await?;
+
+    firewall_configuration_service::update_config_version(&pool).await?;
+
     Ok(Json(mud_data))
 }
 

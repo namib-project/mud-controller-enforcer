@@ -1,17 +1,18 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use isahc::http::StatusCode;
+use actix_web::{http::StatusCode, HttpResponse};
 use paperclip::actix::{api_v2_operation, web, web::Json};
-use validator::{HasLen, Validate};
-
-use crate::{auth::AuthToken, db::DbConnection, error, error::Result, services::role_service::permission::Permission};
+use validator::Validate;
 
 use crate::{
+    auth::AuthToken,
+    db::DbConnection,
+    error,
+    error::Result,
     models::User,
-    routes::dtos::{MgmCreateUserDto, MgmUpdateUserBasicDto, MgmUserDto},
-    services::{role_service, user_service},
+    routes::dtos::{MgmCreateUserDto, MgmUpdateUserBasicDto},
+    services::{role_service, role_service::Permission, user_service},
 };
-use actix_web::HttpResponse;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/", web::get().to(get_all_users));
@@ -22,22 +23,10 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 }
 
 #[api_v2_operation(summary = "List of all users")]
-pub async fn get_all_users(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<MgmUserDto>>> {
+pub async fn get_all_users(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<User>>> {
     auth.require_permission(Permission::user__management__list)?;
 
-    let mut all_users: Vec<MgmUserDto> = vec![];
-
-    for user in user_service::get_all(pool.get_ref()).await? {
-        debug!(">user> {:?}", user);
-        all_users.push(MgmUserDto {
-            user_id: user.id,
-            username: user.username,
-            roles: user.roles,
-            permissions: user.permissions,
-        });
-    }
-
-    Ok(Json(all_users))
+    Ok(Json(user_service::get_all(&pool).await?))
 }
 
 #[api_v2_operation(summary = "Get a specific user")]
@@ -45,10 +34,10 @@ pub async fn get_user_by_id(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
     user_id: web::Path<i64>,
-) -> Result<Json<MgmUserDto>> {
+) -> Result<Json<User>> {
     auth.require_permission(Permission::user__management__read)?;
 
-    Ok(Json(get_user_from_service(pool.get_ref(), user_id.into_inner()).await?))
+    Ok(Json(user_service::find_by_id(user_id.into_inner(), &pool).await?))
 }
 
 #[api_v2_operation(summary = "Create a new user")]
@@ -56,7 +45,7 @@ pub async fn create_user(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
     create_user_dto: Json<MgmCreateUserDto>,
-) -> Result<Json<MgmUserDto>> {
+) -> Result<Json<User>> {
     auth.require_permission(Permission::user__management__create)?;
 
     create_user_dto.validate().or_else(|_| {
@@ -67,16 +56,17 @@ pub async fn create_user(
         .fail()
     })?;
 
-    let user = User::new(create_user_dto.username.clone(), create_user_dto.password.as_str())?;
-    let new_user_id = user_service::insert(user, pool.get_ref()).await?;
+    let dto = create_user_dto.into_inner();
+    let user = User::new(dto.username, dto.password.as_str())?;
+    let new_user_id = user_service::insert(user, &pool).await?;
 
-    if auth.require_permission(Permission::role__assign).ok().is_some() {
-        for role_id in create_user_dto.roles_ids.iter() {
-            role_service::role_add_to_user(pool.get_ref(), new_user_id, *role_id).await?;
+    if auth.require_permission(Permission::role__assign).is_ok() {
+        for role_id in dto.roles_ids {
+            role_service::add_role_to_user(&pool, new_user_id, role_id).await?;
         }
     }
 
-    Ok(Json(get_user_from_service(pool.get_ref(), new_user_id).await?))
+    Ok(Json(user_service::find_by_id(new_user_id, &pool).await?))
 }
 
 #[api_v2_operation(summary = "Update a user")]
@@ -96,29 +86,20 @@ pub async fn update_user_by_id(
         .fail()
     })?;
 
-    let user_db_result = user_service::find_by_username(&update_user_dto.username, pool.get_ref()).await;
-    if user_db_result.is_ok() {
-        let same_name_user_db = user_db_result.unwrap();
-        if same_name_user_db.id != user_id.clone() {
+    if let Ok(same_name_user_db) = user_service::find_by_username(&update_user_dto.username, &pool).await {
+        if same_name_user_db.id != user_id.0 {
             return Ok(HttpResponse::Conflict().reason("Username already in use!").finish());
         }
     }
 
-    let user_db = user_service::find_by_id(user_id.clone(), pool.get_ref()).await?;
-    let mut user = User {
-        id: user_id.clone(),
-        username: update_user_dto.username.clone(),
-        password: user_db.password,
-        salt: user_db.salt,
-        roles: vec![],
-        permissions: vec![],
-    };
+    let mut user = user_service::find_by_id(user_id.0, &pool).await?;
+    user.username = update_user_dto.0.username;
 
-    user_service::update_username(user_id.clone(), &user, pool.get_ref()).await?;
+    user_service::update_username(&user, &pool).await?;
 
-    if update_user_dto.password.length() > 0 {
-        user.password = User::hash_password(&update_user_dto.password, &user.salt)?;
-        user_service::update_password(user.id, &user, pool.get_ref()).await?;
+    if let Some(password) = update_user_dto.0.password {
+        user.update_password(&password)?;
+        user_service::update_password(&user, &pool).await?;
     }
 
     Ok(HttpResponse::NoContent().finish())
@@ -132,18 +113,7 @@ pub async fn delete_user_by_id(
 ) -> Result<HttpResponse> {
     auth.require_permission(Permission::user__management__delete)?;
 
-    user_service::delete(user_id.into_inner(), pool.get_ref()).await?;
+    user_service::delete(user_id.into_inner(), &pool).await?;
 
     Ok(HttpResponse::NoContent().finish())
-}
-
-async fn get_user_from_service(pool: &DbConnection, user_id: i64) -> Result<MgmUserDto> {
-    let user = user_service::find_by_id(user_id, pool).await?;
-
-    Ok(MgmUserDto {
-        user_id: user.id,
-        username: user.username,
-        roles: user.roles,
-        permissions: user.permissions,
-    })
 }

@@ -1,14 +1,15 @@
 #![allow(clippy::field_reassign_with_default)]
 
-use crate::{error::Result, models::Room};
 use paperclip::actix::Apiv2Schema;
+
+use crate::models::Room;
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema, PartialEq)]
 pub struct RoomDto {
     pub id: i64,
     #[validate(length(max = 50))]
     pub name: String,
-    #[validate(length(max = 6))]
+    #[validate(length(max = 10))]
     pub color: String,
 }
 
@@ -26,16 +27,16 @@ impl From<Room> for RoomDto {
 pub struct RoomCreationUpdateDto {
     #[validate(length(max = 50))]
     pub name: String,
-    #[validate(length(max = 6))]
+    #[validate(length(max = 10))]
     pub color: String,
 }
 
 impl RoomCreationUpdateDto {
-    pub fn to_room(&self, id: i64) -> Result<Room> {
-        Ok(Room {
+    pub fn into_room(self, id: i64) -> Room {
+        Room {
             room_id: id,
-            name: self.name.clone(),
-            color: self.color.clone(),
-        })
+            name: self.name,
+            color: self.color,
+        }
     }
 }

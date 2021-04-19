@@ -1,17 +1,136 @@
-version: "3"
+version: "3.8"
 
 services:
   namib_mud_controller:
-    image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:latest
-    #image: controller
+    image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_mud_controller:postgres
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+    restart: always
+    volumes:
+      - ./acme:/namib/acme
     ports:
       - 8000:8000
       - 8734:8734
+    networks:
+      - lan
 
   postgres:
     image: postgres
     environment:
       POSTGRES_USER: namib
       POSTGRES_PASSWORD: namib
+      POSTGRES_DB: namib_mud_controller
+    volumes:
+      - ./data:/var/lib/postgresql/data
     ports:
       - 5432:5432
+    networks:
+      - lan
+
+  namib_enforcer:
+    image: gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
+    command:
+      - sh
+      - -c
+      - rm -f /etc/uci-defaults/xxx_config && exec /sbin/init
+    tty: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    ports:
+      - 5480:80
+    networks:
+      lan:
+        priority: 100
+      wan:
+
+  add_mock_data:
+    image: docker
+    depends_on:
+      - namib_mud_controller
+    profiles:
+      - tools
+    command:
+      - sh
+      - -c
+      - echo 2 | sh /import_mock_data.sh
+    privileged: true
+    volumes:
+      - ../scripts/import_mock_data.sh:/import_mock_data.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  dhcp_client:
+    image: debian
+    depends_on:
+      - namib_enforcer
+    profiles:
+      - tools
+    command:
+      - sh
+      - -c
+      - >
+        apt-get update && apt-get install -y isc-dhcp-client &&
+        echo 'option mudurl code 161 = text;' >> /etc/dhcp/dhclient.conf &&
+        echo 'send mudurl "https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json";' >> /etc/dhcp/dhclient.conf &&
+        dhclient -1 -4 -d
+    networks:
+      - lan
+
+  dhcp_client_2:
+    image: debian
+    depends_on:
+      - namib_enforcer
+    profiles:
+      - tools
+    command:
+      - sh
+      - -c
+      - >
+        apt-get update && apt-get install -y isc-dhcp-client &&
+        dhclient -1 -4 -d
+    networks:
+      - lan
+
+  neo4j:
+    image: neo4j
+    ports:
+      - 7474:7474
+      - 7687:7687
+    volumes:
+      - ./neo4j/data:/data
+    environment:
+      - NEO4J_AUTH=neo4j/test
+    networks:
+      - lan
+
+  neo4things:
+    image: gitlab.informatik.uni-bremen.de:5005/namib/gruppe-1-legacy-nodes/neo4things:master
+    depends_on:
+      - neo4j
+    entrypoint:
+      - sh
+      - -c
+      - >
+        python manage.py install_labels;
+        python manage.py migrate;
+        echo "from django.contrib.auth import get_user_model; get_user_model().objects.create_superuser('admin', 'admin@namib.me', 'namib')" | python manage.py shell;
+        exec /app/neogit/docker-entrypoint.sh
+    ports:
+      - 7000:8000
+    environment:
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: test
+      NEO4J_HOST: neo4j
+      NEO4J_PORT: 7687
+      NEO4J_BOLT_URL: bolt://neo4j:test@neo4j:7687
+      SECRET_KEY: asecret
+    networks:
+      - lan
+
+networks:
+  wan:
+    driver: bridge
+  lan:
+    driver: bridge

@@ -3,13 +3,12 @@ use std::{clone::Clone, net::IpAddr, str::FromStr};
 use chrono::{Duration, Utc};
 use snafu::ensure;
 
+use super::json_models;
 use crate::{
     error,
     error::Result,
     models::{Ace, AceAction, AceMatches, AcePort, AceProtocol, Acl, AclDirection, AclType, MudData},
 };
-
-use super::json_models;
 
 // inspired by https://github.com/CiscoDevNet/MUD-Manager by Cisco
 pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
@@ -227,9 +226,9 @@ mod tests {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, NaiveDateTime, Utc};
+    use serde_json::Value;
 
     use super::*;
-    use serde_json::Value;
 
     #[test]
     fn test_trivial_example() -> Result<()> {

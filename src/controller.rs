@@ -1,3 +1,16 @@
+use std::{env, net::SocketAddr, ops::Deref, rc::Rc, time::Duration};
+
+use actix_cors::Cors;
+use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
+use actix_web::{dev::Service, middleware, App, HttpServer};
+use dotenv::dotenv;
+use lazy_static::{lazy_static, LazyStatic};
+use paperclip::actix::{web, OpenApiExt};
+use tokio::{
+    select,
+    sync::{oneshot, oneshot::Sender},
+};
+
 use crate::{
     db,
     db::DbConnection,
@@ -5,17 +18,6 @@ use crate::{
     routes,
     services::{acme_service, job_service},
     VERSION,
-};
-use actix_cors::Cors;
-use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
-use actix_web::{dev::Service, middleware, App, HttpServer};
-use dotenv::dotenv;
-use lazy_static::{lazy_static, LazyStatic};
-use paperclip::actix::{web, OpenApiExt};
-use std::{env, net::SocketAddr, ops::Deref, rc::Rc, time::Duration};
-use tokio::{
-    select,
-    sync::{oneshot, oneshot::Sender},
 };
 
 lazy_static! {
@@ -25,13 +27,14 @@ lazy_static! {
 pub fn app(
     conn: DbConnection,
     end_server: oneshot::Receiver<()>,
-    http_addr: SocketAddr,
-    https_addr: Option<SocketAddr>,
+    http_addrs: Vec<SocketAddr>,
+    https_addrs: Vec<SocketAddr>,
     worker_count: Option<usize>,
     finished_startup_sender: Option<oneshot::Sender<()>>,
 ) -> Result<()> {
     LazyStatic::initialize(&RT);
-    actix_rt::System::new("main").block_on(async move {
+    actix_web::rt::System::new("main").block_on(async move {
+        let tls_config = acme_service::server_config();
         let mut server = HttpServer::new(move || {
             let cors = Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {
@@ -40,6 +43,9 @@ pub fn app(
                         || origin
                             .as_bytes()
                             .starts_with(format!("https://{}", *acme_service::DOMAIN).as_bytes())
+                        || origin
+                            .as_bytes()
+                            .starts_with(format!("http://{}", *acme_service::DOMAIN).as_bytes())
                 })
                 .allow_any_method()
                 .allow_any_header()
@@ -91,15 +97,25 @@ pub fn app(
                 .service(web::scope("/rooms").configure(routes::room_controller::init))
                 .with_json_spec_at("/api/spec")
                 .build()
+                .route(
+                    "/",
+                    web::to(|| {
+                        web::HttpResponse::PermanentRedirect()
+                            .header("Location", "/app")
+                            .finish()
+                    }),
+                )
                 .service(
                     actix_files::Files::new("/", "static")
                         .index_file("index.html")
                         .redirect_to_slash_directory(),
                 )
-        })
-        .bind(http_addr)?;
-        if let Some(https_addr) = https_addr {
-            server = server.bind_rustls(https_addr, acme_service::server_config())?;
+        });
+        for http_addr in http_addrs {
+            server = server.bind(http_addr)?;
+        }
+        for https_addr in https_addrs {
+            server = server.bind_rustls(https_addr, tls_config.clone())?;
         }
         if let Some(worker_count) = worker_count {
             server = server.workers(worker_count);
@@ -112,7 +128,7 @@ pub fn app(
         }
         end_server.await;
         server_instance.stop(true).await;
-        actix_rt::System::current().stop();
+        actix_web::rt::System::current().stop();
         Ok(())
     })
 }
