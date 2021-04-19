@@ -1,6 +1,6 @@
 use std::{
     env,
-    net::SocketAddr,
+    net::{SocketAddr, SocketAddrV6, TcpListener},
     ops::{Deref, DerefMut},
     time::Duration,
 };
@@ -10,6 +10,8 @@ use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimite
 use actix_web::{dev::Service, middleware, App, HttpServer};
 use lazy_static::{lazy_static, LazyStatic};
 use paperclip::actix::{web, OpenApiExt};
+#[cfg(unix)]
+use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     sync::{oneshot, oneshot::error::RecvError},
     task::{JoinError, JoinHandle},
@@ -20,6 +22,8 @@ use crate::{db::DbConnection, error::Result, routes, services::acme_service};
 lazy_static! {
     static ref RT: tokio::runtime::Handle = tokio::runtime::Handle::current();
 }
+
+const BACKLOG: i32 = 1024;
 
 #[derive(Debug)]
 pub struct ControllerAppWrapper {
@@ -88,7 +92,6 @@ pub fn app(
 ) -> Result<()> {
     LazyStatic::initialize(&RT);
     actix_web::rt::System::new("main").block_on(async move {
-        let tls_config = acme_service::server_config();
         let mut server = HttpServer::new(move || {
             let cors = Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {
@@ -165,11 +168,52 @@ pub fn app(
                         .redirect_to_slash_directory(),
                 )
         });
+        // Some unix variants automatically bind to IPv4 as well when binding to IPv6
+        // (Linux makes it configurable using /proc/sys/net/ipv6/bindv6only), therefore
+        // causing "address already in use" errors if both IPv4 and IPv6 SockAddrs are specified.
+        // This behaviour is specified to be the default for the sockets interface as per RFC 3493
+        // (section 5.3).
+        // To fix this, we need to manually create a socket and set the IPV6_V6ONLY socket option.
+        // We use socket2 for this here, because it is the library that actix uses internally.
+
+        // We need to set this explicitly, because we might not know if this default will change in
+        // the future and it should match the setting we use for our own IPv6 sockets on UNIX.
+        server = server.backlog(BACKLOG);
         for http_addr in http_addrs {
-            server = server.bind(http_addr)?;
+            #[cfg(unix)]
+            match http_addr {
+                // Special handling for IPv6: Set IPV6_V6ONLY
+                SocketAddr::V6(v6addr) => {
+                    let listener = create_v6only_listener(&v6addr)?;
+                    server = server.listen(listener)?;
+                },
+                _ => {
+                    server = server.bind(http_addr)?;
+                },
+            }
+            #[cfg(not(unix))]
+            {
+                server = server.bind(http_addr)?;
+            }
         }
-        for https_addr in https_addrs {
-            server = server.bind_rustls(https_addr, tls_config.clone())?;
+        if !https_addrs.is_empty() {
+            let tls_config = acme_service::server_config();
+            for https_addr in https_addrs {
+                #[cfg(unix)]
+                match https_addr {
+                    SocketAddr::V6(v6addr) => {
+                        let listener = create_v6only_listener(&v6addr)?;
+                        server = server.listen_rustls(listener, tls_config.clone())?;
+                    },
+                    _ => {
+                        server = server.bind_rustls(https_addr, tls_config.clone())?;
+                    },
+                }
+                #[cfg(not(unix))]
+                {
+                    server = server.bind_rustls(https_addr, tls_config.clone())?;
+                }
+            }
         }
         if let Some(worker_count) = worker_count {
             server = server.workers(worker_count);
@@ -185,4 +229,14 @@ pub fn app(
         actix_web::rt::System::current().stop();
         Ok(())
     })
+}
+
+#[cfg(unix)]
+fn create_v6only_listener(addr: &SocketAddrV6) -> std::io::Result<TcpListener> {
+    let sock = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))?;
+    sock.set_only_v6(true)?;
+    sock.bind(&addr.clone().into())?;
+    sock.set_reuse_address(true)?;
+    sock.listen(BACKLOG)?;
+    Ok(TcpListener::from(sock))
 }

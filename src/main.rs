@@ -14,7 +14,7 @@
 
 use std::{
     env,
-    net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
     ops::DerefMut,
 };
 
@@ -70,34 +70,28 @@ async fn main() -> Result<()> {
         })
         .unwrap_or(DEFAULT_HTTPS_PORT);
 
-    let mut actix_wrapper = ControllerAppWrapper::start_new_server(
-        conn,
-        vec![
-            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), http_port).into(),
-            ("::", http_port).to_socket_addrs().unwrap().into_iter().next().unwrap(),
-        ],
-        vec![
-            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), https_port).into(),
-            ("::", https_port)
-                .to_socket_addrs()
-                .unwrap()
-                .into_iter()
-                .next()
-                .unwrap(),
-        ],
-        None,
-    )
-    .await
-    .unwrap_or_else(|(e, wrp)| {
+    let http_addrs = vec![
+        SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, http_port, 0, 0).into(),
+        SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, http_port).into(),
+    ];
+
+    let https_addrs = vec![
+        SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, https_port, 0, 0).into(),
+        SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, https_port).into(),
+    ];
+
+    let actix_wrapper = ControllerAppWrapper::start_new_server(conn, http_addrs, https_addrs, None).await;
+
+    if let Err((e, wrp)) = actix_wrapper {
         error!(
             "Error while awaiting actix server start (did the server terminate unexpectedly during start?): {:?}",
             e
         );
-        wrp
-    });
-
-    let r = try_join!(rpc_server_task, job_task, actix_wrapper.deref_mut())?;
-    r.0?;
-    r.2?;
+        return wrp.stop_server().await.unwrap_or_else(|join_err| Err(join_err.into()));
+    } else if let Ok(mut actix_wrapper) = actix_wrapper {
+        let r = try_join!(rpc_server_task, job_task, actix_wrapper.deref_mut())?;
+        r.0?;
+        r.2?;
+    }
     Ok(())
 }
