@@ -32,12 +32,12 @@ pub struct UpdateUserDto {
     pub username: Option<String>,
 }
 
-#[derive(Serialize, Apiv2Schema)]
+#[derive(Serialize, Deserialize, Apiv2Schema)]
 pub struct TokenDto {
     pub token: String,
 }
 
-#[derive(Serialize, Apiv2Schema)]
+#[derive(Serialize, Deserialize, Apiv2Schema)]
 pub struct SuccessDto {
     pub status: String,
 }

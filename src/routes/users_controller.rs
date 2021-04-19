@@ -12,12 +12,9 @@ use crate::{
     error::Result,
     models::User,
     routes::dtos::{
-        LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
-        UserConfigValueDto,
+        LoginDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
     },
-    services::{
-        config_service, config_service::ConfigKeys, role_service::Permission, user_config_service, user_service,
-    },
+    services::{config_service, config_service::ConfigKeys, user_config_service, user_service},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -27,7 +24,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/me", web::get().to(get_me));
     cfg.route("/me", web::post().to(update_me));
     cfg.route("/password", web::post().to(update_password));
-    cfg.route("/roles", web::get().to(get_roles));
     cfg.route("/configs", web::get().to(get_users_configs));
     cfg.route("/configs/{key}", web::get().to(get_users_config));
     cfg.route("/configs/{key}", web::post().to(set_users_config));
@@ -167,7 +163,7 @@ pub fn update_password(
         .fail()
     })?;
 
-    let mut user = user_service::find_by_id(auth.sub, &pool).await?;
+    let user = user_service::find_by_id(auth.sub, &pool).await?;
 
     user.verify_password(&update_password_dto.old_password).or_else(|_| {
         error::ResponseError {
@@ -177,31 +173,11 @@ pub fn update_password(
         .fail()
     })?;
 
-    user.password = User::hash_password(&update_password_dto.new_password, &user.salt)?;
-
-    user_service::update_password(&user, &pool).await?;
+    user_service::update_password(auth.sub, &update_password_dto.new_password, &pool).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
     }))
-}
-
-#[api_v2_operation(summary = "Retrieve all roles")]
-pub fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
-    auth.require_permission(Permission::role__list)?;
-
-    let roles = user_service::get_all_roles(&pool).await?;
-
-    Ok(Json(
-        roles
-            .into_iter()
-            .map(|r| RoleDto {
-                id: r.id,
-                name: r.name,
-                permissions: r.permissions.split(',').map(ToOwned::to_owned).collect(),
-            })
-            .collect(),
-    ))
 }
 
 #[api_v2_operation(summary = "Gets the config variables of the user")]

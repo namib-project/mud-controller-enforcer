@@ -54,3 +54,6 @@ get_if_addrs = "^0.5.3"
 url = "^2.2.1"
 backoff = { version = "^0.3.0", features = ["tokio"] }
 neo4things-api = { path = "neo4things-api" }
+
+[target.'cfg(unix)'.dependencies]
+socket2 = "0.4.0"

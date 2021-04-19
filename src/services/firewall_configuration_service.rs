@@ -219,7 +219,6 @@ mod tests {
         ];
 
         let merged_acls = merge_acls(&original_acls, &override_acls);
-        println!("Merged: {:#?}", merged_acls);
 
         let to_device_acl = merged_acls
             .iter()
@@ -320,8 +319,6 @@ mod tests {
 
         let x = convert_device_to_fw_rules(&device);
 
-        println!("{:#?}", x);
-
         let resulting_device = FirewallDevice {
             id: device.id,
             ipv4_addr: device.ipv4_addr,
@@ -409,8 +406,6 @@ mod tests {
         };
 
         let x = convert_device_to_fw_rules(&device);
-
-        println!("{:#?}", x);
 
         let resulting_device = FirewallDevice {
             id: device.id,

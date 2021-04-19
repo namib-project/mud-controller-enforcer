@@ -17,7 +17,7 @@ async fn test_create_mud() -> Result<()> {
     let ctx = lib::IntegrationTestContext::new("test_create_mud").await;
 
     mud_controller::create_mud(
-        web::Data::new(ctx.db_conn),
+        web::Data::new(ctx.db_conn.clone()),
         AuthToken::generate_access_token(1, "admin".to_string(), vec!["**".to_string()]),
         web::Json(MudCreationDto {
             mud_url: "Some Mud".to_string(),
