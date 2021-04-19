@@ -759,7 +759,7 @@ async fn test_user_config_delete_entry_non_existing() -> Result<()> {
     assert_delete_status(
         &client,
         format!("http://{}/users/configs/testkey_non_existing", server_addr).as_str(),
-        StatusCode::NOT_FOUND,
+        StatusCode::NO_CONTENT,
     )
     .await;
 
