@@ -1,16 +1,81 @@
-use std::{env, net::SocketAddr, time::Duration};
+use std::{
+    env,
+    net::SocketAddr,
+    ops::{Deref, DerefMut},
+    time::Duration,
+};
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{dev::Service, middleware, App, HttpServer};
 use lazy_static::{lazy_static, LazyStatic};
 use paperclip::actix::{web, OpenApiExt};
-use tokio::sync::oneshot;
+use tokio::{
+    sync::{oneshot, oneshot::error::RecvError},
+    task::{JoinError, JoinHandle},
+};
 
 use crate::{db::DbConnection, error::Result, routes, services::acme_service};
 
 lazy_static! {
     static ref RT: tokio::runtime::Handle = tokio::runtime::Handle::current();
+}
+
+#[derive(Debug)]
+pub struct ControllerAppWrapper {
+    end_server_send: oneshot::Sender<()>,
+    server_join_handle: JoinHandle<Result<()>>,
+}
+
+impl ControllerAppWrapper {
+    pub async fn start_new_server(
+        conn: DbConnection,
+        http_addrs: Vec<SocketAddr>,
+        https_addrs: Vec<SocketAddr>,
+        worker_count: Option<usize>,
+    ) -> core::result::Result<ControllerAppWrapper, (RecvError, ControllerAppWrapper)> {
+        let (end_server_send, end_server_recv) = oneshot::channel();
+        let (startup_finish_send, startup_finish_recv) = oneshot::channel();
+        let server_join_handle = tokio::task::spawn_blocking(move || {
+            app(
+                conn,
+                end_server_recv,
+                http_addrs,
+                https_addrs,
+                worker_count,
+                startup_finish_send,
+            )
+        });
+        let wrapper = ControllerAppWrapper {
+            end_server_send,
+            server_join_handle,
+        };
+        if let Err(e) = startup_finish_recv.await {
+            return Err((e, wrapper));
+        }
+        Ok(wrapper)
+    }
+
+    pub async fn stop_server(self) -> core::result::Result<Result<()>, JoinError> {
+        self.end_server_send
+            .send(())
+            .unwrap_or_else(|e| warn!("Unable to send termination signal to actix server: {:?}", e));
+        self.server_join_handle.await
+    }
+}
+
+impl Deref for ControllerAppWrapper {
+    type Target = JoinHandle<Result<()>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.server_join_handle
+    }
+}
+
+impl DerefMut for ControllerAppWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.server_join_handle
+    }
 }
 
 pub fn app(
@@ -19,7 +84,7 @@ pub fn app(
     http_addrs: Vec<SocketAddr>,
     https_addrs: Vec<SocketAddr>,
     worker_count: Option<usize>,
-    finished_startup_sender: Option<oneshot::Sender<()>>,
+    finished_startup_sender: oneshot::Sender<()>,
 ) -> Result<()> {
     LazyStatic::initialize(&RT);
     actix_web::rt::System::new("main").block_on(async move {
@@ -110,11 +175,9 @@ pub fn app(
             server = server.workers(worker_count);
         }
         let server_instance = server.run();
-        if let Some(finished_startup_sender) = finished_startup_sender {
-            finished_startup_sender
-                .send(())
-                .unwrap_or_else(|e| warn!("Could not notify caller of finished startup: {:?}", e));
-        }
+        finished_startup_sender
+            .send(())
+            .unwrap_or_else(|e| warn!("Could not notify caller of finished startup: {:?}", e));
         end_server
             .await
             .unwrap_or_else(|e| warn!("Error while waiting for server end signal: {:?}", e));

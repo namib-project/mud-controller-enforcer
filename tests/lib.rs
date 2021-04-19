@@ -4,25 +4,22 @@ use std::net::SocketAddr;
 
 use dotenv::dotenv;
 use futures::executor::block_on;
-use log::{debug, error, info};
+use log::{debug, info};
 use namib_mud_controller::{
-    controller::app,
+    controller::ControllerAppWrapper,
     db::DbConnection,
     error::Result,
     routes::dtos::{LoginDto, SignupDto, SuccessDto, TokenDto},
 };
 use reqwest::{header::HeaderMap, Client, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
-use snafu::{Backtrace, GenerateBacktrace};
 use sqlx::migrate;
-use tokio::{sync::oneshot, task::JoinHandle};
 
 pub struct IntegrationTestContext {
     pub db_url: String,
     pub db_name: &'static str,
     pub db_conn: DbConnection,
-    server_task: Option<JoinHandle<Result<()>>>,
-    end_signal_send: Option<oneshot::Sender<()>>,
+    server_instance: Option<ControllerAppWrapper>,
 }
 
 impl IntegrationTestContext {
@@ -78,8 +75,7 @@ impl IntegrationTestContext {
             db_url,
             db_name,
             db_conn,
-            server_task: None,
-            end_signal_send: None,
+            server_instance: None,
         }
     }
 
@@ -93,61 +89,28 @@ impl IntegrationTestContext {
     // Not actually dead code, wrongly detected as such because it is in lib.rs.
     #[allow(dead_code)]
     pub async fn start_test_server(&mut self) -> SocketAddr {
-        if self.server_task.is_some() {
+        if self.server_instance.is_some() {
             panic!(
                 "start_test_server() called even though a server instance is already running for the given context."
             );
         }
-        let (end_signal_send, end_signal_rec) = tokio::sync::oneshot::channel();
-        self.end_signal_send = Some(end_signal_send);
         let conn = self.db_conn.clone();
         let server_addr = actix_web::test::unused_addr();
-        let (startup_complete_send, startup_complete_recv) = tokio::sync::oneshot::channel();
-        self.server_task = Some(tokio::task::spawn_blocking(move || {
-            app(
-                conn,
-                end_signal_rec,
-                vec![server_addr.clone()],
-                Vec::new(),
-                Some(2),
-                Some(startup_complete_send),
-            )
-        }));
-        startup_complete_recv.await.unwrap();
+        self.server_instance = Some(
+            ControllerAppWrapper::start_new_server(conn, vec![server_addr.clone()], Vec::new(), Some(2))
+                .await
+                .expect("Error while starting server."),
+        );
         server_addr
     }
 
     /// Stops the test server instance created from this context.
     pub async fn stop_test_server(&mut self) -> Result<()> {
-        if let Some(ess) = self.end_signal_send.take() {
-            ess.send(()).unwrap();
-            if let Some(st) = self.server_task.take() {
-                match st.await {
-                    Ok(Ok(())) => {},
-                    Ok(Err(e)) => {
-                        error!("Error in HTTP Server: {:?}", e);
-                        return Err(e);
-                    },
-                    Err(e) => {
-                        error!("Error while stopping HTTP Server: {:?}", e);
-                        return Err(namib_mud_controller::error::Error::NoneError {
-                            backtrace: Backtrace::generate(),
-                        });
-                    },
-                }
-            } else {
-                error!("Error while acquiring server task.");
-                return Err(namib_mud_controller::error::Error::NoneError {
-                    backtrace: Backtrace::generate(),
-                });
-            }
+        if let Some(server_instance) = self.server_instance.take() {
+            server_instance.stop_server().await.unwrap_or_else(|e| Err(e.into()))
         } else {
-            error!("Error while acquiring server end signal sender.");
-            return Err(namib_mud_controller::error::Error::NoneError {
-                backtrace: Backtrace::generate(),
-            });
+            panic!("Attempted to stop server that was not started.");
         }
-        Ok(())
     }
 }
 
@@ -168,7 +131,7 @@ impl Drop for IntegrationTestContext {
 impl Drop for IntegrationTestContext {
     /// Removes/cleans the DB context
     fn drop(&mut self) {
-        if self.server_task.is_some() {
+        if self.server_instance.is_some() {
             block_on(self.stop_test_server()).unwrap();
             info!("Stopped HTTP server");
         }

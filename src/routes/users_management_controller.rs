@@ -95,12 +95,11 @@ pub async fn update_user_by_id(
     let mut user = user_service::find_by_id(user_id.0, &pool).await?;
     user.username = update_user_dto.0.username;
 
-    user_service::update_username(&user, &pool).await?;
-
     if let Some(password) = update_user_dto.0.password {
         user.update_password(&password)?;
-        user_service::update_password(&user, &pool).await?;
     }
+
+    user_service::update(&user, &pool).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }

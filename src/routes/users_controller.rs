@@ -2,7 +2,6 @@
 
 use actix_web::{http::StatusCode, HttpResponse};
 use paperclip::actix::{api_v2_operation, web, web::Json};
-use rand::{rngs::OsRng, Rng};
 use snafu::ensure;
 use validator::Validate;
 
@@ -11,7 +10,7 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    models::{User, SALT_LENGTH},
+    models::User,
     routes::dtos::{
         LoginDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
     },
@@ -164,7 +163,7 @@ pub fn update_password(
         .fail()
     })?;
 
-    let mut user = user_service::find_by_id(auth.sub, &pool).await?;
+    let user = user_service::find_by_id(auth.sub, &pool).await?;
 
     user.verify_password(&update_password_dto.old_password).or_else(|_| {
         error::ResponseError {
@@ -174,12 +173,7 @@ pub fn update_password(
         .fail()
     })?;
 
-    let mut salt = vec![0u8; SALT_LENGTH];
-    OsRng::default().fill(salt.as_mut_slice());
-    user.password = User::hash_password(&update_password_dto.new_password, &salt)?;
-    user.salt = salt;
-
-    user_service::update_password(&user, &pool).await?;
+    user_service::update_password(auth.sub, &update_password_dto.new_password, &pool).await?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),

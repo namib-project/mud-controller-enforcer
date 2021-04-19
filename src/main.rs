@@ -15,10 +15,14 @@
 use std::{
     env,
     net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
+    ops::DerefMut,
 };
 
 use dotenv::dotenv;
-use namib_mud_controller::{controller::app, db, error::Result, rpc_server, services::job_service, VERSION};
+use log::{error, warn};
+use namib_mud_controller::{
+    controller::ControllerAppWrapper, db, error::Result, rpc_server, services::job_service, VERSION,
+};
 use tokio::try_join;
 
 const DEFAULT_HTTP_PORT: u16 = 8000;
@@ -37,53 +41,57 @@ async fn main() -> Result<()> {
     // Starts a new job that updates the expired profiles at regular intervals.
     let job_task = tokio::task::spawn(job_service::start_jobs(conn.clone()));
 
-    let (_end_signal_send, end_signal_rec) = tokio::sync::oneshot::channel();
-    let actix_task = tokio::task::spawn_blocking(move || {
-        app(
-            conn,
-            end_signal_rec,
-            vec![
-                SocketAddrV4::new(
-                    Ipv4Addr::new(0, 0, 0, 0),
-                    env::var("HTTP_PORT")
-                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTP_PORT))
-                        .unwrap_or(DEFAULT_HTTP_PORT),
-                )
-                .into(),
-                SocketAddrV6::new(
-                    Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0),
-                    env::var("HTTP_PORT")
-                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTPS_PORT))
-                        .unwrap_or(DEFAULT_HTTPS_PORT),
-                    0,
-                    0,
-                )
-                .into(),
-            ],
-            vec![
-                SocketAddrV4::new(
-                    Ipv4Addr::new(0, 0, 0, 0),
-                    env::var("HTTPS_PORT")
-                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTPS_PORT))
-                        .unwrap_or(DEFAULT_HTTPS_PORT),
-                )
-                .into(),
-                SocketAddrV6::new(
-                    Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0),
-                    env::var("HTTPS_PORT")
-                        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_HTTPS_PORT))
-                        .unwrap_or(DEFAULT_HTTPS_PORT),
-                    0,
-                    0,
-                )
-                .into(),
-            ],
-            None,
-            None,
-        )
+    let http_port = env::var("HTTP_PORT")
+        .map_err(|e| warn!("Could not get HTTP_PORT environment variable, using default port instead: {:?}", e))
+        .ok()
+        .and_then(|v| {
+            v.parse::<u16>()
+                .map_err(|e| {
+                    warn!(
+                        "Could not parse HTTP_PORT environment variable, using default port instead  (is it a valid port number?): {:?}",
+                        e
+                    )
+                })
+                .ok()
+        })
+        .unwrap_or(DEFAULT_HTTP_PORT);
+    let https_port = env::var("HTTPS_PORT")
+        .map_err(|e| warn!("Could not get HTTPS_PORT environment variable, using default port instead: {:?}", e))
+        .ok()
+        .and_then(|v| {
+            v.parse::<u16>()
+                .map_err(|e| {
+                    warn!(
+                        "Could not parse HTTPS_PORT environment variable, using default port instead (is it a valid port number?): {:?}",
+                        e
+                    )
+                })
+                .ok()
+        })
+        .unwrap_or(DEFAULT_HTTPS_PORT);
+
+    let mut actix_wrapper = ControllerAppWrapper::start_new_server(
+        conn,
+        vec![
+            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), http_port).into(),
+            SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), http_port, 0, 0).into(),
+        ],
+        vec![
+            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), https_port).into(),
+            SocketAddrV6::new(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), https_port, 0, 0).into(),
+        ],
+        None,
+    )
+    .await
+    .unwrap_or_else(|(e, wrp)| {
+        error!(
+            "Error while awaiting actix server start (did the server terminate unexpectedly during start?): {:?}",
+            e
+        );
+        wrp
     });
 
-    let r = try_join!(rpc_server_task, job_task, actix_task)?;
+    let r = try_join!(rpc_server_task, job_task, actix_wrapper.deref_mut())?;
     r.0?;
     r.2?;
     Ok(())
