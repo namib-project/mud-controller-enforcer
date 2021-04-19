@@ -125,7 +125,7 @@ impl Drop for IntegrationTestContext {
             info!("Stopped HTTP server");
         }
         if let Err(e) =
-            block_on(sqlx::query(("DROP DATABASE ".to_owned() + self.db_name).as_str()).execute(&self.db_conn))
+            block_on(sqlx::query(("DROP DATABASE __".to_owned() + self.db_name).as_str()).execute(&self.db_conn))
         {
             error!("Error while dropping database {}: {:?}", self.db_name, e)
         }
