@@ -1,24 +1,13 @@
-use std::{env, net::SocketAddr, ops::Deref, rc::Rc, time::Duration};
+use std::{env, net::SocketAddr, time::Duration};
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{dev::Service, middleware, App, HttpServer};
-use dotenv::dotenv;
 use lazy_static::{lazy_static, LazyStatic};
 use paperclip::actix::{web, OpenApiExt};
-use tokio::{
-    select,
-    sync::{oneshot, oneshot::Sender},
-};
+use tokio::sync::oneshot;
 
-use crate::{
-    db,
-    db::DbConnection,
-    error::Result,
-    routes,
-    services::{acme_service, job_service},
-    VERSION,
-};
+use crate::{db::DbConnection, error::Result, routes, services::acme_service};
 
 lazy_static! {
     static ref RT: tokio::runtime::Handle = tokio::runtime::Handle::current();
@@ -126,7 +115,9 @@ pub fn app(
                 .send(())
                 .unwrap_or_else(|e| warn!("Could not notify caller of finished startup: {:?}", e));
         }
-        end_server.await;
+        end_server
+            .await
+            .unwrap_or_else(|e| warn!("Error while waiting for server end signal: {:?}", e));
         server_instance.stop(true).await;
         actix_web::rt::System::current().stop();
         Ok(())

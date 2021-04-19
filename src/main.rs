@@ -15,24 +15,10 @@
 use std::{
     env,
     net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
-    time::Duration,
 };
 
-use actix_cors::Cors;
-use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
-use actix_web::{middleware, App, HttpServer};
 use dotenv::dotenv;
-use lazy_static::LazyStatic;
-use namib_mud_controller::{
-    controller::app,
-    db,
-    db::DbConnection,
-    error::Result,
-    routes, rpc_server,
-    services::{acme_service, job_service},
-    VERSION,
-};
-use paperclip::actix::{web, OpenApiExt};
+use namib_mud_controller::{controller::app, db, error::Result, rpc_server, services::job_service, VERSION};
 use tokio::try_join;
 
 const DEFAULT_HTTP_PORT: u16 = 8000;

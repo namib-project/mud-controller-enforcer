@@ -13,12 +13,9 @@ use crate::{
     error::Result,
     models::{User, SALT_LENGTH},
     routes::dtos::{
-        LoginDto, RoleDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto,
-        UserConfigValueDto,
+        LoginDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
     },
-    services::{
-        config_service, config_service::ConfigKeys, role_service::Permission, user_config_service, user_service,
-    },
+    services::{config_service, config_service::ConfigKeys, user_config_service, user_service},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {

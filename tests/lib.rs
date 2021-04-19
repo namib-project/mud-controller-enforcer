@@ -1,10 +1,6 @@
 #[cfg(feature = "postgres")]
 use std::env;
-use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    str::FromStr,
-    sync::Arc,
-};
+use std::net::SocketAddr;
 
 use dotenv::dotenv;
 use futures::executor::block_on;
@@ -18,23 +14,15 @@ use namib_mud_controller::{
 use reqwest::{header::HeaderMap, Client, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 use snafu::{Backtrace, GenerateBacktrace};
-use sqlx::{migrate, sqlite::SqliteConnectOptions};
-use tokio::{
-    sync::{
-        oneshot::{Receiver, Sender},
-        Mutex,
-    },
-    task::JoinHandle,
-};
-
-pub const API_TEST_SOCKADDR: &str = "127.0.0.1:0";
+use sqlx::migrate;
+use tokio::{sync::oneshot, task::JoinHandle};
 
 pub struct IntegrationTestContext {
     pub db_url: String,
     pub db_name: &'static str,
     pub db_conn: DbConnection,
     server_task: Option<JoinHandle<Result<()>>>,
-    end_signal_send: Option<Sender<()>>,
+    end_signal_send: Option<oneshot::Sender<()>>,
 }
 
 impl IntegrationTestContext {
@@ -95,7 +83,21 @@ impl IntegrationTestContext {
         }
     }
 
+    /// Start a test server instance of the controller using the database of this context and return
+    /// the socket address under which it is available.
+    ///
+    /// The socket address is chosen at random using actix_web::test::unused_addr().
+    ///
+    /// Note that you should make sure to stop the server using stop_test_server() to ensure that potential
+    /// errors in the server instance are caught.
+    // Not actually dead code, wrongly detected as such because it is in lib.rs.
+    #[allow(dead_code)]
     pub async fn start_test_server(&mut self) -> SocketAddr {
+        if self.server_task.is_some() {
+            panic!(
+                "start_test_server() called even though a server instance is already running for the given context."
+            );
+        }
         let (end_signal_send, end_signal_rec) = tokio::sync::oneshot::channel();
         self.end_signal_send = Some(end_signal_send);
         let conn = self.db_conn.clone();
@@ -111,10 +113,11 @@ impl IntegrationTestContext {
                 Some(startup_complete_send),
             )
         }));
-        startup_complete_recv.await;
+        startup_complete_recv.await.unwrap();
         server_addr
     }
 
+    /// Stops the test server instance created from this context.
     pub async fn stop_test_server(&mut self) -> Result<()> {
         if let Some(ess) = self.end_signal_send.take() {
             ess.send(()).unwrap();
@@ -165,13 +168,18 @@ impl Drop for IntegrationTestContext {
 impl Drop for IntegrationTestContext {
     /// Removes/cleans the DB context
     fn drop(&mut self) {
-        if (self.server_task.is_some()) {
+        if self.server_task.is_some() {
             block_on(self.stop_test_server()).unwrap();
             info!("Stopped HTTP server");
         }
     }
 }
 
+/// Create an HTTP client suitable for performing authorized requests to the API.
+/// To accomplish this, this call will also create the admin user by calling the /users/signup endpoint.
+/// This function should only be called once per test (server) instance.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
 pub async fn create_authorized_http_client(server_addr: &SocketAddr) -> (Client, TokenDto) {
     let signup_dto = SignupDto {
         username: String::from("admin"),
@@ -211,6 +219,11 @@ pub async fn create_authorized_http_client(server_addr: &SocketAddr) -> (Client,
     )
 }
 
+/// Perform a POST request to the API using the given client, url, body and expected status code
+/// and deserialize the result using reqwest::async_impl::Response::json().
+/// Will fail if the status code does not match or either the request itself or deserialization fails.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
 pub async fn assert_post_status_deserialize<B: Serialize+?Sized, O: DeserializeOwned>(
     client: &Client,
     url: &str,
@@ -222,14 +235,27 @@ pub async fn assert_post_status_deserialize<B: Serialize+?Sized, O: DeserializeO
     req_result.json().await.unwrap()
 }
 
+/// Perform a POST request to the API using the given client, url, body and expected status code.
+/// Will fail if the status code does not match or the request itself fails.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
 pub async fn assert_post_status<B: Serialize+?Sized>(client: &Client, url: &str, body: &B, status_code: StatusCode) {
     assert_eq!(client.post(url).json(body).send().await.unwrap().status(), status_code)
 }
 
+/// Perform a DELETE request to the API using the given client, url and expected status code.
+/// Will fail if the status code does not match or the request itself fails.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
 pub async fn assert_delete_status(client: &Client, url: &str, status_code: StatusCode) {
     assert_eq!(client.delete(url).send().await.unwrap().status(), status_code)
 }
 
+/// Perform a GET request to the API using the given client, url and expected status code and
+/// deserialize the result using reqwest::async_impl::Response::json().
+/// Will fail if the status code does not match or either the request itself or deserialization fails.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
 pub async fn assert_get_status_deserialize<O: DeserializeOwned>(
     client: &Client,
     url: &str,
@@ -240,6 +266,10 @@ pub async fn assert_get_status_deserialize<O: DeserializeOwned>(
     req_result.json().await.unwrap()
 }
 
+/// Perform a GET request to the API using the given client, url and expected status code.
+/// Will fail if the status code does not match or the request itself fails.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
 pub async fn assert_get_status(client: &Client, url: &str, status_code: StatusCode) {
     assert_eq!(client.get(url).send().await.unwrap().status(), status_code)
 }

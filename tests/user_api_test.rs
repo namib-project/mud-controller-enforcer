@@ -1,30 +1,20 @@
 mod lib;
-use std::thread;
 
-use actix_web::{
-    dev::Service,
-    rt::{spawn, Arbiter},
-    web::head,
-};
-use futures::TryFutureExt;
 use lib::{
     assert_delete_status, assert_get_status, assert_get_status_deserialize, assert_post_status,
     assert_post_status_deserialize,
 };
-use log::{debug, info};
+use log::info;
 use namib_mud_controller::{
-    controller::app,
-    db::DbConnection,
     error::Result,
-    models::{Role, User},
+    models::Role,
     routes::dtos::{
-        DeviceDto, LoginDto, SignupDto, StatusDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto,
-        UserConfigDto, UserConfigValueDto,
+        LoginDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
     },
-    services::{role_service::ROLE_ID_ADMIN, user_service},
+    services::role_service::ROLE_ID_ADMIN,
 };
-use reqwest::{header::HeaderMap, Client, StatusCode};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use reqwest::{header::HeaderMap, StatusCode};
+use serde::Deserialize;
 use serde_json::json;
 use tokio::time::{sleep, Duration};
 
@@ -588,9 +578,11 @@ async fn test_user_config_add_multiple_entries() -> Result<()> {
         "SELECT COUNT(*) AS count FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ?",
         "admin"
     )
-    .fetch_all(&ctx.db_conn)
+    .fetch_one(&ctx.db_conn)
     .await
-    .unwrap();
+    .unwrap()
+    .count;
+    assert_eq!(db_configs_count, 2);
 
     let db_config_1 = sqlx::query_as!(
         UserConfigDto,
@@ -770,7 +762,7 @@ async fn test_user_config_delete_entry_non_existing() -> Result<()> {
     )
     .await;
 
-    assert_eq!(configs.len(), 0);
+    assert_eq!(configs.len(), 1);
 
     let db_configs = sqlx::query_as!(
         UserConfigDto,
