@@ -47,7 +47,7 @@ async fn test_signup() -> Result<()> {
     assert_eq!(result.permissions.len(), 1);
 
     let user_count = sqlx::query!(
-        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ? AND r.role_id = ?", 
+        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1 AND r.role_id = $2", 
         "admin", 
         ROLE_ID_ADMIN
     ).fetch_one(&ctx.db_conn).await.unwrap().count;
@@ -131,7 +131,7 @@ async fn test_signup_already_created() -> Result<()> {
     )
     .await;
 
-    let user_count = sqlx::query!("SELECT COUNT(*) AS count FROM users WHERE username = ?", "admin2")
+    let user_count = sqlx::query!("SELECT COUNT(*) AS count FROM users WHERE username = $1", "admin2")
         .fetch_one(&ctx.db_conn)
         .await
         .unwrap()
@@ -149,7 +149,7 @@ async fn test_pw_update() -> Result<()> {
     let (client, _auth_token) = lib::create_authorized_http_client(&server_addr).await;
 
     let before_state = sqlx::query!(
-        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -169,7 +169,7 @@ async fn test_pw_update() -> Result<()> {
     .await;
 
     let after_state = sqlx::query!(
-        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -202,7 +202,7 @@ async fn test_pw_update_wrong_old_pw() -> Result<()> {
     let (client, _auth_token) = lib::create_authorized_http_client(&server_addr).await;
 
     let before_state = sqlx::query!(
-        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -222,7 +222,7 @@ async fn test_pw_update_wrong_old_pw() -> Result<()> {
     .await;
 
     let after_state = sqlx::query!(
-        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -244,7 +244,7 @@ async fn test_pw_update_not_logged_in() -> Result<()> {
     let client = reqwest::Client::new();
 
     let before_state = sqlx::query!(
-        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -264,7 +264,7 @@ async fn test_pw_update_not_logged_in() -> Result<()> {
     .await;
 
     let after_state = sqlx::query!(
-        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT password, salt FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -296,7 +296,7 @@ async fn test_username_update() -> Result<()> {
     .await;
 
     let old_name_count = sqlx::query!(
-        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -305,7 +305,7 @@ async fn test_username_update() -> Result<()> {
     .count;
 
     let new_name_count = sqlx::query!(
-        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "new_admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -370,7 +370,7 @@ async fn test_username_update_none() -> Result<()> {
     .await;
 
     let old_name_count = sqlx::query!(
-        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = ?",
+        "SELECT COUNT(*) AS count FROM users AS u JOIN users_roles AS r ON u.id = r.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -512,7 +512,7 @@ async fn test_user_config_add_single_entry() -> Result<()> {
 
     let db_configs = sqlx::query_as!(
         UserConfigDto,
-        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ?",
+        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_all(&ctx.db_conn)
@@ -575,7 +575,7 @@ async fn test_user_config_add_multiple_entries() -> Result<()> {
     assert_eq!(config.value, "testvalue1");
 
     let db_configs_count = sqlx::query!(
-        "SELECT COUNT(*) AS count FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ?",
+        "SELECT COUNT(*) AS count FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_one(&ctx.db_conn)
@@ -586,7 +586,7 @@ async fn test_user_config_add_multiple_entries() -> Result<()> {
 
     let db_config_1 = sqlx::query_as!(
         UserConfigDto,
-        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ? AND c.key = ?",
+        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1 AND c.key = $2",
         "admin",
         "testkey1"
     )
@@ -599,7 +599,7 @@ async fn test_user_config_add_multiple_entries() -> Result<()> {
 
     let db_config_2 = sqlx::query_as!(
         UserConfigDto,
-        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ? AND c.key = ?",
+        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1 AND c.key = $2",
         "admin",
         "testkey2"
     )
@@ -666,7 +666,7 @@ async fn test_user_config_update_entry() -> Result<()> {
 
     let db_configs = sqlx::query_as!(
         UserConfigDto,
-        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ?",
+        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_all(&ctx.db_conn)
@@ -717,7 +717,7 @@ async fn test_user_config_delete_entry() -> Result<()> {
 
     let db_configs = sqlx::query_as!(
         UserConfigDto,
-        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ?",
+        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_all(&ctx.db_conn)
@@ -766,7 +766,7 @@ async fn test_user_config_delete_entry_non_existing() -> Result<()> {
 
     let db_configs = sqlx::query_as!(
         UserConfigDto,
-        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = ?",
+        "SELECT key, value FROM user_configs AS c JOIN users AS u ON u.id = c.user_id WHERE u.username = $1",
         "admin"
     )
     .fetch_all(&ctx.db_conn)

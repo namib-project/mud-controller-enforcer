@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use dotenv::dotenv;
 use futures::executor::block_on;
-use log::{debug, info};
+use log::{debug, error, info};
 use namib_mud_controller::{
     controller::ControllerAppWrapper,
     db::DbConnection,
@@ -118,11 +118,14 @@ impl IntegrationTestContext {
 impl Drop for IntegrationTestContext {
     /// Removes/cleans the DB context
     fn drop(&mut self) {
-        if (self.server_task.is_some()) {
+        if self.server_instance.is_some() {
             block_on(self.stop_test_server()).unwrap();
             info!("Stopped HTTP server");
         }
-        sqlx::query("DROP DATABASE " + self.db_name);
+        sqlx::query(("DROP DATABASE ".to_owned() + self.db_name).as_str())
+            .execute(&self.db_conn)
+            .await
+            .unwrap_or_else(|e| error!("Error while dropping database {}: {:?}", self.db_name, e));
         info!("Cleaned up database context");
     }
 }
