@@ -9,13 +9,15 @@ use std::{
 
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
-use actix_web::{dev::Service, middleware, App, HttpServer};
+use actix_web::{
+    body::MessageBody,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    middleware, App, HttpServer,
+};
 use derive_builder::Builder;
-use lazy_static::{lazy_static, LazyStatic};
+use futures::{future, future::Ready};
 use paperclip::actix::{web, OpenApiExt};
 use pin_project::pin_project;
-#[cfg(unix)]
-use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     sync::{oneshot, oneshot::error::RecvError},
     task::{JoinError, JoinHandle},
@@ -23,11 +25,7 @@ use tokio::{
 
 use crate::{db::DbConnection, error, error::Result, routes, services::acme_service};
 
-lazy_static! {
-    static ref RT: tokio::runtime::Handle = tokio::runtime::Handle::current();
-}
-
-const BACKLOG: i32 = 1024;
+const BACKLOG: i32 = 2048;
 
 #[pin_project]
 #[derive(Debug)]
@@ -54,6 +52,7 @@ impl ControllerAppBuilder {
         let controller_app = self.build().expect("Invalid app config");
         let (end_server_send, stop_server_recv) = oneshot::channel();
         let (startup_finish_send, startup_finish_recv) = oneshot::channel();
+        let tokio_handle = tokio::runtime::Handle::current();
         let server_join_handle = tokio::task::spawn_blocking(move || {
             start_app(
                 controller_app.conn,
@@ -62,6 +61,7 @@ impl ControllerAppBuilder {
                 controller_app.https_addrs,
                 controller_app.worker_count,
                 startup_finish_send,
+                tokio_handle,
             )
         });
         let wrapper = ControllerAppWrapper {
@@ -98,8 +98,8 @@ pub fn start_app(
     https_addrs: Vec<SocketAddr>,
     worker_count: usize,
     startup_finished_send: oneshot::Sender<()>,
+    tokio_handle: tokio::runtime::Handle,
 ) -> Result<()> {
-    LazyStatic::initialize(&RT);
     actix_web::rt::System::new("main").block_on(async move {
         let mut server = HttpServer::new(move || {
             let cors = Cors::default()
@@ -145,13 +145,7 @@ pub fn start_app(
                 .wrap(cors)
                 .wrap(middleware::Logger::default())
                 .wrap(rate_limiter)
-                .wrap_fn(|req, srv| {
-                    let fut = srv.call(req);
-                    async {
-                        let _hand = RT.enter();
-                        fut.await
-                    }
-                })
+                .wrap(TokioWrapper(tokio_handle.clone()))
                 .wrap_api()
                 .service(web::scope("/status").configure(routes::status_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
@@ -177,7 +171,8 @@ pub fn start_app(
                         .redirect_to_slash_directory(),
                 )
         })
-        .workers(worker_count);
+        .workers(worker_count)
+        .backlog(BACKLOG);
         // Some unix variants automatically bind to IPv4 as well when binding to IPv6
         // (Linux makes it configurable using /proc/sys/net/ipv6/bindv6only), therefore
         // causing "address already in use" errors if both IPv4 and IPv6 SockAddrs are specified.
@@ -188,39 +183,22 @@ pub fn start_app(
 
         // We need to set this explicitly, because we might not know if this default will change in
         // the future and it should match the setting we use for our own IPv6 sockets on UNIX.
-        server = server.backlog(BACKLOG);
         for http_addr in http_addrs {
-            #[cfg(unix)]
-            match http_addr {
+            if let std::net::SocketAddr::V6(v6addr) = http_addr {
                 // Special handling for IPv6: Set IPV6_V6ONLY
-                SocketAddr::V6(v6addr) => {
-                    let listener = create_v6only_listener(&v6addr)?;
-                    server = server.listen(listener)?;
-                },
-                _ => {
-                    server = server.bind(http_addr)?;
-                },
-            }
-            #[cfg(not(unix))]
-            {
+                let listener = create_v6only_listener(v6addr)?;
+                server = server.listen(listener)?;
+            } else {
                 server = server.bind(http_addr)?;
             }
         }
         if !https_addrs.is_empty() {
             let tls_config = acme_service::server_config();
             for https_addr in https_addrs {
-                #[cfg(unix)]
-                match https_addr {
-                    SocketAddr::V6(v6addr) => {
-                        let listener = create_v6only_listener(&v6addr)?;
-                        server = server.listen_rustls(listener, tls_config.clone())?;
-                    },
-                    _ => {
-                        server = server.bind_rustls(https_addr, tls_config.clone())?;
-                    },
-                }
-                #[cfg(not(unix))]
-                {
+                if let std::net::SocketAddr::V6(v6addr) = https_addr {
+                    let listener = create_v6only_listener(v6addr)?;
+                    server = server.listen_rustls(listener, tls_config.clone())?;
+                } else {
                     server = server.bind_rustls(https_addr, tls_config.clone())?;
                 }
             }
@@ -238,12 +216,83 @@ pub fn start_app(
     })
 }
 
-#[cfg(unix)]
-fn create_v6only_listener(addr: &SocketAddrV6) -> std::io::Result<TcpListener> {
+fn create_v6only_listener(addr: SocketAddrV6) -> Result<TcpListener> {
+    use socket2::{Domain, Protocol, Socket, Type};
     let sock = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))?;
     sock.set_only_v6(true)?;
-    sock.bind(&addr.clone().into())?;
     sock.set_reuse_address(true)?;
+    sock.bind(&addr.into())?;
     sock.listen(BACKLOG)?;
-    Ok(TcpListener::from(sock))
+    Ok(sock.into())
+}
+
+struct TokioWrapper(tokio::runtime::Handle);
+
+impl<S, B> Transform<S> for TokioWrapper
+where
+    S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=actix_web::error::Error>,
+    B: MessageBody,
+{
+    type Error = actix_web::error::Error;
+    type Future = Ready<std::result::Result<Self::Transform, Self::InitError>>;
+    type InitError = ();
+    type Request = ServiceRequest;
+    type Response = ServiceResponse<B>;
+    type Transform = TokioMiddleware<S>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        future::ok(TokioMiddleware {
+            handle: self.0.clone(),
+            service,
+        })
+    }
+}
+
+struct TokioMiddleware<S> {
+    handle: tokio::runtime::Handle,
+    service: S,
+}
+
+impl<S, B> Service for TokioMiddleware<S>
+where
+    S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=actix_web::error::Error>,
+    B: MessageBody,
+{
+    type Error = actix_web::error::Error;
+    type Future = TokioResponse<S>;
+    type Request = ServiceRequest;
+    type Response = ServiceResponse<B>;
+
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+        self.service.poll_ready(ctx)
+    }
+
+    fn call(&mut self, req: Self::Request) -> TokioResponse<S> {
+        TokioResponse {
+            borrow: self.handle.clone(),
+            fut: self.service.call(req),
+        }
+    }
+}
+
+#[pin_project::pin_project]
+pub struct TokioResponse<S>
+where
+    S: Service,
+{
+    #[pin]
+    fut: S::Future,
+    borrow: tokio::runtime::Handle,
+}
+
+impl<S, B> Future for TokioResponse<S>
+where
+    S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=actix_web::error::Error>,
+{
+    type Output = std::result::Result<ServiceResponse<B>, actix_web::error::Error>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let _guard = self.borrow.enter();
+        self.project().fut.poll(cx)
+    }
 }

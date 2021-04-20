@@ -6,7 +6,6 @@ use lib::{
 };
 use log::info;
 use namib_mud_controller::{
-    error::Result,
     models::Role,
     routes::dtos::{
         LoginDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
@@ -27,7 +26,7 @@ pub struct UserResult {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signup() -> Result<()> {
+async fn test_signup() {
     let ctx = lib::IntegrationTestContext::new("test_signup")
         .await
         .start_test_server()
@@ -54,12 +53,10 @@ async fn test_signup() -> Result<()> {
         ROLE_ID_ADMIN
     ).fetch_one(&ctx.db_conn).await.unwrap().count;
     assert_eq!(user_count, 1);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signup_missing_username() -> Result<()> {
+async fn test_signup_missing_username() {
     let ctx = lib::IntegrationTestContext::new("test_first_signup_missing_username")
         .await
         .start_test_server()
@@ -83,12 +80,10 @@ async fn test_signup_missing_username() -> Result<()> {
         .unwrap()
         .count;
     assert_eq!(user_count, 0);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signup_missing_password() -> Result<()> {
+async fn test_signup_missing_password() {
     let ctx = lib::IntegrationTestContext::new("test_first_signup_missing_password")
         .await
         .start_test_server()
@@ -112,12 +107,10 @@ async fn test_signup_missing_password() -> Result<()> {
         .unwrap()
         .count;
     assert_eq!(user_count, 0);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signup_already_created() -> Result<()> {
+async fn test_signup_already_created() {
     let ctx = lib::IntegrationTestContext::new("test_signup_already_created")
         .await
         .start_test_server()
@@ -142,12 +135,10 @@ async fn test_signup_already_created() -> Result<()> {
         .unwrap()
         .count;
     assert_eq!(user_count, 1);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_pw_update() -> Result<()> {
+async fn test_pw_update() {
     let ctx = lib::IntegrationTestContext::new("test_pw_update")
         .await
         .start_test_server()
@@ -196,12 +187,10 @@ async fn test_pw_update() -> Result<()> {
         StatusCode::OK,
     )
     .await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_pw_update_wrong_old_pw() -> Result<()> {
+async fn test_pw_update_wrong_old_pw() {
     let ctx = lib::IntegrationTestContext::new("test_pw_update_wrong_old_pw")
         .await
         .start_test_server()
@@ -238,12 +227,10 @@ async fn test_pw_update_wrong_old_pw() -> Result<()> {
 
     assert_eq!(before_state.password, after_state.password);
     assert_eq!(before_state.salt, after_state.salt);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_pw_update_not_logged_in() -> Result<()> {
+async fn test_pw_update_not_logged_in() {
     let ctx = lib::IntegrationTestContext::new("test_pw_update_not_logged_in")
         .await
         .start_test_server()
@@ -281,12 +268,10 @@ async fn test_pw_update_not_logged_in() -> Result<()> {
 
     assert_eq!(before_state.password, after_state.password);
     assert_eq!(before_state.salt, after_state.salt);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_username_update() -> Result<()> {
+async fn test_username_update() {
     let ctx = lib::IntegrationTestContext::new("test_username_update")
         .await
         .start_test_server()
@@ -336,12 +321,10 @@ async fn test_username_update() -> Result<()> {
         StatusCode::OK,
     )
     .await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_username_update_not_logged_in() -> Result<()> {
+async fn test_username_update_not_logged_in() {
     let ctx = lib::IntegrationTestContext::new("test_username_update_not_logged_in")
         .await
         .start_test_server()
@@ -359,12 +342,10 @@ async fn test_username_update_not_logged_in() -> Result<()> {
         StatusCode::UNAUTHORIZED,
     )
     .await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_username_update_none() -> Result<()> {
+async fn test_username_update_none() {
     let ctx = lib::IntegrationTestContext::new("test_username_update_none")
         .await
         .start_test_server()
@@ -402,12 +383,10 @@ async fn test_username_update_none() -> Result<()> {
         StatusCode::OK,
     )
     .await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_token_refresh() -> Result<()> {
+async fn test_token_refresh() {
     let ctx = lib::IntegrationTestContext::new("test_token_refresh")
         .await
         .start_test_server()
@@ -442,12 +421,10 @@ async fn test_token_refresh() -> Result<()> {
     .await;
     info!("{:?}", result);
     assert_eq!(result.username, "admin");
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_empty() -> Result<()> {
+async fn test_user_config_empty() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_empty")
         .await
         .start_test_server()
@@ -462,12 +439,10 @@ async fn test_user_config_empty() -> Result<()> {
     .await;
 
     assert!(configs.is_empty());
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_not_logged_in() -> Result<()> {
+async fn test_user_config_not_logged_in() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_not_logged_in")
         .await
         .start_test_server()
@@ -481,12 +456,10 @@ async fn test_user_config_not_logged_in() -> Result<()> {
         StatusCode::UNAUTHORIZED,
     )
     .await;
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_add_single_entry() -> Result<()> {
+async fn test_user_config_add_single_entry() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_add_single_entry")
         .await
         .start_test_server()
@@ -537,12 +510,10 @@ async fn test_user_config_add_single_entry() -> Result<()> {
     assert_eq!(db_configs.len(), 1);
     assert_eq!(db_configs.get(0).unwrap().key, "testkey1");
     assert_eq!(db_configs.get(0).unwrap().value, "testvalue1");
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_add_multiple_entries() -> Result<()> {
+async fn test_user_config_add_multiple_entries() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_add_multiple_entries")
         .await
         .start_test_server()
@@ -625,12 +596,10 @@ async fn test_user_config_add_multiple_entries() -> Result<()> {
 
     assert_eq!(db_config_2.key, "testkey2");
     assert_eq!(db_config_2.value, "testvalue2");
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_update_entry() -> Result<()> {
+async fn test_user_config_update_entry() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_update_single_entry")
         .await
         .start_test_server()
@@ -693,12 +662,10 @@ async fn test_user_config_update_entry() -> Result<()> {
     assert_eq!(db_configs.len(), 1);
     assert_eq!(db_configs.get(0).unwrap().key, "testkey1");
     assert_eq!(db_configs.get(0).unwrap().value, "testvalue1_new");
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_delete_entry() -> Result<()> {
+async fn test_user_config_delete_entry() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_delete_entry")
         .await
         .start_test_server()
@@ -743,12 +710,10 @@ async fn test_user_config_delete_entry() -> Result<()> {
     .unwrap();
 
     assert_eq!(db_configs.len(), 0);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_delete_entry_non_existing() -> Result<()> {
+async fn test_user_config_delete_entry_non_existing() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_delete_entry_non_existing")
         .await
         .start_test_server()
@@ -793,12 +758,10 @@ async fn test_user_config_delete_entry_non_existing() -> Result<()> {
     .unwrap();
 
     assert_eq!(db_configs.len(), 1);
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_user_config_entry_non_existing() -> Result<()> {
+async fn test_user_config_entry_non_existing() {
     let ctx = lib::IntegrationTestContext::new("test_user_config_entry_non_existing")
         .await
         .start_test_server()
@@ -811,6 +774,4 @@ async fn test_user_config_entry_non_existing() -> Result<()> {
         StatusCode::NOT_FOUND,
     )
     .await;
-
-    Ok(())
 }

@@ -69,16 +69,20 @@ impl IntegrationTestContext {
             .expect("Couldn't establish connection pool for database");
 
         #[cfg(not(feature = "postgres"))]
-        migrate!("migrations/sqlite")
-            .run(&db_conn)
-            .await
-            .expect("Database migrations failed");
+        {
+            migrate!("migrations/sqlite")
+                .run(&db_conn)
+                .await
+                .expect("Database migrations failed");
+        }
 
         #[cfg(feature = "postgres")]
-        migrate!("migrations/postgres")
-            .run(&db_conn)
-            .await
-            .expect("Database migrations failed");
+        {
+            migrate!("migrations/postgres")
+                .run(&db_conn)
+                .await
+                .expect("Database migrations failed");
+        }
 
         Self {
             db_url,
@@ -101,7 +105,7 @@ impl IntegrationTestContext {
         let ctx = IntegrationTestContextWithApp {
             server_instance: ControllerAppBuilder::default()
                 .conn(self.db_conn.clone())
-                .http_addrs(vec![server_addr.clone()])
+                .http_addrs(vec![server_addr])
                 .worker_count(2)
                 .start()
                 .await
@@ -110,19 +114,6 @@ impl IntegrationTestContext {
             server_addr,
         };
         Disposable::new(ctx)
-    }
-}
-
-#[cfg(feature = "postgres")]
-impl Drop for IntegrationTestContext {
-    /// Removes/cleans the DB context
-    fn drop(&mut self) {
-        if let Err(e) = block_on(
-            sqlx::query(format!("DROP DATABASE __{} WITH (FORCE)", self.db_name).as_str()).execute(&self.db_conn),
-        ) {
-            log::error!("Error while dropping database {}: {:?}", self.db_name, e)
-        }
-        info!("Cleaned up database context");
     }
 }
 

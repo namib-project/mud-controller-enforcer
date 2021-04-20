@@ -56,9 +56,8 @@ backoff = { version = "^0.3.0", features = ["tokio"] }
 neo4things-api = { path = "neo4things-api" }
 num_cpus = "^1.13.0"
 derive_builder = "^0.10.0"
+socket2 = "^0.4.0"
 
 [dev-dependencies]
 dispose = "^0.2.1"
 
-[target.'cfg(unix)'.dependencies]
-socket2 = "0.4.0"

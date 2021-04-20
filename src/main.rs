@@ -9,7 +9,9 @@
     clippy::redundant_else,
     clippy::must_use_candidate,
     clippy::cast_possible_truncation,
-    clippy::option_if_let_else
+    clippy::option_if_let_else,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
 )]
 
 use std::{
