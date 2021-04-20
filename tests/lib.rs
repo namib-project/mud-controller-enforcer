@@ -1,16 +1,12 @@
-#[cfg(feature = "postgres")]
-use std::env;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, ops::Deref};
 
+use dispose::{Disposable, Dispose};
 use dotenv::dotenv;
 use futures::executor::block_on;
-#[cfg(feature = "postgres")]
-use log::error;
 use log::{debug, info};
 use namib_mud_controller::{
-    controller::ControllerAppWrapper,
+    controller::{ControllerAppBuilder, ControllerAppWrapper},
     db::DbConnection,
-    error::Result,
     routes::dtos::{LoginDto, SignupDto, SuccessDto, TokenDto},
 };
 use reqwest::{header::HeaderMap, Client, StatusCode};
@@ -21,7 +17,20 @@ pub struct IntegrationTestContext {
     pub db_url: String,
     pub db_name: &'static str,
     pub db_conn: DbConnection,
-    server_instance: Option<ControllerAppWrapper>,
+}
+
+pub struct IntegrationTestContextWithApp {
+    ctx: IntegrationTestContext,
+    server_instance: ControllerAppWrapper,
+    pub server_addr: SocketAddr,
+}
+
+impl Deref for IntegrationTestContextWithApp {
+    type Target = IntegrationTestContext;
+
+    fn deref(&self) -> &Self::Target {
+        &self.ctx
+    }
 }
 
 impl IntegrationTestContext {
@@ -33,9 +42,7 @@ impl IntegrationTestContext {
         env_logger::try_init().ok();
 
         #[cfg(not(feature = "postgres"))]
-        let db_url = "sqlite::memory:".to_string();
-        // No longer supported as of sqlx 0.5.X
-        //let db_url = format!("sqlite:{}?mode=memory", db_name);
+        let db_url = format!("sqlite:file:{}?mode=memory", db_name);
 
         #[cfg(feature = "postgres")]
         let db_url = {
@@ -62,22 +69,25 @@ impl IntegrationTestContext {
             .expect("Couldn't establish connection pool for database");
 
         #[cfg(not(feature = "postgres"))]
-        migrate!("migrations/sqlite")
-            .run(&db_conn)
-            .await
-            .expect("Database migrations failed");
+        {
+            migrate!("migrations/sqlite")
+                .run(&db_conn)
+                .await
+                .expect("Database migrations failed");
+        }
 
         #[cfg(feature = "postgres")]
-        migrate!("migrations/postgres")
-            .run(&db_conn)
-            .await
-            .expect("Database migrations failed");
+        {
+            migrate!("migrations/postgres")
+                .run(&db_conn)
+                .await
+                .expect("Database migrations failed");
+        }
 
         Self {
             db_url,
             db_name,
             db_conn,
-            server_instance: None,
         }
     }
 
@@ -90,57 +100,28 @@ impl IntegrationTestContext {
     /// errors in the server instance are caught.
     // Not actually dead code, wrongly detected as such because it is in lib.rs.
     #[allow(dead_code)]
-    pub async fn start_test_server(&mut self) -> SocketAddr {
-        if self.server_instance.is_some() {
-            panic!(
-                "start_test_server() called even though a server instance is already running for the given context."
-            );
-        }
-        let conn = self.db_conn.clone();
+    pub async fn start_test_server(self) -> Disposable<IntegrationTestContextWithApp> {
         let server_addr = actix_web::test::unused_addr();
-        self.server_instance = Some(
-            ControllerAppWrapper::start_new_server(conn, vec![server_addr.clone()], Vec::new(), Some(2))
+        let ctx = IntegrationTestContextWithApp {
+            server_instance: ControllerAppBuilder::default()
+                .conn(self.db_conn.clone())
+                .http_addrs(vec![server_addr])
+                .worker_count(2)
+                .start()
                 .await
                 .expect("Error while starting server."),
-        );
-        server_addr
-    }
-
-    /// Stops the test server instance created from this context.
-    pub async fn stop_test_server(&mut self) -> Result<()> {
-        if let Some(server_instance) = self.server_instance.take() {
-            server_instance.stop_server().await.unwrap_or_else(|e| Err(e.into()))
-        } else {
-            panic!("Attempted to stop server that was not started.");
-        }
+            ctx: self,
+            server_addr,
+        };
+        Disposable::new(ctx)
     }
 }
 
-#[cfg(feature = "postgres")]
-impl Drop for IntegrationTestContext {
-    /// Removes/cleans the DB context
-    fn drop(&mut self) {
-        if self.server_instance.is_some() {
-            block_on(self.stop_test_server()).unwrap();
-            info!("Stopped HTTP server");
-        }
-        if let Err(e) = block_on(
-            sqlx::query(format!("DROP DATABASE __{} WITH (FORCE)", self.db_name).as_str()).execute(&self.db_conn),
-        ) {
-            error!("Error while dropping database {}: {:?}", self.db_name, e)
-        }
-        info!("Cleaned up database context");
-    }
-}
-
-#[cfg(not(feature = "postgres"))]
-impl Drop for IntegrationTestContext {
-    /// Removes/cleans the DB context
-    fn drop(&mut self) {
-        if self.server_instance.is_some() {
-            block_on(self.stop_test_server()).unwrap();
-            info!("Stopped HTTP server");
-        }
+/// we need to implement dispose, since drop() only takes a reference to self and stop_server requires moving
+impl Dispose for IntegrationTestContextWithApp {
+    fn dispose(self) {
+        block_on(self.server_instance.stop_server()).unwrap();
+        info!("Stopped HTTP server");
     }
 }
 
