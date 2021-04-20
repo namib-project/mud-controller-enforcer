@@ -15,13 +15,12 @@
 use std::{
     env,
     net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
-    ops::DerefMut,
 };
 
 use dotenv::dotenv;
 use log::{error, warn};
 use namib_mud_controller::{
-    controller::ControllerAppWrapper, db, error::Result, rpc_server, services::job_service, VERSION,
+    controller::ControllerAppBuilder, db, error::Result, rpc_server, services::job_service, VERSION,
 };
 use tokio::try_join;
 
@@ -70,28 +69,32 @@ async fn main() -> Result<()> {
         })
         .unwrap_or(DEFAULT_HTTPS_PORT);
 
-    let http_addrs = vec![
-        SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, http_port, 0, 0).into(),
-        SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, http_port).into(),
-    ];
+    let actix_wrapper = ControllerAppBuilder::default()
+        .conn(conn)
+        .http_addrs(vec![
+            SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, http_port, 0, 0).into(),
+            SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, http_port).into(),
+        ])
+        .https_addrs(vec![
+            SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, https_port, 0, 0).into(),
+            SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, https_port).into(),
+        ])
+        .start()
+        .await;
 
-    let https_addrs = vec![
-        SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, https_port, 0, 0).into(),
-        SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, https_port).into(),
-    ];
-
-    let actix_wrapper = ControllerAppWrapper::start_new_server(conn, http_addrs, https_addrs, None).await;
-
-    if let Err((e, wrp)) = actix_wrapper {
-        error!(
-            "Error while awaiting actix server start (did the server terminate unexpectedly during start?): {:?}",
-            e
-        );
-        return wrp.stop_server().await.unwrap_or_else(|join_err| Err(join_err.into()));
-    } else if let Ok(mut actix_wrapper) = actix_wrapper {
-        let r = try_join!(rpc_server_task, job_task, actix_wrapper.deref_mut())?;
-        r.0?;
-        r.2?;
+    match actix_wrapper {
+        Ok(actix_wrapper) => {
+            let r = try_join!(rpc_server_task, job_task, actix_wrapper)?;
+            r.0?;
+            r.2?;
+        },
+        Err((e, wrp)) => {
+            error!(
+                "Error while awaiting actix server start (did the server terminate unexpectedly during start?): {:?}",
+                e
+            );
+            return wrp.stop_server().await;
+        },
     }
     Ok(())
 }

@@ -122,7 +122,7 @@ impl actix_web::ResponseError for Error {
     }
 
     fn error_response(&self) -> HttpResponse {
-        error!("Error during request: {}", self);
+        error!("Error during request: {:?}", self);
         let (mut rb, body) = match self {
             Error::ResponseError { status, message, .. } => {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));

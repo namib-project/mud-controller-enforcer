@@ -52,7 +52,13 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
 
     let user = User::new(signup_dto.0.username, &signup_dto.0.password)?;
 
-    user_service::insert(user, &pool).await?;
+    user_service::insert(user, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
