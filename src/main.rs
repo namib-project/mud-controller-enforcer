@@ -21,9 +21,7 @@ use std::{
 
 use dotenv::dotenv;
 use log::{error, warn};
-use namib_mud_controller::{
-    controller::ControllerAppBuilder, db, error::Result, rpc_server, services::job_service, VERSION,
-};
+use namib_mud_controller::{app::ControllerAppBuilder, db, error::Result, rpc_server, services::job_service, VERSION};
 use tokio::try_join;
 
 const DEFAULT_HTTP_PORT: u16 = 8000;

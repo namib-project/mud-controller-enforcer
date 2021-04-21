@@ -10,8 +10,7 @@ use std::{
 use actix_cors::Cors;
 use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
-    body::MessageBody,
-    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    dev::{Service, Transform},
     middleware, App, HttpServer,
 };
 use derive_builder::Builder;
@@ -50,8 +49,8 @@ pub struct ControllerApp {
 impl ControllerAppBuilder {
     pub async fn start(&self) -> std::result::Result<ControllerAppWrapper, (RecvError, ControllerAppWrapper)> {
         let controller_app = self.build().expect("Invalid app config");
-        let (end_server_send, stop_server_recv) = oneshot::channel();
-        let (startup_finish_send, startup_finish_recv) = oneshot::channel();
+        let (stop_server_send, stop_server_recv) = oneshot::channel();
+        let (startup_finished_send, startup_finished_recv) = oneshot::channel();
         let tokio_handle = tokio::runtime::Handle::current();
         let server_join_handle = tokio::task::spawn_blocking(move || {
             start_app(
@@ -60,15 +59,15 @@ impl ControllerAppBuilder {
                 controller_app.http_addrs,
                 controller_app.https_addrs,
                 controller_app.worker_count,
-                startup_finish_send,
+                startup_finished_send,
                 tokio_handle,
             )
         });
         let wrapper = ControllerAppWrapper {
-            stop_server_send: end_server_send,
+            stop_server_send,
             server_join_handle,
         };
-        if let Err(e) = startup_finish_recv.await {
+        if let Err(e) = startup_finished_recv.await {
             return Err((e, wrapper));
         }
         Ok(wrapper)
@@ -228,16 +227,15 @@ fn create_v6only_listener(addr: SocketAddrV6) -> Result<TcpListener> {
 
 struct TokioWrapper(tokio::runtime::Handle);
 
-impl<S, B> Transform<S> for TokioWrapper
+impl<S> Transform<S> for TokioWrapper
 where
-    S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=actix_web::error::Error>,
-    B: MessageBody,
+    S: Service,
 {
-    type Error = actix_web::error::Error;
+    type Error = S::Error;
     type Future = Ready<std::result::Result<Self::Transform, Self::InitError>>;
     type InitError = ();
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Request = S::Request;
+    type Response = S::Response;
     type Transform = TokioMiddleware<S>;
 
     fn new_transform(&self, service: S) -> Self::Future {
@@ -253,15 +251,14 @@ struct TokioMiddleware<S> {
     service: S,
 }
 
-impl<S, B> Service for TokioMiddleware<S>
+impl<S> Service for TokioMiddleware<S>
 where
-    S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=actix_web::error::Error>,
-    B: MessageBody,
+    S: Service,
 {
-    type Error = actix_web::error::Error;
+    type Error = S::Error;
     type Future = TokioResponse<S>;
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Request = S::Request;
+    type Response = S::Response;
 
     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         self.service.poll_ready(ctx)
@@ -269,7 +266,7 @@ where
 
     fn call(&mut self, req: Self::Request) -> TokioResponse<S> {
         TokioResponse {
-            borrow: self.handle.clone(),
+            handle: self.handle.clone(),
             fut: self.service.call(req),
         }
     }
@@ -282,17 +279,17 @@ where
 {
     #[pin]
     fut: S::Future,
-    borrow: tokio::runtime::Handle,
+    handle: tokio::runtime::Handle,
 }
 
-impl<S, B> Future for TokioResponse<S>
+impl<S> Future for TokioResponse<S>
 where
-    S: Service<Request=ServiceRequest, Response=ServiceResponse<B>, Error=actix_web::error::Error>,
+    S: Service,
 {
-    type Output = std::result::Result<ServiceResponse<B>, actix_web::error::Error>;
+    type Output = std::result::Result<S::Response, S::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let _guard = self.borrow.enter();
+        let _guard = self.handle.enter();
         self.project().fut.poll(cx)
     }
 }

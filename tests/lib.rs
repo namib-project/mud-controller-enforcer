@@ -5,7 +5,7 @@ use dotenv::dotenv;
 use futures::executor::block_on;
 use log::{debug, info};
 use namib_mud_controller::{
-    controller::{ControllerAppBuilder, ControllerAppWrapper},
+    app::{ControllerAppBuilder, ControllerAppWrapper},
     db::DbConnection,
     routes::dtos::{LoginDto, SignupDto, SuccessDto, TokenDto},
 };

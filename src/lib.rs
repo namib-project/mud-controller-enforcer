@@ -21,8 +21,8 @@ extern crate serde;
 #[macro_use]
 extern crate validator;
 
+pub mod app;
 pub mod auth;
-pub mod controller;
 pub mod db;
 pub mod error;
 pub mod models;
