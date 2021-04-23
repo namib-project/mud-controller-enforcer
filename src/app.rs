@@ -1,5 +1,4 @@
 use std::{
-    env,
     future::Future,
     net::{SocketAddr, SocketAddrV6, TcpListener},
     pin::Pin,
@@ -18,11 +17,12 @@ use futures::{future, future::Ready};
 use paperclip::actix::{web, OpenApiExt};
 use pin_project::pin_project;
 use tokio::{
+    select,
     sync::{oneshot, oneshot::error::RecvError},
     task::{JoinError, JoinHandle},
 };
 
-use crate::{db::DbConnection, error, error::Result, routes, services::acme_service};
+use crate::{app_config::APP_CONFIG, db::DbConnection, error, error::Result, routes, services::acme_service};
 
 const BACKLOG: i32 = 2048;
 
@@ -103,8 +103,7 @@ pub fn start_app(
         let mut server = HttpServer::new(move || {
             let cors = Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {
-                    origin.as_bytes().starts_with(b"https://localhost:")
-                        || origin.as_bytes().starts_with(b"http://localhost:")
+                    origin.as_bytes().starts_with(b"http://localhost:")
                         || origin
                             .as_bytes()
                             .starts_with(format!("https://{}", *acme_service::DOMAIN).as_bytes())
@@ -117,18 +116,13 @@ pub fn start_app(
                 .max_age(3600);
             let rate_limiter = RateLimiter::new(MemoryStoreActor::from(MemoryStore::new()).start())
                 .with_interval(Duration::from_secs(60))
-                .with_max_requests(
-                    env::var("RATELIMITER_REQUESTS_PER_MINUTE")
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(120),
-                )
+                .with_max_requests(APP_CONFIG.ratelimiter_requests_per_minute)
                 .with_identifier(|req| {
                     let connection_info = req.connection_info();
 
                     // Setup optional reverse-proxy measures and strip the port from the IP
                     // Will be changed in v0.4, more info: https://github.com/TerminalWitchcraft/actix-ratelimit/issues/15
-                    let ip = if env::var("RATELIMITER_BEHIND_REVERSE_PROXY").as_deref() == Ok("true") {
+                    let ip = if APP_CONFIG.ratelimiter_behind_reverse_proxy {
                         connection_info.realip_remote_addr()
                     } else {
                         connection_info.remote_addr()
@@ -206,10 +200,19 @@ pub fn start_app(
         startup_finished_send
             .send(())
             .unwrap_or_else(|e| warn!("Could not notify caller of finished startup: {:?}", e));
-        stop_server_recv
-            .await
-            .unwrap_or_else(|e| warn!("Error while waiting for server end signal: {:?}", e));
-        server_instance.stop(true).await;
+        select! {
+            result = stop_server_recv => {
+                if let Err(e) = result {
+                    warn!("Error while waiting for server end signal: {:?}", e);
+                }
+            },
+            result = server_instance => {
+                if let Err(e) = result {
+                    error!("Error during server execution: {:?}", e);
+                }
+            }
+        }
+        // stops the server
         actix_web::rt::System::current().stop();
         Ok(())
     })

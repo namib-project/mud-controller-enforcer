@@ -1,5 +1,5 @@
 use std::{
-    env, fmt,
+    fmt,
     fs::File,
     io::Read,
     net::ToSocketAddrs,
@@ -19,6 +19,7 @@ use sha3::{Digest, Sha3_224};
 use snafu::ensure;
 
 use crate::{
+    app_config::APP_CONFIG,
     error::{self, Result},
     util::open_file_with,
 };
@@ -50,10 +51,10 @@ impl fmt::Display for CertId {
 }
 
 fn get_letsencrypt_url() -> DirectoryUrl<'static> {
-    if env::var("STAGING").as_deref() == Ok("0") {
-        DirectoryUrl::LetsEncrypt
-    } else {
+    if APP_CONFIG.staging {
         DirectoryUrl::LetsEncryptStaging
+    } else {
+        DirectoryUrl::LetsEncrypt
     }
 }
 
@@ -69,7 +70,7 @@ lazy_static! {
     /// The certificate id (sha1 hash in base64)
     static ref SERVER_ID: CertId = CertId::new(SERVER_CERT[0].as_ref());
     /// The domain that this controllers certificate will be valid for
-    pub static ref DOMAIN: String = format!("{}.{}", *SERVER_ID, env::var("DOMAIN").expect("DOMAIN was not defined"));
+    pub static ref DOMAIN: String = format!("{}.{}", *SERVER_ID, APP_CONFIG.domain);
     /// store the CertifiedKey to not recreate it on every request
     static ref ACME_CERTIFIED_KEY: RwLock<Option<CertifiedKey>> = RwLock::new(None);
 }
@@ -145,8 +146,7 @@ pub fn update_certs() -> Result<()> {
         File::open("certs/server-key.pem")?.read_to_end(&mut certs)?;
         let mut ca: Vec<u8> = Vec::new();
         // Use the global namib certificate here, since the httpchallenge service is always using the global one.
-        File::open(&env::var("GLOBAL_NAMIB_CA_CERT").expect("GLOBAL_NAMIB_CA_CERT env is missing"))?
-            .read_to_end(&mut ca)?;
+        File::open(&APP_CONFIG.global_namib_ca_cert)?.read_to_end(&mut ca)?;
         // send the httpchallenge token to the service.
         let response = reqwest::blocking::ClientBuilder::new()
             .tls_built_in_root_certs(false)

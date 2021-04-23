@@ -1,5 +1,3 @@
-use std::env;
-
 use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
@@ -8,7 +6,7 @@ use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
 
-use crate::{error, error::Result, services::role_service::Permission};
+use crate::{app_config::APP_CONFIG, error, error::Result, services::role_service::Permission};
 
 static HEADER_PREFIX: &str = "Bearer ";
 
@@ -63,7 +61,7 @@ impl AuthToken {
         jwt::encode(
             &jwt::Header::default(),
             self,
-            &jwt::EncodingKey::from_secret(env::var("JWT_SECRET").expect("JWT_SECRET must be set").as_ref()),
+            &jwt::EncodingKey::from_base64_secret(&APP_CONFIG.jwt_secret).expect("env JWT_SECRET is not valid base64"),
         )
         .expect("jwt")
     }
@@ -74,11 +72,11 @@ impl AuthToken {
 
         jwt::decode(
             token,
-            &jwt::DecodingKey::from_secret(env::var("JWT_SECRET").expect("JWT_SECRET must be set").as_ref()),
+            &jwt::DecodingKey::from_base64_secret(&APP_CONFIG.jwt_secret).expect("env JWT_SECRET is not valid base64"),
             &Validation::new(Algorithm::HS256),
         )
         .map_err(|err| {
-            eprintln!("Auth decode error: {:?}", err);
+            warn!("Auth decode error: {:?}", err);
         })
         .ok()
         .map(|token_data| token_data.claims)

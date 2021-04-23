@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use futures::{future, stream, StreamExt, TryStreamExt};
 use namib_shared::{
@@ -20,6 +20,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::{
+    app_config::APP_CONFIG,
     db::DbConnection,
     error::Result,
     services::{acme_service::CertId, device_service, firewall_configuration_service, log_service},
@@ -90,18 +91,15 @@ impl NamibRpc for NamibRpcServer {
 
 /// Advertise the rpc server via dnssd and listen for incoming rpc connections.
 pub async fn listen(pool: DbConnection) -> Result<()> {
-    let port = env::var("RPC_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(8734);
     debug!("Registering in dnssd");
-    let (_registration, result) = async_dnssd::register("_namib_controller._tcp", port)?.await?;
+    let (_registration, result) = async_dnssd::register("_namib_controller._tcp", APP_CONFIG.rpc_port)?.await?;
     info!("Registered: {:?}", result);
 
     // Build TLS configuration.
     let tls_cfg = {
         // Use client certificate authentication.
         let mut client_auth_roots = RootCertStore::empty();
-        open_file_with(&env::var("NAMIB_CA_CERT").expect("NAMIB_CA_CERT env is missing"), |b| {
-            client_auth_roots.add_pem_file(b)
-        })?;
+        open_file_with(&APP_CONFIG.namib_ca_cert, |b| client_auth_roots.add_pem_file(b))?;
 
         // Load server cert
         let certs = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)
@@ -115,8 +113,8 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
 
         Arc::new(cfg)
     };
-    let v4_addr = SocketAddr::new("0.0.0.0".parse()?, port);
-    let v6_addr = SocketAddr::new("::".parse()?, port);
+    let v4_addr = SocketAddr::new("0.0.0.0".parse()?, APP_CONFIG.rpc_port);
+    let v6_addr = SocketAddr::new("::".parse()?, APP_CONFIG.rpc_port);
     info!("Starting to serve on {} and {}.", v4_addr, v6_addr);
     let tcp_stream = {
         let v4_stream = TcpListenerStream::new(TcpListener::bind(v4_addr).await?);

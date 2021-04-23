@@ -22,6 +22,7 @@ extern crate serde;
 extern crate validator;
 
 pub mod app;
+pub mod app_config;
 pub mod auth;
 pub mod db;
 pub mod error;
