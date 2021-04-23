@@ -1,5 +1,6 @@
 mod config_dto;
 mod device_dto;
+mod enforcer_dto;
 mod mud_dto;
 mod role_assign_dto;
 mod room_dto;
@@ -11,6 +12,7 @@ mod users_management_dto;
 
 pub use config_dto::*;
 pub use device_dto::*;
+pub use enforcer_dto::*;
 pub use mud_dto::*;
 pub use role_assign_dto::*;
 pub use room_dto::*;

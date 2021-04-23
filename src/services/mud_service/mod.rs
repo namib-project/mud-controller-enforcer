@@ -137,7 +137,7 @@ pub fn generate_empty_custom_mud_profile(url: &str, acl_override: Vec<Acl>) -> M
     MudData {
         url: url.to_string(),
         masa_url: None,
-        last_update: Utc::now().naive_local().to_string(),
+        last_update: Utc::now().naive_utc().to_string(),
         systeminfo: None,
         mfg_name: None,
         model_name: None,

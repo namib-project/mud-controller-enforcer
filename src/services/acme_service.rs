@@ -24,7 +24,7 @@ use crate::{
     util::open_file_with,
 };
 
-/// `CertId` contains the url-safe base64-encoded sha1-hash of a certificate and may be regarded as a unique identifier for a Namib service.
+/// `CertId` contains the url-safe base64-encoded sha3-hash of a certificate and may be regarded as a unique identifier for a Namib service.
 #[derive(Clone)]
 pub struct CertId(String);
 

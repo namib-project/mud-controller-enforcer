@@ -145,8 +145,8 @@ pub async fn create_mud(
         let mud_dbo = MudDbo {
             url: mud_creation_dto.mud_url,
             data: serde_json::to_string(&empty_mud)?,
-            created_at: Utc::now().naive_local(),
-            expiration: empty_mud.expiration.naive_local(),
+            created_at: Utc::now().naive_utc(),
+            expiration: empty_mud.expiration.naive_utc(),
         };
 
         mud_service::create_mud(&mud_dbo, &pool).await?;

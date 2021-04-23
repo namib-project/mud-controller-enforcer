@@ -390,7 +390,7 @@ mod tests {
     fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
         let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
         let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S")?;
-        data.0.expiration = Utc.from_local_datetime(&naive).unwrap();
+        data.0.expiration = Utc.from_utc_datetime(&naive).unwrap();
         assert_eq!(serde_json::to_value(&data.0)?, serde_json::from_str::<Value>(&data.1)?);
         Ok(())
     }
