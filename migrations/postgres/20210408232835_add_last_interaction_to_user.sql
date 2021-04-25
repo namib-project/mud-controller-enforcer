@@ -1,3 +1,3 @@
 -- Add migration script here
 ALTER TABLE users
-ADD COLUMN last_interaction DATETIME NOT NULL DEFAULT now();
+ADD COLUMN last_interaction TIMESTAMP NOT NULL DEFAULT now();
