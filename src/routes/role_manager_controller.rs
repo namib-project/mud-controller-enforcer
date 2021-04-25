@@ -24,14 +24,14 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{role_id}", web::delete().to(delete_role));
 }
 
-#[api_v2_operation(summary = "List of all roles")]
+#[api_v2_operation(summary = "List of all roles", tags(Roles))]
 pub async fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
     auth.require_permission(Permission::role__list)?;
     let res: Vec<RoleDto> = role_service::roles_get_all(&pool).await?;
     Ok(Json(res))
 }
 
-#[api_v2_operation(summary = "Get a specific role")]
+#[api_v2_operation(summary = "Get a specific role", tags(Roles))]
 pub async fn get_role(
     pool: web::Data<DbConnection>,
     role_id: web::Path<i64>,
@@ -42,7 +42,7 @@ pub async fn get_role(
     Ok(Json(res))
 }
 
-#[api_v2_operation(summary = "Create a new role")]
+#[api_v2_operation(summary = "Create a new role", tags(Roles))]
 pub async fn create_role(
     pool: web::Data<DbConnection>,
     role_dto: Json<RoleUpdateDto>,
@@ -69,7 +69,7 @@ pub async fn create_role(
     Ok(Json(res))
 }
 
-#[api_v2_operation(summary = "Edit a specific role")]
+#[api_v2_operation(summary = "Edit a specific role", tags(Roles))]
 pub async fn edit_role(
     pool: web::Data<DbConnection>,
     role_id: web::Path<i64>,
@@ -111,7 +111,7 @@ pub async fn edit_role(
     }
 }
 
-#[api_v2_operation(summary = "Delete a role")]
+#[api_v2_operation(summary = "Delete a role", tags(Roles))]
 pub async fn delete_role(
     pool: web::Data<DbConnection>,
     role_id: web::Path<i64>,
@@ -122,7 +122,7 @@ pub async fn delete_role(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Assign a specific role to an user")]
+#[api_v2_operation(summary = "Assign a specific role to an user", tags(Roles))]
 pub async fn assign_role(
     pool: web::Data<DbConnection>,
     assignment_dto: Json<RoleAssignDto>,
@@ -142,7 +142,7 @@ pub async fn assign_role(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Unassign a specific role from an user")]
+#[api_v2_operation(summary = "Unassign a specific role from an user", tags(Roles))]
 pub async fn unassign_role(
     pool: web::Data<DbConnection>,
     assignment_dto: Json<RoleAssignDto>,
@@ -162,7 +162,7 @@ pub async fn unassign_role(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "List of all available permissions")]
+#[api_v2_operation(summary = "List of all available permissions", tags(Roles))]
 pub async fn available_permissions(_: AuthToken) -> Result<Json<Vec<String>>> {
     let permissions: Vec<String> = role_service::permissions_get_all().unwrap();
     Ok(Json(permissions))

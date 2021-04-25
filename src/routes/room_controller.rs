@@ -27,7 +27,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{id}", web::delete().to(delete_room));
 }
 
-#[api_v2_operation(summary = "Return all rooms.")]
+#[api_v2_operation(summary = "Return all rooms.", tags(Rooms))]
 async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoomDto>>> {
     auth.require_permission(Permission::room__list)?;
     auth.require_permission(Permission::room__read)?;
@@ -36,7 +36,7 @@ async fn get_all_rooms(pool: web::Data<DbConnection>, auth: AuthToken) -> Result
     Ok(Json(res.into_iter().map(RoomDto::from).collect()))
 }
 
-#[api_v2_operation(summary = "Get a room through the room id.")]
+#[api_v2_operation(summary = "Get a room through the room id.", tags(Rooms))]
 async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__read)?;
     let res = room_service::find_by_id(id.into_inner(), &pool).await.or_else(|_| {
@@ -50,7 +50,7 @@ async fn get_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<
     Ok(Json(RoomDto::from(res)))
 }
 
-#[api_v2_operation(summary = "Returns all devices in a room.")]
+#[api_v2_operation(summary = "Returns all devices in a room.", tags(Rooms))]
 async fn get_all_devices_inside_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -87,7 +87,7 @@ async fn get_all_devices_inside_room(
     ))
 }
 
-#[api_v2_operation(summary = "Creates a new room. Color in hex e.g. {FFFFFF, 000000}")]
+#[api_v2_operation(summary = "Creates a new room. Color in hex e.g. {FFFFFF, 000000}", tags(Rooms))]
 async fn create_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -127,7 +127,7 @@ async fn create_room(
     Ok(Json(RoomDto::from(res)))
 }
 
-#[api_v2_operation(summary = "Updates a room.")]
+#[api_v2_operation(summary = "Updates a room.", tags(Rooms))]
 async fn update_room(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -179,7 +179,7 @@ async fn update_room(
     Ok(Json(RoomDto::from(room)))
 }
 
-#[api_v2_operation(summary = "Deletes a room.")]
+#[api_v2_operation(summary = "Deletes a room.", tags(Rooms))]
 async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<HttpResponse> {
     auth.require_permission(Permission::room__delete)?;
 
