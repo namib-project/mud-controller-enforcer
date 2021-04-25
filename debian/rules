@@ -1,0 +1,47 @@
+#!/usr/bin/make -f
+DH_VERBOSE = 1
+
+rust_triple =
+
+ifeq ($(DEB_TARGET_ARCH),i386)
+    rust_triple = "i686-unknown-linux-gnu"
+else ifeq ($(DEB_TARGET_ARCH),amd64)
+    rust_triple = "x86_64-unknown-linux-gnu"
+else ifeq ($(DEB_TARGET_ARCH),armhf)
+    rust_triple = "armv7-unknown-linux-gnueabihf"
+else ifeq ($(DEB_TARGET_ARCH),armel)
+    rust_triple = "arm-unknown-linux-gnueabi"
+else ifeq ($(DEB_TARGET_ARCH),arm64)
+    rust_triple = "aarch64-unknown-linux-gnu"
+endif
+
+override_dh_auto_build:
+	cargo build --target $(rust_triple) --target-dir install/
+
+override_dh_auto_install:
+	dh_install install/$(rust_triple)/debug/namib_mud_controller /usr/bin
+	dh_install certs/* /etc/namib
+	dh_install db.sqlite static /var/lib/namib
+
+override_dh_auto_clean:
+	cargo clean
+	rm -rf install/
+	mkdir install
+	dh_auto_clean $@
+
+build: build-arch build-indep
+
+build-indep:
+
+build-arch:
+	dh $@
+
+binary: binary-arch binary-indep
+
+binary-arch:
+	dh $@
+
+binary-indep:
+
+clean:
+	dh $@

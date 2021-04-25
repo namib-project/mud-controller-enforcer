@@ -252,3 +252,10 @@ GitHub.sublime-settings
 
 .idea/
 .DS_Store
+
+install
+debian/.debhelper
+debian/debhelper-build-stamp
+debian/files
+debian/namib-mud-controller.substvars
+debian/namib-mud-controller

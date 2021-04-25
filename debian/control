@@ -1,0 +1,11 @@
+Source: namib-mud-controller
+Maintainer: Hugo Hakim Damer <hdamer@uni-bremen.de>
+Uploaders: Benjamin Ludewig <ludewigb@uni-bremen.de>, Florian Bonetti <flobon@uni-bremen.de>, Michael Bach <bachm@uni-bremen.de>, Jeffrey Munstermann <jemu@uni-bremen.de>, Luca Nittscher <lnittsch@uni-bremen.de>
+Priority: optional
+Section: admin
+Standards-Version: 4.5.1
+Build-Depends: cargo,libavahi-compat-libdnssd-dev,libssl-dev
+
+Package: namib-mud-controller
+Architecture: i386 amd64 armhf arm64
+Depends: libavahi-compat-libdnssd1,openssl
