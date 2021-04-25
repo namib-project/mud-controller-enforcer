@@ -1,12 +1,12 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use argon2::{self, Config};
+use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 use rand::{rngs::OsRng, Rng};
 use snafu::ensure;
 
 use crate::{error, error::Result};
-use chrono::NaiveDateTime;
 
 pub const SALT_LENGTH: usize = 32;
 

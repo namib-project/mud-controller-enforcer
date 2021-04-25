@@ -1,10 +1,11 @@
+use chrono::Utc;
+
 use crate::{
     db::DbConnection,
     error::Result,
     models::{Role, RoleDbo, User, UserDbo},
     services::role_service,
 };
-use chrono::Utc;
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {

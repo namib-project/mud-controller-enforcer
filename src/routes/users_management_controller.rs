@@ -94,7 +94,7 @@ pub async fn update_user_by_id(
 
     let mut user = user_service::find_by_id(user_id.0, &pool).await?;
     user.username = update_user_dto.0.username;
-    user.last_interaction = utc_now;
+    user.last_interaction = chrono::Utc::now().naive_utc();
 
     if let Some(password) = update_user_dto.0.password {
         user.update_password(&password)?;

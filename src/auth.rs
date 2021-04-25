@@ -1,12 +1,4 @@
-use std::env;
-
-use crate::{
-    db::DbConnection,
-    error,
-    error::{Result},
-    services::{role_service::Permission, user_service},
-};
-use actix_web::{dev, error::ErrorUnauthorized, web, FromRequest, HttpRequest};
+use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, web, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
 use futures::{future, future::Ready};
 use glob::Pattern;
@@ -14,7 +6,13 @@ use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
 
-use crate::{app_config::APP_CONFIG, error, error::Result, services::role_service::Permission};
+use crate::{
+    app_config::APP_CONFIG,
+    db::DbConnection,
+    error,
+    error::Result,
+    services::{role_service::Permission, user_service},
+};
 
 static HEADER_PREFIX: &str = "Bearer ";
 
@@ -119,7 +117,9 @@ impl FromRequest for AuthToken {
             Some(auth) => {
                 let pool = req.app_data::<web::Data<DbConnection>>().unwrap();
                 let runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-                runtime.block_on(user_service::update_last_interaction_stamp(auth.sub, pool)).is_ok();
+                runtime
+                    .block_on(user_service::update_last_interaction_stamp(auth.sub, pool))
+                    .unwrap();
                 return future::ok(auth);
             },
             None => future::err(ErrorUnauthorized("Unauthorized")),
