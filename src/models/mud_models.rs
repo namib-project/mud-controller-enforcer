@@ -9,6 +9,8 @@ use paperclip::{
     },
 };
 
+use crate::error::Result;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MudDboRefresh {
     pub url: String,
@@ -21,6 +23,12 @@ pub struct MudDbo {
     pub data: String,
     pub created_at: NaiveDateTime,
     pub expiration: NaiveDateTime,
+}
+
+impl MudDbo {
+    pub fn parse_data(&self) -> Result<MudData> {
+        Ok(serde_json::from_str::<MudData>(self.data.as_str())?)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
@@ -131,8 +139,9 @@ pub enum AclDirection {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn expect_port_json() {

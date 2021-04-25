@@ -1,21 +1,21 @@
-use crate::{error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
 use backoff::{backoff::Backoff, future::retry, ExponentialBackoff};
 use lazy_static::lazy_static;
 use neo4things_api::{
     apis::{configuration::Configuration, mud_api, thing_api},
     models::{Acl, Description, Thing},
 };
-use std::env;
 use tokio::time::Duration;
+
+use crate::{app_config::APP_CONFIG, error, error::Result, models::Device, routes::dtos::GuessDto, VERSION};
 
 lazy_static! {
     /// The configuration for connecting to the neo4jthings service.
     /// We could configure the base_url here too
     static ref N4T_CONFIG: Configuration = Configuration {
-        base_path: env::var("NEO4THINGS_URL").expect("NEO4THINGS_URL env missing"),
+        base_path: APP_CONFIG.neo4things_url.clone(),
         basic_auth: Some((
-            env::var("NEO4THINGS_USER").expect("NEO4THINGS_USER env missing"),
-            Some(env::var("NEO4THINGS_PASS").expect("NEO4THINGS_PASS env missing"))
+            APP_CONFIG.neo4things_user.clone(),
+            Some(APP_CONFIG.neo4things_pass.clone())
         )),
         user_agent: Some(format!("namib_mud_controller {}", VERSION)),
         ..Default::default()

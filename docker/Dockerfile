@@ -5,7 +5,7 @@ ENV RUST_LOG=info,namib_mud_controller=debug \
     NAMIB_CA_CERT=certs/namib-ca.pem \
     GLOBAL_NAMIB_CA_CERT=certs/namib-ca.pem \
     DOMAIN=controller.namib.me \
-    STAGING=0 \
+    STAGING=false \
     NEO4THINGS_URL=http://neo4things:8000 \
     NEO4THINGS_USER=admin \
     NEO4THINGS_PASS=namib

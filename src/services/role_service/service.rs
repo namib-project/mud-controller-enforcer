@@ -1,3 +1,7 @@
+use std::io;
+
+use strum::IntoEnumIterator;
+
 use crate::{
     db::DbConnection,
     error::Result,
@@ -5,8 +9,6 @@ use crate::{
     routes::dtos::{RoleDto, RoleUpdateDto},
     services::role_service::permission::Permission,
 };
-use std::io;
-use strum::IntoEnumIterator;
 
 pub const ROLE_ID_ADMIN: i64 = 0;
 pub const ROLE_ID_GUEST: i64 = 1;
@@ -14,7 +16,7 @@ pub const ROLE_ID_GUEST: i64 = 1;
 pub async fn role_create(conn: &DbConnection, role: RoleUpdateDto) -> Result<RoleDto> {
     let permissions_vec = role.permissions.join(",");
 
-    #[cfg(feature = "sqlite")]
+    #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO roles (name, permissions) VALUES (?, ?)",
         role.name,
@@ -87,7 +89,7 @@ pub fn permissions_get_all() -> Result<Vec<String>> {
     Ok(Permission::iter().map(|p| p.to_string()).collect())
 }
 
-pub async fn role_add_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
+pub async fn add_role_to_user(conn: &DbConnection, user_id: i64, role_id: i64) -> Result<()> {
     sqlx::query!(
         "INSERT INTO users_roles (user_id, role_id) VALUES ($1, $2)",
         user_id,

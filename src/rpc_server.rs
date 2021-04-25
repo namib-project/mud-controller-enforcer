@@ -1,27 +1,31 @@
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use futures::{future, stream, StreamExt, TryStreamExt};
+use namib_shared::{
+    codec,
+    models::DhcpEvent,
+    rpc::NamibRpc,
+    tarpc::{
+        context, serde_transport,
+        serde_transport::Transport,
+        server,
+        server::{BaseChannel, Channel},
+    },
+    EnforcerConfig,
+};
 use rustls::{RootCertStore, ServerSession, Session};
-use tarpc::{
-    context, serde_transport,
-    serde_transport::Transport,
-    server,
-    server::{BaseChannel, Channel},
-};
-
-use namib_shared::{codec, firewall_config::EnforcerConfig, models::DhcpEvent, open_file_with, rpc::NamibRpc};
-
-use crate::{
-    db::DbConnection,
-    error::Result,
-    services::{device_service, firewall_configuration_service},
-};
-
-use crate::services::{acme_service::CertId, log_service};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{server::TlsStream, TlsAcceptor};
 use tokio_stream::wrappers::TcpListenerStream;
 use tokio_util::codec::LengthDelimitedCodec;
+
+use crate::{
+    app_config::APP_CONFIG,
+    db::DbConnection,
+    error::Result,
+    services::{acme_service::CertId, device_service, firewall_configuration_service, log_service},
+    util::open_file_with,
+};
 
 #[derive(Clone)]
 pub struct NamibRpcServer {
@@ -32,6 +36,7 @@ pub struct NamibRpcServer {
 
 #[server]
 impl NamibRpc for NamibRpcServer {
+    /// Called regularly by the enforcer to refresh its state.
     async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<EnforcerConfig> {
         let current_config_version = firewall_configuration_service::get_config_version(&self.db_connection).await;
         debug!(
@@ -57,13 +62,13 @@ impl NamibRpc for NamibRpcServer {
         None
     }
 
+    /// Called when the enforcer receives a dhcp lease event.
     async fn dhcp_request(self, _: context::Context, dhcp_event: DhcpEvent) {
         debug!("dhcp_request from: {:?}. Data: {:?}", self.client_ip, dhcp_event);
 
         // TODO: Handle different dhcp event lease types (currently handles everything as "add")
         let lease_info = match dhcp_event {
-            DhcpEvent::LeaseAdded { lease_info, .. } => lease_info,
-            DhcpEvent::ExistingLeaseUpdate { lease_info, .. } => lease_info,
+            DhcpEvent::LeaseAdded { lease_info, .. } | DhcpEvent::ExistingLeaseUpdate { lease_info, .. } => lease_info,
             _ => return,
         };
 
@@ -72,9 +77,10 @@ impl NamibRpc for NamibRpcServer {
         }
     }
 
+    /// Called when the enforcer reads new dns logs
     async fn send_logs(self, _: context::Context, logs: Vec<String>) {
         debug!(
-            "send_logs from {:?} ({}): logs {:?}",
+            "send_logs from {:?} ({}): logs {}",
             self.client_ip,
             self.client_id,
             logs.len(),
@@ -83,18 +89,17 @@ impl NamibRpc for NamibRpcServer {
     }
 }
 
+/// Advertise the rpc server via dnssd and listen for incoming rpc connections.
 pub async fn listen(pool: DbConnection) -> Result<()> {
     debug!("Registering in dnssd");
-    let (_registration, result) = async_dnssd::register("_namib_controller._tcp", 8734)?.await?;
+    let (_registration, result) = async_dnssd::register("_namib_controller._tcp", APP_CONFIG.rpc_port)?.await?;
     info!("Registered: {:?}", result);
 
     // Build TLS configuration.
     let tls_cfg = {
         // Use client certificate authentication.
         let mut client_auth_roots = RootCertStore::empty();
-        open_file_with(&env::var("NAMIB_CA_CERT").expect("NAMIB_CA_CERT env is missing"), |b| {
-            client_auth_roots.add_pem_file(b)
-        })?;
+        open_file_with(&APP_CONFIG.namib_ca_cert, |b| client_auth_roots.add_pem_file(b))?;
 
         // Load server cert
         let certs = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)
@@ -108,18 +113,27 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
 
         Arc::new(cfg)
     };
+    let v4_addr = SocketAddr::new("0.0.0.0".parse()?, APP_CONFIG.rpc_port);
+    let v6_addr = SocketAddr::new("::".parse()?, APP_CONFIG.rpc_port);
+    info!("Starting to serve on {} and {}.", v4_addr, v6_addr);
+    let tcp_stream = {
+        let v4_stream = TcpListenerStream::new(TcpListener::bind(v4_addr).await?);
+        // attempt binding to the ipv6 address and create a merged stream if successful.
+        if let Ok(v6_listener) = TcpListener::bind(v6_addr).await {
+            stream::select(v4_stream, TcpListenerStream::new(v6_listener)).boxed()
+        } else {
+            v4_stream.boxed()
+        }
+    };
 
-    let addr: SocketAddr = "0.0.0.0:8734".parse()?;
-    info!("Starting to serve on {}.", addr);
-
-    // Create a TLS listener via tokio.
+    // Create a tls acceptor that wraps a tcp acceptor.
     let acceptor = TlsAcceptor::from(tls_cfg);
-    TcpListenerStream::new(TcpListener::bind(addr).await?)
+    tcp_stream
         .and_then(|str| acceptor.accept(str))
         .map_ok(|tlsstr| {
             serde_transport::new(
                 LengthDelimitedCodec::builder()
-                    .max_frame_length(50 * 1024 * 1024)
+                    .max_frame_length(50 * 1024 * 1024) // max packet size is 50 MB
                     .new_framed(tlsstr),
                 codec(),
             )
@@ -129,11 +143,9 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
         .filter_map(|r| future::ready(r.ok()))
         .map(BaseChannel::with_defaults)
         .map(|channel| {
-            let streams = get_streams(&channel);
             let server = NamibRpcServer {
-                client_ip: streams.0.peer_addr().unwrap(),
-                // the fingerprint of a certificate is the sha1 of its entire bytes encoded in DER
-                client_id: CertId::new(streams.1.get_peer_certificates().unwrap()[0].as_ref()),
+                client_ip: channel.get_tcp_stream().peer_addr().unwrap(),
+                client_id: CertId::new(channel.get_tls_session().get_peer_certificates().unwrap()[0].as_ref()),
                 db_connection: pool.clone(),
             };
             channel.requests().execute(server.serve())
@@ -148,8 +160,21 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
     Ok(())
 }
 
-fn get_streams<A, B, Item, SinkItem, Codec>(
-    channel: &BaseChannel<A, B, Transport<TlsStream<TcpStream>, Item, SinkItem, Codec>>,
-) -> (&TcpStream, &ServerSession) {
-    channel.as_ref().get_ref().get_ref()
+trait BaseChannelExt {
+    fn get_tcp_stream(&self) -> &TcpStream;
+    fn get_tls_session(&self) -> &ServerSession;
+}
+
+impl<A, B, Item, SinkItem, Codec> BaseChannelExt
+    for BaseChannel<A, B, Transport<TlsStream<TcpStream>, Item, SinkItem, Codec>>
+{
+    /// Unwrap a `BaseChannel` wrapping a `TlsStream` and retrieve a reference to its `TcpStream`
+    fn get_tcp_stream(&self) -> &TcpStream {
+        self.as_ref().get_ref().get_ref().0
+    }
+
+    /// Unwrap a `BaseChannel` wrapping a `TlsStream` and retrieve a reference to its tls `ServerSession`
+    fn get_tls_session(&self) -> &ServerSession {
+        self.as_ref().get_ref().get_ref().1
+    }
 }

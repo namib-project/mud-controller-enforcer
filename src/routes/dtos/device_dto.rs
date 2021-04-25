@@ -1,12 +1,13 @@
 #![allow(clippy::field_reassign_with_default)]
 
+use chrono::{NaiveDateTime, Utc};
+use namib_shared::macaddr::{MacAddr, SerdeMacAddr};
+use paperclip::actix::Apiv2Schema;
+
 use crate::{
     error::Result,
     models::{Device, DeviceType, DeviceWithRefs, MudData, Room},
 };
-use chrono::{NaiveDateTime, Utc};
-use namib_shared::{mac, MacAddr};
-use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceDto {
@@ -70,7 +71,7 @@ impl DeviceCreationUpdateDto {
     pub fn into_device(self, collect_info: bool) -> Result<Device> {
         let mac_addr = match self.mac_addr {
             None => None,
-            Some(m) => Some(MacAddr::from(m.parse::<mac::MacAddr>()?)),
+            Some(m) => Some(SerdeMacAddr::from(m.parse::<MacAddr>()?)),
         };
 
         Ok(Device {
@@ -116,7 +117,7 @@ impl DeviceCreationUpdateDto {
             device.room_id = Some(room_id);
         }
         if let Some(mac_addr) = self.mac_addr {
-            device.mac_addr = mac_addr.parse::<mac::MacAddr>().ok().map(MacAddr::from);
+            device.mac_addr = mac_addr.parse::<MacAddr>().ok().map(SerdeMacAddr::from);
         }
         if let Some(duid) = self.duid {
             device.duid = Some(duid);

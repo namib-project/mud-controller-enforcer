@@ -8,7 +8,7 @@ use chrono::Utc;
 
 // Database methods
 pub async fn get_all(conn: &DbConnection) -> Result<Vec<User>> {
-    #[cfg(feature = "sqlite")]
+    #[cfg(not(feature = "postgres"))]
     let usrs = sqlx::query!(
 r#"select
 	u.id as user_id
@@ -91,7 +91,7 @@ pub async fn find_by_id(id: i64, conn: &DbConnection) -> Result<User> {
         .fetch_one(conn)
         .await?;
 
-    Ok(add_user_roles(usr, conn).await?)
+    Ok(with_roles(usr, conn).await?)
 }
 
 pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<User> {
@@ -99,10 +99,10 @@ pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<Use
         .fetch_one(conn)
         .await?;
 
-    Ok(add_user_roles(usr, conn).await?)
+    Ok(with_roles(usr, conn).await?)
 }
 
-async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
+async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
     let roles: Vec<RoleDbo> = sqlx::query_as!(
         RoleDbo,
         "SELECT * FROM roles WHERE id IN (SELECT role_id FROM users_roles WHERE user_id = $1)",
@@ -128,7 +128,7 @@ async fn add_user_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
-    #[cfg(feature = "sqlite")]
+    #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
         user.username,
@@ -156,19 +156,19 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
         .count;
 
     if user_count == 1 {
-        role_service::role_add_to_user(conn, result, role_service::ROLE_ID_ADMIN).await?;
+        role_service::add_role_to_user(conn, result, role_service::ROLE_ID_ADMIN).await?;
     }
 
     Ok(result)
 }
 
-pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
+pub async fn update(user: &User, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
         "update users SET username = $1, password = $2, salt = $3 WHERE id = $4",
         user.username,
         user.password,
         user.salt,
-        id
+        user.id
     )
     .execute(conn)
     .await?;
@@ -176,19 +176,21 @@ pub async fn update(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
     Ok(upd_count.rows_affected() == 1)
 }
 
-pub async fn update_username(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
-    let upd_count = sqlx::query!("UPDATE users SET username = $1 where id = $2", user.username, id)
+pub async fn update_username(id: i64, username: &str, conn: &DbConnection) -> Result<bool> {
+    let upd_count = sqlx::query!("UPDATE users SET username = $1 where id = $2", username, id)
         .execute(conn)
         .await?;
 
     Ok(upd_count.rows_affected() == 1)
 }
 
-pub async fn update_password(id: i64, user: &User, conn: &DbConnection) -> Result<bool> {
+pub async fn update_password(id: i64, password: &str, conn: &DbConnection) -> Result<bool> {
+    let salt = User::generate_salt();
+    let password = User::hash_password(&password, &salt)?;
     let upd_count = sqlx::query!(
         "UPDATE users SET password = $1, salt = $2 where id = $3",
-        user.password,
-        user.salt,
+        password,
+        salt,
         id
     )
     .execute(conn)

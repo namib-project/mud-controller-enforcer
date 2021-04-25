@@ -1,7 +1,5 @@
-use strum_macros::EnumIter;
-
 #[allow(non_camel_case_types)]
-#[derive(strum_macros::ToString, Debug, EnumIter, Copy, Clone)]
+#[derive(strum::AsRefStr, strum::ToString, Debug, strum::EnumIter, Copy, Clone)]
 pub enum Permission {
     /// config/read
     #[strum(serialize = "config/read")]

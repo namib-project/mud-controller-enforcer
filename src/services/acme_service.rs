@@ -1,8 +1,14 @@
-use crate::error::{self, Result};
+use std::{
+    fmt,
+    fs::File,
+    io::Read,
+    net::ToSocketAddrs,
+    sync::{Arc, RwLock},
+};
+
 use acme_lib::{create_rsa_key, persist::FilePersist, Account, Directory, DirectoryUrl};
 use get_if_addrs::get_if_addrs;
 use lazy_static::lazy_static;
-use namib_shared::open_file_with;
 use regex::{Captures, Regex};
 use reqwest::{Certificate, Identity};
 use rustls_18::{
@@ -11,12 +17,11 @@ use rustls_18::{
 };
 use sha3::{Digest, Sha3_224};
 use snafu::ensure;
-use std::{
-    env, fmt,
-    fs::File,
-    io::Read,
-    net::ToSocketAddrs,
-    sync::{Arc, RwLock},
+
+use crate::{
+    app_config::APP_CONFIG,
+    error::{self, Result},
+    util::open_file_with,
 };
 
 /// `CertId` contains the url-safe base64-encoded sha1-hash of a certificate and may be regarded as a unique identifier for a Namib service.
@@ -46,10 +51,10 @@ impl fmt::Display for CertId {
 }
 
 fn get_letsencrypt_url() -> DirectoryUrl<'static> {
-    if env::var("STAGING").as_deref() == Ok("0") {
-        DirectoryUrl::LetsEncrypt
-    } else {
+    if APP_CONFIG.staging {
         DirectoryUrl::LetsEncryptStaging
+    } else {
+        DirectoryUrl::LetsEncrypt
     }
 }
 
@@ -65,7 +70,7 @@ lazy_static! {
     /// The certificate id (sha1 hash in base64)
     static ref SERVER_ID: CertId = CertId::new(SERVER_CERT[0].as_ref());
     /// The domain that this controllers certificate will be valid for
-    pub static ref DOMAIN: String = format!("{}.{}", *SERVER_ID, env::var("DOMAIN").expect("DOMAIN was not defined"));
+    pub static ref DOMAIN: String = format!("{}.{}", *SERVER_ID, APP_CONFIG.domain);
     /// store the CertifiedKey to not recreate it on every request
     static ref ACME_CERTIFIED_KEY: RwLock<Option<CertifiedKey>> = RwLock::new(None);
 }
@@ -141,10 +146,10 @@ pub fn update_certs() -> Result<()> {
         File::open("certs/server-key.pem")?.read_to_end(&mut certs)?;
         let mut ca: Vec<u8> = Vec::new();
         // Use the global namib certificate here, since the httpchallenge service is always using the global one.
-        File::open(&env::var("GLOBAL_NAMIB_CA_CERT").expect("GLOBAL_NAMIB_CA_CERT env is missing"))?
-            .read_to_end(&mut ca)?;
+        File::open(&APP_CONFIG.global_namib_ca_cert)?.read_to_end(&mut ca)?;
         // send the httpchallenge token to the service.
         let response = reqwest::blocking::ClientBuilder::new()
+            .tls_built_in_root_certs(false)
             .add_root_certificate(Certificate::from_pem(&ca)?)
             .identity(Identity::from_pem(&certs)?)
             .build()?
@@ -175,7 +180,7 @@ pub fn update_certs() -> Result<()> {
 /// Get the tls server config for actix
 pub fn server_config() -> ServerConfig {
     // create the certificate in the background, it doesn't have to be immediatly present for ActiX to start.
-    actix_rt::spawn(async {
+    tokio::task::spawn_blocking(|| {
         if let Err(e) = update_certs() {
             warn!("Failed to update certificates: {:?}", e);
         }
@@ -188,16 +193,13 @@ pub fn server_config() -> ServerConfig {
 /// Returns the secure dns name for this controller.
 /// Will return `None` if no certificate has been issued yet, or the domain is not resolved to be this controller's ip.
 pub fn secure_name() -> Option<String> {
-    if let Ok(g) = ACME_CERTIFIED_KEY.read() {
-        if g.is_some() {
-            drop(g);
-            if let Ok(ifs) = get_if_addrs() {
-                if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
-                    for resolved in resolved {
-                        for interf in &ifs {
-                            if interf.ip() == resolved.ip() {
-                                return Some(DOMAIN.to_string());
-                            }
+    if let Ok(Some(_)) = ACCOUNT.certificate(&DOMAIN) {
+        if let Ok(ifs) = get_if_addrs() {
+            if let Ok(resolved) = (DOMAIN.as_str(), 443u16).to_socket_addrs() {
+                for resolved in resolved {
+                    for interf in &ifs {
+                        if interf.ip() == resolved.ip() {
+                            return Some(DOMAIN.to_string());
                         }
                     }
                 }

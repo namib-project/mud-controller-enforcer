@@ -1,19 +1,20 @@
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    ops::Deref,
+};
+
+use chrono::{NaiveDateTime, Utc};
+use namib_shared::{
+    macaddr::{MacAddr, SerdeMacAddr},
+    models::{DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation},
+};
+use paperclip::actix::Apiv2Schema;
+
 use crate::{
     db::DbConnection,
     error::Result,
     models::{mud_models::MudData, Room},
     services::{mud_service, room_service},
-};
-use chrono::{NaiveDateTime, Utc};
-use namib_shared::{
-    mac,
-    models::{DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation},
-    MacAddr,
-};
-use paperclip::actix::Apiv2Schema;
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    ops::Deref,
 };
 
 #[derive(Debug, Clone)]
@@ -39,7 +40,7 @@ pub struct Device {
     pub name: Option<String>,
     pub ipv4_addr: Option<Ipv4Addr>,
     pub ipv6_addr: Option<Ipv6Addr>,
-    pub mac_addr: Option<MacAddr>,
+    pub mac_addr: Option<SerdeMacAddr>,
     pub duid: Option<String>,
     pub hostname: String,
     pub vendor_class: String,
@@ -111,7 +112,7 @@ impl From<DeviceDbo> for Device {
             ipv6_addr: device.ipv6_addr.and_then(|ip| ip.parse().ok()),
             mac_addr: device
                 .mac_addr
-                .map(|m| m.parse::<mac::MacAddr>().expect("Is valid mac addr").into()),
+                .map(|m| m.parse::<MacAddr>().expect("Is valid mac addr").into()),
             duid: device.duid,
             hostname: device.hostname,
             vendor_class: device.vendor_class,

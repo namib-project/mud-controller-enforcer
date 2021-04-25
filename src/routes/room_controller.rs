@@ -1,6 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::http::StatusCode;
+use futures::{stream, StreamExt, TryStreamExt};
 use paperclip::actix::{
     api_v2_operation, web,
     web::{HttpResponse, Json},
@@ -16,7 +17,6 @@ use crate::{
     routes::dtos::{DeviceDto, RoomCreationUpdateDto, RoomDto},
     services::{role_service::Permission, room_service},
 };
-use futures::{stream, StreamExt, TryStreamExt};
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_rooms));

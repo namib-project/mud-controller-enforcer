@@ -1,5 +1,9 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use actix_web::{http::StatusCode, HttpResponse};
+use paperclip::actix::{api_v2_operation, web, web::Json};
+use validator::Validate;
+
 use crate::{
     auth::AuthToken,
     db::DbConnection,
@@ -8,10 +12,6 @@ use crate::{
     routes::dtos::{RoleAssignDto, RoleDto, RoleUpdateDto},
     services::role_service::{self, Permission},
 };
-use actix_web::HttpResponse;
-use isahc::http::StatusCode;
-use paperclip::actix::{api_v2_operation, web, web::Json};
-use validator::Validate;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/", web::get().to(get_roles));
@@ -27,7 +27,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 #[api_v2_operation(summary = "List of all roles")]
 pub async fn get_roles(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<RoleDto>>> {
     auth.require_permission(Permission::role__list)?;
-    let res: Vec<RoleDto> = role_service::roles_get_all(pool.get_ref()).await?;
+    let res: Vec<RoleDto> = role_service::roles_get_all(&pool).await?;
     Ok(Json(res))
 }
 
@@ -38,7 +38,7 @@ pub async fn get_role(
     auth: AuthToken,
 ) -> Result<Json<RoleDto>> {
     auth.require_permission(Permission::role__read)?;
-    let res: RoleDto = role_service::role_get(pool.get_ref(), role_id.into_inner()).await?;
+    let res: RoleDto = role_service::role_get(&pool, role_id.into_inner()).await?;
     Ok(Json(res))
 }
 
@@ -65,7 +65,7 @@ pub async fn create_role(
         .fail()
     })?;
 
-    let res: RoleDto = role_service::role_create(pool.get_ref(), role_dto.into_inner()).await?;
+    let res: RoleDto = role_service::role_create(&pool, role_dto.into_inner()).await?;
     Ok(Json(res))
 }
 
@@ -87,7 +87,7 @@ pub async fn edit_role(
 
     let role_id = role_id.into_inner();
 
-    role_service::role_get(pool.get_ref(), role_id).await.or_else(|_| {
+    role_service::role_get(&pool, role_id).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: "Role not found".to_string(),
@@ -103,7 +103,7 @@ pub async fn edit_role(
         .fail()
     })?;
 
-    if role_service::role_update(pool.get_ref(), role_id, role_dto.into_inner()).await? {
+    if role_service::role_update(&pool, role_id, role_dto.into_inner()).await? {
         Ok(HttpResponse::NoContent().finish())
     } else {
         // return 404 if no role was updated
@@ -118,7 +118,7 @@ pub async fn delete_role(
     auth: AuthToken,
 ) -> Result<HttpResponse> {
     auth.require_permission(Permission::role__delete)?;
-    role_service::role_delete(pool.get_ref(), role_id.into_inner()).await?;
+    role_service::role_delete(&pool, role_id.into_inner()).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -138,7 +138,7 @@ pub async fn assign_role(
     })?;
 
     let assignment: RoleAssignDto = assignment_dto.into_inner();
-    role_service::role_add_to_user(pool.get_ref(), assignment.user_id, assignment.role_id).await?;
+    role_service::add_role_to_user(&pool, assignment.user_id, assignment.role_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -158,7 +158,7 @@ pub async fn unassign_role(
     })?;
 
     let assignment: RoleAssignDto = assignment_dto.into_inner();
-    role_service::role_delete_from_user(pool.get_ref(), assignment.user_id, assignment.role_id).await?;
+    role_service::role_delete_from_user(&pool, assignment.user_id, assignment.role_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

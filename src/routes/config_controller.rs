@@ -1,5 +1,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
+use std::collections::HashMap;
+
 use paperclip::actix::{api_v2_operation, web, web::Json};
 
 use crate::{
@@ -9,7 +11,6 @@ use crate::{
     routes::dtos::ConfigQueryDto,
     services::{config_service, role_service::Permission},
 };
-use std::collections::HashMap;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_configs));

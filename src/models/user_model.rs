@@ -8,7 +8,7 @@ use snafu::ensure;
 use crate::{error, error::Result};
 use chrono::NaiveDateTime;
 
-const SALT_LENGTH: usize = 32;
+pub const SALT_LENGTH: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct UserDbo {
@@ -57,11 +57,8 @@ pub struct RoleDbo {
 // Local methods
 impl User {
     pub fn new(username: String, password: &str) -> Result<Self> {
-        let mut salt = vec![0u8; SALT_LENGTH];
-        OsRng::default().fill(salt.as_mut_slice());
-
+        let salt = User::generate_salt();
         let utc_now = chrono::Utc::now().naive_utc();
-
         Ok(Self {
             id: 0,
             username,
@@ -71,6 +68,12 @@ impl User {
             roles: Vec::new(),
             permissions: Vec::new(),
         })
+    }
+
+    pub fn update_password(&mut self, password: &str) -> Result<()> {
+        self.salt = User::generate_salt();
+        self.password = User::hash_password(password, &self.salt)?;
+        Ok(())
     }
 
     pub fn verify_password(&self, password: &str) -> Result<()> {
@@ -83,5 +86,11 @@ impl User {
         let argon_config = Config::default();
 
         Ok(argon2::hash_encoded(password.as_bytes(), salt, &argon_config)?)
+    }
+
+    pub fn generate_salt() -> Vec<u8> {
+        let mut salt = vec![0u8; SALT_LENGTH];
+        OsRng::default().fill(salt.as_mut_slice());
+        salt
     }
 }
