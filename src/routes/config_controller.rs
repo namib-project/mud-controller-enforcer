@@ -18,7 +18,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::delete().to(delete_config));
 }
 
-#[api_v2_operation(summary = "Retrieve all or a subset of system config key-value pairs")]
+#[api_v2_operation(summary = "Retrieve all or a subset of system config key-value pairs", tags(Config))]
 async fn get_configs(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -45,7 +45,7 @@ async fn get_configs(
     Ok(Json(config_map))
 }
 
-#[api_v2_operation(summary = "Set system config values")]
+#[api_v2_operation(summary = "Set system config values", tags(Config))]
 async fn set_configs(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -66,7 +66,7 @@ async fn set_configs(
     Ok(Json(config_map))
 }
 
-#[api_v2_operation(summary = "Delete the given system config entries")]
+#[api_v2_operation(summary = "Delete the given system config entries", tags(Config))]
 async fn delete_config(
     pool: web::Data<DbConnection>,
     auth: AuthToken,

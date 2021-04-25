@@ -24,7 +24,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/", web::post().to(create_mud));
 }
 
-#[api_v2_operation(summary = "Get all known MUDs or query for a single MUD-Url")]
+#[api_v2_operation(summary = "Get all known MUDs or query for a single MUD-Url", tags(MUD))]
 pub async fn get_muds(
     pool: web::Data<DbConnection>,
     query: web::Query<MudQueryDto>,
@@ -53,7 +53,7 @@ pub async fn get_muds(
     }
 }
 
-#[api_v2_operation(summary = "Update the overrides on a MUD")]
+#[api_v2_operation(summary = "Update the overrides on a MUD", tags(MUD))]
 pub async fn update_mud(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -84,7 +84,7 @@ pub async fn update_mud(
     Ok(Json(mud_data))
 }
 
-#[api_v2_operation(summary = "Delete a MUD")]
+#[api_v2_operation(summary = "Delete a MUD", tags(MUD))]
 pub async fn delete_mud(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -114,7 +114,7 @@ pub async fn delete_mud(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Create a MUD from a URL or custom name")]
+#[api_v2_operation(summary = "Create a MUD from a URL or custom name", tags(MUD))]
 pub async fn create_mud(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
