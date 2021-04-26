@@ -1,6 +1,8 @@
+use std::{future::Future, pin::Pin};
+
 use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, web, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
-use futures::{future, future::Ready};
+use futures::{future, FutureExt};
 use glob::Pattern;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
@@ -105,7 +107,7 @@ fn extract_auth_from_request(request: &HttpRequest) -> Option<AuthToken> {
 impl FromRequest for AuthToken {
     type Config = ();
     type Error = actix_web::Error;
-    type Future = Ready<std::result::Result<Self, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output=std::result::Result<Self, Self::Error>>>>;
 
     /// Middleware for Auth struct extraction from "Authorization: Bearer {}" header.
     /// (Header => Token => Auth)
@@ -115,14 +117,13 @@ impl FromRequest for AuthToken {
     fn from_request(req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
         match extract_auth_from_request(req) {
             Some(auth) => {
-                let pool = req.app_data::<web::Data<DbConnection>>().unwrap();
-                let runtime = tokio::runtime::Runtime::new().expect("Unable to create a runtime");
-                runtime
-                    .block_on(user_service::update_last_interaction_stamp(auth.sub, pool))
-                    .unwrap();
-                return future::ok(auth);
+                let conn = req.app_data::<web::Data<DbConnection>>().unwrap().clone();
+                Box::pin(async move {
+                    user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
+                    Ok(auth)
+                })
             },
-            None => future::err(ErrorUnauthorized("Unauthorized")),
+            None => future::err(ErrorUnauthorized("Unauthorized")).boxed_local(),
         }
     }
 }
