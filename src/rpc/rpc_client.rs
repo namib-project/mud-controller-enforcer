@@ -66,12 +66,7 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
         {
             let enf = enforcer.read().await;
             let version = Some(enf.config.version().into());
-            let heartbeat: io::Result<Option<EnforcerConfig>> = enf
-                .client
-                .as_ref()
-                .expect("Enforcer RPC client must be set before performing heartbeat.")
-                .heartbeat(context::current(), version)
-                .await;
+            let heartbeat: io::Result<Option<EnforcerConfig>> = enf.client.heartbeat(context::current(), version).await;
             match heartbeat {
                 Err(error) => match error.kind() {
                     ErrorKind::ConnectionReset => {
@@ -79,8 +74,8 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                         if let Ok((new_client, addr)) = run().await {
                             drop(enf);
                             let mut enf = enforcer.write().await;
-                            enf.client = Some(new_client);
-                            enf.addr = Some(addr);
+                            enf.client = new_client;
+                            enf.addr = addr;
                         }
                     },
                     _ => {
@@ -90,11 +85,7 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
                     if enf.config.secure_name() != config.secure_name() {
-                        if let Err(e) = apply_secure_name_config(
-                            &enf.config.secure_name(),
-                            enf.addr
-                                .expect("Controller address must be set before performing heartbeat"),
-                        ) {
+                        if let Err(e) = apply_secure_name_config(&enf.config.secure_name(), enf.addr) {
                             error!("Error while applying new controller address: {:?}", e);
                         }
                     }
