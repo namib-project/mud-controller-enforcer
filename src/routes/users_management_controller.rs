@@ -22,14 +22,14 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{user_id}", web::delete().to(delete_user_by_id));
 }
 
-#[api_v2_operation(summary = "List of all users")]
+#[api_v2_operation(summary = "List of all users", tags(Management))]
 pub async fn get_all_users(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<User>>> {
     auth.require_permission(Permission::user__management__list)?;
 
     Ok(Json(user_service::get_all(&pool).await?))
 }
 
-#[api_v2_operation(summary = "Get a specific user")]
+#[api_v2_operation(summary = "Get a specific user", tags(Management))]
 pub async fn get_user_by_id(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -40,7 +40,7 @@ pub async fn get_user_by_id(
     Ok(Json(user_service::find_by_id(user_id.into_inner(), &pool).await?))
 }
 
-#[api_v2_operation(summary = "Create a new user")]
+#[api_v2_operation(summary = "Create a new user", tags(Management))]
 pub async fn create_user(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -69,7 +69,7 @@ pub async fn create_user(
     Ok(Json(user_service::find_by_id(new_user_id, &pool).await?))
 }
 
-#[api_v2_operation(summary = "Update a user")]
+#[api_v2_operation(summary = "Update a user", tags(Management))]
 pub async fn update_user_by_id(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -105,7 +105,7 @@ pub async fn update_user_by_id(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Delete a user")]
+#[api_v2_operation(summary = "Delete a user", tags(Management))]
 pub async fn delete_user_by_id(
     pool: web::Data<DbConnection>,
     auth: AuthToken,

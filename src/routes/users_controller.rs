@@ -30,7 +30,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/configs/{key}", web::delete().to(delete_users_config));
 }
 
-#[api_v2_operation(summary = "Register a new user")]
+#[api_v2_operation(summary = "Register a new user", tags(Users))]
 pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) -> Result<Json<SuccessDto>> {
     ensure!(
         config_service::get_config_value(ConfigKeys::AllowUserSignup.as_ref(), &pool)
@@ -65,7 +65,7 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
     }))
 }
 
-#[api_v2_operation(summary = "Login with username and password")]
+#[api_v2_operation(summary = "Login with username and password", tags(Users))]
 pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
     login_dto.validate().or_else(|_| {
         error::ResponseError {
@@ -104,7 +104,7 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
     }))
 }
 
-#[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.")]
+#[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.", tags(Users))]
 pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<TokenDto>> {
     let user = user_service::find_by_id(auth.sub, &pool).await.or_else(|_| {
         error::ResponseError {
@@ -123,14 +123,14 @@ pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
     }))
 }
 
-#[api_v2_operation(summary = "Retrieve information about the logged-in user")]
+#[api_v2_operation(summary = "Retrieve information about the logged-in user", tags(Users))]
 pub async fn get_me(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<User>> {
     let user = user_service::find_by_id(auth.sub, &pool).await?;
 
     Ok(Json(user))
 }
 
-#[api_v2_operation(summary = "Update the current user")]
+#[api_v2_operation(summary = "Update the current user", tags(Users))]
 pub fn update_me(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -157,7 +157,7 @@ pub fn update_me(
     }))
 }
 
-#[api_v2_operation(summary = "Update the user's password")]
+#[api_v2_operation(summary = "Update the user's password", tags(Users))]
 pub fn update_password(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -188,7 +188,7 @@ pub fn update_password(
     }))
 }
 
-#[api_v2_operation(summary = "Gets the config variables of the user")]
+#[api_v2_operation(summary = "Gets the config variables of the user", tags(Users))]
 pub fn get_users_configs(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<UserConfigDto>>> {
     let user_configs = user_config_service::get_all_configs_for_user(auth.sub, &pool).await?;
 
@@ -204,7 +204,7 @@ pub fn get_users_configs(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
     Ok(Json(user_configs_dto))
 }
 
-#[api_v2_operation(summary = "Gets a config variable of the user")]
+#[api_v2_operation(summary = "Gets a config variable of the user", tags(Users))]
 pub fn get_users_config(
     pool: web::Data<DbConnection>,
     key: web::Path<String>,
@@ -229,7 +229,10 @@ pub fn get_users_config(
     }))
 }
 
-#[api_v2_operation(summary = "Sets a config variables of the user. Returns status code 204 on success.")]
+#[api_v2_operation(
+    summary = "Sets a config variables of the user. Returns status code 204 on success.",
+    tags(Users)
+)]
 pub fn set_users_config(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -249,7 +252,10 @@ pub fn set_users_config(
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Deletes a config variables of the user. Returns status code 204 on success.")]
+#[api_v2_operation(
+    summary = "Deletes a config variables of the user. Returns status code 204 on success.",
+    tags(Users)
+)]
 pub fn delete_users_config(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
