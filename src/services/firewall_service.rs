@@ -100,6 +100,7 @@ impl FirewallService {
     pub async fn apply_current_config(&self) -> Result<()> {
         debug!("Configuration has changed, applying new rules to nftables");
         let config = &self.enforcer_state.read().await.config;
+        debug!("{:?}", config);
         let mut batch = Batch::new();
         self.add_old_config_deletion_instructions(&mut batch)?;
         self.dns_watcher.clear_watched_names().await;
@@ -382,19 +383,24 @@ impl FirewallService {
 fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
     // Create a netlink socket to netfilter.
     let socket = mnl::Socket::new(mnl::Bus::Netfilter)?;
-    // Send all the bytes in the batch.
-    socket.send_all(batch)?;
 
-    // Try to parse the messages coming back from netfilter. This part is still very unclear.
     let portid = socket.portid();
     let mut buffer = vec![0; nftnl::nft_nlmsg_maxsize() as usize];
-    let very_unclear_what_this_is_for = 2;
-    while let Some(message) = socket_recv(&socket, &mut buffer[..])? {
-        match mnl::cb_run(message, very_unclear_what_this_is_for, portid)? {
-            mnl::CbResult::Stop => {
-                break;
-            },
-            mnl::CbResult::Ok => (),
+    let seq_num = 2;
+
+    // Send all the bytes in the batch one by one.
+    let mut batch_iter = batch.iter();
+    while let Some(batch_part) = batch_iter.next() {
+        socket.send(batch_part)?;
+        // Wait for sent part of batch to be received properly before sending next batch part.
+        // This is needed to prevent some buffer overruns.
+        if let Some(message) = socket_recv(&socket, &mut buffer[..])? {
+            match mnl::cb_run(message, seq_num, portid)? {
+                mnl::CbResult::Stop => {
+                    break;
+                },
+                mnl::CbResult::Ok => (),
+            }
         }
     }
     Ok(())
