@@ -27,7 +27,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{id}/guesses", web::get().to(guess_thing));
 }
 
-#[api_v2_operation(summary = "List all devices")]
+#[api_v2_operation(summary = "List all devices", tags(Devices))]
 async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<DeviceDto>>> {
     auth.require_permission(Permission::device__list)?;
     auth.require_permission(Permission::device__read)?;
@@ -42,7 +42,7 @@ async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
     ))
 }
 
-#[api_v2_operation(summary = "Get a device by id")]
+#[api_v2_operation(summary = "Get a device by id", tags(Devices))]
 async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<DeviceDto>> {
     auth.require_permission(Permission::device__read)?;
 
@@ -51,7 +51,7 @@ async fn get_device(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Pat
     Ok(Json(DeviceDto::from(device.load_refs(&pool).await?)))
 }
 
-#[api_v2_operation(summary = "Create a device")]
+#[api_v2_operation(summary = "Create a device", tags(Devices))]
 async fn create_device(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -75,7 +75,7 @@ async fn create_device(
     Ok(Json(DeviceDto::from(created_device.load_refs(&pool).await?)))
 }
 
-#[api_v2_operation(summary = "Update a device")]
+#[api_v2_operation(summary = "Update a device", tags(Devices))]
 async fn update_device(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -120,7 +120,7 @@ async fn update_device(
     Ok(Json(DeviceDto::from(device_with_refs)))
 }
 
-#[api_v2_operation(summary = "Delete a devices")]
+#[api_v2_operation(summary = "Delete a devices", tags(Devices))]
 async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<HttpResponse> {
     auth.require_permission(Permission::device__delete)?;
 
@@ -130,7 +130,7 @@ async fn delete_device(pool: web::Data<DbConnection>, auth: AuthToken, id: web::
     Ok(HttpResponse::NoContent().finish())
 }
 
-#[api_v2_operation(summary = "Retrieve the MUD-Url guesses for a device")]
+#[api_v2_operation(summary = "Retrieve the MUD-Url guesses for a device", tags(Devices))]
 async fn guess_thing(
     pool: web::Data<DbConnection>,
     auth: AuthToken,

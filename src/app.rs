@@ -14,7 +14,10 @@ use actix_web::{
 };
 use derive_builder::Builder;
 use futures::{future, future::Ready};
-use paperclip::actix::{web, OpenApiExt};
+use paperclip::{
+    actix::{web, OpenApiExt},
+    v2::models::{DefaultApiRaw, Info, Tag},
+};
 use pin_project::pin_project;
 use tokio::{
     select,
@@ -22,7 +25,7 @@ use tokio::{
     task::{JoinError, JoinHandle},
 };
 
-use crate::{app_config::APP_CONFIG, db::DbConnection, error, error::Result, routes, services::acme_service};
+use crate::{app_config::APP_CONFIG, db::DbConnection, error, error::Result, routes, services::acme_service, VERSION};
 
 const BACKLOG: i32 = 2048;
 
@@ -132,6 +135,49 @@ pub fn start_app(
                     let ip_parts: Vec<&str> = ip.split(':').collect();
                     Ok(ip_parts[0].to_string())
                 });
+            let mut spec = DefaultApiRaw::default();
+            spec.tags = vec![
+                Tag {
+                    name: "Config".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+                Tag {
+                    name: "Devices".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+                Tag {
+                    name: "Management".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+                Tag {
+                    name: "MUD".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+                Tag {
+                    name: "Roles".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+                Tag {
+                    name: "Rooms".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+                Tag {
+                    name: "Users".to_string(),
+                    description: Some("".to_string()),
+                    external_docs: None,
+                },
+            ];
+            spec.info = Info {
+                version: VERSION.parse().unwrap(),
+                title: "NAMIB Controller".into(),
+                ..Default::default()
+            };
 
             App::new()
                 .data(conn.clone())
@@ -139,7 +185,7 @@ pub fn start_app(
                 .wrap(middleware::Logger::default())
                 .wrap(rate_limiter)
                 .wrap(TokioWrapper(tokio_handle.clone()))
-                .wrap_api()
+                .wrap_api_with_spec(spec)
                 .service(web::scope("/status").configure(routes::status_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
                 .service(web::scope("/management/users").configure(routes::users_management_controller::init))
