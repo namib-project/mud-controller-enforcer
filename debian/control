@@ -4,8 +4,10 @@ Uploaders: Benjamin Ludewig <ludewigb@uni-bremen.de>, Florian Bonetti <flobon@un
 Priority: optional
 Section: admin
 Standards-Version: 4.5.1
-Build-Depends: cargo,libavahi-compat-libdnssd-dev,libssl-dev
+Build-Depends: cargo:native,libavahi-compat-libdnssd-dev,libssl-dev,debhelper,libc6-dev
+Description: MUD Controller for use with other components of the NAMIB project.
 
 Package: namib-mud-controller
-Architecture: i386 amd64 armhf arm64
-Depends: libavahi-compat-libdnssd1,openssl
+Architecture: i386 amd64 armel armhf arm64
+Depends: libc6,libavahi-compat-libdnssd1,openssl
+Description: MUD Controller for use with other components of the NAMIB project.
