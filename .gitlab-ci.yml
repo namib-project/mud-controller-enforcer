@@ -192,7 +192,8 @@ build-release-postgres:
     - ./gen_server_cert.sh namib-ca
     - cd ..
     - git secret hide
-    - dpkg-buildpackage --host-arch $DEBIAN_ARCH
+    - cd namib_mud_controller
+    - dpkg-buildpackage --no-pre-clean --no-post-clean --host-arch $DEBIAN_ARCH
     - mkdir output
     - mv ../namib-mud-controller*.deb output/
     - mv ../namib-mud-controller*.buildinfo output/
