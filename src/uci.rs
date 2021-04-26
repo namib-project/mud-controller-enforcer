@@ -57,9 +57,8 @@ mod mock {
 mod tests {
     use std::{fs, fs::File, io::Read};
 
-    use crate::error::Result;
-
     use super::*;
+    use crate::error::Result;
 
     fn init() -> Result<Uci> {
         let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))

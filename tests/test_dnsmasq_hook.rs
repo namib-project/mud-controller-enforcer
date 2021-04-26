@@ -1,6 +1,5 @@
 #[cfg(feature = "dnsmasq_hook")]
 mod test_dnsmasq_hook {
-    use core::time::Duration;
     use std::{
         collections::HashMap,
         env,
@@ -11,15 +10,18 @@ mod test_dnsmasq_hook {
         process::{Command, Stdio},
         thread,
         thread::JoinHandle,
+        time::Duration,
     };
 
     use chrono::{DateTime, FixedOffset, Local, TimeZone};
-    use serial_test::serial;
-
-    use namib_shared::models::{
-        DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation,
-        DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
+    use namib_shared::{
+        macaddr::MacAddr,
+        models::{
+            DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation,
+            DhcpV4LeaseVersionSpecificInformation, DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
+        },
     };
+    use serial_test::serial;
 
     fn full_lease_info_v4() -> DhcpLeaseInformation {
         DhcpLeaseInformation {
@@ -37,7 +39,7 @@ mod test_dnsmasq_hook {
             ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: Some("eth0".to_string()),
-            mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
+            mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
             mud_url: Some("https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json".to_string()),
             tags: vec!["lan".to_string(), "lan2".to_string()],
             hostname: Some("actual_hostname".to_string()),
@@ -61,7 +63,7 @@ mod test_dnsmasq_hook {
             ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: Some("eth0".to_string()),
-            mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
+            mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
             mud_url: Some("https://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json".to_string()),
             tags: vec!["lan".to_string(), "lan2".to_string()],
             hostname: Some("actual_hostname".to_string()),
@@ -350,7 +352,7 @@ mod test_dnsmasq_hook {
             ),
             time_remaining: std::time::Duration::from_secs(43200),
             receiver_interface: None,
-            mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<macaddr::MacAddr>().unwrap().into()),
+            mac_address: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
             mud_url: None,
             tags: vec![],
             hostname: None,

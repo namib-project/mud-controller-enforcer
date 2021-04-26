@@ -1,21 +1,18 @@
-use std::{env, io, net::SocketAddr, sync::Arc};
+use std::{env, io, net::SocketAddr, sync::Arc, time::SystemTime};
 
 use futures::{pin_mut, prelude::*};
-use tarpc::{client, context, serde_transport};
-use tokio::time::{sleep, Duration};
-
-use crate::services::controller_name::apply_secure_name_config;
-use namib_shared::{codec, firewall_config::EnforcerConfig, rpc::NamibRpcClient};
-
-use crate::{error::Result, services::firewall_service::FirewallService, Enforcer};
-
-use super::controller_discovery::discover_controllers;
-use std::time::SystemTime;
+use namib_shared::{
+    codec,
+    rpc::NamibRpcClient,
+    tarpc::{client, context, serde_transport},
+    EnforcerConfig,
+};
 use tokio::{
     fs::File,
     io::{AsyncReadExt, ErrorKind},
     net::TcpStream,
     sync::RwLock,
+    time::{sleep, Duration},
 };
 use tokio_native_tls::{
     native_tls,
@@ -23,6 +20,13 @@ use tokio_native_tls::{
     TlsConnector,
 };
 use tokio_util::codec::LengthDelimitedCodec;
+
+use super::controller_discovery::discover_controllers;
+use crate::{
+    error::Result,
+    services::{controller_name::apply_secure_name_config, firewall_service::FirewallService},
+    Enforcer,
+};
 
 pub async fn run() -> Result<(NamibRpcClient, SocketAddr)> {
     let identity = {
@@ -115,11 +119,6 @@ async fn try_connect(
 ) -> Result<Option<(NamibRpcClient, SocketAddr)>> {
     debug!("trying to connect to address {:?}", addr);
 
-    // ip6 geht anscheinend nicht
-    if let SocketAddr::V6(_) = addr {
-        return Ok(None);
-    }
-
     let tcp_stream = TcpStream::connect(addr).await?;
     let tls_connector = TlsConnector::from(
         native_tls::TlsConnector::builder()
@@ -134,15 +133,15 @@ async fn try_connect(
     let transport = serde_transport::new(framed_io, codec());
 
     Ok(Some((
-        NamibRpcClient::new(client::Config::default(), transport).spawn()?,
+        NamibRpcClient::new(client::Config::default(), transport).spawn(),
         addr,
     )))
 }
 
 /// Returns the context for the current request, or a default Context if no request is active.
 /// Copied and adapted based on tarpc/rpc/context.rs
-pub fn current_rpc_context() -> tarpc::context::Context {
-    let mut rpc_context = tarpc::context::current();
+pub fn current_rpc_context() -> context::Context {
+    let mut rpc_context = context::current();
     rpc_context.deadline = SystemTime::now() + Duration::from_secs(60); // The deadline is the timestamp, when the request should be dropped, if not already responded to
     rpc_context
 }

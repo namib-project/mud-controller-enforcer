@@ -57,6 +57,11 @@ pub enum Error {
     },
     #[snafu(display("NoneError"), visibility(pub))]
     NoneError { backtrace: Backtrace },
+    #[snafu(display("SerdeError {}", source), context(false))]
+    SerdeError {
+        source: serde_json::Error,
+        backtrace: Backtrace,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

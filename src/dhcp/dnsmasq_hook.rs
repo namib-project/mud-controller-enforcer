@@ -1,19 +1,17 @@
-use std::{env, net, net::IpAddr, num, os::unix::net::UnixStream, str::FromStr, time::Duration};
+use std::{convert::TryInto, env, net, net::IpAddr, num, os::unix::net::UnixStream, str::FromStr, time::Duration};
 
 use chrono::prelude::*;
 use log::{debug, info};
-use snafu::Snafu;
-
 use namib_shared::{
-    mac as macaddr,
+    macaddr,
+    macaddr::SerdeMacAddr,
     models::{
         DhcpEvent, DhcpLeaseInformation, DhcpLeaseVersionSpecificInformation, DhcpV4LeaseVersionSpecificInformation,
         DhcpV6LeaseVersionSpecificInformation, Duid, LeaseExpiryTime,
     },
-    MacAddr,
 };
 use regex::Regex;
-use std::convert::TryInto;
+use snafu::Snafu;
 
 enum EventType {
     Add,
@@ -246,7 +244,7 @@ fn extract_dhcp_hook_data() -> Result<DhcpEvent> {
     // using the question mark operator in case the parsing failed.
     let mac_address = match mac_address {
         Some(mac_str) => {
-            let mac_addr_array: MacAddr = mac_str
+            let mac_addr_array: SerdeMacAddr = mac_str
                 .parse::<macaddr::MacAddr>()
                 .map_err(|e| DnsmasqHookError::InvalidMacAddress {
                     supplied_mac: mac_str,

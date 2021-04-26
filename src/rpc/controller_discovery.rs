@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use futures::{future, Stream, TryStreamExt};
-
 use async_dnssd::{ResolvedHostFlags, ScopedSocketAddr, StreamTimeoutExt};
+use futures::{future, Stream, TryStreamExt};
 
 use crate::error::Result;
 

@@ -4,19 +4,17 @@
 #[macro_use]
 extern crate log;
 
-use std::sync::Arc;
+use std::{env, fs::File, net::SocketAddr, path::Path, sync::Arc, thread};
 
 use dotenv::dotenv;
-use tokio::{fs, fs::OpenOptions};
+use error::{Error, Result};
+use namib_shared::{rpc::NamibRpcClient, EnforcerConfig};
+use tokio::{fs, fs::OpenOptions, sync::RwLock};
 
 use crate::{
     rpc::rpc_client::current_rpc_context,
     services::{controller_name::apply_secure_name_config, firewall_service::FirewallService},
 };
-use error::Result;
-use namib_shared::{firewall_config::EnforcerConfig, rpc::NamibRpcClient};
-use std::{env, net::SocketAddr, path::Path, thread};
-use tokio::sync::RwLock;
 
 mod dhcp;
 mod error;
@@ -27,6 +25,7 @@ mod uci;
 /// Default location for the file containing the last received enforcer configuration.
 const DEFAULT_CONFIG_STATE_FILE: &str = "/etc/namib/state.json";
 
+/// Contains the current config and rpc connection to the controller
 pub struct Enforcer {
     pub client: Option<NamibRpcClient>,
     pub addr: Option<SocketAddr>,
@@ -52,22 +51,14 @@ async fn persist_config(config: &EnforcerConfig) {
             .await
             .unwrap_or_else(|e| warn!("Error while creating config state parent directory: {:?}", e));
     };
-    match serde_json::to_vec(&config) {
-        Ok(serialised_bytes) => {
-            fs::write(config_state_path, serialised_bytes).await.map_or_else(
-                |e| warn!("Error while persisting config state: {:?}", e),
-                |_| {
-                    debug!(
-                        "Persisted configuration at path \"{}\"",
-                        config_state_path.to_string_lossy()
-                    );
-                },
-            );
-        },
-        Err(e) => {
-            warn!("Error while serialising config state: {:?}", e);
-        },
+    if let Err(e) = File::create(config_state_path)
+        .map_err(Error::from)
+        .and_then(|file| Ok(serde_json::to_writer(&file, &config)?))
+    {
+        warn!("Error while persisting config state: {:?}", e);
+        return;
     }
+    debug!("Persisted configuration at path \"{}\"", config_state_path.display());
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
@@ -79,30 +70,23 @@ async fn main() -> Result<()> {
         "Starting in {} mode",
         if services::is_system_mode() { "SYSTEM" } else { "USER" }
     );
+    // Create uci config file if it doesn't exist
     if !services::is_system_mode() {
         fs::create_dir_all("config").await?;
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open("config/firewall")
-            .await?;
+        OpenOptions::new().write(true).create(true).open("config/dhcp").await?;
     }
 
     // Attempt to read last persisted enforcer state.
     info!("Reading last saved enforcer state");
     let config_state_path =
         env::var("NAMIB_CONFIG_STATE_FILE").unwrap_or_else(|_| DEFAULT_CONFIG_STATE_FILE.to_string());
-    let config: Option<EnforcerConfig> = match fs::read(config_state_path)
-        .await
-        .map(|state_bytes| serde_json::from_slice(state_bytes.as_slice()))
+    let config: Option<EnforcerConfig> = match File::open(config_state_path)
+        .map_err(Error::from)
+        .and_then(|file| Ok(serde_json::from_reader(file)?))
     {
-        Ok(Ok(v)) => Some(v),
+        Ok(v) => Some(v),
         Err(err) => {
             warn!("Error while reading config state file: {:?}", err);
-            None
-        },
-        Ok(Err(err)) => {
-            warn!("Error while deserializing config state file: {:?}", err);
             None
         },
     };
@@ -138,6 +122,8 @@ async fn main() -> Result<()> {
 
     // Instantiate firewall service with DNS watcher.
     let watcher = dns_service.create_watcher();
+
+    // Create the firewall service
     let fw_service = Arc::new(FirewallService::new(enforcer.clone(), watcher));
     fw_service.apply_current_config().await?;
 

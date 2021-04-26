@@ -1,23 +1,26 @@
 #[cfg(feature = "nftables")]
-use namib_shared::firewall_config::{EnforcerConfig, NetworkHost, Protocol, Target};
-
-use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
-
-#[cfg(feature = "nftables")]
-use nftnl::{
-    expr::{IcmpCode, RejectionType, Verdict},
-    nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
-};
-#[cfg(feature = "nftables")]
 use std::ffi::CString;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::Arc,
 };
+
+#[cfg(feature = "nftables")]
+use namib_shared::{
+    firewall_config::{Protocol, RuleTargetHost, Verdict},
+    EnforcerConfig,
+};
+#[cfg(feature = "nftables")]
+use nftnl::{
+    expr::{IcmpCode, RejectionType, Verdict as VerdictExpr},
+    nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
+};
 use tokio::{
     select,
     sync::{Notify, RwLock},
 };
+
+use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
 
 /// This file represent the service for firewall on openwrt.
 ///
@@ -204,18 +207,18 @@ impl FirewallService {
                 // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
                 // for the packet source or destination, create a vector of ip addresses for this identifier.
                 let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
-                    Some(NetworkHost::Ip(ipaddr)) => {
+                    Some(RuleTargetHost::Ip(ipaddr)) => {
                         vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
                     },
                     // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
                     // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-                    Some(NetworkHost::Hostname(dns_name)) => self
+                    Some(RuleTargetHost::Hostname(dns_name)) => self
                         .dns_watcher
                         .resolve_and_watch(dns_name.as_str())
                         .await
                         .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
                         .unwrap_or(Vec::new()),
-                    Some(NetworkHost::FirewallDevice) => device
+                    Some(RuleTargetHost::FirewallDevice) => device
                         .ipv4_addr
                         .map(RuleAddrEntry::from)
                         .into_iter()
@@ -224,18 +227,18 @@ impl FirewallService {
                     _ => vec![RuleAddrEntry::AnyAddr],
                 };
                 let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
-                    Some(NetworkHost::Ip(ipaddr)) => {
+                    Some(RuleTargetHost::Ip(ipaddr)) => {
                         vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
                     },
                     // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
                     // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-                    Some(NetworkHost::Hostname(dns_name)) => self
+                    Some(RuleTargetHost::Hostname(dns_name)) => self
                         .dns_watcher
                         .resolve_and_watch(dns_name.as_str())
                         .await
                         .map(|v| v.iter().map(|v| RuleAddrEntry::from(v)).collect())
                         .unwrap_or(Vec::new()),
-                    Some(NetworkHost::FirewallDevice) => device
+                    Some(RuleTargetHost::FirewallDevice) => device
                         .ipv4_addr
                         .map(RuleAddrEntry::from)
                         .into_iter()
@@ -355,12 +358,11 @@ impl FirewallService {
                         }
 
                         // Set verdict if current rule matches.
-                        match rule_spec.target {
-                            Target::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
-                            Target::Reject => {
-                                current_rule.add_expr(&Verdict::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
-                            },
-                            Target::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
+                        match rule_spec.verdict {
+                            Verdict::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
+                            Verdict::Reject => current_rule
+                                .add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited))),
+                            Verdict::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
                         }
                         batch.add(&current_rule, nftnl::MsgType::Add);
                     }
