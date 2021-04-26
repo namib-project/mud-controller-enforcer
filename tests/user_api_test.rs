@@ -8,13 +8,13 @@ use log::info;
 use namib_mud_controller::{
     models::Role,
     routes::dtos::{
-        LoginDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
+        LoginDto, RoleDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
     },
     services::role_service::ROLE_ID_ADMIN,
 };
 use reqwest::{header::HeaderMap, StatusCode};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
 #[derive(Debug, Deserialize, Clone)]
@@ -772,6 +772,67 @@ async fn test_user_config_entry_non_existing() {
         &client,
         format!("http://{}/users/configs/testkey_non_existing", ctx.server_addr).as_str(),
         StatusCode::NOT_FOUND,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_usermanagement_roles() {
+    let ctx = lib::IntegrationTestContext::new("test_usermanagement_roles")
+        .await
+        .start_test_server()
+        .await;
+    let (client, _auth_token) = lib::create_authorized_http_client(&ctx.server_addr).await;
+
+    let roles: Vec<RoleDto> =
+        assert_get_status_deserialize(&client, &format!("http://{}/roles/", ctx.server_addr), StatusCode::OK).await;
+
+    let new_user: Value = assert_post_status_deserialize(
+        &client,
+        &format!("http://{}/management/users/", ctx.server_addr),
+        &json!({"username": "testman", "password": "iamverysecure", "roles_ids": []}),
+        StatusCode::OK,
+    )
+    .await;
+
+    assert_post_status(
+        &client,
+        format!("http://{}/roles/assign", ctx.server_addr).as_str(),
+        &json!({"role_id": roles.iter().find(|r| r.name == "reader").unwrap().id, "user_id": new_user["id"]}),
+        StatusCode::NO_CONTENT,
+    )
+    .await;
+
+    assert_post_status(
+        &reqwest::Client::new(),
+        format!("http://{}/users/login", ctx.server_addr).as_str(),
+        &json!({"username": "testman", "password": "iamverysecure"}),
+        StatusCode::OK,
+    )
+    .await;
+
+    assert_post_status(
+        &client,
+        format!("http://{}/roles/assign", ctx.server_addr).as_str(),
+        &json!({"role_id": roles.iter().find(|r| r.name == "admin").unwrap().id, "user_id": new_user["id"]}),
+        StatusCode::NO_CONTENT,
+    )
+    .await;
+
+    let login: TokenDto = assert_post_status_deserialize(
+        &reqwest::Client::new(),
+        format!("http://{}/users/login", ctx.server_addr).as_str(),
+        &json!({"username": "testman", "password": "iamverysecure"}),
+        StatusCode::OK,
+    )
+    .await;
+
+    let mut headers = HeaderMap::new();
+    headers.insert("authorization", format!("Bearer {}", login.token).parse().unwrap());
+    assert_delete_status(
+        &reqwest::ClientBuilder::new().default_headers(headers).build().unwrap(),
+        format!("http://{}/management/users/{}", ctx.server_addr, new_user["id"]).as_str(),
+        StatusCode::NO_CONTENT,
     )
     .await;
 }

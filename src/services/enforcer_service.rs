@@ -45,6 +45,13 @@ pub async fn get_enforcers(conn: &DbConnection) -> Result<Vec<EnforcerDto>> {
     Ok(result)
 }
 
+pub async fn get_enforcer(cert_id: &str, conn: &DbConnection) -> Result<EnforcerDto> {
+    let result = sqlx::query_as!(EnforcerDto, "SELECT * FROM enforcers WHERE cert_id = $1", cert_id)
+        .fetch_one(conn)
+        .await?;
+    Ok(result)
+}
+
 pub async fn set_enforcer_allowed(cert_id: &str, allowed: bool, conn: &DbConnection) -> Result<EnforcerDto> {
     sqlx::query!("UPDATE enforcers SET allowed = $1 WHERE cert_id = $2", allowed, cert_id)
         .execute(conn)

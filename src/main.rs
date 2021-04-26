@@ -11,7 +11,8 @@
     clippy::cast_possible_truncation,
     clippy::option_if_let_else,
     clippy::missing_errors_doc,
-    clippy::missing_panics_doc
+    clippy::missing_panics_doc,
+    clippy::too_many_lines
 )]
 
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};

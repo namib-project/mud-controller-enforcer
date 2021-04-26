@@ -51,7 +51,7 @@ pub async fn create_user(
     create_user_dto.validate().or_else(|_| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
-            message: None,
+            message: "Invalid POST data".to_string(),
         }
         .fail()
     })?;
