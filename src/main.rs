@@ -4,15 +4,7 @@
 #[macro_use]
 extern crate log;
 
-use std::{
-    env,
-    fs::File,
-    net::SocketAddr,
-    ops::{Deref, DerefMut},
-    path::Path,
-    sync::Arc,
-    thread,
-};
+use std::{env, fs::File, net::SocketAddr, path::Path, sync::Arc, thread};
 
 use dotenv::dotenv;
 use error::{Error, Result};
@@ -131,7 +123,7 @@ async fn main() -> Result<()> {
     // Instantiate firewall service with DNS watcher.
     let watcher = dns_service.create_watcher();
 
-    apply_firewall_config(&config, &watcher).await;
+    apply_firewall_config(&config, &watcher).await?;
 
     // If the RPC client was not already retrieved while getting the initial config, get it now.
     let enforcer = match connected_enforcer {
