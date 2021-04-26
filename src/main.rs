@@ -25,6 +25,8 @@ use tokio::select;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
+    // IMPORTANT: You MUST NOT perform any database queries in the main.rs file because the sqlx offline mode
+    // can only analyse queries in the library.
     dotenv().ok();
     env_logger::init();
 
