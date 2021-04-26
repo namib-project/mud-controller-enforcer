@@ -394,6 +394,8 @@ fn send_and_process(batch: &FinalizedBatch) -> Result<()> {
         socket.send(batch_part)?;
         // Wait for sent part of batch to be received properly before sending next batch part.
         // This is needed to prevent some buffer overruns.
+        // This fix was actually mentioned in another issue in another project that uses the netlink API:
+        // https://github.com/acassen/keepalived/issues/392#issuecomment-239609235
         if let Some(message) = socket_recv(&socket, &mut buffer[..])? {
             match mnl::cb_run(message, seq_num, portid)? {
                 mnl::CbResult::Stop => {
