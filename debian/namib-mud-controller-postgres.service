@@ -1,0 +1,13 @@
+[Service]
+After=network-online.target
+Requires=network-online.target
+Type=exec
+User=namib-controller
+ExecStartPre=/usr/bin/chown namib-controller /var/lib/namib/db.sqlite
+ExecStartPre=/usr/bin/chown -R namib-controller /etc/namib
+ExecStart=/usr/bin/namib-mud-controller
+ProtectSystem=true
+PermissionsStartOnly=true
+ExecStart=/usr/bin/namib_mud_controller
+EnvironmentFile=/etc/namib/config
+WorkingDirectory=/etc/namib

@@ -1,0 +1,1411 @@
+{
+  "db": "SQLite",
+  "03e0e1606773fcefcf325ed73225f637eb29599a4555170aa2475153e7f8043a": {
+    "query": "DELETE FROM devices WHERE id = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "04a265f1cd2949696cfec78d87be8d5ada9925c54997d7c98a3a890302c58ad4": {
+    "query": "SELECT * FROM devices WHERE ipv4_addr = $1 OR ipv6_addr = $2",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "0bdc0f735a04046a3f77e5f517b6bc08dfcb61a0462f62bdb9f57d0329805d0c": {
+    "query": "UPDATE roles SET name = $1, permissions = $2 WHERE id = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 3
+      },
+      "nullable": []
+    }
+  },
+  "124854aa2b1f6a82e097d86d1d1e5791e53ac2d4a54e75d7125cc4b1ca4ac9cb": {
+    "query": "SELECT * FROM roles WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "permissions",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "169a0ba2c1c125a36c3ba7d6988cfba6097745e3a2ce8ccae1982d000b64876d": {
+    "query": "DELETE FROM mud_data WHERE url = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "2560752a8743f96b00644bb09fc4a9a340af8a451341b3a0cc8f80b85ac9aa92": {
+    "query": "DELETE FROM rooms WHERE name = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "2857ebb5ad6c7afe618bd566b0a3b5a0aef7bea1332bbea110cd68ab29ca7d1d": {
+    "query": "SELECT * FROM devices WHERE mud_url = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "28b892badd964bd00ef828ac3e4fd77aa0cfe94bfad4b3df2b068649006a219f": {
+    "query": "INSERT INTO user_configs VALUES ($1, $2, $3) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 3
+      },
+      "nullable": []
+    }
+  },
+  "2b860e89f5756d59c948eb03301450323e9a10eca5089d691f11c3afa9c71654": {
+    "query": "UPDATE devices SET ipv6_addr = NULL WHERE ipv6_addr = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "2f22ea11bc8f1b8e3859b48f8328bf3eef83d3e136b0b07f6558fa01b075eb75": {
+    "query": "INSERT INTO devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 12
+      },
+      "nullable": []
+    }
+  },
+  "3b5d2f596fea635daa56a2cab06c50e78a52be7853165d0a2a0481534dffc277": {
+    "query": "SELECT * FROM mud_data",
+    "describe": {
+      "columns": [
+        {
+          "name": "url",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "data",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 2,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "expiration",
+          "ordinal": 3,
+          "type_info": "Datetime"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "442341f640ede8c7f9498ae92aada9ff897284b1e7e8a2e06b477fabae17b933": {
+    "query": "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 3
+      },
+      "nullable": []
+    }
+  },
+  "463e3cb3cc41990e508d9159e6e4043629edcc6761ce8ccaddfafc51523b2991": {
+    "query": "DELETE FROM roles WHERE id = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "470b19b89f96054699384828936d722f669b5145708bdba9a0dff04e101d67ff": {
+    "query": "DELETE FROM users_roles WHERE user_id = $1 and role_id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "4728ac164c8c13fafd1e5bcab06c9c303046a29dfedc5e3a86982a2dfc8a22a0": {
+    "query": "SELECT * FROM user_configs WHERE user_id = $1 AND key = $2",
+    "describe": {
+      "columns": [
+        {
+          "name": "key",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "value",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "50293c2e54af11d4c2a553e29b671cef087a159c6ee7182d8ca929ecb748f3b7": {
+    "query": "DELETE FROM users WHERE id = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "5f1bdc5ccb8cf7ad7b2868620575eaeabfd311ca3206f9833c33aca1905a8628": {
+    "query": "SELECT * FROM devices WHERE mac_addr = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "606364c79e0990deb07dfbe6c32b3d302d083ec5333f3a5ce04113c38a041100": {
+    "query": "SELECT * FROM users WHERE username = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "username",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "salt",
+          "ordinal": 3,
+          "type_info": "Blob"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "67402fbafa3ccd09a78d04b8317f71655dcdba52507b68eff45ded78278fbd40": {
+    "query": "SELECT url, expiration FROM mud_data",
+    "describe": {
+      "columns": [
+        {
+          "name": "url",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "expiration",
+          "ordinal": 1,
+          "type_info": "Datetime"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "6973e62386b4c8a0d7489fec99a1e2e4b326a6906f4460e252d8ef7fc87428fd": {
+    "query": "INSERT INTO roles (name, permissions) VALUES (?, ?)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "7cb5a0787b51eac0ca3f245e7f89abe4db01e42a8676eb445bca10c9e23a78b1": {
+    "query": "UPDATE rooms SET name = $1, color = $2 WHERE room_id = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 3
+      },
+      "nullable": []
+    }
+  },
+  "843923b9a0257cf80f1dff554e7dc8fdfc05f489328e8376513124dfb42996e3": {
+    "query": "SELECT * FROM users WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "username",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "salt",
+          "ordinal": 3,
+          "type_info": "Blob"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "8446fd211cce9e42ecbf0aeae8e7baf4c3cbcb7dc7bd30b57e08d0f3fb12a579": {
+    "query": "update users SET username = $1, password = $2, salt = $3 WHERE id = $4",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 4
+      },
+      "nullable": []
+    }
+  },
+  "8574c33e06cbb9dcab5ca7625782a88b94920834385d8dfd4985e3404f7480b5": {
+    "query": "SELECT * FROM roles WHERE id IN (SELECT role_id FROM users_roles WHERE user_id = $1)",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "permissions",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "87bd1894e62836eb4a1387b6049490de046eb72cc27fa925aea37bd348df53f8": {
+    "query": "UPDATE users SET password = $1, salt = $2 where id = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 3
+      },
+      "nullable": []
+    }
+  },
+  "8ba0dd749c151d66af716b61c3ef85e702780ced32638064dbd3e915db0efa4d": {
+    "query": "SELECT COUNT(*) AS \"count!\" FROM users",
+    "describe": {
+      "columns": [
+        {
+          "name": "count!",
+          "ordinal": 0,
+          "type_info": "Int"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "8d7d729cc1b1af7b0bf6823fd7ecd2c4fdcba8e54aebee030f563e9e2087c121": {
+    "query": "INSERT INTO mud_data (url, data, created_at, expiration) VALUES ($1, $2, $3, $4)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 4
+      },
+      "nullable": []
+    }
+  },
+  "8fa1c6e8c500e8b4555a13f5b1799d85c4edf86853623945bf9197e50dab430d": {
+    "query": "UPDATE users SET username = $1 where id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "922dda0d16b61a25068183d3b7c7892ad15d72e175433a4e35cab33d0263acfb": {
+    "query": "SELECT * FROM config",
+    "describe": {
+      "columns": [
+        {
+          "name": "key",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "value",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "a8f2397d8d6b2c2ad756f0c5bafafed29ff3239bdb607fe9ce0f2bc78b9821d7": {
+    "query": "SELECT * FROM devices WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "aa868ec1e16f5b760bcdd4b8046958e7f7e7f2e9d31aee91b8fcfc65fb556cbe": {
+    "query": "INSERT INTO rooms (name, color) VALUES ($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "adc4b90ad3d391b39768d1a80b8d956c55ef2a82a052aee34972eef59ea25116": {
+    "query": "SELECT * FROM roles",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "permissions",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "b3a521f0b813d6b3dfbd82ec3dd4ccec33d2d3e0b39d1be9fa1e3ca9688d05b1": {
+    "query": "SELECT * FROM devices WHERE room_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "b86e56eb1e520ce6d73099ea464ad3cd1756610a0aa81c858043f2bf0d3fe6e7": {
+    "query": "INSERT INTO config VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "c0721a4042d6ae7d2359013ab7baae942b4563949276beb7f8bda70cfa2cd4a5": {
+    "query": "SELECT * FROM devices WHERE duid = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "c108cba3c4326b94f6364d8ffe20192d06c70bcb42c1b7e85ee0f14e7c06ee9d": {
+    "query": "SELECT * FROM rooms WHERE name = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "room_id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "color",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "c2c6ecfe836f8b05da6365dfdb02ddfae6c019942c4358e14226cd201c05fb46": {
+    "query": "SELECT * FROM devices",
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv4_addr",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "ipv6_addr",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "mac_addr",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "duid",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "hostname",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "vendor_class",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "mud_url",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_interaction",
+          "ordinal": 9,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "clipart",
+          "ordinal": 10,
+          "type_info": "Text"
+        },
+        {
+          "name": "collect_info",
+          "ordinal": 11,
+          "type_info": "Bool"
+        },
+        {
+          "name": "room_id",
+          "ordinal": 12,
+          "type_info": "Int64"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ]
+    }
+  },
+  "c4c9cbdc4793c4ce036dc01224de515f55319aab457ff13f1d7c439812c04197": {
+    "query": "SELECT * FROM rooms WHERE room_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "room_id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "color",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "c9819e438b09ff2651d818e31cb04f10bd7101683ac0d3308867bc04b8b3b6f4": {
+    "query": "UPDATE DEVICES SET name = $1, ipv4_addr = $2, ipv6_addr = $3, mac_addr = $4, duid = $5, hostname = $6, vendor_class = $7, mud_url = $8, collect_info = $9, last_interaction = $10, room_id = $11, clipart = $12 where id = $13",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 13
+      },
+      "nullable": []
+    }
+  },
+  "ca2a15d61421f6b714c452d274dfc37e813b6eb90d9f727cdc1b1e2f237e541e": {
+    "query": "UPDATE devices SET ipv4_addr = NULL WHERE ipv4_addr = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "ce7f8e709b4a1f0636aad03811fc379e93af76fc8f567d058adf1217c3e146dc": {
+    "query": "DELETE FROM user_configs WHERE key = $1 AND user_id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "db3938b9f3ab4f15b7a277b2da09d8ee704ca91c0055d1a42d76099f85c48cfb": {
+    "query": "INSERT INTO mud_data (url, data, created_at, expiration) VALUES ($1, $2, $3, $4) ON CONFLICT(url) DO UPDATE SET data = excluded.data, created_at = excluded.created_at, expiration = excluded.expiration",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 4
+      },
+      "nullable": []
+    }
+  },
+  "dfb3b8cf5dc4713879965564fd6d0539f1c01eadcbc8a862e87bc1d15448136c": {
+    "query": "SELECT * FROM rooms",
+    "describe": {
+      "columns": [
+        {
+          "name": "room_id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "color",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "e41fa9cd37577a5ba4d7e1e3322b40ab9f0e0fdb12eaa5913427b96fea06ad2c": {
+    "query": "DELETE FROM config WHERE key = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": []
+    }
+  },
+  "e63fac60f2c11f4cfcac91e66c570cc6f42ba8a33eca2149b50347a9b7764a43": {
+    "query": "SELECT * FROM mud_data WHERE url = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "url",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "data",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 2,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "expiration",
+          "ordinal": 3,
+          "type_info": "Datetime"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "eb898d6536e671f69b27ecf9e5e13659cb8c3ee14717be2e8f2effc1a0075eb7": {
+    "query": "select\n\tu.id as user_id\n\t, username\n\t, password\n\t, salt\n\t, (select group_concat(name) from (select name from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as \"roles: Option<String>\"\n\t, (select group_concat(role_id) from (select role_id from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as \"roles_ids: Option<String>\"\n\t, (select group_concat(permissions) from (select permissions from users_roles ur join roles r on r.id = ur.role_id where user_id = u.id)) as \"permissions: Option<String>\"\nfrom\n\tusers u",
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "username",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "salt",
+          "ordinal": 3,
+          "type_info": "Blob"
+        },
+        {
+          "name": "roles: Option<String>",
+          "ordinal": 4,
+          "type_info": "Null"
+        },
+        {
+          "name": "roles_ids: Option<String>",
+          "ordinal": 5,
+          "type_info": "Null"
+        },
+        {
+          "name": "permissions: Option<String>",
+          "ordinal": 6,
+          "type_info": "Null"
+        }
+      ],
+      "parameters": {
+        "Right": 0
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "ede853c40bf76833dfd53516858ca64ca67f9422483841685d709c97e34a349b": {
+    "query": "SELECT * FROM config WHERE key = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "key",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "value",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "f44fa0a52f3e363cbfdcdf664293d0c74cf1aa0d72544cd86eba4ad1707f06a1": {
+    "query": "INSERT INTO users_roles (user_id, role_id) VALUES ($1, $2)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  },
+  "fc5872edf273706a0060aaf91b7a892d54ea5cd02cc5c972654a0df387f7e2ce": {
+    "query": "SELECT * FROM user_configs WHERE user_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "name": "key",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "value",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  }
+}

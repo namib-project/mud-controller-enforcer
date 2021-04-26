@@ -1,0 +1,2 @@
+DATABASE_URL=sqlite:/var/lib/namib/db.sqlite
+NAMIB_CA_CERT=/etc/namib/certs/namib-ca.pem

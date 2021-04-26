@@ -35,21 +35,25 @@ export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER = arm-linux-gnueabihf-g
 export CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABI_LINKER = arm-linux-gnueabi-gcc
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = aarch64-linux-gnu-gcc
 
+export SQLX_OFFLINE=true
+
 # dh_strip does not like cross compiled binaries for some reason, therefore we skip stripping the binary.
 override_dh_strip:
 
 # Build the release binary into the install/ directory.
 override_dh_auto_build:
-	env
-	echo $(PKG_CONFIG_PATH)
-	echo $(PKG_CONFIG_LIBDIR)
+	cp debian/sqlx-data.sqlite.json sqlx-data.json
 	cargo build --release --target $(rust_triple) --target-dir install/
+	cp debian/sqlx-data.postgres.json sqlx-data.json
+	cargo build --release --target $(rust_triple) --target-dir install-postgres/ --no-default-features --features postgres
 
 # Put built binaries and files into the right directory of the binary package.
 override_dh_auto_install:
-	dh_install install/$(rust_triple)/release/namib_mud_controller /usr/bin
-	dh_install certs /etc/namib
-	dh_install db.sqlite static /var/lib/namib
+	dh_install
+	dh_installsystemd
+	# Does not work yet
+	#dh_installsysusers
+	dh_fixperms
 
 # Run cargo clean and delete install/ directory in addition to the usual cleanup.
 override_dh_auto_clean:
