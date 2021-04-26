@@ -85,4 +85,13 @@ pub enum Permission {
     /// room/delete
     #[strum(serialize = "room/create")]
     room__create,
+    /// enforcer/list
+    #[strum(serialize = "enforcer/list")]
+    enforcer__list,
+    /// enforcer/read
+    #[strum(serialize = "enforcer/read")]
+    enforcer__read,
+    /// enforcer/update
+    #[strum(serialize = "enforcer/update")]
+    enforcer__update,
 }

@@ -85,7 +85,7 @@ impl DeviceCreationUpdateDto {
             vendor_class: self.vendor_class.unwrap_or_else(|| "".to_string()),
             mud_url: self.mud_url,
             collect_info: self.collect_info.unwrap_or(collect_info),
-            last_interaction: Utc::now().naive_local(),
+            last_interaction: Utc::now().naive_utc(),
             clipart: self.clipart.clone(),
             room_id: self.room_id,
         })
