@@ -268,7 +268,8 @@ impl DnsWatcher {
 
     /// Clears the list of watched DNS entries.
     pub async fn clear_watched_names(&self) {
-        for name in self.current_watched_entries.lock().await.clone() {
+        let current_watched_entries = self.current_watched_entries.lock().await.clone();
+        for name in current_watched_entries {
             self.remove_watched_name(name.as_str()).await;
         }
     }
