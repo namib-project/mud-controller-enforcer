@@ -15,7 +15,7 @@ use crate::{
     rpc::rpc_client::current_rpc_context,
     services::{
         controller_name::apply_secure_name_config,
-        firewall_service::{apply_firewall_config, FirewallService},
+        firewall_service::{apply_firewall_config_inner, FirewallService},
     },
 };
 
@@ -123,7 +123,7 @@ async fn main() -> Result<()> {
     // Instantiate firewall service with DNS watcher.
     let watcher = dns_service.create_watcher();
 
-    apply_firewall_config(&config, &watcher).await?;
+    apply_firewall_config_inner(&config, &watcher).await?;
 
     // If the RPC client was not already retrieved while getting the initial config, get it now.
     let enforcer = match connected_enforcer {
