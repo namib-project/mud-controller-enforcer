@@ -1,6 +1,7 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use argon2::{self, Config};
+use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 use rand::{rngs::OsRng, Rng};
 use snafu::ensure;
@@ -15,6 +16,7 @@ pub struct UserDbo {
     pub username: String,
     pub password: String,
     pub salt: Vec<u8>,
+    pub last_interaction: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -25,6 +27,7 @@ pub struct User {
     pub password: String,
     #[serde(skip_serializing)]
     pub salt: Vec<u8>,
+    pub last_interaction: NaiveDateTime,
     pub roles: Vec<Role>,
     pub permissions: Vec<String>,
 }
@@ -55,11 +58,13 @@ pub struct RoleDbo {
 impl User {
     pub fn new(username: String, password: &str) -> Result<Self> {
         let salt = User::generate_salt();
+        let utc_now = chrono::Utc::now().naive_utc();
         Ok(Self {
             id: 0,
             username,
             password: User::hash_password(password, &salt)?,
             salt,
+            last_interaction: utc_now,
             roles: Vec::new(),
             permissions: Vec::new(),
         })

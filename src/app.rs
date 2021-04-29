@@ -16,7 +16,7 @@ use derive_builder::Builder;
 use futures::{future, future::Ready};
 use paperclip::{
     actix::{web, OpenApiExt},
-    v2::models::{DefaultApiRaw, Info, Tag},
+    v2::models::{DefaultApiRaw, Info},
 };
 use pin_project::pin_project;
 use tokio::{
@@ -135,49 +135,6 @@ pub fn start_app(
                     let ip_parts: Vec<&str> = ip.split(':').collect();
                     Ok(ip_parts[0].to_string())
                 });
-            let mut spec = DefaultApiRaw::default();
-            spec.tags = vec![
-                Tag {
-                    name: "Config".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-                Tag {
-                    name: "Devices".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-                Tag {
-                    name: "Management".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-                Tag {
-                    name: "MUD".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-                Tag {
-                    name: "Roles".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-                Tag {
-                    name: "Rooms".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-                Tag {
-                    name: "Users".to_string(),
-                    description: Some("".to_string()),
-                    external_docs: None,
-                },
-            ];
-            spec.info = Info {
-                version: VERSION.parse().unwrap(),
-                title: "NAMIB Controller".into(),
-                ..Default::default()
-            };
 
             App::new()
                 .data(conn.clone())
@@ -185,8 +142,16 @@ pub fn start_app(
                 .wrap(middleware::Logger::default())
                 .wrap(rate_limiter)
                 .wrap(TokioWrapper(tokio_handle.clone()))
-                .wrap_api_with_spec(spec)
+                .wrap_api_with_spec(DefaultApiRaw {
+                    info: Info {
+                        version: VERSION.to_string(),
+                        title: "NAMIB Controller".to_string(),
+                        ..Info::default()
+                    },
+                    ..DefaultApiRaw::default()
+                })
                 .service(web::scope("/status").configure(routes::status_controller::init))
+                .service(web::scope("/enforcers").configure(routes::enforcer_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
                 .service(web::scope("/management/users").configure(routes::users_management_controller::init))
                 .service(web::scope("/devices").configure(routes::device_controller::init))

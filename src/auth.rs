@@ -1,12 +1,20 @@
-use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, FromRequest, HttpRequest};
+use std::{future::Future, pin::Pin};
+
+use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, web, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
-use futures::{future, future::Ready};
+use futures::{future, FutureExt};
 use glob::Pattern;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
 use serde::{Deserialize, Serialize};
 
-use crate::{app_config::APP_CONFIG, error, error::Result, services::role_service::Permission};
+use crate::{
+    app_config::APP_CONFIG,
+    db::DbConnection,
+    error,
+    error::Result,
+    services::{role_service::Permission, user_service},
+};
 
 static HEADER_PREFIX: &str = "Bearer ";
 
@@ -99,7 +107,7 @@ fn extract_auth_from_request(request: &HttpRequest) -> Option<AuthToken> {
 impl FromRequest for AuthToken {
     type Config = ();
     type Error = actix_web::Error;
-    type Future = Ready<std::result::Result<Self, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output=std::result::Result<Self, Self::Error>>>>;
 
     /// Middleware for Auth struct extraction from "Authorization: Bearer {}" header.
     /// (Header => Token => Auth)
@@ -108,8 +116,14 @@ impl FromRequest for AuthToken {
     /// if invalid => will fail request with Unauthorized
     fn from_request(req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
         match extract_auth_from_request(req) {
-            Some(auth) => future::ok(auth),
-            None => future::err(ErrorUnauthorized("Unauthorized")),
+            Some(auth) => {
+                let conn = req.app_data::<web::Data<DbConnection>>().unwrap().clone();
+                Box::pin(async move {
+                    user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
+                    Ok(auth)
+                })
+            },
+            None => future::err(ErrorUnauthorized("Unauthorized")).boxed_local(),
         }
     }
 }

@@ -174,14 +174,19 @@ pub async fn create_authorized_http_client(server_addr: &SocketAddr) -> (Client,
 /// Will fail if the status code does not match or either the request itself or deserialization fails.
 // Not actually dead code, wrongly detected as such because it is in lib.rs.
 #[allow(dead_code)]
-pub async fn assert_post_status_deserialize<B: Serialize+?Sized, O: DeserializeOwned>(
+pub async fn assert_post_status_deserialize<B: Serialize, O: DeserializeOwned>(
     client: &Client,
     url: &str,
     body: &B,
     status_code: StatusCode,
 ) -> O {
     let req_result = client.post(url).json(body).send().await.unwrap();
-    assert_eq!(req_result.status(), status_code);
+    assert_eq!(
+        req_result.status(),
+        status_code,
+        "Status code mismatch. Response: {:?}",
+        req_result.text().await
+    );
     req_result.json().await.unwrap()
 }
 
@@ -189,8 +194,16 @@ pub async fn assert_post_status_deserialize<B: Serialize+?Sized, O: DeserializeO
 /// Will fail if the status code does not match or the request itself fails.
 // Not actually dead code, wrongly detected as such because it is in lib.rs.
 #[allow(dead_code)]
-pub async fn assert_post_status<B: Serialize+?Sized>(client: &Client, url: &str, body: &B, status_code: StatusCode) {
+pub async fn assert_post_status<B: Serialize>(client: &Client, url: &str, body: &B, status_code: StatusCode) {
     assert_eq!(client.post(url).json(body).send().await.unwrap().status(), status_code)
+}
+
+/// Perform a PUT request to the API using the given client, url, body and expected status code.
+/// Will fail if the status code does not match or the request itself fails.
+// Not actually dead code, wrongly detected as such because it is in lib.rs.
+#[allow(dead_code)]
+pub async fn assert_put_status<B: Serialize>(client: &Client, url: &str, body: &B, status_code: StatusCode) {
+    assert_eq!(client.put(url).json(body).send().await.unwrap().status(), status_code)
 }
 
 /// Perform a DELETE request to the API using the given client, url and expected status code.

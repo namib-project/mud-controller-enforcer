@@ -93,6 +93,8 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
         .fail()
     })?;
 
+    user_service::update_last_interaction_stamp(user.id, &pool).await?;
+
     Ok(Json(TokenDto {
         token: AuthToken::encode_token(&AuthToken::generate_access_token(
             user.id,

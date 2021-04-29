@@ -23,7 +23,7 @@ use crate::{
     app_config::APP_CONFIG,
     db::DbConnection,
     error::Result,
-    services::{acme_service::CertId, device_service, firewall_configuration_service, log_service},
+    services::{acme_service::CertId, device_service, enforcer_service, firewall_configuration_service, log_service},
     util::open_file_with,
 };
 
@@ -142,13 +142,23 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
         .inspect_err(|err| warn!("Failed to accept {:?}", err))
         .filter_map(|r| future::ready(r.ok()))
         .map(BaseChannel::with_defaults)
-        .map(|channel| {
-            let server = NamibRpcServer {
-                client_ip: channel.get_tcp_stream().peer_addr().unwrap(),
-                client_id: CertId::new(channel.get_tls_session().get_peer_certificates().unwrap()[0].as_ref()),
-                db_connection: pool.clone(),
-            };
-            channel.requests().execute(server.serve())
+        .filter_map(|channel| {
+            let client_ip = channel.get_tcp_stream().peer_addr().unwrap();
+            let client_id = CertId::new(channel.get_tls_session().get_peer_certificates().unwrap()[0].as_ref());
+            let db_connection = pool.clone();
+
+            async move {
+                if let Err(e) = enforcer_service::register_enforcer(&db_connection, client_ip.ip(), &client_id).await {
+                    warn!("Not accepting enforcer connection {:?}", e);
+                    return None;
+                }
+                let server = NamibRpcServer {
+                    client_ip,
+                    client_id,
+                    db_connection,
+                };
+                Some(channel.requests().execute(server.serve()))
+            }
         })
         // max 10 connections
         .buffer_unordered(10)
