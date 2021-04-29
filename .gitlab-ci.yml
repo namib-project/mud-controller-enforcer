@@ -197,10 +197,10 @@ build-release-postgres:
     - dpkg-buildpackage --no-pre-clean --no-post-clean --host-arch $DEBIAN_ARCH
     - mkdir output
     - mv ../namib-mud-controller*.deb output/
-    - mv ../namib-mud-controller*.buildinfo output/
-    - mv ../namib-mud-controller*.changes output/
-    - mv ../namib-mud-controller*.tar.gz output/
-    - mv ../namib-mud-controller*.dsc output/
+    - mv ../namib-mud-controller*.buildinfo output/ || true
+    - mv ../namib-mud-controller*.changes output/ || true
+    - mv ../namib-mud-controller*.tar.gz output/ || true
+    - mv ../namib-mud-controller*.dsc output/ || true
   artifacts:
     paths:
       - output
