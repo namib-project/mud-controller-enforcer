@@ -192,6 +192,7 @@ build-release-postgres:
     - ./gen_server_cert.sh namib-ca
     - cd ..
     - git secret hide
+    - mv Cargo.toml Cargo.toml.thisisnotaworkspace
     - cd namib_mud_controller
     - dpkg-buildpackage --no-pre-clean --no-post-clean --host-arch $DEBIAN_ARCH
     - mkdir output
