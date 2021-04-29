@@ -101,12 +101,12 @@ impl FirewallService {
         let config = &self.enforcer_state.read().await.config;
         debug!("{:?}", config);
         self.dns_watcher.clear_watched_names().await;
-        apply_firewall_config(&config, &self.dns_watcher).await
+        apply_firewall_config_inner(&config, &self.dns_watcher).await
     }
 }
 
 #[cfg(feature = "nftables")]
-pub(crate) async fn apply_firewall_config(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
+pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
     let mut batch = Batch::new();
     add_old_config_deletion_instructions(&mut batch)?;
     convert_config_to_nftnl_commands(&mut batch, &config, dns_watcher).await?;
@@ -122,7 +122,7 @@ pub(crate) async fn apply_firewall_config(config: &EnforcerConfig, dns_watcher: 
 }
 
 #[cfg(not(feature = "nftables"))]
-pub async fn apply_firewall_config(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
+pub async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
     Ok(())
 }
 
