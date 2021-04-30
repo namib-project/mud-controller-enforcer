@@ -108,8 +108,8 @@ pub async fn role_delete_from_user(conn: &DbConnection, user_id: i64, role_id: i
 
     sqlx::query!(
         "DELETE FROM users_roles WHERE user_id = $1 and role_id = $2",
-        role_db.id,
-        user_id
+        user_id,
+        role_db.id
     )
     .execute(conn)
     .await?;
