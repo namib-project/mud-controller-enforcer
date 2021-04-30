@@ -6,6 +6,7 @@ use lib::{
 };
 use log::info;
 use namib_mud_controller::{
+    auth::AuthToken,
     models::Role,
     routes::dtos::{
         LoginDto, RoleDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
@@ -819,6 +820,46 @@ async fn test_usermanagement_roles() {
     )
     .await;
 
+    let usrs: Value = assert_get_status_deserialize(
+        &client,
+        &format!("http://{}/management/users/", ctx.server_addr),
+        StatusCode::OK,
+    )
+    .await;
+
+    assert_eq!(
+        usrs.as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["username"] == "testman")
+            .unwrap()["roles"],
+        json!([{"name": "reader", "id": 1}, {"name": "admin", "id": 0}])
+    );
+
+    assert_post_status(
+        &client,
+        format!("http://{}/roles/unassign", ctx.server_addr).as_str(),
+        &json!({"role_id": roles.iter().find(|r| r.name == "reader").unwrap().id, "user_id": new_user["id"]}),
+        StatusCode::NO_CONTENT,
+    )
+    .await;
+
+    let usrs: Value = assert_get_status_deserialize(
+        &client,
+        &format!("http://{}/management/users/", ctx.server_addr),
+        StatusCode::OK,
+    )
+    .await;
+
+    assert_eq!(
+        usrs.as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["username"] == "testman")
+            .unwrap()["roles"],
+        json!([{"name": "admin", "id": 0}])
+    );
+
     let login: TokenDto = assert_post_status_deserialize(
         &reqwest::Client::new(),
         format!("http://{}/users/login", ctx.server_addr).as_str(),
@@ -826,6 +867,9 @@ async fn test_usermanagement_roles() {
         StatusCode::OK,
     )
     .await;
+
+    let auth = AuthToken::decode_token(&login.token).unwrap();
+    assert_eq!(auth.permissions, vec!["**"]);
 
     let mut headers = HeaderMap::new();
     headers.insert("authorization", format!("Bearer {}", login.token).parse().unwrap());
