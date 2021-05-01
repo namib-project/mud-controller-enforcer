@@ -3,3 +3,4 @@ certs /etc/namib
 db.sqlite /var/lib/namib
 static /usr/lib/namib
 debian/config /etc/namib
+migrations/sqlite /etc/namib/migrations
