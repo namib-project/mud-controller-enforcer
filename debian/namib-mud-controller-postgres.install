@@ -2,4 +2,3 @@ install-postgres/*/release/namib_mud_controller /usr/bin
 certs /etc/namib
 static /usr/lib/namib
 debian/config /etc/namib
-debian/namib-mud-controller.conf /usr/lib/sysusers.d
