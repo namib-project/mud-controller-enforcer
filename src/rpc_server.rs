@@ -102,10 +102,13 @@ pub async fn listen(pool: DbConnection) -> Result<()> {
         open_file_with(&APP_CONFIG.namib_ca_cert, |b| client_auth_roots.add_pem_file(b))?;
 
         // Load server cert
-        let certs = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)
-            .expect("Could not find certs/server.pem");
-        let key = open_file_with("certs/server-key.pem", rustls::internal::pemfile::rsa_private_keys)
-            .expect("Could not find certs/server-key.pem")[0]
+        let certs = open_file_with(&APP_CONFIG.namib_server_cert, rustls::internal::pemfile::certs)
+            .expect("Could not find NAMIB_SERVER_CERT");
+        let key = open_file_with(
+            &APP_CONFIG.namib_server_key,
+            rustls::internal::pemfile::rsa_private_keys,
+        )
+        .expect("Could not find NAMIB_SERVER_KEY")[0]
             .clone();
 
         let mut cfg = rustls::ServerConfig::new(rustls::AllowAnyAuthenticatedClient::new(client_auth_roots));
