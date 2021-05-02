@@ -261,4 +261,5 @@ debian/namib-mud-controller.substvars
 debian/namib-mud-controller
 debian/namib-mud-controller.debhelper.log
 debian/*.debhelper
+debian/sqlx-data*.json
 install-postgres
