@@ -28,6 +28,12 @@ pub struct AppConfig {
     pub rpc_port: u16,
     /// `NAMIB_CA_CERT`: The path to the NAMIB CA Certificate to use for client verification.
     pub namib_ca_cert: String,
+    /// `NAMIB_SERVER_CERT`: The path to the NAMIB server certificate to use for client identification.
+    #[serde(default = "default_server_cert")]
+    pub namib_server_cert: String,
+    /// `NAMIB_SERVER_KEY`: The path to the NAMIB server key to use for client identification.
+    #[serde(default = "default_server_key")]
+    pub namib_server_key: String,
     /// `GLOBAL_NAMIB_CA_CERT`: The path to the Global NAMIB CA Certificate used to verify the httpchallenge service.
     /// This only differs from `NAMIB_CA_CERT` if using the staging environment.
     pub global_namib_ca_cert: String,
@@ -42,6 +48,9 @@ pub struct AppConfig {
     pub neo4things_user: String,
     /// `NEO4THINGS_USER`: The password for neo4things authentication.
     pub neo4things_pass: String,
+    /// `NAMIB_ACME_DIR`: The directory that ACME generated certs (letsencrypt certs) are saved
+    #[serde(default = "default_acme_dir")]
+    pub namib_acme_dir: String,
 }
 
 fn default_ratelimiter_requests_per_minute() -> usize {
@@ -66,4 +75,15 @@ fn default_rpc_port() -> u16 {
 
 fn default_is_staging() -> bool {
     true
+}
+
+fn default_acme_dir() -> String {
+    "./acme".to_string()
+}
+
+fn default_server_cert() -> String {
+    "./certs/server.pem".to_string()
+}
+fn default_server_key() -> String {
+    "./certs/server-key.pem".to_string()
 }

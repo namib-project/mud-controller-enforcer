@@ -5,6 +5,7 @@ Requires=network-online.target
 [Service]
 Type=exec
 User=namib-controller
+ExecStartPre=/usr/bin/mkdir -p /etc/namib/acme
 ExecStartPre=/usr/bin/chown -R namib-controller /var/lib/namib/
 ExecStartPre=/usr/bin/chown -R namib-controller /etc/namib
 ExecStartPre=/usr/bin/chmod -R u+rw /var/lib/namib/

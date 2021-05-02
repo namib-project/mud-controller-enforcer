@@ -61,12 +61,12 @@ fn get_letsencrypt_url() -> DirectoryUrl<'static> {
 lazy_static! {
     /// The letsencrypt API, use staging for local usage
     static ref ACME_API: Directory<FilePersist> =
-        Directory::from_url(FilePersist::new("./acme"), get_letsencrypt_url()).unwrap();
+        Directory::from_url(FilePersist::new(&APP_CONFIG.namib_acme_dir), get_letsencrypt_url()).unwrap();
     /// The account email does not have to be unique, calling this method will generate a private key for the account
     static ref ACCOUNT: Account<FilePersist> = ACME_API.account("namib@uni-bremen.de").unwrap();
     /// The server certificate for communicating with namib services
-    static ref SERVER_CERT: Vec<rustls::Certificate> = open_file_with("certs/server.pem", rustls::internal::pemfile::certs)
-            .expect("Could not find certs/server.pem");
+    static ref SERVER_CERT: Vec<rustls::Certificate> = open_file_with(&APP_CONFIG.namib_server_cert, rustls::internal::pemfile::certs)
+            .expect("Could not find NAMIB_SERVER_CERT");
     /// The certificate id (sha1 hash in base64)
     static ref SERVER_ID: CertId = CertId::new(SERVER_CERT[0].as_ref());
     /// The domain that this controllers certificate will be valid for
@@ -141,9 +141,9 @@ pub fn update_certs() -> Result<()> {
         debug!("got http challenge: {}", challenge.http_token());
         let mut certs: Vec<u8> = Vec::new();
         // The server certificate for communicating with namib services
-        File::open("certs/server.pem")?.read_to_end(&mut certs)?;
+        File::open(&APP_CONFIG.namib_server_cert)?.read_to_end(&mut certs)?;
         // The private key for the server certificate
-        File::open("certs/server-key.pem")?.read_to_end(&mut certs)?;
+        File::open(&APP_CONFIG.namib_server_key)?.read_to_end(&mut certs)?;
         let mut ca: Vec<u8> = Vec::new();
         // Use the global namib certificate here, since the httpchallenge service is always using the global one.
         File::open(&APP_CONFIG.global_namib_ca_cert)?.read_to_end(&mut ca)?;

@@ -1,5 +1,7 @@
 DATABASE_URL=sqlite:/var/lib/namib/db.sqlite
 NAMIB_CA_CERT=/etc/namib/certs/namib-ca.pem
+NAMIB_SERVER_CERT=/etc/namib/certs/server.pem
+NAMIB_SERVER_KEY=/etc/namib/certs/server-key.pem
 JWT_SECRET=
 NEO4THINGS_URL=http://localhost:7000
 NEO4THINGS_USER=admin
