@@ -1,6 +1,5 @@
 install/*/release/namib_mud_controller /usr/bin
 certs /etc/namib
-db.sqlite /var/lib/namib
-static /usr/lib/namib
+static /usr/share/namib
 debian/config /etc/namib
-migrations/sqlite /etc/namib/migrations
+migrations/sqlite /usr/share/namib/migrations

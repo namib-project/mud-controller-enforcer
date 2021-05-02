@@ -14,4 +14,4 @@ ExecStart=/usr/bin/namib_mud_controller
 ProtectSystem=true
 PermissionsStartOnly=true
 EnvironmentFile=/etc/namib/config
-WorkingDirectory=/etc/namib
+WorkingDirectory=/usr/share/namib

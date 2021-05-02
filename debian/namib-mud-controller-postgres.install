@@ -1,5 +1,5 @@
 install-postgres/*/release/namib_mud_controller /usr/bin
 certs /etc/namib
-static /usr/lib/namib
+static /usr/share/namib
 debian/config /etc/namib
-migrations/postgres /etc/namib/migrations
+migrations/postgres /usr/share/namib/migrations
