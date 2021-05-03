@@ -7,6 +7,14 @@ It controls firewall configurations for IoT Devices inside the network and can p
 
 Download the docker-compose.yml under `docker/docker-compose.yml` and start the controller with `docker-compose up namib_mud_controller`
 
+## Running on Debian/Ubuntu
+
+Install the Debian package provided by the CI by running `sudo apt install [PATH TO DEB FILE]`. 
+You might want to change some configuration settings under `/etc/namib/config`.
+The controller will be installed as a systemd service with the name `namib-mud-controller.service` and will run using a new user called
+`namib-controller`.
+If you prefer using postgres instead of sqlite, use the `namib-mud-controller-postgres` package from the CI instead.
+
 ## Project Setup
 
 Clone the meta project, this will checkout all of our repositories
