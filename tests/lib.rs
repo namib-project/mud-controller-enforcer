@@ -6,7 +6,7 @@ use futures::executor::block_on;
 use log::{debug, info};
 use namib_mud_controller::{
     app::{ControllerAppBuilder, ControllerAppWrapper},
-    db::DbConnection,
+    db::{initialize_jwt_secret, DbConnection},
     routes::dtos::{LoginDto, SignupDto, SuccessDto, TokenDto},
 };
 use reqwest::{header::HeaderMap, Client, StatusCode};
@@ -83,6 +83,8 @@ impl IntegrationTestContext {
                 .await
                 .expect("Database migrations failed");
         }
+
+        initialize_jwt_secret(&db_conn).await.expect("Unable to set JWT Secret");
 
         Self {
             db_url,

@@ -96,11 +96,10 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
     user_service::update_last_interaction_stamp(user.id, &pool).await?;
 
     Ok(Json(TokenDto {
-        token: AuthToken::encode_token(&AuthToken::generate_access_token(
-            user.id,
-            user.username,
-            user.permissions,
-        )),
+        token: AuthToken::encode_token(
+            &AuthToken::generate_access_token(user.id, user.username, user.permissions),
+            &pool,
+        ),
     }))
 }
 
@@ -115,11 +114,10 @@ pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
     })?;
 
     Ok(Json(TokenDto {
-        token: AuthToken::encode_token(&AuthToken::generate_access_token(
-            auth.sub,
-            user.username,
-            user.permissions,
-        )),
+        token: AuthToken::encode_token(
+            &AuthToken::generate_access_token(auth.sub, user.username, user.permissions),
+            &pool,
+        ),
     }))
 }
 

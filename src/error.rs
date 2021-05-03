@@ -66,6 +66,11 @@ pub enum Error {
         source: serde_json::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("JsonWebTokenError {}", source), context(false))]
+    JsonWebTokenError {
+        source: jsonwebtoken::errors::Error,
+        backtrace: Backtrace,
+    },
     #[snafu(display("PatternError {}", source), context(false))]
     PatternError {
         source: glob::PatternError,

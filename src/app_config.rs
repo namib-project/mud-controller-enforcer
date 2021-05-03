@@ -13,8 +13,6 @@ pub struct AppConfig {
     /// `RATELIMITER_BEHIND_REVERSE_PROXY`: If the app should use the `X-Forwarded-For` header to determine the client's IP address (default `false`).
     #[serde(default = "default_ratelimiter_behind_reverse_proxy")]
     pub ratelimiter_behind_reverse_proxy: bool,
-    /// `JWT_SECRET`: The base64 encoded jwt secret (with + and /) used for token de- and encryption.
-    pub jwt_secret: String,
     /// `DATABASE_URL`: The postgres (`postgres://..`) or sqlite (`sqlite:db.sqlite`) url to connect to.
     pub database_url: String,
     /// `HTTP_PORT`: The port to use for the http server (default `8000`)
