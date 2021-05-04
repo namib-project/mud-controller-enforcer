@@ -15,7 +15,6 @@ pub type DbConnection = sqlx::SqlitePool;
 pub async fn connect() -> Result<DbConnection> {
     let conn = sqlx::PgPool::connect(&APP_CONFIG.database_url).await?;
     migrate!("migrations/postgres").run(&conn).await?;
-    initialize_jwt_secret(&conn).await?;
     Ok(conn)
 }
 
