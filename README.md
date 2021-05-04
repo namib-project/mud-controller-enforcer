@@ -7,6 +7,43 @@ It controls firewall configurations for IoT Devices inside the network and can p
 
 Download the docker-compose.yml under `docker/docker-compose.yml` and start the controller with `docker-compose up namib_mud_controller`
 
+## Running natively on *nix
+
+1. Install avahi-daemon
+
+    ```
+    sudo apt update && sudo apt install avahi-daemon
+    ```
+   **WSL2 only: start the avahi-daemon**
+   WSL2 does not run any services by default
+    ```
+    sudo service dbus start
+    sudo service avahi-daemon start
+    ```
+
+2. [Download the latest release artifacts](https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_mud_controller/-/pipelines) (from the `build-release` job)
+
+3. Unzip the artifacts and move the `bin/install/namib_mud_controller` into the root
+4. Create a `.env` File with the following content:
+    ```
+    DATABASE_URL=sqlite:db.sqlite
+    RUST_LOG=info,namib_mud_controller=debug,sqlx::query=warn,tarpc::server=warn
+    NAMIB_CA_CERT=certs/namib-ca.pem
+    RATELIMITER_BEHIND_REVERSE_PROXY=false
+    RATELIMITER_REQUESTS_PER_MINUTE=120
+    GLOBAL_NAMIB_CA_CERT=certs/namib-ca.pem
+    DOMAIN=staging.namib.me
+    STAGING=true
+    NEO4THINGS_URL=http://localhost:7000
+    NEO4THINGS_USER=admin
+    NEO4THINGS_PASS=namib
+    HTTP_PORT=8000
+    HTTPS_PORT=9000
+    RPC_PORT=8734
+    ```
+5. Start the `namib_mud_controller`.
+   You should now be able to access the frontend under [http://localhost:8000/](http://localhost:8000/)
+
 ## Project Setup
 
 Clone the meta project, this will checkout all of our repositories
