@@ -8,7 +8,7 @@ use namib_mud_controller::{
 async fn test_version() {
     let ctx = lib::IntegrationTestContext::new("test_version").await;
 
-    config_service::set_config_value(ConfigKeys::Version.as_ref(), u64::MAX, &ctx.db_conn)
+    config_service::set_config_value(ConfigKeys::FirewallConfigVersion.as_ref(), u64::MAX, &ctx.db_conn)
         .await
         .unwrap();
 
@@ -17,7 +17,7 @@ async fn test_version() {
         .unwrap();
 
     assert_eq!(
-        config_service::get_config_value::<u64>(ConfigKeys::Version.as_ref(), &ctx.db_conn)
+        config_service::get_config_value::<u64>(ConfigKeys::FirewallConfigVersion.as_ref(), &ctx.db_conn)
             .await
             .unwrap(),
         0

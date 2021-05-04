@@ -6,7 +6,7 @@ use crate::{db::DbConnection, error, error::Result, models::Config};
 pub enum ConfigKeys {
     CollectDeviceData,
     AllowUserSignup,
-    Version,
+    FirewallConfigVersion,
 }
 
 /// Gets the config value by key from the database.

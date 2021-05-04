@@ -121,16 +121,21 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
-    get_config_value(ConfigKeys::Version.as_ref(), pool)
+    get_config_value(ConfigKeys::FirewallConfigVersion.as_ref(), pool)
         .await
         .unwrap_or_else(|_| "0".to_string())
 }
 
 pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
-    let old_config_version = get_config_value(ConfigKeys::Version.as_ref(), pool)
+    let old_config_version = get_config_value(ConfigKeys::FirewallConfigVersion.as_ref(), pool)
         .await
         .unwrap_or(0u64);
-    set_config_value(ConfigKeys::Version.as_ref(), old_config_version.wrapping_add(1), pool).await?;
+    set_config_value(
+        ConfigKeys::FirewallConfigVersion.as_ref(),
+        old_config_version.wrapping_add(1),
+        pool,
+    )
+    .await?;
     Ok(())
 }
 
