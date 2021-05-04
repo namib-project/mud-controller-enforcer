@@ -5,13 +5,18 @@ use chrono::{Duration, Utc};
 use glob::Pattern;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
+use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     db::DbConnection,
     error,
-    error::Result,
-    services::{config_service::get_config_value, role_service::Permission, user_service},
+    error::{Error::DatabaseError, Result},
+    services::{
+        config_service::{get_config_value, set_config_value},
+        role_service::Permission,
+        user_service,
+    },
 };
 
 static HEADER_PREFIX: &str = "Bearer ";
@@ -134,5 +139,21 @@ impl FromRequest for AuthToken {
                 None => Err(ErrorUnauthorized("Unauthorized")),
             }
         })
+    }
+}
+
+pub async fn initialize_jwt_secret(conn: &DbConnection) -> Result<()> {
+    let jwt_secret: Result<String> = get_config_value("jwt_secret", &conn).await;
+    match jwt_secret {
+        Err(DatabaseError {
+            source: sqlx::error::Error::RowNotFound,
+            backtrace: _,
+        }) => {
+            let mut jwt_secret = [0; 256];
+            thread_rng().fill_bytes(&mut jwt_secret);
+            set_config_value("jwt_secret", base64::encode(&jwt_secret), &conn).await?;
+            Ok(())
+        },
+        x => x.map(|_v| ()),
     }
 }

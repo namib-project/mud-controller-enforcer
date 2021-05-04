@@ -6,7 +6,8 @@ use futures::executor::block_on;
 use log::{debug, info};
 use namib_mud_controller::{
     app::{ControllerAppBuilder, ControllerAppWrapper},
-    db::{initialize_jwt_secret, DbConnection},
+    auth::initialize_jwt_secret,
+    db::DbConnection,
     routes::dtos::{LoginDto, SignupDto, SuccessDto, TokenDto},
 };
 use reqwest::{header::HeaderMap, Client, StatusCode};
