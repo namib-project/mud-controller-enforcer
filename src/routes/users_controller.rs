@@ -99,7 +99,8 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
         token: AuthToken::encode_token(
             &AuthToken::generate_access_token(user.id, user.username, user.permissions),
             &pool,
-        ),
+        )
+        .await,
     }))
 }
 
@@ -117,7 +118,8 @@ pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
         token: AuthToken::encode_token(
             &AuthToken::generate_access_token(auth.sub, user.username, user.permissions),
             &pool,
-        ),
+        )
+        .await,
     }))
 }
 

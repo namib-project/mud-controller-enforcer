@@ -1,8 +1,7 @@
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, rc::Rc};
 
 use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, web, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
-use futures::{executor::block_on, future, FutureExt};
 use glob::Pattern;
 use jsonwebtoken as jwt;
 use paperclip::actix::Apiv2Security;
@@ -64,11 +63,12 @@ impl AuthToken {
     }
 
     /// Encodes "Auth" struct to JWT token
-    pub fn encode_token(&self, conn: &DbConnection) -> String {
+    pub async fn encode_token(&self, conn: &DbConnection) -> String {
         jwt::encode(
             &jwt::Header::default(),
             self,
-            &block_on(get_config_value("jwt_secret", conn))
+            &get_config_value("jwt_secret", conn)
+                .await
                 .and_then(|s: String| jwt::EncodingKey::from_base64_secret(&s).map_err(|e| e.into()))
                 .expect("env JWT_SECRET is not valid base64"),
         )
@@ -76,12 +76,13 @@ impl AuthToken {
     }
 
     /// Decode token into "Auth" struct.
-    pub fn decode_token(token: &str, conn: &DbConnection) -> Option<AuthToken> {
+    pub async fn decode_token(token: &str, conn: &DbConnection) -> Option<AuthToken> {
         use jwt::{Algorithm, Validation};
 
         jwt::decode(
             token,
-            &block_on(get_config_value("jwt_secret", conn))
+            &get_config_value("jwt_secret", conn)
+                .await
                 .and_then(|s: String| jwt::DecodingKey::from_base64_secret(&s).map_err(|e| e.into()))
                 .expect("env JWT_SECRET is not valid base64"),
             &Validation::new(Algorithm::HS256),
@@ -98,13 +99,17 @@ fn extract_token_from_header(header: &str) -> Option<&str> {
     header.strip_prefix(HEADER_PREFIX)
 }
 
-fn extract_auth_from_request(conn: &DbConnection, request: &HttpRequest) -> Option<AuthToken> {
-    request
+async fn extract_auth_from_request(conn: &DbConnection, request: &HttpRequest) -> Option<AuthToken> {
+    let token = request
         .headers()
         .get("authorization")
         .and_then(|header| header.to_str().ok())
-        .and_then(extract_token_from_header)
-        .and_then(|token| AuthToken::decode_token(token, &conn))
+        .and_then(extract_token_from_header);
+    if let Some(token_str) = token {
+        AuthToken::decode_token(token_str, &conn).await
+    } else {
+        None
+    }
 }
 
 impl FromRequest for AuthToken {
@@ -118,13 +123,16 @@ impl FromRequest for AuthToken {
     /// If valid => success
     /// if invalid => will fail request with Unauthorized
     fn from_request(req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
-        let conn = req.app_data::<web::Data<DbConnection>>().unwrap().clone();
-        match extract_auth_from_request(&conn, req) {
-            Some(auth) => Box::pin(async move {
-                user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
-                Ok(auth)
-            }),
-            None => future::err(ErrorUnauthorized("Unauthorized")).boxed_local(),
-        }
+        let req = req.clone();
+        Box::pin(async move {
+            let conn = req.app_data::<web::Data<DbConnection>>().unwrap().clone();
+            match extract_auth_from_request(&conn, Rc::new(req.clone()).as_ref()).await {
+                Some(auth) => {
+                    user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
+                    Ok(auth)
+                },
+                None => Err(ErrorUnauthorized("Unauthorized")),
+            }
+        })
     }
 }
