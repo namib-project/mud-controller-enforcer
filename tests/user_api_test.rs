@@ -827,14 +827,26 @@ async fn test_usermanagement_roles() {
     )
     .await;
 
-    assert_eq!(
-        usrs.as_array()
-            .unwrap()
-            .iter()
-            .find(|u| u["username"] == "testman")
-            .unwrap()["roles"],
-        json!([{"name": "reader", "id": 1}, {"name": "admin", "id": 0}])
-    );
+    assert!(usrs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["username"] == "testman")
+        .unwrap()["roles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| &json!({"name": "reader", "id": 1}) == r));
+    assert!(usrs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["username"] == "testman")
+        .unwrap()["roles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| &json!({"name": "admin", "id": 0}) == r));
 
     assert_post_status(
         &client,
