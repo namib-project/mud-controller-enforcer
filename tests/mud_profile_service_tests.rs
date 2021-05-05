@@ -9,7 +9,7 @@ use namib_mud_controller::{
     error::Result,
     models::{MudData, MudDbo},
     routes::{dtos::MudCreationDto, mud_controller},
-    services::mud_service::{json_models, parser::parse_mud, update_outdated_profiles},
+    services::mud_service::{get_or_fetch_mud, json_models, parser::parse_mud, update_outdated_profiles},
 };
 
 #[tokio::test(flavor = "multi_thread")]
@@ -148,7 +148,7 @@ async fn test_update_outdated_profiles() -> Result<()> {
     const PATH: &str = "tests/mud_tests/Amazon-Echo.json";
     let ctx = lib::IntegrationTestContext::new("test_update_outdated_profiles").await;
     //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
-    let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
+    let url: String = String::from("https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json");
     let mut file = File::open(PATH).unwrap_or_else(|_| panic!("Could not open {}", PATH));
     let mut str_data = String::new();
     file.read_to_string(&mut str_data)
@@ -220,7 +220,7 @@ async fn test_update_valid_profiles() -> Result<()> {
     const PATH: &str = "tests/mud_tests/Amazon-Echo.json";
     let ctx = lib::IntegrationTestContext::new("test_update_valid_profiles").await;
     //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
-    let url: String = String::from("http://iotanalytics.unsw.edu.au/mud/amazonEchoMud.json");
+    let url: String = String::from("https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json");
     let duration: i64 = 50;
     let mut file = File::open(PATH).unwrap_or_else(|_| panic!("Could not open {}", PATH));
     let mut str_data = String::new();
@@ -274,6 +274,39 @@ async fn test_update_valid_profiles() -> Result<()> {
     assert!(new_mud_data.expiration > Utc::now().naive_utc());
 
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_invalid_mud_urls() {
+    let ctx = lib::IntegrationTestContext::new("test_invalid_urls").await;
+
+    assert!(get_or_fetch_mud(
+        "https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json",
+        &ctx.db_conn
+    )
+    .await
+    .is_ok());
+
+    assert!(get_or_fetch_mud(
+        "gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json",
+        &ctx.db_conn
+    )
+    .await
+    .is_err());
+
+    assert!(get_or_fetch_mud(
+        "http://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json",
+        &ctx.db_conn
+    )
+    .await
+    .is_err());
+
+    assert!(get_or_fetch_mud(
+        "//gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json",
+        &ctx.db_conn
+    )
+    .await
+    .is_err());
 }
 
 fn strip_nano(ts: &mut NaiveDateTime) {

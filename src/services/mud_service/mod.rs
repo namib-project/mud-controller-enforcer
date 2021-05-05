@@ -3,6 +3,7 @@ use url::Url;
 
 use crate::{
     db::DbConnection,
+    error,
     error::Result,
     models::{Acl, MudData, MudDbo, MudDboRefresh},
     services::{firewall_configuration_service::update_config_version, mud_service::fetch::fetch_mud},
@@ -92,9 +93,9 @@ async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh
 /// This function is mainly used in the `RPCServer`, where it's used to save Device's MUD-URLs which are being sent via DHCP
 /// Local MUD-Profiles can be loaded *BUT NOT CREATED* through this function, since they have an expiration far far in the future
 pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData> {
-    // lookup datenbank ob schon existiert und nicht abgelaufen
     let mut acl_override = Vec::default();
 
+    // lookup datenbank ob schon existiert und nicht abgelaufen
     if let Some(mud) = get_mud(url, pool).await {
         if let Ok(mud_data) = mud.parse_data() {
             if mud.expiration > Utc::now().naive_utc() {
@@ -102,6 +103,11 @@ pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData>
             }
             acl_override = mud_data.acl_override;
         }
+    }
+
+    // mud_url muss eine https:// url sein.
+    if !is_url(url) || !url.starts_with("https://") {
+        error::MudFileInvalid {}.fail()?;
     }
 
     // wenn nicht: fetch

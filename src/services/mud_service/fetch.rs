@@ -1,17 +1,31 @@
 use std::time::Duration;
 
+use const_format::concatcp;
 use encoding_rs::{CoderResult, Encoding, UTF_8};
 use mime::Mime;
-use reqwest::redirect::Policy;
+use reqwest::{
+    header::{ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, USER_AGENT},
+    redirect::Policy,
+};
 use snafu::ensure;
 
-use crate::{error, error::Result};
+use crate::{error, error::Result, VERSION};
 
+/// Request timeout of 15 seconds
 const TIMEOUT: Duration = Duration::from_secs(15);
+/// Maximum 3xx redirects to follow
 const MAX_REDIRECTS: usize = 5;
+/// Maximum response body size: 10MB
 const MAX_LEN: usize = 10_000_000;
+/// `Accept` header value specified by RFC8520
+const ACCEPT_HEADER_VALUE: &str = "application/mud+json";
+/// `Accept-Language` header value, prefer english or german.
+const ACCEPT_LANGUAGE_HEADER_VALUE: &str = "en, de, *;q=0.5";
+/// `User-Agent` header value.
+const USER_AGENT_HEADER_VALUE: &str = concatcp!("NAMIB-MUD-Controller/", VERSION);
 
-/// Fetch MUD-URL Data respecting timeout, redirects and maximum response length
+/// Fetch MUD-URL Data respecting timeout, redirects and maximum response length.
+/// Respects the request headers specified by https://tools.ietf.org/html/rfc8520#section-1.6
 pub async fn fetch_mud(url: &str) -> Result<String> {
     // start the response
     let mut response = reqwest::Client::builder()
@@ -19,12 +33,15 @@ pub async fn fetch_mud(url: &str) -> Result<String> {
         .timeout(TIMEOUT)
         .build()?
         .get(url)
+        .header(ACCEPT, ACCEPT_HEADER_VALUE)
+        .header(ACCEPT_LANGUAGE, ACCEPT_LANGUAGE_HEADER_VALUE)
+        .header(USER_AGENT, USER_AGENT_HEADER_VALUE)
         .send()
         .await?;
     // try to get the content type
     let content_type = response
         .headers()
-        .get(reqwest::header::CONTENT_TYPE)
+        .get(CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<Mime>().ok());
     // get the charset from content type or use utf-8
