@@ -1,0 +1,9 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: NAMIB MUD Controller
+Upstream-Contact: Hugo Hakim Damer <hdamer@uni-bremen.de>
+License: All-rights-reserved
+Copyright: Copyright 2020, 2021 NAMIB Project
+
+Files: *
+License: All-rights-reserved
+Copyright: Copyright 2020, 2021 NAMIB Project

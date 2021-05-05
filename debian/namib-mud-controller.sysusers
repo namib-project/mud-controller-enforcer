@@ -1,0 +1,3 @@
+# sysusers.d file for NAMIB MUD Controller
+#Type Name             ID                  GECOS                  Home directory Shell
+u     namib-controller -                  "NAMIB MUD Controller" /usr/sbin/nologin

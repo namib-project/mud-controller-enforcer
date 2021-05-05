@@ -20,18 +20,22 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use dotenv::dotenv;
 use log::{error, warn};
 use namib_mud_controller::{
-    app::ControllerAppBuilder, app_config::APP_CONFIG, db, error::Result, rpc_server, services::job_service, VERSION,
+    app::ControllerAppBuilder, app_config::APP_CONFIG, auth::initialize_jwt_secret, db, error::Result, rpc_server,
+    services::job_service, VERSION,
 };
 use tokio::select;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
+    // IMPORTANT: You MUST NOT perform any database queries in the main.rs file because the sqlx offline mode
+    // can only analyse queries in the library.
     dotenv().ok();
     env_logger::init();
 
     log::info!("Starting mud_controller {}", VERSION);
 
     let conn = db::connect().await?;
+    initialize_jwt_secret(&conn).await?;
     let rpc_server_task = tokio::task::spawn(rpc_server::listen(conn.clone()));
 
     // Starts a new job that updates the expired profiles at regular intervals.

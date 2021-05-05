@@ -16,11 +16,6 @@ before_script:
   - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
   - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
   - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
-  - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
-  - chmod +x sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
-  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
-  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
   - rustc --version
   - cargo --version
   - cargo install sqlx-cli
@@ -99,6 +94,8 @@ build-release:
     - build
   only:
     - master
+  cache:
+    key: "build-release"
   script:
     - cargo install --root ./install --path .
     - apt-get install git-secret -y
@@ -128,6 +125,8 @@ build-release-postgres:
     - feature/#59_kompatibel_mit_postgres_machen
   services:
     - postgres
+  cache:
+    key: "build-release"
   variables:
     MIGRATION_DIRECTORY: migrations/postgres
     POSTGRES_USER: namib
@@ -151,6 +150,78 @@ build-release-postgres:
       - install/bin
       - certs
       - static
+
+.build-release-debian:
+  stage: release
+  needs:
+    - build
+  only:
+    - master
+    - feature/controller-debian-paket
+  services:
+    - postgres
+  cache:
+    key: "build-release"
+  variables:
+    MIGRATION_DIRECTORY: migrations/postgres
+    POSTGRES_USER: namib
+    POSTGRES_PASSWORD: namib
+    DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+  script:
+    - rustup target add $RUST_TRIPLE
+    - cargo sqlx prepare -- --no-default-features --features postgres --lib
+    - mv sqlx-data.json debian/sqlx-data.postgres.json
+    - export DATABASE_URL=sqlite:db.sqlite
+    - export MIGRATION_DIRECTORY=migrations/sqlite
+    - ./scripts/recreate_db.sh
+    - cargo sqlx prepare -- --lib
+    - mv sqlx-data.json debian/sqlx-data.sqlite.json
+    - dpkg --add-architecture $DEBIAN_ARCH
+    - apt-get update
+    - apt-get install git-secret build-essential crossbuild-essential-$DEBIAN_ARCH -y
+    - apt-get build-dep -a $DEBIAN_ARCH . -y
+    # download namib frontend
+    - ./scripts/download_namib_frontend.sh
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
+    - cd ..
+    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
+    - git fetch origin && git checkout origin/master -f
+    - git secret reveal
+    - cd certs
+    - ./gen_server_cert.sh namib-ca
+    - cd ..
+    - git secret hide
+    - mv Cargo.toml Cargo.toml.thisisnotaworkspace
+    - cd namib_mud_controller
+    - dpkg-buildpackage --no-pre-clean --no-post-clean --host-arch $DEBIAN_ARCH
+    - mkdir output
+    - mv ../namib-mud-controller*.deb output/
+    - mv ../namib-mud-controller*.buildinfo output/ || true
+    - mv ../namib-mud-controller*.changes output/ || true
+    - mv ../namib-mud-controller*.tar.gz output/ || true
+    - mv ../namib-mud-controller*.dsc output/ || true
+  artifacts:
+    paths:
+      - output
+
+build-release-debian-amd64:
+  extends: .build-release-debian
+  variables:
+    DEBIAN_ARCH: amd64
+    RUST_TRIPLE: x86_64-unknown-linux-gnu
+
+build-release-debian-arm64:
+  extends: .build-release-debian
+  variables:
+    DEBIAN_ARCH: arm64
+    RUST_TRIPLE: aarch64-unknown-linux-gnu
+
+build-release-debian-armhf:
+  extends: .build-release-debian
+  variables:
+    DEBIAN_ARCH: armhf
+    RUST_TRIPLE: armv7-unknown-linux-gnueabihf
 
 create-docker:
   stage: docker

@@ -1,0 +1,80 @@
+#!/usr/bin/make -f
+# Uncomment for debugging output.
+#DH_VERBOSE = 1
+
+# Set correct value for RUST_TRIPLE
+rust_triple =
+ifeq ($(DEB_HOST_ARCH),i386)
+	rust_triple = "i686-unknown-linux-gnu"
+else ifeq ($(DEB_HOST_ARCH),amd64)
+	rust_triple = "x86_64-unknown-linux-gnu"
+else ifeq ($(DEB_HOST_ARCH),armhf)
+	rust_triple = "armv7-unknown-linux-gnueabihf"
+else ifeq ($(DEB_HOST_ARCH),armel)
+	rust_triple = "arm-unknown-linux-gnueabi"
+else ifeq ($(DEB_HOST_ARCH),arm64)
+	rust_triple = "aarch64-unknown-linux-gnu"
+else
+	$(error target architecture not supported!)
+endif
+
+# Set variables for target arch dependent compiler, pkg-config and strip in case we need them later.
+CC = $(DEB_HOST_GNU_TYPE)-gcc
+PKG_CONFIG = $(DEB_HOST_GNU_TYPE)-pkg-config
+STRIP = $(DEB_HOST_GNU_TYPE)-strip
+
+# Adjust PKG_CONFIG configuration to allow for cross compilation.
+export PKG_CONFIG_ALLOW_CROSS=1
+export PKG_CONFIG_PATH=/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/
+export PKG_CONFIG_LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/
+
+# Replace linkers with the correct variants for the target architecture.
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = x86_64-linux-gnu-gcc
+export CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER = i686-linux-gnu-gcc
+export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER = arm-linux-gnueabihf-gcc
+export CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABI_LINKER = arm-linux-gnueabi-gcc
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = aarch64-linux-gnu-gcc
+
+export SQLX_OFFLINE=true
+
+# dh_strip does not like cross compiled binaries for some reason, therefore we skip stripping the binary.
+override_dh_strip:
+
+# Build the release binary into the install/ directory.
+override_dh_auto_build:
+	cp debian/sqlx-data.sqlite.json sqlx-data.json
+	cargo build --release --target $(rust_triple) --target-dir install/ --bin namib_mud_controller
+	cp debian/sqlx-data.postgres.json sqlx-data.json
+	cargo build --release --target $(rust_triple) --target-dir install-postgres/ --no-default-features --features postgres --bin namib_mud_controller
+
+# Put built binaries and files into the right directory of the binary package.
+override_dh_auto_install:
+	dh_install
+	dh_installsystemd
+	# Does not work yet
+	#dh_installsysusers
+	dh_fixperms
+
+# Run cargo clean and delete install/ directory in addition to the usual cleanup.
+override_dh_auto_clean:
+	cargo clean
+	rm -rf install/
+	mkdir install
+	dh_auto_clean $@
+
+build: build-arch build-indep
+
+build-indep:
+
+build-arch:
+	dh $@
+
+binary: binary-arch binary-indep
+
+binary-arch:
+	dh $@
+
+binary-indep:
+
+clean:
+	dh $@

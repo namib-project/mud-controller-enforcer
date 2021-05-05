@@ -880,7 +880,7 @@ async fn test_usermanagement_roles() {
     )
     .await;
 
-    let auth = AuthToken::decode_token(&login.token).unwrap();
+    let auth = AuthToken::decode_token(&login.token, &ctx.db_conn).await.unwrap();
     assert_eq!(auth.permissions, vec!["**"]);
 
     let mut headers = HeaderMap::new();
