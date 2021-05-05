@@ -1,4 +1,4 @@
-use std::{future::Future, pin::Pin, rc::Rc};
+use std::{future::Future, pin::Pin};
 
 use actix_web::{dev, error::ErrorUnauthorized, http::StatusCode, web, FromRequest, HttpRequest};
 use chrono::{Duration, Utc};
@@ -130,8 +130,8 @@ impl FromRequest for AuthToken {
     fn from_request(req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
         let req = req.clone();
         Box::pin(async move {
-            let conn = req.app_data::<web::Data<DbConnection>>().unwrap().clone();
-            match extract_auth_from_request(&conn, Rc::new(req.clone()).as_ref()).await {
+            let conn = req.app_data::<web::Data<DbConnection>>().unwrap();
+            match extract_auth_from_request(&conn, &req).await {
                 Some(auth) => {
                     user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
                     Ok(auth)
