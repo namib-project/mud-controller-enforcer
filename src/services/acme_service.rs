@@ -1,5 +1,5 @@
 use std::{
-    fmt,
+    fmt, fs,
     fs::File,
     io::Read,
     net::ToSocketAddrs,
@@ -120,6 +120,7 @@ impl ResolvesServerCert for CertResolver {
 /// Checks whether the persisted certificate is present and valid for more than 15 days
 /// and if not will request a new certificate from Let's Encrypt.
 pub fn update_certs() -> Result<()> {
+    fs::create_dir_all(&APP_CONFIG.namib_acme_dir)?;
     debug!("checking if a certificate for {} exists", *DOMAIN);
     if let Some(c) = ACCOUNT.certificate(&DOMAIN).unwrap_or(None) {
         debug!("certificate found, days left: {}", c.valid_days_left());
@@ -154,13 +155,14 @@ pub fn update_certs() -> Result<()> {
             .identity(Identity::from_pem(&certs)?)
             .build()?
             .post(format!(
-                "https://{}/.well-known/acme-challenge/{}",
+                "https://{}/.well-known/acme-challenge/{}/{}",
+                APP_CONFIG.domain,
                 *DOMAIN,
                 challenge.http_token()
             ))
             .body(challenge.http_proof())
             .send()?;
-        ensure!(response.text()? == "ok", error::NoneError {});
+        ensure!(response.text()? == "ok", error::CertificateRequestError {});
         // tell LetsEncrypt to check the file
         challenge.validate(5000)?;
         // update the csr status
@@ -179,7 +181,7 @@ pub fn update_certs() -> Result<()> {
 
 /// Get the tls server config for actix
 pub fn server_config() -> ServerConfig {
-    // create the certificate in the background, it doesn't have to be immediatly present for ActiX to start.
+    // create the certificate in the background, it doesn't have to be immediately present for ActiX to start.
     tokio::task::spawn_blocking(|| {
         if let Err(e) = update_certs() {
             warn!("Failed to update certificates: {:?}", e);

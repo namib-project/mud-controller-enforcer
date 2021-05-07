@@ -104,6 +104,8 @@ pub enum Error {
     Neo4ThingsError { message: String, backtrace: Backtrace },
     #[snafu(display("MudFileInvalid"), visibility(pub))]
     MudFileInvalid { backtrace: Backtrace },
+    #[snafu(display("CertificateRequestError"), visibility(pub))]
+    CertificateRequestError { backtrace: Backtrace },
     #[snafu(display("EnforcerNotAllowed"), visibility(pub))]
     EnforcerNotAllowed { backtrace: Backtrace },
 }
