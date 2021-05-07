@@ -155,7 +155,7 @@ pub fn update_certs() -> Result<()> {
             .identity(Identity::from_pem(&certs)?)
             .build()?
             .post(format!(
-                "https://{}/.well-known/acme-challenge/{}/{}",
+                "https://httpchallenge.{}/.well-known/acme-challenge/{}/{}",
                 APP_CONFIG.domain,
                 *DOMAIN,
                 challenge.http_token()
