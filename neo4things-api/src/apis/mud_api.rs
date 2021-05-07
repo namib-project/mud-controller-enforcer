@@ -48,6 +48,13 @@ pub enum MudCreateError {
     UnknownValue(serde_json::Value),
 }
 
+/// struct for typed errors of method `mud_create_fork_create`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MudCreateForkCreateError {
+    UnknownValue(serde_json::Value),
+}
+
 /// struct for typed errors of method `mud_destroy`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -146,13 +153,6 @@ pub enum MudUploadCreateError {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed errors of method `mud_upload_list`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum MudUploadListError {
-    UnknownValue(serde_json::Value),
-}
-
 
 /// API endpoint that allows admins to upload MUD-files
 pub async fn mud_by_manufacturer_create(configuration: &configuration::Configuration, mud_by_manufacturer: crate::models::MudByManufacturer) -> Result<crate::models::MudByManufacturer, Error<MudByManufacturerCreateError>> {
@@ -219,14 +219,14 @@ pub async fn mud_by_manufacturer_list(configuration: &configuration::Configurati
 }
 
 /// Create or List connections (ACL Relationsships for MUDs)
-pub async fn mud_connections_create(configuration: &configuration::Configuration, mac_addr: &str, acl: crate::models::Acl) -> Result<crate::models::Acl, Error<MudConnectionsCreateError>> {
+pub async fn mud_connections_create(configuration: &configuration::Configuration, mud_url: &str, acl: crate::models::Acl) -> Result<crate::models::Acl, Error<MudConnectionsCreateError>> {
 
     let local_var_client = &configuration.client;
 
     let local_var_uri_str = format!("{}/mud/connections", configuration.base_path);
     let mut local_var_req_builder = local_var_client.post(local_var_uri_str.as_str());
 
-    local_var_req_builder = local_var_req_builder.query(&[("mac-addr", &mac_addr.to_string())]);
+    local_var_req_builder = local_var_req_builder.query(&[("mud_url", &mud_url.to_string())]);
     if let Some(ref local_var_user_agent) = configuration.user_agent {
         local_var_req_builder = local_var_req_builder.header(reqwest::header::USER_AGENT, local_var_user_agent.clone());
     }
@@ -251,14 +251,14 @@ pub async fn mud_connections_create(configuration: &configuration::Configuration
 }
 
 /// Create or List connections (ACL Relationsships for MUDs)
-pub async fn mud_connections_list(configuration: &configuration::Configuration, mac_addr: &str, page: Option<i32>) -> Result<crate::models::PaginatedAclList, Error<MudConnectionsListError>> {
+pub async fn mud_connections_list(configuration: &configuration::Configuration, mud_url: &str, page: Option<i32>) -> Result<crate::models::PaginatedAclList, Error<MudConnectionsListError>> {
 
     let local_var_client = &configuration.client;
 
     let local_var_uri_str = format!("{}/mud/connections", configuration.base_path);
     let mut local_var_req_builder = local_var_client.get(local_var_uri_str.as_str());
 
-    local_var_req_builder = local_var_req_builder.query(&[("mac-addr", &mac_addr.to_string())]);
+    local_var_req_builder = local_var_req_builder.query(&[("mud_url", &mud_url.to_string())]);
     if let Some(ref local_var_str) = page {
         local_var_req_builder = local_var_req_builder.query(&[("page", &local_var_str.to_string())]);
     }
@@ -310,6 +310,39 @@ pub async fn mud_create(configuration: &configuration::Configuration, mud: crate
         serde_json::from_str(&local_var_content).map_err(Error::from)
     } else {
         let local_var_entity: Option<MudCreateError> = serde_json::from_str(&local_var_content).ok();
+        let local_var_error = ResponseContent { status: local_var_status, content: local_var_content, entity: local_var_entity };
+        Err(Error::ResponseError(local_var_error))
+    }
+}
+
+/// Creates a Fork on our Gitlab Instance so that the changes can be merged by a maintainer
+pub async fn mud_create_fork_create(configuration: &configuration::Configuration, mud_url: &str, name: &str, fork: crate::models::Fork) -> Result<crate::models::Fork, Error<MudCreateForkCreateError>> {
+
+    let local_var_client = &configuration.client;
+
+    let local_var_uri_str = format!("{}/mud/createFork", configuration.base_path);
+    let mut local_var_req_builder = local_var_client.post(local_var_uri_str.as_str());
+
+    local_var_req_builder = local_var_req_builder.query(&[("mud_url", &mud_url.to_string())]);
+    local_var_req_builder = local_var_req_builder.query(&[("name", &name.to_string())]);
+    if let Some(ref local_var_user_agent) = configuration.user_agent {
+        local_var_req_builder = local_var_req_builder.header(reqwest::header::USER_AGENT, local_var_user_agent.clone());
+    }
+    if let Some(ref local_var_auth_conf) = configuration.basic_auth {
+        local_var_req_builder = local_var_req_builder.basic_auth(local_var_auth_conf.0.to_owned(), local_var_auth_conf.1.to_owned());
+    };
+    local_var_req_builder = local_var_req_builder.json(&fork);
+
+    let local_var_req = local_var_req_builder.build()?;
+    let local_var_resp = local_var_client.execute(local_var_req).await?;
+
+    let local_var_status = local_var_resp.status();
+    let local_var_content = local_var_resp.text().await?;
+
+    if !local_var_status.is_client_error() && !local_var_status.is_server_error() {
+        serde_json::from_str(&local_var_content).map_err(Error::from)
+    } else {
+        let local_var_entity: Option<MudCreateForkCreateError> = serde_json::from_str(&local_var_content).ok();
         let local_var_error = ResponseContent { status: local_var_status, content: local_var_content, entity: local_var_entity };
         Err(Error::ResponseError(local_var_error))
     }
@@ -768,39 +801,6 @@ pub async fn mud_upload_create(configuration: &configuration::Configuration, upl
         serde_json::from_str(&local_var_content).map_err(Error::from)
     } else {
         let local_var_entity: Option<MudUploadCreateError> = serde_json::from_str(&local_var_content).ok();
-        let local_var_error = ResponseContent { status: local_var_status, content: local_var_content, entity: local_var_entity };
-        Err(Error::ResponseError(local_var_error))
-    }
-}
-
-/// API endpoint that allows admins to upload MUD-files
-pub async fn mud_upload_list(configuration: &configuration::Configuration, page: Option<i32>) -> Result<crate::models::PaginatedUploadMudList, Error<MudUploadListError>> {
-
-    let local_var_client = &configuration.client;
-
-    let local_var_uri_str = format!("{}/mud/upload", configuration.base_path);
-    let mut local_var_req_builder = local_var_client.get(local_var_uri_str.as_str());
-
-    if let Some(ref local_var_str) = page {
-        local_var_req_builder = local_var_req_builder.query(&[("page", &local_var_str.to_string())]);
-    }
-    if let Some(ref local_var_user_agent) = configuration.user_agent {
-        local_var_req_builder = local_var_req_builder.header(reqwest::header::USER_AGENT, local_var_user_agent.clone());
-    }
-    if let Some(ref local_var_auth_conf) = configuration.basic_auth {
-        local_var_req_builder = local_var_req_builder.basic_auth(local_var_auth_conf.0.to_owned(), local_var_auth_conf.1.to_owned());
-    };
-
-    let local_var_req = local_var_req_builder.build()?;
-    let local_var_resp = local_var_client.execute(local_var_req).await?;
-
-    let local_var_status = local_var_resp.status();
-    let local_var_content = local_var_resp.text().await?;
-
-    if !local_var_status.is_client_error() && !local_var_status.is_server_error() {
-        serde_json::from_str(&local_var_content).map_err(Error::from)
-    } else {
-        let local_var_entity: Option<MudUploadListError> = serde_json::from_str(&local_var_content).ok();
         let local_var_error = ResponseContent { status: local_var_status, content: local_var_content, entity: local_var_entity };
         Err(Error::ResponseError(local_var_error))
     }

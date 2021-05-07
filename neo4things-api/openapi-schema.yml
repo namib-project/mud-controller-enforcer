@@ -858,7 +858,7 @@ paths:
       description: Create or List connections (ACL Relationsships for MUDs)
       parameters:
       - in: query
-        name: mac-addr
+        name: mud_url
         schema:
           type: string
         description: The mud url of the MUD
@@ -887,7 +887,7 @@ paths:
       description: Create or List connections (ACL Relationsships for MUDs)
       parameters:
       - in: query
-        name: mac-addr
+        name: mud_url
         schema:
           type: string
         description: The mud url of the MUD
@@ -916,6 +916,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ACL'
+          description: ''
+  /mud/createFork:
+    post:
+      operationId: mud_createFork_create
+      description: Creates a Fork on our Gitlab Instance so that the changes can be
+        merged by a maintainer
+      parameters:
+      - in: query
+        name: mud_url
+        schema:
+          type: string
+        description: The mud-url for which the Things are shown
+        required: true
+      - in: query
+        name: name
+        schema:
+          type: string
+        description: name of the file which has been changed and for which you want
+          to create a merge request
+        required: true
+      tags:
+      - mud
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Fork'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Fork'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Fork'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fork'
           description: ''
   /mud/dns:
     get:
@@ -1168,28 +1212,6 @@ paths:
                 $ref: '#/components/schemas/PaginatedThingList'
           description: ''
   /mud/upload:
-    get:
-      operationId: mud_upload_list
-      description: API endpoint that allows admins to upload MUD-files
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      tags:
-      - mud
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedUploadMudList'
-          description: ''
     post:
       operationId: mud_upload_create
       description: API endpoint that allows admins to upload MUD-files
@@ -2112,6 +2134,18 @@ components:
       required:
       - mac_addr
       - mud_url
+    Fork:
+      type: object
+      properties:
+        mud_url:
+          type: string
+          maxLength: 512
+        name:
+          type: string
+          maxLength: 64
+      required:
+      - mud_url
+      - name
     Generator:
       type: object
       properties:
@@ -2448,26 +2482,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Thing'
-    PaginatedUploadMudList:
-      type: object
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/UploadMud'
     PaginatedUserList:
       type: object
       properties:

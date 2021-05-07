@@ -32,6 +32,7 @@ MODELS=(
   MUDJson
   PaginatedMUDJsonList
   Generator
+  Fork
 )
 
 if [[ "$1" == "new" ]]; then
