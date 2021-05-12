@@ -45,7 +45,7 @@ pub async fn run() -> Result<(NamibRpcClient, SocketAddr)> {
     };
 
     loop {
-        let addr_stream = discover_controllers("_namib_controller._tcp")?
+        let addr_stream = discover_controllers("_namib_controller._tcp")
             .try_filter_map(|addr| try_connect(addr.into(), "_controller._namib", identity.clone(), ca.clone()))
             .inspect_err(|err| warn!("Failed to connect to controller: {:?}", err))
             .filter_map(|r| future::ready(r.ok()));
