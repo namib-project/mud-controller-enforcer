@@ -1,3 +1,6 @@
+// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 use std::{fs::File, io, result::Result};
 
 /// Utility function to open a file with a `BufReader` and then pass the `BufReader` into a method

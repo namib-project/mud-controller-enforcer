@@ -1,3 +1,6 @@
+// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 use std::str::FromStr;
 
 use crate::{db::DbConnection, error, error::Result, models::Config};

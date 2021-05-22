@@ -142,3 +142,23 @@ Make sure you first start the neo4things server under port 7000 (by running `doc
 cd neo4things-api
 ./generate-rust-code.sh new
 ```
+
+## License
+
+The files under the debian folder are licensed under GPL-2.0-or-later as indicated by the copyright file.
+
+Alle other files are licensed under either of
+
+* Apache License, Version 2.0
+  ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+* MIT license
+  ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
+
