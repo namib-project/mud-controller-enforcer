@@ -1,9 +1,10 @@
 [package]
 name = "namib_shared"
-version = "0.5.1"
-authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>"]
+version = "0.5.2"
+authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>", "Luca Nittscher <lnittsch@uni-bremen.de>"]
 edition = "2018"
 resolver = "2"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 snafu = "0.6"
