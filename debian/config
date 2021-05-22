@@ -1,3 +1,6 @@
+# Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 DATABASE_URL=sqlite:/var/lib/namib/db.sqlite
 NAMIB_CA_CERT=/etc/namib/certs/namib-ca.pem
 NAMIB_SERVER_CERT=/etc/namib/certs/server.pem

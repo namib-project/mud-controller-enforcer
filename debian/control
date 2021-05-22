@@ -1,9 +1,13 @@
+# Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+# SPDX-License-Identifier: MIT OR Apache-2.0
 Source: namib-mud-controller
 Maintainer: Hugo Hakim Damer <hdamer@uni-bremen.de>
 Uploaders: Benjamin Ludewig <ludewigb@uni-bremen.de>, Florian Bonetti <flobon@uni-bremen.de>, Michael Bach <bachm@uni-bremen.de>, Jeffrey Munstermann <jemu@uni-bremen.de>, Luca Nittscher <lnittsch@uni-bremen.de>
 Priority: optional
 Section: admin
 Standards-Version: 4.5.1
+Vcs-Browser: https://github.com/namib-project/namib_mud_controller
+Vcs-Git: https://github.com/namib-project/namib_mud_controller.git
 Build-Depends: cargo:native,libavahi-compat-libdnssd-dev,libssl-dev,debhelper,libc6-dev
 Description: MUD Controller for use with other components of the NAMIB project.
 

@@ -145,9 +145,9 @@ cd neo4things-api
 
 ## License
 
-The files under the debian folder are licensed under GPL-2.0-or-later as indicated by the copyright file.
+The debian package postinstall-script in debian/postinst is licensed under GPL-2.0-or-later as indicated by the copyright file.
 
-Alle other files are licensed under either of
+All other files are licensed under either of
 
 * Apache License, Version 2.0
   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
