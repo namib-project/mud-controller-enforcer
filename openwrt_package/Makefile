@@ -1,9 +1,17 @@
+#
+# Copyright (C) 2020-2021 Benjamin Ludewig, Hugo Damer, namib.me
+# Copyright (C) 2017-2018 Justin Kilpatrick, Stanislaw Drozd, Openwrt.org
+#
+# This is free software, licensed under the GNU General Public License v2.
+#
+
 # you must set $RUST_TRIPLE in your env
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=namib
 PKG_VERSION:=0.1.0
 PKG_RELEASE:=1
+PKG_LICENSE:=GPL-2.0
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -13,7 +21,7 @@ define Package/namib
   SUBMENU:=NAMIB
   TITLE:=NAMIB Enforcer
   URL:=https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_enforcer
-  MAINTAINER:=Benjamin Ludewig <ludewigb@uni-bremen.de>
+  MAINTAINER:=Benjamin Ludewig <ludewigb@uni-bremen.de>, Hugo Damer <hdamer@uni-bremen.de>
   DEPENDS:=@IPV6 +libavahi-compat-libdnssd +libuci +nftables +libnftnl +libmnl
   PKG_BUILD_DEPENDS:=openssl
 endef

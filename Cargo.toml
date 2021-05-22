@@ -5,6 +5,7 @@ authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewi
 edition = "2018"
 default-run = "namib_enforcer"
 resolver = "2"
+license = "MIT OR Apache-2.0"
 
 [features]
 default = ["uci", "nftables"]

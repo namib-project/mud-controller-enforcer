@@ -1,3 +1,6 @@
+// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 use std::net::SocketAddr;
 
 use crate::{error::Result, services::is_system_mode, uci::Uci};
