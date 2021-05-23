@@ -96,7 +96,7 @@ async fn get_all_mud_expiration(pool: &DbConnection) -> Result<Vec<MudDboRefresh
 /// This function is mainly used in the `RPCServer`, where it's used to save Device's MUD-URLs which are being sent via DHCP
 /// Local MUD-Profiles can be loaded *BUT NOT CREATED* through this function, since they have an expiration far far in the future
 pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData> {
-    let mut acl_override = Vec::default();
+    let mut expired_mud_data: Option<MudData> = None;
 
     // lookup datenbank ob schon existiert und nicht abgelaufen
     if let Some(mud) = get_mud(url, pool).await {
@@ -104,21 +104,32 @@ pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData>
             if mud.expiration > Utc::now().naive_utc() {
                 return Ok(mud_data);
             }
-            acl_override = mud_data.acl_override;
+            expired_mud_data = Some(mud_data);
         }
     }
 
-    // mud_url muss eine https:// url sein.
+    // mud_url muss ein https:// url sein.
     if !is_url(url) || !url.starts_with("https://") {
         error::MudFileInvalid {}.fail()?;
     }
 
     // wenn nicht: fetch
-    let mud_json = fetch_mud(url).await?;
+    // falls ein fehler auftritt verwende die alte mud_data
+    let mud_json = match fetch_mud(url).await {
+        Ok(m) => m,
+        Err(e) => return expired_mud_data.ok_or(e),
+    };
 
     // ruf parse_mud auf
-    let mut data = parser::parse_mud(url.to_string(), mud_json.as_str())?;
-    data.acl_override = acl_override;
+    // falls ein fehler auftritt verwende die alte mud_data
+    let mut data = match parser::parse_mud(url.to_string(), mud_json.as_str()) {
+        Ok(d) => d,
+        Err(e) => return expired_mud_data.ok_or(e),
+    };
+    // acl_override von alter mud_data übernehmen
+    if let Some(MudData { acl_override, .. }) = expired_mud_data {
+        data.acl_override = acl_override;
+    }
 
     // speichern in db
     let mud = MudDbo {
