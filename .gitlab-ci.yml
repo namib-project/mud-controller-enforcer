@@ -1,9 +1,10 @@
 stages:
   - build
   - test
-  - docs
   - release
+  - gh-release
   - docker
+  - docs
 
 image: rust:latest
 
@@ -64,8 +65,15 @@ formatting:
     - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
+.test_stage:
+  - test
+  - test-postgres
+  - formatting
+
 docs:
   stage: docs
+  needs:
+    - build
   except:
     - master
   script:
@@ -77,6 +85,7 @@ docs:
 
 pages:
   stage: docs
+  needs: !reference [.test_stage]
   only:
     - master
   script:
@@ -90,8 +99,7 @@ pages:
 
 build-release:
   stage: release
-  needs:
-    - build
+  needs: []
   only:
     - master
   cache:
@@ -118,11 +126,9 @@ build-release:
 
 build-release-postgres:
   stage: release
-  needs:
-    - build
+  needs: []
   only:
     - master
-    - feature/#59_kompatibel_mit_postgres_machen
   services:
     - postgres
   cache:
@@ -153,8 +159,7 @@ build-release-postgres:
 
 .build-release-debian:
   stage: release
-  needs:
-    - build
+  needs: []
   only:
     - master
     - feature/controller-debian-paket
@@ -223,10 +228,27 @@ build-release-debian-armhf:
     DEBIAN_ARCH: armhf
     RUST_TRIPLE: armv7-unknown-linux-gnueabihf
 
+publish-github:
+  image: ubuntu:20.04
+  stage: gh-release
+  needs:
+    - build-release-debian-amd64
+    - build-release-debian-arm64
+    - build-release-debian-armhf
+    - !reference [.test_stage]
+  only:
+    - tags
+  before_script: []
+  script:
+    - wget -qO- https://github.com/cli/cli/releases/download/v1.10.3/gh_1.10.3_linux_amd64.tar.gz | tar -xvz --transform 's|^gh_1.10.3_linux_amd64/bin/||' -C /usr/local/bin gh_1.10.3_linux_amd64/bin
+    - gh auth login --with-token < $GITHUB_RELEASE_TOKEN
+    - gh release create $CI_COMMIT_TAG output/namib-mud-controller*.deb -R namib-project/namib_mud_controller
+
 create-docker:
   stage: docker
   needs:
     - build-release
+    - !reference [.test_stage]
   cache: {}
   image:
     name: gcr.io/kaniko-project/executor:debug
@@ -243,13 +265,13 @@ create-docker-postgres:
   stage: docker
   needs:
     - build-release-postgres
+    - !reference [.test_stage]
   cache: {}
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [ "" ]
   only:
     - master
-    - feature/#59_kompatibel_mit_postgres_machen
   before_script: []
   script:
     - mkdir -p /kaniko/.docker
