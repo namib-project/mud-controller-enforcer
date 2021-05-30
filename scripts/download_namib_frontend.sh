@@ -7,7 +7,7 @@ cd $(dirname $0)/../static
 function extract() {
   rm -rf app
   unzip -d app artifacts.zip
-  mv app/flutter_protyp/build/web/* app
+  mv app/build/web/* app
   rm -rf artifacts.zip app/flutter_protyp
   echo "Successfully downloaded & extracted namib frontend"
   echo "You can access it under http://localhost:8000/app"
