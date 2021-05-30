@@ -141,6 +141,7 @@ async fn test_create_mud() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 //tests whether update_outdated_profiles() works on expired profiles. Dependent on external Service.
 async fn test_update_outdated_profiles() -> Result<()> {
@@ -276,6 +277,7 @@ async fn test_update_valid_profiles() -> Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invalid_mud_urls() {
     let ctx = lib::IntegrationTestContext::new("test_invalid_urls").await;
