@@ -12,6 +12,13 @@ cache:
   paths:
     - .cargo/
 
+variables:
+  KUBERNETES_CPU_REQUEST: 3
+  KUBERNETES_CPU_LIMIT: 5
+  KUBERNETES_MEMORY_REQUEST: 2Gi
+  KUBERNETES_MEMORY_LIMIT: 4Gi
+  FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
+
 before_script:
   - git config --global credential.helper store
   - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
@@ -189,7 +196,7 @@ build_image_bcm2710:
 
 build_image_bcm2710_snapshot:
   extends: .openwrt_image_base
-  image: openwrtorg/imagebuilder@sha256:fefebe6f944034a1f2915458f7ea4422fe23066fc97a6f96b88200d049bb578f # :bcm27xx-bcm2710-snapshot # rpi 3
+  image: openwrtorg/imagebuilder@sha256:708a4bd7d645a808576ae57d4fd780eab233467deaa1498c9da6b75f987791e5 # :bcm27xx-bcm2710-snapshot # rpi 3
   needs:
     - openwrt_package_bcm2710_snapshot
   variables:
@@ -200,7 +207,7 @@ build_image_bcm2710_snapshot:
 
 build_image_bcm2711_snapshot:
   extends: .openwrt_image_base
-  image: openwrtorg/imagebuilder@sha256:bf6a044901a5c90c02b519dd5c0eda3619a207ad1379f073f1886d178bc06dc2 # :bcm27xx-bcm2711-snapshot # rpi 4
+  image: openwrtorg/imagebuilder@sha256:6e51a0f681819888c096b1d5c4d1532277fd38771c4705b039443d7be5173607 # :bcm27xx-bcm2711-snapshot # rpi 4
   needs:
     - openwrt_package_bcm2711_snapshot
   variables:
