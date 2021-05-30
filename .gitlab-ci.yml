@@ -6,7 +6,7 @@ stages:
   - docker
   - docs
 
-image: rust:latest
+image: rust:1.52.1
 
 cache:
   paths:
@@ -21,6 +21,7 @@ variables:
   KUBERNETES_SERVICE_CPU_LIMIT: 400m
   KUBERNETES_SERVICE_MEMORY_REQUEST: 512Mi
   KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
+  FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
 
 before_script:
   - git config --global credential.helper store
