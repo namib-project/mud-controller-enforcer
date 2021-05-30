@@ -162,7 +162,7 @@ build-release-postgres:
   needs: []
   only:
     - master
-    - feature/controller-debian-paket
+    - tags
   services:
     - postgres
   cache:
