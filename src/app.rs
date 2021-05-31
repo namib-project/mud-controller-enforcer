@@ -106,6 +106,8 @@ pub fn start_app(
     tokio_handle: tokio::runtime::Handle,
 ) -> Result<()> {
     actix_web::rt::System::new("main").block_on(async move {
+        // create the memory store before the server, otherwise one will be created for each worker.
+        let store = MemoryStore::new();
         let mut server = HttpServer::new(move || {
             let cors = Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {
@@ -120,7 +122,7 @@ pub fn start_app(
                 .allow_any_method()
                 .allow_any_header()
                 .max_age(3600);
-            let rate_limiter = RateLimiter::new(MemoryStoreActor::from(MemoryStore::new()).start())
+            let rate_limiter = RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
                 .with_interval(Duration::from_secs(60))
                 .with_max_requests(APP_CONFIG.ratelimiter_requests_per_minute)
                 .with_identifier(|req| {
