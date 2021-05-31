@@ -242,7 +242,7 @@ impl DnsService {
 }
 
 /// Struct which can be used to keep track of dns entry changes.
-pub(crate) struct DnsWatcher {
+pub struct DnsWatcher {
     /// Reference to the DNS cache of the DnsService.
     cache: Arc<RwLock<DnsServiceCache>>,
     /// Reference to a sender instance which is added to cache entries if the watches wishes to be notified of changes.

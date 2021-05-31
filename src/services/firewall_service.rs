@@ -125,7 +125,10 @@ pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_wat
 }
 
 #[cfg(not(feature = "nftables"))]
-pub async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
+pub async fn apply_firewall_config_inner(
+    _config: &namib_shared::EnforcerConfig,
+    _dns_watcher: &DnsWatcher,
+) -> Result<()> {
     Ok(())
 }
 

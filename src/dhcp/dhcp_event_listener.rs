@@ -38,7 +38,7 @@ mod unix {
         while let Ok((event_stream, _)) = listener.accept().await {
             let enforcer = enforcer.clone();
             active_listeners.push(tokio::spawn(async move {
-                handle_dhcp_script_connection(enforcer, event_stream).await;
+                handle_dhcp_script_connection(enforcer, event_stream).await
             }));
         }
         join_all(active_listeners).await;

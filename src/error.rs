@@ -34,7 +34,7 @@ pub enum Error {
     },
     #[snafu(display("TrustDnsResolverError: {}", source), context(false))]
     TrustDnsResolver {
-        source: trust_dns_resolver::error::ResolveError,
+        source: Box<trust_dns_resolver::error::ResolveError>,
         backtrace: Backtrace,
     },
     #[cfg(feature = "uci")]
