@@ -67,4 +67,10 @@ pub enum Error {
     },
 }
 
+impl From<trust_dns_resolver::error::ResolveError> for Error {
+    fn from(resolve_error: trust_dns_resolver::error::ResolveError) -> Self {
+        Box::new(resolve_error).into()
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
