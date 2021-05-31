@@ -146,20 +146,14 @@ async fn main() -> Result<()> {
     // Create the firewall service
     let fw_service = Arc::new(FirewallService::new(enforcer.clone(), watcher));
 
-    let heartbeat_task = rpc::rpc_client::heartbeat(enforcer.clone(), fw_service.clone());
+    let heartbeat_task = tokio::spawn(rpc::rpc_client::heartbeat(enforcer.clone(), fw_service.clone()));
+    let dhcp_event_task = tokio::spawn(dhcp::dhcp_event_listener::listen_for_dhcp_events(enforcer.clone()));
+    let dns_task = tokio::spawn(async move { dns_service.auto_refresher_task().await });
+    let firewall_task = tokio::spawn(async move { fw_service.firewall_change_watcher().await });
+    let np0f_log_task = tokio::spawn(services::log_watcher::watch_np0f(enforcer.clone()));
 
-    let dhcp_event_task = dhcp::dhcp_event_listener::listen_for_dhcp_events(enforcer.clone());
-
-    let dns_task = tokio::spawn(async move {
-        dns_service.auto_refresher_task().await;
-    });
     let _log_watcher = thread::spawn(move || services::log_watcher::watch(&enforcer));
 
-    let firewall_task = tokio::spawn(async move {
-        fw_service.firewall_change_watcher().await;
-    });
-
-    let ((), (), dns_result, firewall_result) = tokio::join!(heartbeat_task, dhcp_event_task, dns_task, firewall_task);
-    dns_result.and(firewall_result)?;
+    tokio::try_join!(heartbeat_task, dhcp_event_task, dns_task, firewall_task, np0f_log_task)?;
     Ok(())
 }
