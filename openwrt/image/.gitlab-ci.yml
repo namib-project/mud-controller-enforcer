@@ -1,0 +1,83 @@
+build_image_x86_64:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:x86-64-19.07.7 # - statt _ wie im sdk...
+  needs:
+    - openwrt_package_x86_64
+
+build_image_bcm2708:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:brcm2708-bcm2708-19.07.7 # rpi 1
+  needs:
+    - openwrt_package_bcm2708
+  variables:
+    PROFILE: rpi
+
+build_image_bcm2710:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:brcm2708-bcm2710-19.07.7 # rpi 3
+  needs:
+    - openwrt_package_bcm2710
+  variables:
+    PROFILE: rpi-3
+
+build_image_bcm2710_snapshot:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder@sha256:708a4bd7d645a808576ae57d4fd780eab233467deaa1498c9da6b75f987791e5 # :bcm27xx-bcm2710-snapshot # rpi 3
+  needs:
+    - openwrt_package_bcm2710_snapshot
+  variables:
+    PROFILE: rpi-3
+    EXTRA_PACKAGES: brcmfmac-firmware-43430-sdio-rpi-3b brcmfmac-firmware-43455-sdio-rpi-3b-plus -cypress-nvram-43430-sdio-rpi-3b -cypress-nvram-43455-sdio-rpi-3b-plus
+  allow_failure: true
+
+build_image_bcm2711_snapshot:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder@sha256:6e51a0f681819888c096b1d5c4d1532277fd38771c4705b039443d7be5173607 # :bcm27xx-bcm2711-snapshot # rpi 4
+  needs:
+    - openwrt_package_bcm2711_snapshot
+  variables:
+    PROFILE: rpi-4
+  allow_failure: true
+
+.openwrt_image_base:
+  stage: imagebuilder
+  before_script: []
+  only:
+    - master
+  script:
+    - cd /home/build/openwrt
+    - cp -r ${CI_PROJECT_DIR}/openwrt/image/files files
+    # copy the IPKs created by the needed build jobs
+    - mkdir -p packages
+    - cp ${CI_PROJECT_DIR}/output/dnsmasq-full_*.ipk packages/
+    - cp ${CI_PROJECT_DIR}/output/namib_*.ipk packages/
+    - grep imagebuilder repositories.conf || echo "src imagebuilder file:packages" >> repositories.conf
+    - make _check_keys package_index || true # this is necessary for snapshot
+    # build the openwrt image with our packages
+    - make image PROFILE=$PROFILE PACKAGES="dnsmasq-full namib luci nano -dnsmasq -odhcpd-ipv6only $EXTRA_PACKAGES" FILES=files
+    - mkdir ${CI_PROJECT_DIR}/image
+    # x86 puts it under bin, bcm under build_dir ...
+    - cp bin/targets/*/*/openwrt-*-combined-*.img.gz ${CI_PROJECT_DIR}/image || true
+    - cp build_dir/target-*/linux-*/tmp/openwrt-*-factory.img.gz ${CI_PROJECT_DIR}/image || true
+    - cp -r build_dir/target-x86_64_musl/root-x86 ${CI_PROJECT_DIR}/rootfs || true
+  artifacts:
+    paths:
+      - image
+      - rootfs
+
+build_openwrt_docker:
+  stage: docker
+  image: docker
+  only:
+    - master
+  tags:
+    - namib
+    - privileged
+  needs:
+    - build_image_x86_64
+  before_script: [ ]
+  script:
+    - mkdir -p ~/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"namib_enforcer\",\"password\":\"$CI_DEPLOY_TOKEN\"}}}" > ~/.docker/config.json
+    - docker build . -f openwrt/image/Dockerfile -t gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
+    - docker push gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer

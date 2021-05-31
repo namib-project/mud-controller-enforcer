@@ -26,7 +26,9 @@ with logs:
 
 ## License
 
-The Makefile under openwrt_package is licensed under GPLv2 as noted in its header.
+The Makefile under openwrt/package is licensed under GPLv2 as noted in its header.
+
+The dnsmasq packages are licensed under GPLv3, for more information check https://thekelleys.org.uk/dnsmasq/doc.html
 
 All other files are licensed under either of
 

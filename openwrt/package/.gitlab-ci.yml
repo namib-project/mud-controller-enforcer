@@ -1,0 +1,75 @@
+openwrt_package_x86_64:
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk:x86_64-19.07.7
+  variables:
+    RUST_TRIPLE: x86_64-unknown-linux-musl
+
+openwrt_package_bcm2708: # raspberry v1
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk:brcm2708-bcm2708-19.07.7
+  variables:
+    RUST_TRIPLE: arm-unknown-linux-musleabihf
+
+openwrt_package_bcm2710: # raspberry v3
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk:brcm2708-bcm2710-19.07.7
+  variables:
+    RUST_TRIPLE: aarch64-unknown-linux-musl
+
+openwrt_package_bcm2710_snapshot: # raspberry v3
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk@sha256:d4dcd1b0c0e80030a7989ff02f911b9b0873ea6997288bb6ef16f738892e2d3d # :bcm27xx-bcm2710-21.02-snapshot
+  variables:
+    RUST_TRIPLE: aarch64-unknown-linux-musl
+
+openwrt_package_bcm2711_snapshot: # raspberry v4
+  extends: .openwrt_package_base
+  image: openwrtorg/sdk@sha256:2973097d0db2bf533ee075d654d83227bc77e7af530785fe9fe680b2d9b43fa6 # :bcm27xx-bcm2711-21.02-snapshot
+  variables:
+    RUST_TRIPLE: aarch64-unknown-linux-musl
+
+.openwrt_package_base:
+  stage: binary
+  dependencies: [ ]
+  cache: { }
+  only:
+    - master
+    - tags
+  before_script:
+    # setup https credentials
+    - git config --global credential.helper store
+    - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
+    # install rust
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
+    - source $HOME/.cargo/env
+    # install git-secret & build dependency for bindgen
+    - sudo apt-get update && sudo apt-get install -y clang libc6-dev-i386 git-secret --no-install-recommends
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
+    - cd ..
+    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
+    - git fetch origin && git checkout origin/master -f
+    - git secret reveal
+    - cd certs
+    - ./gen_client_cert.sh namib-ca
+  script:
+    - cd /home/build/openwrt
+    - ./scripts/feeds update base packages
+    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl nftables dnsmasq-full
+    - mv ${CI_PROJECT_DIR}/openwrt/package/config.diff .config
+    - mv ${CI_PROJECT_DIR}/openwrt/package/patches/* package/feeds/base/dnsmasq/patches/
+    - mv ${CI_PROJECT_DIR}/openwrt/package ./package/namib
+    - mkdir package/namib/src
+    - cp -r ${CI_PROJECT_DIR} package/namib/src/namib_enforcer
+    - make defconfig
+    - make package/namib/compile -j8
+    - make package/feeds/base/dnsmasq/compile -j8
+  after_script:
+    - mkdir ${CI_PROJECT_DIR}/output
+    - cp -r /home/build/openwrt/logs/package/namib ${CI_PROJECT_DIR}/output/logs || true
+    - cp -r /home/build/openwrt/bin/packages/*/base/namib_0.1.0-*.ipk ${CI_PROJECT_DIR}/output || true
+    - cp -r /home/build/openwrt/bin/packages/*/base/dnsmasq-full_*.ipk ${CI_PROJECT_DIR}/output || true
+  artifacts:
+    paths:
+      - output
+    when: always
