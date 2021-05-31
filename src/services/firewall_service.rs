@@ -118,9 +118,10 @@ pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_wat
     let batch = batch.finalize();
     if let Err(e) = send_and_process(batch, &device_batches) {
         error!("Error sending firewall configuration to netfilter: {:?}", e);
-        return Err(e);
+        Err(e)
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 #[cfg(not(feature = "nftables"))]
