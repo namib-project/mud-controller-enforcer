@@ -251,6 +251,7 @@ publish-github:
     - tags
   before_script: []
   script:
+    - apt-get update && apt-get install -y wget
     - wget -qO- https://github.com/cli/cli/releases/download/v1.10.3/gh_1.10.3_linux_amd64.tar.gz | tar -xvz --transform 's|^gh_1.10.3_linux_amd64/bin/||' -C /usr/local/bin gh_1.10.3_linux_amd64/bin
     - gh auth login --with-token < $GITHUB_RELEASE_TOKEN
     - gh release create $CI_COMMIT_TAG output/namib-mud-controller*.deb -R namib-project/namib_mud_controller
