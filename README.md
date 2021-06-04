@@ -1,7 +1,20 @@
 # NAMIB Enforcer
 
-The Enforcer Software is designed to run on an OpenWRT operating system.
+The Enforcer Software is designed to run on an OpenWRT operating system to enforce the configuration provided by the [NAMIB Controller](https://github.com/namib-project/namib_mud_controller).
 It looks for a MUD Controller in the local network via dns-sd. 
+
+## Installation
+
+Public installation packages are provided [on GitHub](https://github.com/namib-project/namib_enforcer/releases).
+
+To install the enforcer on a device running OpenWRT, download the appropiate `namib` and `dnsmasq_full` packages from the releases page, copy them to your device (e.g. using `scp`) and run `opkg install [FILENAME]` on both of them.
+The `dnsmasq_full` package contains a patched version of `dnsmasq` which adds necessary features for the enforcer to correctly detect devices.
+The source code for this package can be found [here](https://github.com/namib-project/dnsmasq)
+
+After installation, you might want to validate that the CA cert and enforcer key pair are correct (for example, if you use your own keys). These are located in the `/etc/namib` directory.
+
+The enforcer is run as a service called `namib` that can be started or stopped on demand, either using the command line (`/etc/init.d/namib [start|stop|restart]`) or another interface (like LuCI). 
+By default, this service will be started with the operating system.
 
 ## Project Setup
 
