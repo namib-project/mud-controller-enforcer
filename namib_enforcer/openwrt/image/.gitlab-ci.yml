@@ -20,24 +20,35 @@ build_image_bcm2710:
   variables:
     PROFILE: rpi-3
 
-build_image_bcm2710_snapshot:
+build_image_x86_64_21.02:
   extends: .openwrt_image_base
-  image: openwrtorg/imagebuilder@sha256:708a4bd7d645a808576ae57d4fd780eab233467deaa1498c9da6b75f987791e5 # :bcm27xx-bcm2710-snapshot # rpi 3
+  image: openwrtorg/imagebuilder:x86-64-21.02.0 # - statt _ wie im sdk...
   needs:
-    - openwrt_package_bcm2710_snapshot
+    - openwrt_package_x86_64_21.02
+
+build_image_bcm2708_21.02:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2708-21.02.0 # rpi 1
+  needs:
+    - openwrt_package_bcm2708_21.02
+  variables:
+    PROFILE: rpi
+
+build_image_bcm2710_21.02:
+  extends: .openwrt_image_base
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2710-21.02.0 # rpi 3
+  needs:
+    - openwrt_package_bcm2710_21.02
   variables:
     PROFILE: rpi-3
-    EXTRA_PACKAGES: brcmfmac-firmware-43430-sdio-rpi-3b brcmfmac-firmware-43455-sdio-rpi-3b-plus -cypress-nvram-43430-sdio-rpi-3b -cypress-nvram-43455-sdio-rpi-3b-plus
-  allow_failure: true
 
-build_image_bcm2711_snapshot:
+build_image_bcm2711_21.02:
   extends: .openwrt_image_base
-  image: openwrtorg/imagebuilder@sha256:6e51a0f681819888c096b1d5c4d1532277fd38771c4705b039443d7be5173607 # :bcm27xx-bcm2711-snapshot # rpi 4
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2711-21.02.0 # rpi 4
   needs:
-    - openwrt_package_bcm2711_snapshot
+    - openwrt_package_bcm2711_21.02
   variables:
     PROFILE: rpi-4
-  allow_failure: true
 
 .openwrt_image_base:
   stage: imagebuilder
