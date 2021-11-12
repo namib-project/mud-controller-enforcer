@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/dnsmasq" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/httpchallenge" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/namib_enforcer" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/namib_mud_controller" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/namib_shared" vcs="Git" />
+  </component>
+</project>

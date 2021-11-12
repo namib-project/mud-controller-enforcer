@@ -1,0 +1,31 @@
+# OpenSSL configuration file for creating a CSR for a client certificate
+
+[ req ]
+default_md = sha256
+prompt = no
+utf8 = yes
+distinguished_name = dn
+req_extensions = req_ext
+x509_extensions = usr_cert
+
+[ dn ]
+C = DE
+ST = Bremen
+L = Bremen
+O = Uni Bremen
+OU = NAMIB
+CN = _enforcer._namib
+
+[ req_ext ]
+basicConstraints = CA:FALSE
+subjectAltName = DNS:_enforcer._namib
+
+[ usr_cert ]
+basicConstraints = CA:FALSE
+subjectAltName = DNS:_enforcer._namib
+nsCertType = client
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth, codeSigning
+nsComment = "NAMIB Enforcer Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer

@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "namib_enforcer",
+    "namib_controller",
+    "namib_shared",
+]

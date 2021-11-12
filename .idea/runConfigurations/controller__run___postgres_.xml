@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="controller [run] [postgres]" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="command" value="run --package namib_mud_controller --bin namib_mud_controller --no-default-features --features postgres" />
+    <option name="workingDirectory" value="file://$PROJECT_DIR$/namib_mud_controller" />
+    <option name="channel" value="STABLE" />
+    <option name="requiredFeatures" value="true" />
+    <option name="allFeatures" value="false" />
+    <option name="emulateTerminal" value="false" />
+    <option name="backtrace" value="SHORT" />
+    <envs>
+      <env name="DATABASE_URL" value="postgres://namib:namib@localhost/namib_mud_controller" />
+    </envs>
+    <option name="isRedirectInput" value="false" />
+    <option name="redirectInputPath" value="" />
+    <method v="2">
+      <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+    </method>
+  </configuration>
+</component>
