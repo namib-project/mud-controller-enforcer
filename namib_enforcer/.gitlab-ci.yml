@@ -101,11 +101,10 @@ publish-github:
   image: alpine:3
   stage: gh-release
   needs:
-    - openwrt_package_x86_64
-    - openwrt_package_bcm2708
-    - openwrt_package_bcm2710
-    - openwrt_package_bcm2710_snapshot
-    - openwrt_package_bcm2711_snapshot
+    - openwrt_package_x86_64_21.02
+    - openwrt_package_bcm2708_21.02
+    - openwrt_package_bcm2710_21.02
+    - openwrt_package_bcm2711_21.02
   only:
     - tags
   before_script:
