@@ -1,0 +1,20 @@
+# Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+[Unit]
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+Type=exec
+User=namib-controller
+ExecStartPre=/usr/bin/mkdir -p /etc/namib/acme
+ExecStartPre=/usr/bin/chown -R namib-controller /var/lib/namib/
+ExecStartPre=/usr/bin/chown -R namib-controller /etc/namib
+ExecStartPre=/usr/bin/chmod -R u+rw /var/lib/namib/
+ExecStartPre=/usr/bin/chmod -R u+rw /etc/namib
+ExecStart=/usr/bin/namib_mud_controller
+ProtectSystem=true
+PermissionsStartOnly=true
+EnvironmentFile=/etc/namib/config
+WorkingDirectory=/usr/share/namib

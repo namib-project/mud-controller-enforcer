@@ -1,0 +1,13 @@
+# Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+DATABASE_URL=sqlite:/var/lib/namib/db.sqlite
+NAMIB_CA_CERT=/etc/namib/certs/namib-ca.pem
+NAMIB_SERVER_CERT=/etc/namib/certs/server.pem
+NAMIB_SERVER_KEY=/etc/namib/certs/server-key.pem
+NAMIB_ACME_DIR=/etc/namib/acme
+NEO4THINGS_URL=http://localhost:7000
+NEO4THINGS_USER=admin
+NEO4THINGS_PASS=namib
+DOMAIN=controller.namib.me
+STAGING=false

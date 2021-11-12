@@ -1,0 +1,4 @@
+install/*/release/namib_mud_controller /usr/bin
+certs /etc/namib
+static /usr/share/namib
+debian/config /etc/namib

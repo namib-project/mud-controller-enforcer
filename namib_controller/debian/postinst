@@ -1,0 +1,17 @@
+#!/bin/sh
+# NAMIB Controller debian package postinstall script
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2020-2021 Hugo Damer, Benjamin Ludewig, namib.me
+# Copyright (C) 2005-2014 Martin Pitt, 2009 Cyril Bouthors, 2010 Dimitri Fontaine, 2011-2020 Christoph Berg, 2013 Peter Eisentraut
+# This is free software, licensed under the GNU General Public License v2 or (at your option) any later version.
+#
+# Adapted from postgresql-common postinstall script, licensed under the GPLv2+.
+# The second copyright notice refers to the original authors of the postgresql-common Debian package this script was
+# adapted from.
+
+if [ "$1" = configure ]; then
+    if ! getent passwd namib-controller > /dev/null; then
+        adduser --system --home /var/lib/namib \
+            --shell /bin/sh --group --gecos "NAMIB Controller" namib-controller
+    fi
+fi

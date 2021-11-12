@@ -1,0 +1,6 @@
+# sysusers.d file for NAMIB MUD Controller
+# Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+#Type Name             ID                  GECOS                  Home directory Shell
+u     namib-controller -                  "NAMIB MUD Controller" /usr/sbin/nologin
