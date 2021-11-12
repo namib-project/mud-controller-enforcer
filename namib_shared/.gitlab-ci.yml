@@ -1,0 +1,85 @@
+stages:
+  - build
+  - test
+  - docs
+  - release
+
+image: 'rust:latest'
+
+cache:
+  paths:
+    - .cargo/
+
+before_script:
+  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
+  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
+  - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
+  - chmod +x sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
+  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
+  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
+  - rustc --version
+  - cargo --version
+
+default:
+  tags:
+    - linux
+    - docker
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: always
+
+build:
+  stage: build
+  script:
+    - cargo build
+
+warnings:
+  stage: test
+  script:
+    - rustup toolchain install nightly --component clippy --no-self-update
+    - cargo +nightly clippy -- -D warnings
+  allow_failure: true
+
+formatting:
+  stage: test
+  script:
+    - rustup toolchain install nightly --component rustfmt --no-self-update
+    - cargo +nightly fmt -- --check
+
+docs:
+  stage: docs
+  except:
+    - master
+  script:
+    - cargo doc --no-deps
+  artifacts:
+    paths:
+      - target/doc
+    expire_in: 7 days
+
+pages:
+  stage: docs
+  only:
+    - master
+  script:
+    - cargo doc --no-deps
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > public/index.html
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
+
+tag:
+  stage: release
+  only:
+    - master
+  script:
+    - cargo generate-lockfile
+    - "export PACKAGE_VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)"
+    - git remote add api-origin https://gitlab-ci-token:${CI_PUSH_TOKEN}@gitlab.informatik.uni-bremen.de/${CI_PROJECT_PATH}
+    - git tag $PACKAGE_VERSION
+    - git push api-origin $PACKAGE_VERSION
