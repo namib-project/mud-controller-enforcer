@@ -27,8 +27,11 @@ openwrt_package_bcm2711_21.02: # raspberry v4
   dependencies: [ ]
   cache: { }
   only:
-    - master
-    - tags
+    refs:
+      - main
+      - tags
+    changes:
+      - "namib_enforcer/**/*"  
   before_script:
     # setup https credentials
     - git config --global credential.helper store

@@ -1,0 +1,14 @@
+stages:
+  - build
+  - test
+  - binary
+  - gh-release
+  - imagebuilder
+  - docs
+  - release
+  - docker
+
+include:
+  - local: namib_controller/.gitlab-ci.yml
+  - local: namib_enforcer/.gitlab-ci.yml
+  - local: namib_shared/.gitlab-ci.yml

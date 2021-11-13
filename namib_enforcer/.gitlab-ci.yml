@@ -1,15 +1,6 @@
-stages:
-  - build
-  - test
-  - binary
-  - gh-release
-  - imagebuilder
-  - docker
-  - docs
-
 include:
-  - local: openwrt/package/.gitlab-ci.yml
-  - local: openwrt/image/.gitlab-ci.yml
+  - local: namib_enforcer/openwrt/package/.gitlab-ci.yml
+  - local: namib_enforcer/openwrt/image/.gitlab-ci.yml
 
 image: rust:1.52
 
@@ -39,16 +30,19 @@ default:
   retry: 2
 
 build:
+  extends: .namib_enforcer_base
   stage: build
   script:
     - cargo build
 
 test:
+  extends: .namib_enforcer_base
   stage: test
   script:
     - cargo test --features dnsmasq_hook
 
 warnings:
+  extends: .namib_enforcer_base
   stage: test
   script:
     - rustup toolchain install nightly --component clippy --no-self-update
@@ -56,15 +50,17 @@ warnings:
   allow_failure: true
 
 formatting:
+  extends: .namib_enforcer_base
   stage: test
   script:
     - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
 docs:
+  extends: .namib_enforcer_base
   stage: docs
   except:
-    - master
+    - main
   script:
     - cargo doc --no-deps
   artifacts:
@@ -73,9 +69,11 @@ docs:
     expire_in: 7 days
 
 pages:
+  extends: .namib_enforcer_base
   stage: docs
   only:
-    - master
+    refs:
+      - main
   script:
     - cargo doc --no-deps
     - mv target/doc public
@@ -86,9 +84,11 @@ pages:
     expire_in: 7 days
 
 binary:
+  extends: .namib_enforcer_base
   stage: binary
   only:
-    - master
+    refs:
+      - main
   script:
     - cargo build --features="dnsmasq_hook" --release
   artifacts:
@@ -98,6 +98,7 @@ binary:
     expire_in: 7 days
 
 publish-github:
+  extends: .namib_enforcer_base
   image: alpine:3
   stage: gh-release
   needs:
@@ -106,10 +107,16 @@ publish-github:
     - openwrt_package_bcm2710_21.02
     - openwrt_package_bcm2711_21.02
   only:
-    - tags
+    refs:
+      - tags
   before_script:
     - apk add --no-cache wget tar
     - wget -qO- https://github.com/cli/cli/releases/download/v1.10.3/gh_1.10.3_linux_amd64.tar.gz | tar -xvz --transform 's|^gh_1.10.3_linux_amd64/bin/||' -C /usr/local/bin gh_1.10.3_linux_amd64/bin
     - gh auth login --with-token < $GITHUB_RELEASE_TOKEN
   script:
     - gh release create $CI_COMMIT_TAG output/namib_*.ipk output/dnsmasq-full_*.ipk -R namib-project/namib_enforcer
+
+.namib_enforcer_base:
+  only:
+    changes:
+      - "namib_enforcer/**/*"  
