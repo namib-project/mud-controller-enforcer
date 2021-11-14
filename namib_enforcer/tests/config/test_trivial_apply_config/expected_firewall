@@ -1,0 +1,13 @@
+
+config rule 'namibrule_18352413083402012524'
+	option name 'Regel2'
+	option proto '6'
+	option target 'DROP'
+	option src 'lan'
+	option src_ip '192.1.1.1'
+	option src_port '5000'
+	option dest 'lan'
+	option dest_ip '192.2.2.2'
+	option dst_port '5001'
+	option namib '1'
+

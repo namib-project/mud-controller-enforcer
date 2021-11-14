@@ -1,0 +1,2 @@
+#!/bin/sh
+/usr/sbin/namib_dnsmasq_hook "$@"

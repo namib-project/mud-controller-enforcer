@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Workaround for https://github.com/moby/moby/issues/34337
+
+initialize_iptables_in_docker() {
+	for t in nat mangle filter; do
+		/usr/sbin/iptables -t $t -nL >/dev/null 2>&1
+		/usr/sbin/ip6tables -t $t -nL >/dev/null 2>&1
+	done
+  uci set network.lan.ipaddr=$(ifconfig eth0 | awk '/inet addr/{print substr($2,6)}')
+  uci set network.lan.netmask=$(ifconfig eth0 | awk '/Mask:/{print substr($4,6)}')
+  uci set network.lan.hwaddr=$(cat /sys/class/net/eth0/address)
+  uci set network.lan.gateway=$(netstat -rn | awk '/UG.*eth0/{print $2}')
+  uci set network.wan.ipaddr=$(ifconfig eth1 | awk '/inet addr/{print substr($2,6)}')
+  uci set network.wan.netmask=$(ifconfig eth1 | awk '/Mask:/{print substr($4,6)}')
+  uci set network.wan.hwaddr=$(cat /sys/class/net/eth1/address)
+  uci set network.wan.gateway=$(netstat -rn | awk '/UG.*eth1/{print $2}')
+  uci commit
+}
+
+boot_hook_add preinit_main initialize_iptables_in_docker
