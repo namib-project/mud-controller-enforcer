@@ -1,53 +1,26 @@
-image: 'rust:latest'
-
-cache:
-  paths:
-    - .cargo/
-
-before_script:
-  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
-  - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
-  - chmod +x sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
-  - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
-  - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
-  - rustc --version
-  - cargo --version
-
-default:
-  tags:
-    - linux
-    - docker
-
-workflow:
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - when: always
-
-build:
-  extends: .namib_shared_base
+shd:build:
+  extends: .shd:job_base
   stage: build
   script:
     - cargo build
 
-warnings:
-  extends: .namib_shared_base
+shd:warnings:
+  extends: .shd:job_base
   stage: test
   script:
     - rustup toolchain install nightly --component clippy --no-self-update
     - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
-formatting:
-  extends: .namib_shared_base
+shd:formatting:
+  extends: .shd:job_base
   stage: test
   script:
     - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
-docs:
-  extends: .namib_shared_base
+shd:docs:
+  extends: .shd:job_base
   stage: docs
   except:
     - master
@@ -58,8 +31,8 @@ docs:
       - target/doc
     expire_in: 7 days
 
-pages:
-  extends: .namib_shared_base
+shd:pages:
+  extends: .shd:job_base
   stage: docs
   only:
     refs:
@@ -73,8 +46,8 @@ pages:
       - public
     expire_in: 7 days
 
-tag:
-  extends: .namib_shared_base
+shd:tag:
+  extends: .shd:job_base
   stage: release
   only:
     refs:
@@ -86,7 +59,16 @@ tag:
     - git tag $PACKAGE_VERSION
     - git push api-origin $PACKAGE_VERSION
 
-.namib_shared_base:
+.shd:job_base:
   only:
     changes:
-      - "namib_shared/**/*"  
+      - "namib_shared/**/*"
+  before_script:
+    - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
+    - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
+    - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
+    - chmod +x sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
+    - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
+    - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
+    - rustc --version
+    - cargo --version

@@ -1,51 +1,33 @@
-image: rust:1.52
+# every job should (transitively) inherit from this job template
+.ctl:job_base:
+  only:
+    changes:
+      - "namib_controller/**/*"
+  before_script:
+    - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
+    - git config --global credential.helper store
+    - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
+    - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
+    - rustc --version
+    - cargo --version
+    - cargo install sqlx-cli
+    - export PATH=$PATH:$CARGO_HOME/bin
+    - ./scripts/recreate_db.sh
 
-cache:
-  paths:
-    - .cargo/
-
-variables:
-  KUBERNETES_CPU_REQUEST: 3
-  KUBERNETES_CPU_LIMIT: 5
-  KUBERNETES_MEMORY_REQUEST: 2Gi
-  KUBERNETES_MEMORY_LIMIT: 4Gi
-  KUBERNETES_SERVICE_CPU_REQUEST: 200m
-  KUBERNETES_SERVICE_CPU_LIMIT: 400m
-  KUBERNETES_SERVICE_MEMORY_REQUEST: 512Mi
-  KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-  FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
-
-before_script:
-  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
-  - git config --global credential.helper store
-  - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
-  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - rustc --version
-  - cargo --version
-  - cargo install sqlx-cli
-  - export PATH=$PATH:$CARGO_HOME/bin
-  - ./scripts/recreate_db.sh
-
-default:
-  tags:
-    - linux
-    - docker
-  retry: 2
-
-build:
-  extends: .namib_controller_base
+ctl:build:
+  extends: .ctl:job_base
   stage: build
   script:
     - cargo build
 
-test:
-  extends: .namib_controller_base
+ctl:test:
+  extends: .ctl:job_base
   stage: test
   script:
     - cargo test
 
-test-postgres:
-  extends: .namib_controller_base
+ctl:test-postgres:
+  extends: .ctl:job_base
   stage: test
   services:
     - postgres
@@ -57,8 +39,8 @@ test-postgres:
   script:
     - cargo test --no-default-features --features postgres
 
-warnings:
-  extends: .namib_controller_base
+ctl:warnings:
+  extends: .ctl:job_base
   stage: test
   script:
     - rustup toolchain install nightly --component clippy --no-self-update
@@ -66,23 +48,23 @@ warnings:
   retry: 0
   allow_failure: true
 
-formatting:
-  extends: .namib_controller_base
+ctl:formatting:
+  extends: .ctl:job_base
   stage: test
   script:
     - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
-.test_stage:
-  - test
-  - test-postgres
-  - formatting
+.ctl_test_stage:
+  - ctl:test
+  - ctl:test-postgres
+  - ctl:formatting
 
-docs:
-  extends: .namib_controller_base
+ctl:docs:
+  extends: .ctl:job_base
   stage: docs
   needs:
-    - build
+    - ctl:build
   except:
     - master
   script:
@@ -92,10 +74,10 @@ docs:
       - target/doc
     expire_in: 7 days
 
-pages:
-  extends: .namib_controller_base
+ctl:pages:
+  extends: .ctl:job_base
   stage: docs
-  needs: !reference [.test_stage]
+  needs: !reference [.ctl_test_stage]
   only:
     refs:
       - main
@@ -108,13 +90,13 @@ pages:
       - public
     expire_in: 7 days
 
-build-release:
-  extends: .build-release-base
+ctl:build-release:
+  extends: .ctl:build-release-base
   variables:
     FEATURES: ""
 
-build-release-postgres:
-  extends: .build-release-base
+ctl:build-release-postgres:
+  extends: .ctl:build-release-base
   services:
     - postgres
   variables:
@@ -124,8 +106,8 @@ build-release-postgres:
     POSTGRES_PASSWORD: namib
     DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
 
-.build-release-base:
-  extends: .namib_controller_base
+.ctl:build-release-base:
+  extends: .ctl:job_base
   stage: release
   needs: []
   only:
@@ -153,8 +135,8 @@ build-release-postgres:
       - static
       - db.sqlite
 
-.build-release-debian:
-  extends: .namib_controller_base
+.ctl:build-release-debian:
+  extends: .ctl:job_base
   stage: release
   needs: []
   only:
@@ -208,33 +190,33 @@ build-release-postgres:
     paths:
       - output
 
-build-release-debian-amd64:
-  extends: .build-release-debian
+ctl:build-release-debian-amd64:
+  extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: amd64
     RUST_TRIPLE: x86_64-unknown-linux-gnu
 
-build-release-debian-arm64:
-  extends: .build-release-debian
+ctl:build-release-debian-arm64:
+  extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: arm64
     RUST_TRIPLE: aarch64-unknown-linux-gnu
 
-build-release-debian-armhf:
-  extends: .build-release-debian
+ctl:build-release-debian-armhf:
+  extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: armhf
     RUST_TRIPLE: armv7-unknown-linux-gnueabihf
 
-publish-github:
-  extends: .namib_controller_base
+ctl:publish-github:
+  extends: .ctl:job_base
   image: alpine:3
   stage: gh-release
   needs:
-    - build-release-debian-amd64
-    - build-release-debian-arm64
-    - build-release-debian-armhf
-    - !reference [.test_stage]
+    - "ctl:build-release-debian-amd64"
+    - "ctl:build-release-debian-arm64"
+    - "ctl:build-release-debian-armhf"
+    - !reference [.ctl_test_stage]
   only:
     refs:
       - tags
@@ -245,12 +227,12 @@ publish-github:
   script:
     - gh release create $CI_COMMIT_TAG output/namib-mud-controller*.deb -R namib-project/namib_mud_controller
 
-create-docker:
-  extends: .namib_controller_base
+ctl:create-docker:
+  extends: .ctl:job_base
   stage: docker
   needs:
-    - build-release
-    - !reference [.test_stage]
+    - ctl:build-release
+    - !reference [.ctl_test_stage]
   cache: {}
   image:
     name: gcr.io/kaniko-project/executor:debug
@@ -264,12 +246,12 @@ create-docker:
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
 
-create-docker-postgres:
-  extends: .namib_controller_base
+ctl:create-docker-postgres:
+  extends: .ctl:job_base
   stage: docker
   needs:
-    - build-release-postgres
-    - !reference [.test_stage]
+    - ctl:build-release-postgres
+    - !reference [.ctl_test_stage]
   cache: {}
   image:
     name: gcr.io/kaniko-project/executor:debug
@@ -282,8 +264,3 @@ create-docker-postgres:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:postgres
-
-.namib_controller_base:
-  only:
-    changes:
-      - "namib_controller/**/*"

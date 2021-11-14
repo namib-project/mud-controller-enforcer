@@ -2,62 +2,48 @@ include:
   - local: namib_enforcer/openwrt/package/.gitlab-ci.yml
   - local: namib_enforcer/openwrt/image/.gitlab-ci.yml
 
-image: rust:1.52
+# every job should (transitively) inherit from this job template
+.enf:job_base:
+  only:
+    changes:
+      - "namib_enforcer/**/*"  
+  before_script:
+    - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev libnftnl-dev libmnl-dev cmake clang
+    - git config --global credential.helper store
+    - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
+    - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
+    - rustc --version
+    - cargo --version
 
-cache:
-  paths:
-    - .cargo/
-
-variables:
-  KUBERNETES_CPU_REQUEST: 3
-  KUBERNETES_CPU_LIMIT: 5
-  KUBERNETES_MEMORY_REQUEST: 2Gi
-  KUBERNETES_MEMORY_LIMIT: 4Gi
-  FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
-
-before_script:
-  - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev libnftnl-dev libmnl-dev cmake clang
-  - git config --global credential.helper store
-  - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
-  - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-  - rustc --version
-  - cargo --version
-
-default:
-  tags:
-    - linux
-    - docker
-  retry: 2
-
-build:
-  extends: .namib_enforcer_base
+enf:build:
+  extends: .enf:job_base
   stage: build
   script:
     - cargo build
 
-test:
-  extends: .namib_enforcer_base
+enf:test:
+  extends: .enf:job_base
   stage: test
   script:
     - cargo test --features dnsmasq_hook
 
-warnings:
-  extends: .namib_enforcer_base
+enf:warnings:
+  extends: .enf:job_base
   stage: test
   script:
     - rustup toolchain install nightly --component clippy --no-self-update
     - cargo +nightly clippy -- -D warnings
   allow_failure: true
 
-formatting:
-  extends: .namib_enforcer_base
+enf:formatting:
+  extends: .enf:job_base
   stage: test
   script:
     - rustup toolchain install nightly --component rustfmt --no-self-update
     - cargo +nightly fmt -- --check
 
-docs:
-  extends: .namib_enforcer_base
+enf:docs:
+  extends: .enf:job_base
   stage: docs
   except:
     - main
@@ -68,8 +54,8 @@ docs:
       - target/doc
     expire_in: 7 days
 
-pages:
-  extends: .namib_enforcer_base
+enf:pages:
+  extends: .enf:job_base
   stage: docs
   only:
     refs:
@@ -83,8 +69,8 @@ pages:
       - public
     expire_in: 7 days
 
-binary:
-  extends: .namib_enforcer_base
+enf:binary:
+  extends: .enf:job_base
   stage: binary
   only:
     refs:
@@ -97,15 +83,15 @@ binary:
       - target/release/namib_dnsmasq_hook
     expire_in: 7 days
 
-publish-github:
-  extends: .namib_enforcer_base
+enf:publish-github:
+  extends: .enf:job_base
   image: alpine:3
   stage: gh-release
   needs:
-    - openwrt_package_x86_64_21.02
-    - openwrt_package_bcm2708_21.02
-    - openwrt_package_bcm2710_21.02
-    - openwrt_package_bcm2711_21.02
+    - enf:openwrt_package_x86_64_21.02
+    - enf:openwrt_package_bcm2708_21.02
+    - enf:openwrt_package_bcm2710_21.02
+    - enf:openwrt_package_bcm2711_21.02
   only:
     refs:
       - tags
@@ -115,8 +101,3 @@ publish-github:
     - gh auth login --with-token < $GITHUB_RELEASE_TOKEN
   script:
     - gh release create $CI_COMMIT_TAG output/namib_*.ipk output/dnsmasq-full_*.ipk -R namib-project/namib_enforcer
-
-.namib_enforcer_base:
-  only:
-    changes:
-      - "namib_enforcer/**/*"  

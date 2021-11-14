@@ -1,28 +1,28 @@
-openwrt_package_x86_64_21.02:
-  extends: .openwrt_package_base
+enf:openwrt_package_x86_64_21.02:
+  extends: .enf:openwrt_package_base
   image: openwrtorg/sdk:x86_64-21.02.0
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
 
-openwrt_package_bcm2708_21.02: # raspberry v1
-  extends: .openwrt_package_base
+enf:openwrt_package_bcm2708_21.02: # raspberry v1
+  extends: .enf:openwrt_package_base
   image: openwrtorg/sdk:bcm27xx-bcm2708-21.02.0
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
 
-openwrt_package_bcm2710_21.02: # raspberry v3
-  extends: .openwrt_package_base
+enf:openwrt_package_bcm2710_21.02: # raspberry v3
+  extends: .enf:openwrt_package_base
   image: openwrtorg/sdk:bcm27xx-bcm2710-21.02.0
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
-openwrt_package_bcm2711_21.02: # raspberry v4
-  extends: .openwrt_package_base
+enf:openwrt_package_bcm2711_21.02: # raspberry v4
+  extends: .enf:openwrt_package_base
   image: openwrtorg/sdk:bcm27xx-bcm2711-21.02.0
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
-.openwrt_package_base:
+.enf:openwrt_package_base:
   stage: binary
   dependencies: [ ]
   cache: { }

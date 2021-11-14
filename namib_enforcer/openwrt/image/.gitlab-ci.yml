@@ -1,34 +1,34 @@
-build_image_x86_64_21.02:
-  extends: .openwrt_image_base
+enf:build_image_x86_64_21.02:
+  extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:x86-64-21.02.0 # - statt _ wie im sdk...
   needs:
-    - openwrt_package_x86_64_21.02
+    - enf:openwrt_package_x86_64_21.02
 
-build_image_bcm2708_21.02:
-  extends: .openwrt_image_base
+enf:build_image_bcm2708_21.02:
+  extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:bcm27xx-bcm2708-21.02.0 # rpi 1
   needs:
-    - openwrt_package_bcm2708_21.02
+    - enf:openwrt_package_bcm2708_21.02
   variables:
     PROFILE: rpi
 
-build_image_bcm2710_21.02:
-  extends: .openwrt_image_base
+enf:build_image_bcm2710_21.02:
+  extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:bcm27xx-bcm2710-21.02.0 # rpi 3
   needs:
-    - openwrt_package_bcm2710_21.02
+    - enf:openwrt_package_bcm2710_21.02
   variables:
     PROFILE: rpi-3
 
-build_image_bcm2711_21.02:
-  extends: .openwrt_image_base
+enf:build_image_bcm2711_21.02:
+  extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:bcm27xx-bcm2711-21.02.0 # rpi 4
   needs:
-    - openwrt_package_bcm2711_21.02
+    - enf:openwrt_package_bcm2711_21.02
   variables:
     PROFILE: rpi-4
 
-.openwrt_image_base:
+.enf:openwrt_image_base:
   stage: imagebuilder
   before_script: []
   only:
@@ -54,7 +54,7 @@ build_image_bcm2711_21.02:
       - image
       - rootfs
 
-build_openwrt_docker:
+enf:build_openwrt_docker:
   stage: docker
   image: docker:19.03.12
   only:
@@ -66,7 +66,7 @@ build_openwrt_docker:
     - namib
     - privileged
   needs:
-    - build_image_x86_64_21.02
+    - enf:build_image_x86_64_21.02
   before_script: [ ]
   script:
     - mkdir -p ~/.docker
