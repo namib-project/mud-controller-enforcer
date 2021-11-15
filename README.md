@@ -5,7 +5,7 @@
 ### Install
 
 ```shell
-sudo apt-get update && sudo apt-get install git-secret -y 
+sudo apt-get update && sudo apt-get install git-secret -y
 ```
 
 ### Add a new user
