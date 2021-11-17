@@ -1,6 +1,7 @@
-include:
-  - local: namib_enforcer/openwrt/package/.gitlab-ci.yml
-  - local: namib_enforcer/openwrt/image/.gitlab-ci.yml
+# TODO lets get the basic builds running first
+#include:
+#  - local: namib_enforcer/openwrt/package/.gitlab-ci.yml
+#  - local: namib_enforcer/openwrt/image/.gitlab-ci.yml
 
 # every job should (transitively) inherit from this job template
 .enf:job_base:
@@ -8,7 +9,6 @@ include:
     changes:
       - "namib_enforcer/**/*"  
   before_script:
-    - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev libnftnl-dev libmnl-dev cmake clang
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
     - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
@@ -19,39 +19,39 @@ enf:build:
   extends: .enf:job_base
   stage: build
   script:
-    - cargo build
+    - cargo build -p namib_enforcer --features dnsmasq_hook
 
 enf:test:
   extends: .enf:job_base
   stage: test
   script:
-    - cargo test --features dnsmasq_hook
+    - cargo test -p namib_enforcer --features dnsmasq_hook
 
 enf:warnings:
   extends: .enf:job_base
   stage: test
   script:
-    - rustup toolchain install nightly --component clippy --no-self-update
-    - cargo +nightly clippy -- -D warnings
+    - cargo clippy -p namib_enforcer -- -D warnings
   allow_failure: true
 
 enf:formatting:
   extends: .enf:job_base
   stage: test
   script:
-    - rustup toolchain install nightly --component rustfmt --no-self-update
-    - cargo +nightly fmt -- --check
+    - cargo fmt -p namib_enforcer -- --check
 
 enf:docs:
   extends: .enf:job_base
   stage: docs
+  needs:
+    - enf:build
   except:
     - main
   script:
-    - cargo doc --no-deps
+    - cargo doc -p namib_enforcer --no-deps --target-dir target-doc-enf
   artifacts:
     paths:
-      - target/doc
+      - target-doc-enf/doc
     expire_in: 7 days
 
 enf:pages:
@@ -61,14 +61,15 @@ enf:pages:
     refs:
       - main
   script:
-    - cargo doc --no-deps
-    - mv target/doc public
+    - cargo doc -p namib_enforcer --no-deps --target-dir target-doc-enf
+    - mv target-doc-enf/doc public
     - echo '<meta http-equiv="refresh" content="0; url=namib_enforcer/index.html">' > public/index.html
   artifacts:
     paths:
       - public
     expire_in: 7 days
 
+# TODO might be redundant, "enf:build" already does (almost) the same, it just doesn't set the --release argument.
 enf:binary:
   extends: .enf:job_base
   stage: binary
@@ -76,14 +77,15 @@ enf:binary:
     refs:
       - main
   script:
-    - cargo build --features="dnsmasq_hook" --release
+    - cargo build -p namib_enforcer --features="dnsmasq_hook" --release
   artifacts:
     paths:
       - target/release/namib_enforcer
       - target/release/namib_dnsmasq_hook
     expire_in: 7 days
 
-enf:publish-github:
+# TODO migrate to new monorepo on GitHub
+.enf:publish-github:
   extends: .enf:job_base
   image: alpine:3
   stage: gh-release

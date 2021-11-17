@@ -22,7 +22,7 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 
 use dotenv::dotenv;
 use log::{error, warn};
-use namib_mud_controller::{
+use namib_controller::{
     app::ControllerAppBuilder, app_config::APP_CONFIG, auth::initialize_jwt_secret, db, error::Result, rpc_server,
     services::job_service, VERSION,
 };

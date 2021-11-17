@@ -1,5 +1,5 @@
 [package]
-name = "namib_mud_controller"
+name = "namib_controller"
 version = "0.1.0"
 authors = ["Jeffrey Munstermann <jemu@uni-bremen.de>", "Benjamin Ludewig <ludewigb@uni-bremen.de>", "Hugo Hakim Damer <hdamer@uni-bremen.de>", "Florian Bonetti <flobon@uni-bremen.de>", "Michael Bach <bachm@uni-bremen.de>", "Luca Nittscher <lnittsch@uni-bremen.de>"]
 edition = "2018"
@@ -11,12 +11,12 @@ default = ["sqlx/sqlite"]
 postgres = ["sqlx/postgres"]
 
 [dependencies]
+namib_shared = { path = "../namib_shared" }
 actix-web = { version = "^3.3.2", features = ["rustls"] }
 actix-files = "^0.5.0"
 actix-cors = "^0.5.4"
 actix-ratelimit = { version = "^0.3.1", default-features = false, features = ["memory"] }
 sqlx = { version = "^0.5.5", features = ["runtime-tokio-rustls", "chrono", "offline"] }
-namib_shared = { tag = "0.5.2", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
 log = "^0.4.14"
 env_logger = "^0.8.3"
 tokio = { version = "^1.5.0", features = ["rt-multi-thread", "fs", "macros"] }

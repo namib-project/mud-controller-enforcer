@@ -19,7 +19,7 @@ workflow:
       when: never
     - when: always
 
-image: rust:1.52
+image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller:generic
 
 cache:
   paths:

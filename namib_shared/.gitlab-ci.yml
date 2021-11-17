@@ -2,22 +2,20 @@ shd:build:
   extends: .shd:job_base
   stage: build
   script:
-    - cargo build
+    - cargo build -p namib_shared
 
 shd:warnings:
   extends: .shd:job_base
   stage: test
   script:
-    - rustup toolchain install nightly --component clippy --no-self-update
-    - cargo +nightly clippy -- -D warnings
+    - cargo clippy -p namib_shared -- -D warnings
   allow_failure: true
 
 shd:formatting:
   extends: .shd:job_base
   stage: test
   script:
-    - rustup toolchain install nightly --component rustfmt --no-self-update
-    - cargo +nightly fmt -- --check
+    - cargo fmt -p namib_shared -- --check
 
 shd:docs:
   extends: .shd:job_base
@@ -25,10 +23,10 @@ shd:docs:
   except:
     - master
   script:
-    - cargo doc --no-deps
+    - cargo doc -p namib_shared --no-deps --target-dir target-doc-shared
   artifacts:
     paths:
-      - target/doc
+      - target-doc-shared/doc
     expire_in: 7 days
 
 shd:pages:
@@ -38,15 +36,16 @@ shd:pages:
     refs:
       - main
   script:
-    - cargo doc --no-deps
-    - mv target/doc public
+    - cargo doc -p namib_shared --no-deps --target-dir target-doc-shared
+    - mv target-doc-shared/doc public
     - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > public/index.html
   artifacts:
     paths:
       - public
     expire_in: 7 days
 
-shd:tag:
+# TODO adjust for monorepo
+.shd:tag:
   extends: .shd:job_base
   stage: release
   only:

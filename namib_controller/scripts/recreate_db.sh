@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-cd $(dirname $0)/..
-
-MIGRATION_DIRECTORY=${MIGRATION_DIRECTORY:-migrations/sqlite}
+MIGRATION_DIRECTORY=${MIGRATION_DIRECTORY:-$(dirname $0)/../migrations/sqlite}
 
 sqlx db drop -y
 sqlx db create

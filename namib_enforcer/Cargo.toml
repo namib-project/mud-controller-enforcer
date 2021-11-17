@@ -14,7 +14,7 @@ nftables = ["nftnl", "mnl", "libc"]
 dnsmasq_hook = []
 
 [dependencies]
-namib_shared = { tag = "0.5.2", git = "https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_shared.git" }
+namib_shared = { path = "../namib_shared" }
 tokio = { version = "1.5", features = ["macros", "rt", "net", "io-util", "sync", "fs"] }
 log = "0.4"
 env_logger = "0.8"

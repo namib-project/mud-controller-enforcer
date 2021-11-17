@@ -3,28 +3,29 @@
   only:
     changes:
       - "namib_controller/**/*"
+  variables:
+    DATABASE_URL: sqlite:namib_controller/db.sqlite
   before_script:
-    - apt-get update && apt-get install -y libavahi-compat-libdnssd-dev
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
     - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
     - rustc --version
     - cargo --version
-    - cargo install sqlx-cli
+    - cargo install sqlx-cli # TODO move to build image
     - export PATH=$PATH:$CARGO_HOME/bin
-    - ./scripts/recreate_db.sh
+    - ./namib_controller/scripts/recreate_db.sh
 
 ctl:build:
   extends: .ctl:job_base
   stage: build
   script:
-    - cargo build
+    - cargo build -p namib_controller
 
 ctl:test:
   extends: .ctl:job_base
   stage: test
   script:
-    - cargo test
+    - cargo test -p namib_controller
 
 ctl:test-postgres:
   extends: .ctl:job_base
@@ -32,19 +33,18 @@ ctl:test-postgres:
   services:
     - postgres
   variables:
-    MIGRATION_DIRECTORY: migrations/postgres
+    MIGRATION_DIRECTORY: namib_controller/migrations/postgres
     POSTGRES_USER: namib
     POSTGRES_PASSWORD: namib
     DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
   script:
-    - cargo test --no-default-features --features postgres
+    - cargo test -p namib_controller --no-default-features --features postgres
 
 ctl:warnings:
   extends: .ctl:job_base
   stage: test
   script:
-    - rustup toolchain install nightly --component clippy --no-self-update
-    - cargo +nightly clippy -- -D warnings
+    - cargo clippy -p namib_controller -- -D warnings
   retry: 0
   allow_failure: true
 
@@ -52,8 +52,7 @@ ctl:formatting:
   extends: .ctl:job_base
   stage: test
   script:
-    - rustup toolchain install nightly --component rustfmt --no-self-update
-    - cargo +nightly fmt -- --check
+    - cargo fmt -p namib_controller -- --check
 
 .ctl_test_stage:
   - ctl:test
@@ -66,12 +65,12 @@ ctl:docs:
   needs:
     - ctl:build
   except:
-    - master
+    - main
   script:
-    - cargo doc --no-deps
+    - cargo doc -p namib_controller --no-deps --target-dir target-doc-ctrl
   artifacts:
     paths:
-      - target/doc
+      - target-doc-ctrl/doc
     expire_in: 7 days
 
 ctl:pages:
@@ -82,8 +81,8 @@ ctl:pages:
     refs:
       - main
   script:
-    - cargo doc --no-deps
-    - mv target/doc public
+    - cargo doc -p namib_controller --no-deps --target-dir target-doc-ctrl
+    - mv target-doc-ctrl/doc public
     - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > public/index.html
   artifacts:
     paths:
@@ -116,24 +115,22 @@ ctl:build-release-postgres:
   cache:
     key: "build-release"
   script:
-    - cargo install --root ./install --path . $FEATURES
+    - cargo install -p namib_controller --root ./namib_controller/install --path . $FEATURES
     # download namib frontend
+    - cd namib_controller
     - ./scripts/download_namib_frontend.sh
-    # decrypt ca secret
-    - apt-get install git-secret -y
-    - gpg --import $GPG_PRIVATE_KEY
     - cd ..
-    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
-    - git fetch origin && git checkout origin/master -f
+    # decrypt ca secret
+    - gpg --import $GPG_PRIVATE_KEY
     - git secret reveal
     - cd certs
     - ./gen_server_cert.sh namib-ca
   artifacts:
     paths:
-      - install/bin
-      - certs
-      - static
-      - db.sqlite
+      - namib_controller/install/bin
+      - namib_controller/certs
+      - namib_controller/static
+      - namib_controller/db.sqlite
 
 .ctl:build-release-debian:
   extends: .ctl:job_base
@@ -166,7 +163,9 @@ ctl:build-release-postgres:
     - apt-get install git-secret build-essential crossbuild-essential-$DEBIAN_ARCH -y
     - apt-get build-dep -a $DEBIAN_ARCH . -y
     # download namib frontend
+    - cd namib_controller
     - ./scripts/download_namib_frontend.sh
+    - cd ..
     # decrypt ca secret
     - gpg --import $GPG_PRIVATE_KEY
     - cd ..
@@ -190,25 +189,27 @@ ctl:build-release-postgres:
     paths:
       - output
 
-ctl:build-release-debian-amd64:
+# TODO lets ignore debian for now until the basic build procedure works.
+.ctl:build-release-debian-amd64:
   extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: amd64
     RUST_TRIPLE: x86_64-unknown-linux-gnu
 
-ctl:build-release-debian-arm64:
+.ctl:build-release-debian-arm64:
   extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: arm64
     RUST_TRIPLE: aarch64-unknown-linux-gnu
 
-ctl:build-release-debian-armhf:
+.ctl:build-release-debian-armhf:
   extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: armhf
     RUST_TRIPLE: armv7-unknown-linux-gnueabihf
 
-ctl:publish-github:
+# TODO migrate to new monorepo on GitHub
+.ctl:publish-github:
   extends: .ctl:job_base
   image: alpine:3
   stage: gh-release
@@ -227,7 +228,8 @@ ctl:publish-github:
   script:
     - gh release create $CI_COMMIT_TAG output/namib-mud-controller*.deb -R namib-project/namib_mud_controller
 
-ctl:create-docker:
+# TODO get basic builds running first
+.ctl:create-docker:
   extends: .ctl:job_base
   stage: docker
   needs:
@@ -246,7 +248,8 @@ ctl:create-docker:
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
 
-ctl:create-docker-postgres:
+# TODO get basic builds running first
+.ctl:create-docker-postgres:
   extends: .ctl:job_base
   stage: docker
   needs:
