@@ -223,7 +223,7 @@ pub fn get_users_config(
                 message: "Key not found".to_string(),
             }
             .fail()
-        },
+        }
     };
 
     Ok(Json(UserConfigDto {

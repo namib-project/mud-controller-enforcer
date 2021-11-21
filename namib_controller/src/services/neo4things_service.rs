@@ -49,7 +49,7 @@ pub async fn add_device(id: i64, device: Device) {
             Err(e) => {
                 warn!("Error while adding thing {:?}", e);
                 Err(backoff::Error::Transient(e))
-            },
+            }
         }
     })
     .await

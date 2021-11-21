@@ -4,7 +4,7 @@ use dispose::{Disposable, Dispose};
 use dotenv::dotenv;
 use futures::executor::block_on;
 use log::{debug, info};
-use namib_mud_controller::{
+use namib_controller::{
     app::{ControllerAppBuilder, ControllerAppWrapper},
     auth::initialize_jwt_secret,
     db::DbConnection,

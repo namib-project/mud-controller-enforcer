@@ -5,7 +5,7 @@ use lib::{
     assert_post_status_deserialize,
 };
 use log::info;
-use namib_mud_controller::{
+use namib_controller::{
     auth::AuthToken,
     models::Role,
     routes::dtos::{

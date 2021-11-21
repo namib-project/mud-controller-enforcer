@@ -1,5 +1,5 @@
 mod lib;
-use namib_mud_controller::{
+use namib_controller::{
     models::Config,
     services::{config_service, config_service::ConfigKeys, firewall_configuration_service},
 };

@@ -123,7 +123,7 @@ async fn extract_auth_from_request(conn: &DbConnection, request: &HttpRequest) -
 impl FromRequest for AuthToken {
     type Config = ();
     type Error = actix_web::Error;
-    type Future = Pin<Box<dyn Future<Output=std::result::Result<Self, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = std::result::Result<Self, Self::Error>>>>;
 
     /// Middleware for Auth struct extraction from "Authorization: Bearer {}" header.
     /// (Header => Token => Auth)
@@ -138,7 +138,7 @@ impl FromRequest for AuthToken {
                 Some(auth) => {
                     user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
                     Ok(auth)
-                },
+                }
                 None => Err(ErrorUnauthorized("Unauthorized")),
             }
         })
@@ -156,7 +156,7 @@ pub async fn initialize_jwt_secret(conn: &DbConnection) -> Result<()> {
             thread_rng().fill_bytes(&mut jwt_secret);
             set_config_value("jwt_secret", base64::encode(&jwt_secret), &conn).await?;
             Ok(())
-        },
+        }
         x => x.map(|_v| ()),
     }
 }

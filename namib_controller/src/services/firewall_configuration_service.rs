@@ -49,7 +49,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
                 rules: result,
                 collect_data: device.collect_info,
             }
-        },
+        }
     };
 
     let merged_acls = if mud_data.acl_override.is_empty() {

@@ -12,7 +12,7 @@ const SEARCH_TIMEOUT: Duration = Duration::from_secs(10);
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(3);
 const ADDRESS_TIMEOUT: Duration = Duration::from_secs(3);
 
-pub fn discover_controllers(reg_type: &str) -> impl Stream<Item=Result<ScopedSocketAddr>> {
+pub fn discover_controllers(reg_type: &str) -> impl Stream<Item = Result<ScopedSocketAddr>> {
     async_dnssd::browse(reg_type)
         .timeout(SEARCH_TIMEOUT)
         .try_filter_map(|service| {

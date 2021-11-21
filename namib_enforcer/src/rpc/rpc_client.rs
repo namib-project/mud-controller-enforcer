@@ -80,10 +80,10 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                             enf.client = new_client;
                             enf.addr = addr;
                         }
-                    },
+                    }
                     _ => {
                         error!("Error during heartbeat: {:?}", error);
-                    },
+                    }
                 },
                 Ok(Some(config)) => {
                     debug!("Received new config {:?}", config);
@@ -96,7 +96,7 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
                     // Apply new config and notify firewall service.
                     enforcer.write().await.apply_new_config(config).await;
                     fw_service.notify_firewall_change();
-                },
+                }
                 Ok(None) => debug!("Heartbeat OK!"),
             }
         }

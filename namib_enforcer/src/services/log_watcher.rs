@@ -48,8 +48,8 @@ pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
                     if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
                         debug!("failed to process file {:?}", e);
                     }
-                },
-                Ok(_) => {},
+                }
+                Ok(_) => {}
                 Err(e) => warn!("watch error: {:?}", e),
             }
         }
@@ -72,7 +72,7 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
 
 async fn handle_log_lines(
     enforcer: &RwLock<Enforcer>,
-    lines: impl Iterator<Item=io::Result<String>>,
+    lines: impl Iterator<Item = io::Result<String>>,
 ) -> io::Result<()> {
     let enforcer = enforcer.read().await;
     let ips_to_filter = enforcer

@@ -75,12 +75,12 @@ pub async fn fetch_mud(url: &str) -> Result<String> {
             match result {
                 CoderResult::InputEmpty => {
                     break;
-                },
+                }
                 CoderResult::OutputFull => {
                     output.push_str(&buffer[..bytes_in_buffer]);
                     bytes_in_buffer = 0usize;
                     continue;
-                },
+                }
             }
         }
     }
@@ -93,10 +93,10 @@ pub async fn fetch_mud(url: &str) -> Result<String> {
         match result {
             CoderResult::InputEmpty => {
                 break;
-            },
+            }
             CoderResult::OutputFull => {
                 continue;
-            },
+            }
         }
     }
     Ok(output)

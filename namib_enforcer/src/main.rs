@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
         Err(err) => {
             warn!("Error while reading config state file: {:?}", err);
             None
-        },
+        }
     };
 
     // Restore enforcer config if persisted file could be restored, otherwise wait for the enforcer
@@ -133,7 +133,7 @@ async fn main() -> Result<()> {
         None => {
             let (client, addr) = rpc::rpc_client::run().await?;
             Arc::new(RwLock::new(Enforcer { client, addr, config }))
-        },
+        }
         Some(e) => e,
     };
 

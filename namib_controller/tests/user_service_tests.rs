@@ -1,6 +1,6 @@
 mod lib;
 
-use namib_mud_controller::{error::Result, models::User, services::user_service};
+use namib_controller::{error::Result, models::User, services::user_service};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_creating_admin_user() -> Result<()> {
