@@ -4,7 +4,7 @@
     changes:
       - "namib_controller/**/*"
   variables:
-    DATABASE_URL: sqlite:namib_controller/db.sqlite
+    DATABASE_URL: sqlite:/tmp/db.sqlite
   before_script:
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
