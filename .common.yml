@@ -1,0 +1,8 @@
+
+# Cache definition for the cargo package cache.
+# Pull only by default - the fetch-deps job will update the cache for each build.
+.pkg_cache: &pkg_cache
+  key: "pkgcache-$CI_COMMIT_REF_SLUG"
+  paths:
+    - .cargo/
+  policy: pull

@@ -2,16 +2,15 @@ include:
   - local: namib_controller/.gitlab-ci.yml
   - local: namib_enforcer/.gitlab-ci.yml
   - local: namib_shared/.gitlab-ci.yml
+  - local: .common.yml
 
 stages:
+  - prepare
   - build
   - test
-  - binary
-  - imagebuilder
+  - package
   - docs
   - release
-  - gh-release
-  - docker
 
 workflow:
   rules:
@@ -21,15 +20,21 @@ workflow:
 
 image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller:generic
 
-cache:
-  paths:
-    - .cargo/
-
 default:
   tags:
     - linux
     - docker
   # retry: 2
+
+fetch-deps:
+  stage: prepare
+  cache:
+    - key: !reference [.pkg_cache, key]
+      paths: !reference [.pkg_cache, paths]
+      policy: pull-push
+  script:
+    - cargo fetch --locked
+
 
 variables:
   KUBERNETES_CPU_REQUEST: 3
@@ -41,3 +46,5 @@ variables:
   KUBERNETES_SERVICE_MEMORY_REQUEST: 512Mi
   KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
   FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
+  FALLBACK_CACHE_KEY: "main"
+  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"

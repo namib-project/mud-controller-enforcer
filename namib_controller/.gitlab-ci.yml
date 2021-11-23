@@ -1,3 +1,6 @@
+include:
+  - local: //.common.yml
+
 # every job should (transitively) inherit from this job template
 .ctl:job_base:
   only:
@@ -5,6 +8,15 @@
       - "namib_controller/**/*"
   variables:
     DATABASE_URL: sqlite:/tmp/db.sqlite
+  cache:
+    - !reference [.pkg_cache]
+    - &ctl_cache
+      key: "ctl-native-$CI_COMMIT_REF_SLUG"
+      paths:
+        - target/*/deps/
+        - target/*/incremental/
+        - target/*/build/
+      policy: pull
   before_script:
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
@@ -17,6 +29,10 @@
 ctl:build:
   extends: .ctl:job_base
   stage: build
+  cache:
+    - !reference [.pkg_cache]
+    - <<: *ctl_cache
+      policy: pull-push
   script:
     - cargo build -p namib_controller
 
@@ -106,7 +122,7 @@ ctl:build-release-postgres:
 
 .ctl:build-release-base:
   extends: .ctl:job_base
-  stage: release
+  stage: package
   needs: []
   only:
     refs:

@@ -1,6 +1,31 @@
+include:
+  - local: /.common.yml
+
+.shd:job_base:
+  only:
+    changes:
+      - "namib_shared/**/*"
+  cache:
+    - !reference [.pkg_cache]
+    - &shared_cache
+      key: "shared-native-$CI_COMMIT_REF_SLUG"
+      paths:
+        - target/*/deps/
+        - target/*/incremental/
+        - target/*/build/
+      policy: pull
+
+  before_script:
+    - rustc --version
+    - cargo --version
+
 shd:build:
   extends: .shd:job_base
   stage: build
+  cache:
+    - !reference [.pkg_cache]
+    - <<: *shared_cache
+      policy: pull-push
   script:
     - cargo build -p namib_shared
 
@@ -21,7 +46,7 @@ shd:docs:
   extends: .shd:job_base
   stage: docs
   except:
-    - master
+    - main
   script:
     - cargo doc -p namib_shared --no-deps --target-dir target-doc-shared
   artifacts:
@@ -57,17 +82,3 @@ shd:pages:
     - git remote add api-origin https://gitlab-ci-token:${CI_PUSH_TOKEN}@gitlab.informatik.uni-bremen.de/${CI_PROJECT_PATH}
     - git tag $PACKAGE_VERSION
     - git push api-origin $PACKAGE_VERSION
-
-.shd:job_base:
-  only:
-    changes:
-      - "namib_shared/**/*"
-  before_script:
-    - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
-    - wget -o /dev/null https://github.com/mozilla/sccache/releases/download/v0.2.15/sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
-    - tar -xzf sccache-v0.2.15-x86_64-unknown-linux-musl.tar.gz
-    - chmod +x sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
-    - export RUSTC_WRAPPER=${CI_PROJECT_DIR}/sccache-v0.2.15-x86_64-unknown-linux-musl/sccache
-    - export SCCACHE_DIR=${CI_PROJECT_DIR}/.cargo/sccache
-    - rustc --version
-    - cargo --version
