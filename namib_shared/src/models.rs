@@ -159,7 +159,7 @@ impl DhcpLeaseInformation {
     pub fn duid(&self) -> Option<&Duid> {
         match &self.version_specific_information {
             DhcpLeaseVersionSpecificInformation::V6(info) => Some(&info.duid),
-            _ => None,
+            DhcpLeaseVersionSpecificInformation::V4(_) => None,
         }
     }
 }
