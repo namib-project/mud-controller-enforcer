@@ -29,7 +29,7 @@ default:
   tags:
     - linux
     - docker
-  retry: 2
+  # retry: 2
 
 variables:
   KUBERNETES_CPU_REQUEST: 3

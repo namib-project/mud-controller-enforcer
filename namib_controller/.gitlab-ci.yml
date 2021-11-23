@@ -11,7 +11,6 @@
     - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
     - rustc --version
     - cargo --version
-    - cargo install --git https://github.com/launchbadge/sqlx sqlx-cli # TODO move to build image
     - export PATH=$PATH:$CARGO_HOME/bin
     - ./namib_controller/scripts/recreate_db.sh
 
