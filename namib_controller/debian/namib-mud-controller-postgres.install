@@ -1,4 +1,4 @@
-install-postgres/*/release/namib_mud_controller /usr/bin
+install-postgres/*/release/namib_controller /usr/bin
 certs /etc/namib
 static /usr/share/namib
 debian/config /etc/namib

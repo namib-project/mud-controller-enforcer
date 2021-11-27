@@ -8,7 +8,7 @@ include:
       - "namib_controller/**/*"
   variables:
     DATABASE_URL: sqlite:/tmp/db.sqlite
-  cache:
+  cache: &job_base_cache_settings
     - !reference [.pkg_cache]
     - &ctl_cache
       key: "ctl-native-$CI_COMMIT_REF_SLUG"
@@ -17,7 +17,7 @@ include:
         - target/*/incremental/
         - target/*/build/
       policy: pull
-  before_script:
+  before_script: &ctl_before_script
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
     - export CARGO_HOME=${CI_PROJECT_DIR}/.cargo
@@ -149,7 +149,7 @@ ctl:build-release-postgres:
 
 .ctl:build-release-debian:
   extends: .ctl:job_base
-  stage: release
+  stage: package
   needs: []
   only:
     refs:
@@ -160,39 +160,37 @@ ctl:build-release-postgres:
   cache:
     key: "build-release"
   variables:
-    MIGRATION_DIRECTORY: migrations/postgres
+    MIGRATION_DIRECTORY: namib_controller/migrations/postgres
     POSTGRES_USER: namib
     POSTGRES_PASSWORD: namib
     DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/debian_pkgbuild:bullseye-$DEBIAN_ARCH
+  before_script:
+    - *ctl_before_script
+    - cd namib_controller
+    - apt-get update && apt-get build-dep -a $DEBIAN_ARCH . -y
+    - cd ..
+    - cargo sqlx prepare -- --no-default-features --features postgres -p namib_controller --lib
+    - mv sqlx-data.json namib_controller/debian/sqlx-data.postgres.json
+    - export DATABASE_URL=sqlite:/tmp/db.sqlite
+    - export MIGRATION_DIRECTORY=namib_controller/migrations/sqlite
+    - ./namib_controller/scripts/recreate_db.sh
+    - cargo sqlx prepare -- -p namib_controller --lib
+    - mv sqlx-data.json namib_controller/debian/sqlx-data.sqlite.json
   script:
-    - rustup target add $RUST_TRIPLE
-    - cargo sqlx prepare -- --no-default-features --features postgres --lib
-    - mv sqlx-data.json debian/sqlx-data.postgres.json
-    - export DATABASE_URL=sqlite:db.sqlite
-    - export MIGRATION_DIRECTORY=migrations/sqlite
-    - ./scripts/recreate_db.sh
-    - cargo sqlx prepare -- --lib
-    - mv sqlx-data.json debian/sqlx-data.sqlite.json
-    - dpkg --add-architecture $DEBIAN_ARCH
-    - apt-get update
-    - apt-get install git-secret build-essential crossbuild-essential-$DEBIAN_ARCH -y
-    - apt-get build-dep -a $DEBIAN_ARCH . -y
     # download namib frontend
     - cd namib_controller
     - ./scripts/download_namib_frontend.sh
     - cd ..
     # decrypt ca secret
     - gpg --import $GPG_PRIVATE_KEY
-    - cd ..
-    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
-    - git fetch origin && git checkout origin/master -f
     - git secret reveal
     - cd certs
     - ./gen_server_cert.sh namib-ca
     - cd ..
     - git secret hide
-    - mv Cargo.toml Cargo.toml.thisisnotaworkspace
-    - cd namib_mud_controller
+    # - mv Cargo.toml Cargo.toml.thisisnotaworkspace
+    - cd namib_controller
     - dpkg-buildpackage --no-pre-clean --no-post-clean --host-arch $DEBIAN_ARCH
     - mkdir output
     - mv ../namib-mud-controller*.deb output/
@@ -202,22 +200,21 @@ ctl:build-release-postgres:
     - mv ../namib-mud-controller*.dsc output/ || true
   artifacts:
     paths:
-      - output
+      - namib_controller/output
 
-# TODO lets ignore debian for now until the basic build procedure works.
-.ctl:build-release-debian-amd64:
+ctl:build-release-debian-amd64:
   extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: amd64
     RUST_TRIPLE: x86_64-unknown-linux-gnu
 
-.ctl:build-release-debian-arm64:
+ctl:build-release-debian-arm64:
   extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: arm64
     RUST_TRIPLE: aarch64-unknown-linux-gnu
 
-.ctl:build-release-debian-armhf:
+ctl:build-release-debian-armhf:
   extends: .ctl:build-release-debian
   variables:
     DEBIAN_ARCH: armhf
