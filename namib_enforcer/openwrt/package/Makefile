@@ -52,12 +52,12 @@ else ifeq ($(ARCH),x86_64)
 	TARGET_AR:=x86_64-openwrt-linux-musl-ar
 endif
 
-NAMIB_PATH:="$(PKG_BUILD_DIR)/namib_enforcer/target/$(RUST_TRIPLE)/release/namib_enforcer"
-NAMIB_HOOK_PATH:="$(PKG_BUILD_DIR)/namib_enforcer/target/$(RUST_TRIPLE)/release/namib_dnsmasq_hook"
+NAMIB_PATH:="$(PKG_BUILD_DIR)/target/$(RUST_TRIPLE)/release/namib_enforcer"
+NAMIB_HOOK_PATH:="$(PKG_BUILD_DIR)/target/$(RUST_TRIPLE)/release/namib_dnsmasq_hook"
 
 define Build/Compile
 	(\
-		cd $(PKG_BUILD_DIR)/namib_enforcer && \
+		cd $(PKG_BUILD_DIR) && \
 \
 		OPENSSL_DIR=$(STAGING_DIR)/usr/ \
 		OPENSSL_STATIC=1 \
@@ -69,7 +69,7 @@ define Build/Compile
 		PKG_CONFIG_ALLOW_CROSS=1 \
 		CROSS_COMPILE=$(CROSS_PREFIX) \
 \
-		cargo build --release --target $(RUST_TRIPLE) --features="dnsmasq_hook" --bin namib_enforcer --bin namib_dnsmasq_hook \
+		cargo build --release --target $(RUST_TRIPLE) --features="dnsmasq_hook" -p namib_enforcer --bin namib_enforcer --bin namib_dnsmasq_hook \
 	)
 endef
 

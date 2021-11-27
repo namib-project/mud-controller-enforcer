@@ -1,31 +1,32 @@
 enf:openwrt_package_x86_64_21.02:
   extends: .enf:openwrt_package_base
-  image: openwrtorg/sdk:x86_64-21.02.0
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-x86_64
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
 
 enf:openwrt_package_bcm2708_21.02: # raspberry v1
   extends: .enf:openwrt_package_base
-  image: openwrtorg/sdk:bcm27xx-bcm2708-21.02.0
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-bcm27xx-bcm2708
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
 
 enf:openwrt_package_bcm2710_21.02: # raspberry v3
   extends: .enf:openwrt_package_base
-  image: openwrtorg/sdk:bcm27xx-bcm2710-21.02.0
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-bcm27xx-bcm2710
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
 enf:openwrt_package_bcm2711_21.02: # raspberry v4
   extends: .enf:openwrt_package_base
-  image: openwrtorg/sdk:bcm27xx-bcm2711-21.02.0
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-bcm27xx-bcm2711
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
 .enf:openwrt_package_base:
-  stage: binary
+  stage: package
   dependencies: [ ]
   cache: { }
+  needs: [ ]
   only:
     refs:
       - main
@@ -36,16 +37,8 @@ enf:openwrt_package_bcm2711_21.02: # raspberry v4
     # setup https credentials
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
-    # install rust
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -t $RUST_TRIPLE
-    - source $HOME/.cargo/env
-    # install git-secret & build dependency for bindgen
-    - sudo apt-get update && sudo apt-get install -y clang libc6-dev-i386 git-secret --no-install-recommends
     # decrypt ca secret
     - gpg --import $GPG_PRIVATE_KEY
-    - cd ..
-    - git init && git remote add origin https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/controller-enforcer-metaproject.git
-    - git fetch origin && git checkout origin/master -f
     - git secret reveal
     - cd certs
     - ./gen_client_cert.sh namib-ca
@@ -53,11 +46,10 @@ enf:openwrt_package_bcm2711_21.02: # raspberry v4
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl nftables dnsmasq-full
-    - mv ${CI_PROJECT_DIR}/openwrt/package/config.diff .config
-    - mv ${CI_PROJECT_DIR}/openwrt/package/patches/* package/feeds/base/dnsmasq/patches/
-    - mv ${CI_PROJECT_DIR}/openwrt/package ./package/namib
-    - mkdir package/namib/src
-    - cp -r ${CI_PROJECT_DIR} package/namib/src/namib_enforcer
+    - mv ${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/config.diff .config
+    - mv ${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/patches/* package/feeds/base/dnsmasq/patches/
+    - mv ${CI_PROJECT_DIR}/namib_enforcer/openwrt/package ./package/namib
+    - ln -s ${CI_PROJECT_DIR} package/namib/src
     - make defconfig
     - make package/namib/compile -j8
     - make package/feeds/base/dnsmasq/compile -j8
