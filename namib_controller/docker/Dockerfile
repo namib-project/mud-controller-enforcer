@@ -12,18 +12,17 @@ ENV RUST_LOG=info,namib_mud_controller=debug \
 
 WORKDIR /namib
 
-RUN apt update \
-        && apt install -y avahi-daemon libavahi-compat-libdnssd1 libsqlite3-0 sqlite3 postgresql-client ca-certificates \
-        && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update \
+        && apt-get install -y avahi-daemon libavahi-compat-libdnssd1 libsqlite3-0 sqlite3 postgresql-client ca-certificates \
         && mkdir acme
 
-COPY ./docker/QuoVadis_Global_SSL_ICA_G3.crt /usr/local/share/ca-certificates/QuoVadis_Global_SSL_ICA_G3.crt
+COPY ./namib_controller/docker/QuoVadis_Global_SSL_ICA_G3.crt /usr/local/share/ca-certificates/QuoVadis_Global_SSL_ICA_G3.crt
 
 RUN update-ca-certificates
 
-COPY docker/run_mud_controller.sh db.sqlite* ./
-COPY ./install/bin/namib_mud_controller namib_mud_controller
-COPY ./certs certs
-COPY ./static static
+COPY ./namib_controller/docker/run_mud_controller.sh db.sqlite* ./
+COPY ./namib_controller/install/bin/namib_controller namib_controller
+COPY ./namib_controller/certs certs
+COPY ./namib_controller/static static
 
 CMD ["/namib/run_mud_controller.sh"]

@@ -34,8 +34,17 @@ ctl:build:
     - <<: *ctl_cache
       policy: pull-push
   script:
-    - cargo build -p namib_controller
+    - if [ -z "$CI_COMMIT_TAG" ]; then cargo build -p namib_controller --release; else cargo build -p namib_controller; fi
 
+ctl:build-postgres:
+  extends: .ctl:job_base
+  stage: build
+#  cache:
+#    - !reference [.pkg_cache]
+#    - <<: *ctl_cache
+#      policy: pull-push
+  script:
+    - if [ -z "$CI_COMMIT_TAG" ]; then cargo build -p namib_controller --release; else cargo build -p namib_controller; fi
 ctl:test:
   extends: .ctl:job_base
   stage: test
@@ -115,7 +124,7 @@ ctl:build-release-postgres:
     - postgres
   variables:
     FEATURES: "--no-default-features --features postgres"
-    MIGRATION_DIRECTORY: migrations/postgres
+    MIGRATION_DIRECTORY: namib_controller/migrations/postgres
     POSTGRES_USER: namib
     POSTGRES_PASSWORD: namib
     DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
@@ -130,7 +139,7 @@ ctl:build-release-postgres:
   cache:
     key: "build-release"
   script:
-    - cargo install -p namib_controller --root ./namib_controller/install --path . $FEATURES
+    - cargo install --path namib_controller --bin namib_controller --root ./namib_controller/install $FEATURES
     # download namib frontend
     - cd namib_controller
     - ./scripts/download_namib_frontend.sh
@@ -240,10 +249,12 @@ ctl:build-release-debian-armhf:
   script:
     - gh release create $CI_COMMIT_TAG output/namib-mud-controller*.deb -R namib-project/namib_mud_controller
 
-# TODO get basic builds running first
-.ctl:create-docker:
+ctl:controller-docker:
   extends: .ctl:job_base
-  stage: docker
+  tags:
+    - docker
+    - privileged
+  stage: package
   needs:
     - ctl:build-release
     - !reference [.ctl_test_stage]
@@ -258,12 +269,14 @@ ctl:build-release-debian-armhf:
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:latest
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/namib_controller/docker/Dockerfile --whitelist-var-run=false --destination $CI_REGISTRY_IMAGE/controller:latest
 
-# TODO get basic builds running first
-.ctl:create-docker-postgres:
+ctl:controller-docker-postgres:
   extends: .ctl:job_base
-  stage: docker
+  tags:
+    - docker
+    - privileged
+  stage: package
   needs:
     - ctl:build-release-postgres
     - !reference [.ctl_test_stage]
@@ -278,4 +291,4 @@ ctl:build-release-debian-armhf:
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/Dockerfile --destination $CI_REGISTRY_IMAGE:postgres
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --whitelist-var-run=false --dockerfile $CI_PROJECT_DIR/namib_controller/docker/Dockerfile --destination $CI_REGISTRY_IMAGE/controller:postgres

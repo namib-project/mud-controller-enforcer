@@ -1,10 +1,10 @@
-enf:build_image_x86_64_21.02:
+enf:openwrt-image-x86_64_21.02:
   extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:x86-64-21.02.0 # - statt _ wie im sdk...
   needs:
     - enf:openwrt_package_x86_64_21.02
 
-enf:build_image_bcm2708_21.02:
+enf:openwrt-image-bcm2708_21.02:
   extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:bcm27xx-bcm2708-21.02.0 # rpi 1
   needs:
@@ -12,7 +12,7 @@ enf:build_image_bcm2708_21.02:
   variables:
     PROFILE: rpi
 
-enf:build_image_bcm2710_21.02:
+enf:openwrt-image-bcm2710_21.02:
   extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:bcm27xx-bcm2710-21.02.0 # rpi 3
   needs:
@@ -20,7 +20,7 @@ enf:build_image_bcm2710_21.02:
   variables:
     PROFILE: rpi-3
 
-enf:build_image_bcm2711_21.02:
+enf:openwrt-image-bcm2711_21.02:
   extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:bcm27xx-bcm2711-21.02.0 # rpi 4
   needs:
@@ -29,13 +29,13 @@ enf:build_image_bcm2711_21.02:
     PROFILE: rpi-4
 
 .enf:openwrt_image_base:
-  stage: imagebuilder
+  stage: package
   before_script: []
   only:
-    - master
+    - main
   script:
     - cd /home/build/openwrt
-    - cp -r ${CI_PROJECT_DIR}/openwrt/image/files files
+    - cp -r ${CI_PROJECT_DIR}/namib_enforcer/openwrt/image/files files
     # copy the IPKs created by the needed build jobs
     - mkdir -p packages
     - cp ${CI_PROJECT_DIR}/output/dnsmasq-full_*.ipk packages/
@@ -46,30 +46,31 @@ enf:build_image_bcm2711_21.02:
     - make image PROFILE=$PROFILE PACKAGES="dnsmasq-full namib luci nano -dnsmasq -odhcpd-ipv6only $EXTRA_PACKAGES" FILES=files
     - mkdir ${CI_PROJECT_DIR}/image
     # x86 puts it under bin, bcm under build_dir ...
-    - cp bin/targets/*/*/openwrt-*-combined-*.img.gz ${CI_PROJECT_DIR}/image || true
-    - cp build_dir/target-*/linux-*/tmp/openwrt-*-factory.img.gz ${CI_PROJECT_DIR}/image || true
-    - cp -r build_dir/target-x86_64_musl/root-x86 ${CI_PROJECT_DIR}/rootfs || true
+    - mv bin/targets/*/*/openwrt-*-combined-*.img.gz ${CI_PROJECT_DIR}/image || true
+    - mv build_dir/target-*/linux-*/tmp/openwrt-*-factory.img.gz ${CI_PROJECT_DIR}/image || true
+    - mv build_dir/target-x86_64_musl/root-x86 ${CI_PROJECT_DIR}/rootfs || true
   artifacts:
     paths:
       - image
       - rootfs
 
-enf:build_openwrt_docker:
-  stage: docker
-  image: docker:19.03.12
+enf:openwrt-docker:
+  stage: package
   only:
     refs:
       - main
     changes:
-      - "namib_enforcer/**/*"  
+      - "namib_enforcer/**/*"
   tags:
-    - namib
+    - docker
     - privileged
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
   needs:
-    - enf:build_image_x86_64_21.02
+    - enf:openwrt_package_x86_64_21.02
   before_script: [ ]
   script:
-    - mkdir -p ~/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"namib_enforcer\",\"password\":\"$CI_DEPLOY_TOKEN\"}}}" > ~/.docker/config.json
-    - docker build . -f openwrt/image/Dockerfile -t gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
-    - docker push gitlab.informatik.uni-bremen.de:5005/namib/mud-controller-enforcer/namib_enforcer
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/namib_enforcer/openwrt/image/Dockerfile --whitelist-var-run=false --destination "$CI_REGISTRY_IMAGE/enforcer:latest"

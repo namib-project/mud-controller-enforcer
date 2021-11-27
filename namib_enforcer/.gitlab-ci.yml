@@ -1,8 +1,7 @@
 include:
   - local: namib_enforcer/openwrt/package/.gitlab-ci.yml
   - local: ///.common.yml
-# TODO Get other builds running first.
-#  - local: namib_enforcer/openwrt/image/.gitlab-ci.yml
+  - local: namib_enforcer/openwrt/image/.gitlab-ci.yml
 
 # every job should (transitively) inherit from this job template
 .enf:job_base:

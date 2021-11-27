@@ -1,11 +1,16 @@
-FROM scratch
+FROM openwrtorg/rootfs:x86_64-21.02.0
 
-ADD rootfs/ /
-ADD openwrt/image/network /etc/config/network
-ADD openwrt/image/50_load_iptables /lib/preinit/50_load_iptables
-ADD openwrt/image/inittab /etc/inittab
-USER root
+ADD output/ /tmp/
 
-RUN mkdir /var/lock && /etc/init.d/sysntpd disable
+RUN mkdir -p /var/lock && \
+    opkg update && \
+    opkg remove dnsmasq odhcpd-ipv6only && \
+    opkg install /tmp/dnsmasq-full_*.ipk && \
+    opkg install /tmp/namib_*.ipk && \
+    rm -rf /tmp/*
 
-CMD ["/sbin/init"]
+ADD namib_enforcer/openwrt/image/network /etc/config/network
+ADD namib_enforcer/openwrt/image/50_load_iptables /lib/preinit/50_load_iptables
+ADD namib_enforcer/openwrt/image/inittab /etc/inittab
+
+RUN mkdir -p /var/lock && /etc/init.d/sysntpd disable
