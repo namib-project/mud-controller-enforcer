@@ -38,7 +38,11 @@ shd:test:
   needs:
     - shd:build
   script:
-    - cargo test -p namib_shared
+    - cargo test -p namib_shared -- -Z unstable-options --format json --report-time | tee results.json
+    - cat results.json | cargo2junit > target/shared-test-results.xml
+  artifacts:
+    reports:
+      junit: target/shared-test-results.xml
   allow_failure: true
 
 shd:warnings:
@@ -48,6 +52,11 @@ shd:warnings:
     - shd:build
   script:
     - cargo clippy -p namib_shared -- -D warnings
+  after_script:
+    - cargo clippy -p namib_shared --message-format=json | gitlab-clippy > target/shared-code-quality.json
+  artifacts:
+    reports:
+      codequality: target/shared-code-quality.json
   allow_failure: true
 
 shd:formatting:

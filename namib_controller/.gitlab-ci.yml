@@ -62,7 +62,7 @@ ctl:build_postgres:
   artifacts:
     paths:
       - "target/*/namib_controller"
-    
+
 
 .ctl:test_stage_job_base:
   extends: .ctl:job_base
@@ -84,17 +84,30 @@ ctl:build_postgres:
 ctl:test:
   extends: .ctl:test_stage_job_base
   script:
-    - cargo test -p namib_controller
+    - cargo test -p namib_controller -- -Z unstable-options --format json --report-time | tee results.json
+    - cat results.json | cargo2junit > target/controller-test-results.xml
+  artifacts:
+    reports:
+      junit: target/controller-test-results.xml
 
 ctl:test_postgres:
   extends: .ctl:test_stage_job_base_postgres
   script:
-    - cargo test -p namib_controller --no-default-features --features postgres
+    - cargo test -p namib_controller --no-default-features --features postgres -- -Z unstable-options --format json --report-time | tee results.json
+    - cat results.json | cargo2junit > target/controller-test-results_postgres.xml
+  artifacts:
+    reports:
+      junit: target/controller-test-results_postgres.xml
 
 ctl:warnings:
   extends: .ctl:test_stage_job_base
   script:
     - cargo clippy -p namib_controller -- -D warnings
+  after_script:
+    - cargo clippy -p namib_controller --message-format=json | gitlab-clippy > target/controller-code-quality.json
+  artifacts:
+    reports:
+      codequality: target/controller-code-quality.json
   allow_failure: true
 
 ctl:formatting:

@@ -51,12 +51,21 @@ enf:build:
 enf:test:
   extends: .enf:test_stage_job_base
   script:
-    - cargo test -p namib_enforcer --features dnsmasq_hook
+    - cargo test -p namib_enforcer --features dnsmasq_hook -- -Z unstable-options --format json --report-time | tee results.json
+    - cat results.json | cargo2junit > target/enforcer-test-results.xml
+  artifacts:
+    reports:
+      junit: target/enforcer-test-results.xml
 
 enf:warnings:
   extends: .enf:test_stage_job_base
   script:
     - cargo clippy -p namib_enforcer -- -D warnings
+  after_script:
+    - cargo clippy -p namib_enforcer --message-format=json | gitlab-clippy > target/enforcer-code-quality.json
+  artifacts:
+    reports:
+      codequality: target/enforcer-code-quality.json
   allow_failure: true
 
 enf:formatting:
