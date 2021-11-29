@@ -5,9 +5,12 @@ include:
 
 # every job should (transitively) inherit from this job template
 .enf:job_base:
-  only:
-    changes:
-      - "namib_enforcer/**/*"
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - &on_enforcer_change changes: ["namib_enforcer/**/*"]
+    - when: manual
+      allow_failure: true
   cache:
     - !reference [.pkg_cache]
     - &enf_cache
@@ -39,53 +42,27 @@ enf:build:
       - target/*/namib_dnsmasq_hook
     expire_in: 7 days
 
-enf:test:
+.enf:test_stage_job_base:
   extends: .enf:job_base
   stage: test
+  needs:
+    - enf:build
+
+enf:test:
+  extends: .enf:test_stage_job_base
   script:
     - cargo test -p namib_enforcer --features dnsmasq_hook
 
 enf:warnings:
-  extends: .enf:job_base
-  stage: test
+  extends: .enf:test_stage_job_base
   script:
     - cargo clippy -p namib_enforcer -- -D warnings
   allow_failure: true
 
 enf:formatting:
-  extends: .enf:job_base
-  stage: test
+  extends: .enf:test_stage_job_base
   script:
     - cargo fmt -p namib_enforcer -- --check
-
-enf:docs:
-  extends: .enf:job_base
-  stage: docs
-  needs:
-    - enf:build
-  except:
-    - main
-  script:
-    - cargo doc -p namib_enforcer --no-deps --target-dir target-doc-enf
-  artifacts:
-    paths:
-      - target-doc-enf/doc
-    expire_in: 7 days
-
-enf:pages:
-  extends: .enf:job_base
-  stage: docs
-  only:
-    refs:
-      - main
-  script:
-    - cargo doc -p namib_enforcer --no-deps --target-dir target-doc-enf
-    - mv target-doc-enf/doc public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_enforcer/index.html">' > public/index.html
-  artifacts:
-    paths:
-      - public
-    expire_in: 7 days
 
 # TODO migrate to new monorepo on GitHub
 .enf:publish-github:

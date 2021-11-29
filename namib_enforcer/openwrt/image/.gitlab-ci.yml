@@ -1,3 +1,6 @@
+include:
+  - local: /////.common.yml
+
 enf:openwrt-image-x86_64_21.02:
   extends: .enf:openwrt_image_base
   image: openwrtorg/imagebuilder:x86-64-21.02.0 # - statt _ wie im sdk...
@@ -29,10 +32,12 @@ enf:openwrt-image-bcm2711_21.02:
     PROFILE: rpi-4
 
 .enf:openwrt_image_base:
-  stage: package
-  before_script: []
-  only:
-    - main
+  stage: image
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
   script:
     - cd /home/build/openwrt
     - cp -r ${CI_PROJECT_DIR}/namib_enforcer/openwrt/image/files files
@@ -55,21 +60,17 @@ enf:openwrt-image-bcm2711_21.02:
       - rootfs
 
 enf:openwrt-docker:
-  stage: package
-  only:
-    refs:
-      - main
-    changes:
-      - "namib_enforcer/**/*"
+  stage: image
   tags:
     - docker
     - privileged
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [ "" ]
+  rules:
+    - !reference [.on_default_branch]
   needs:
     - enf:openwrt_package_x86_64_21.02
-  before_script: [ ]
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json

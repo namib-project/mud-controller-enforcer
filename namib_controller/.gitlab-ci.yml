@@ -3,11 +3,12 @@ include:
 
 # every job should (transitively) inherit from this job template
 .ctl:job_base:
-  only:
-    changes:
-      - "namib_controller/**/*"
-  variables:
-    DATABASE_URL: sqlite:/tmp/db.sqlite
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - &on_controller_change changes: [ "namib_controller/**/*" ]
+    - when: manual
+      allow_failure: true
   cache: &job_base_cache_settings
     - !reference [.pkg_cache]
     - &ctl_cache
@@ -17,6 +18,8 @@ include:
         - target/*/incremental/
         - target/*/build/
       policy: pull
+  variables:
+    DATABASE_URL: sqlite:/tmp/db.sqlite
   before_script: &ctl_before_script
     - git config --global credential.helper store
     - echo "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.informatik.uni-bremen.de" > ~/.git-credentials
@@ -25,6 +28,13 @@ include:
     - cargo --version
     - export PATH=$PATH:$CARGO_HOME/bin
     - ./namib_controller/scripts/recreate_db.sh
+
+.postgres_vars: &ctl_postgres_vars
+  MIGRATION_DIRECTORY: namib_controller/migrations/postgres
+  POSTGRES_USER: namib
+  POSTGRES_PASSWORD: namib
+  DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+
 
 ctl:build:
   extends: .ctl:job_base
@@ -39,105 +49,59 @@ ctl:build:
 ctl:build-postgres:
   extends: .ctl:job_base
   stage: build
-#  cache:
-#    - !reference [.pkg_cache]
-#    - <<: *ctl_cache
-#      policy: pull-push
+  cache:
+    - <<: *ctl_cache
+      key: "ctl-postgres-native-$CI_COMMIT_REF_SLUG"
+      policy: pull-push
   script:
     - if [ -z "$CI_COMMIT_TAG" ]; then cargo build -p namib_controller --release; else cargo build -p namib_controller; fi
-ctl:test:
+
+.ctl:test_stage_job_base:
   extends: .ctl:job_base
   stage: test
+  needs:
+    - job: ctl:build
+      artifacts: false
+
+.ctl:test_stage_job_base_postgres:
+  extends: .ctl:test_stage_job_base
+  cache:
+    - <<: *ctl_cache
+      key: "ctl-postgres-native-$CI_COMMIT_REF_SLUG"
+  services:
+    - postgres
+  variables:
+    <<: *ctl_postgres_vars
+
+ctl:test:
+  extends: .ctl:test_stage_job_base
   script:
     - cargo test -p namib_controller
 
 ctl:test-postgres:
-  extends: .ctl:job_base
-  stage: test
-  services:
-    - postgres
-  variables:
-    MIGRATION_DIRECTORY: namib_controller/migrations/postgres
-    POSTGRES_USER: namib
-    POSTGRES_PASSWORD: namib
-    DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
+  extends: .ctl:test_stage_job_base_postgres
   script:
     - cargo test -p namib_controller --no-default-features --features postgres
 
 ctl:warnings:
-  extends: .ctl:job_base
-  stage: test
+  extends: .ctl:test_stage_job_base
   script:
     - cargo clippy -p namib_controller -- -D warnings
-  retry: 0
   allow_failure: true
 
 ctl:formatting:
-  extends: .ctl:job_base
-  stage: test
+  extends: .ctl:test_stage_job_base
   script:
     - cargo fmt -p namib_controller -- --check
-
-.ctl_test_stage:
-  - ctl:test
-  - ctl:test-postgres
-  - ctl:formatting
-
-ctl:docs:
-  extends: .ctl:job_base
-  stage: docs
-  needs:
-    - ctl:build
-  except:
-    - main
-  script:
-    - cargo doc -p namib_controller --no-deps --target-dir target-doc-ctrl
-  artifacts:
-    paths:
-      - target-doc-ctrl/doc
-    expire_in: 7 days
-
-ctl:pages:
-  extends: .ctl:job_base
-  stage: docs
-  needs: !reference [.ctl_test_stage]
-  only:
-    refs:
-      - main
-  script:
-    - cargo doc -p namib_controller --no-deps --target-dir target-doc-ctrl
-    - mv target-doc-ctrl/doc public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_mud_controller/index.html">' > public/index.html
-  artifacts:
-    paths:
-      - public
-    expire_in: 7 days
-
-ctl:build-release:
-  extends: .ctl:build-release-base
-  variables:
-    FEATURES: ""
-
-ctl:build-release-postgres:
-  extends: .ctl:build-release-base
-  services:
-    - postgres
-  variables:
-    FEATURES: "--no-default-features --features postgres"
-    MIGRATION_DIRECTORY: namib_controller/migrations/postgres
-    POSTGRES_USER: namib
-    POSTGRES_PASSWORD: namib
-    DATABASE_URL: postgres://namib:namib@postgres/namib_mud_controller
 
 .ctl:build-release-base:
   extends: .ctl:job_base
   stage: package
-  needs: []
-  only:
-    refs:
-      - main
-  cache:
-    key: "build-release"
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
   script:
     - cargo install --path namib_controller --bin namib_controller --root ./namib_controller/install $FEATURES
     # download namib frontend
@@ -156,14 +120,38 @@ ctl:build-release-postgres:
       - namib_controller/static
       - namib_controller/db.sqlite
 
+ctl:build-release:
+  extends: .ctl:build-release-base
+  needs:
+    - job: ctl:build
+      artifacts: false
+  variables:
+    FEATURES: ""
+
+ctl:build-release-postgres:
+  extends: .ctl:build-release-base
+  services:
+    - postgres
+  needs:
+    - job: ctl:build-postgres
+      artifacts: false
+  variables:
+    FEATURES: "--no-default-features --features postgres"
+    <<: *ctl_postgres_vars
+
 .ctl:build-release-debian:
   extends: .ctl:job_base
+  needs:
+    - job: ctl:build
+      artifacts: false
+    - job: ctl:build-postgres
+      artifacts: false
   stage: package
-  needs: []
-  only:
-    refs:
-      - main
-      - tags
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
   services:
     - postgres
   cache:
@@ -238,7 +226,6 @@ ctl:build-release-debian-armhf:
     - "ctl:build-release-debian-amd64"
     - "ctl:build-release-debian-arm64"
     - "ctl:build-release-debian-armhf"
-    - !reference [.ctl_test_stage]
   only:
     refs:
       - tags
@@ -249,46 +236,32 @@ ctl:build-release-debian-armhf:
   script:
     - gh release create $CI_COMMIT_TAG output/namib-mud-controller*.deb -R namib-project/namib_mud_controller
 
-ctl:controller-docker:
-  extends: .ctl:job_base
+.ctl:controller_docker_job_base:
+  stage: image
   tags:
     - docker
     - privileged
-  stage: package
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  rules:
+    - !reference [.on_default_branch]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/namib_controller/docker/Dockerfile --whitelist-var-run=false --destination $CI_REGISTRY_IMAGE/controller:$CTL_TAG
+
+
+ctl:controller-docker:
+  extends: .ctl:controller_docker_job_base
   needs:
     - ctl:build-release
-    - !reference [.ctl_test_stage]
-  cache: {}
-  image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [ "" ]
-  only:
-    refs:
-      - main
-  before_script: []
-  script:
-    - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/namib_controller/docker/Dockerfile --whitelist-var-run=false --destination $CI_REGISTRY_IMAGE/controller:latest
+  variables:
+    CTL_TAG: latest
 
 ctl:controller-docker-postgres:
-  extends: .ctl:job_base
-  tags:
-    - docker
-    - privileged
-  stage: package
+  extends: .ctl:controller_docker_job_base
   needs:
     - ctl:build-release-postgres
-    - !reference [.ctl_test_stage]
-  cache: {}
-  image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [ "" ]
-  only:
-    refs:
-      - main
-  before_script: []
-  script:
-    - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --whitelist-var-run=false --dockerfile $CI_PROJECT_DIR/namib_controller/docker/Dockerfile --destination $CI_REGISTRY_IMAGE/controller:postgres
+  variables:
+    CTL_TAG: postgres

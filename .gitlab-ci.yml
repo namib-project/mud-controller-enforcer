@@ -5,30 +5,66 @@ include:
   - local: .common.yml
 
 stages:
-  - prepare
   - build
   - test
   - package
+  - image
   - docs
   - release
 
+variables:
+  # Kubernetes Runner Resource Limiting
+  KUBERNETES_CPU_REQUEST: 4
+  #  KUBERNETES_CPU_LIMIT: 5
+  KUBERNETES_MEMORY_REQUEST: 4Gi
+  KUBERNETES_MEMORY_LIMIT: 4Gi
+  #  KUBERNETES_SERVICE_CPU_REQUEST: 400m
+  #  KUBERNETES_SERVICE_CPU_LIMIT: 400m
+  #  KUBERNETES_SERVICE_MEMORY_REQUEST: 1Gi
+  #  KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
+  # ---
+  # Cargo Settings
+  # Number of concurrent build threads to start.
+  # Note: Removing this value somehow causes jobs to randomly get stuck during compilation.
+  CARGO_BUILD_JOBS: 4
+  # Location of Cargo home. Needed for caching.
+  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"
+  # ---
+  # Fastzip
+  # Use faster cache and artifact compression method.
+  # Increases speed **drastically**, so don't remove it unless it causes issues.
+  FF_USE_FASTZIP: "true"
+  CACHE_COMPRESSION_LEVEL: fast
+  TRANSFER_METER_FREQUENCY: 5s
+
+# No longer create push pipeline if MR is created (avoiding duplicate pipelines).
+# See https://docs.gitlab.com/ee/ci/yaml/workflow.html#switch-between-branch-pipelines-and-merge-request-pipelines
 workflow:
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
       when: never
-    - when: always
+    - if: '$CI_COMMIT_BRANCH'
 
+# Default image for all builds is the generic controller project build image containing most
+# external dependencies, including rust, clippy, cargo, and C library dependencies.
+# Adding additional dependencies to this image (by opening a MR in the respective project)
+# is strongly preferred to installing dependencies in before_script.
 image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller:generic
 
 default:
+  # Use the shared linux Kubernetes cluster for most tasks.
   tags:
     - linux
     - docker
     - kubernetes
+  # We don't want to keep most artifacts around for longer.
+  artifacts:
+    expire_in: 1 week
   # retry: 2
 
 fetch-deps:
-  stage: prepare
+  stage: .pre
   cache:
     - key: !reference [.pkg_cache, key]
       paths: !reference [.pkg_cache, paths]
@@ -36,20 +72,28 @@ fetch-deps:
   script:
     - cargo fetch --locked
 
+docs:
+  stage: docs
+  rules:
+    - !reference [.on_default_branch]
+    - !reference [.on_tags]
+    - when: manual
+      allow_failure: true
+  script:
+    - cargo doc --workspace --no-deps
+  artifacts:
+    paths:
+      - target/doc
 
-variables:
-  KUBERNETES_CPU_REQUEST: 4
-  CARGO_BUILD_JOBS: 4
-#  KUBERNETES_CPU_LIMIT: 5
-  KUBERNETES_MEMORY_REQUEST: 4Gi
-  KUBERNETES_MEMORY_LIMIT: 4Gi
-#  KUBERNETES_SERVICE_CPU_REQUEST: 400m
-#  KUBERNETES_SERVICE_CPU_LIMIT: 400m
-#  KUBERNETES_SERVICE_MEMORY_REQUEST: 1Gi
-#  KUBERNETES_SERVICE_MEMORY_LIMIT: 1Gi
-#  FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY: "false"
-#  FALLBACK_CACHE_KEY: "main"
-  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"
-  FF_USE_FASTZIP: "true"
-  CACHE_COMPRESSION_LEVEL: fast
-  TRANSFER_METER_FREQUENCY: 5s
+pages:
+  stage: release
+  needs:
+    - docs
+  rules:
+    - !reference [.on_default_branch]
+  script:
+    - mv target/doc public
+    - echo '<meta http-equiv="refresh" content="0; url="namib_controller/index.html">' > public/index.html
+  artifacts:
+    paths:
+      - public

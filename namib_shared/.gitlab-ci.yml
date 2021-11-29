@@ -2,9 +2,8 @@ include:
   - local: /.common.yml
 
 .shd:job_base:
-  only:
-    changes:
-      - "namib_shared/**/*"
+  rules:
+    - changes: ["namib_shared/**/*"]
   cache:
     - !reference [.pkg_cache]
     - &shared_cache
@@ -29,9 +28,20 @@ shd:build:
   script:
     - cargo build -p namib_shared
 
+shd:test:
+  extends: .shd:job_base
+  stage: test
+  needs:
+    - shd:build
+  script:
+    - cargo test -p namib_shared
+  allow_failure: true
+
 shd:warnings:
   extends: .shd:job_base
   stage: test
+  needs:
+    - shd:build
   script:
     - cargo clippy -p namib_shared -- -D warnings
   allow_failure: true
@@ -39,46 +49,7 @@ shd:warnings:
 shd:formatting:
   extends: .shd:job_base
   stage: test
+  needs:
+    - shd:build
   script:
     - cargo fmt -p namib_shared -- --check
-
-shd:docs:
-  extends: .shd:job_base
-  stage: docs
-  except:
-    - main
-  script:
-    - cargo doc -p namib_shared --no-deps --target-dir target-doc-shared
-  artifacts:
-    paths:
-      - target-doc-shared/doc
-    expire_in: 7 days
-
-shd:pages:
-  extends: .shd:job_base
-  stage: docs
-  only:
-    refs:
-      - main
-  script:
-    - cargo doc -p namib_shared --no-deps --target-dir target-doc-shared
-    - mv target-doc-shared/doc public
-    - echo '<meta http-equiv="refresh" content="0; url=namib_shared/index.html">' > public/index.html
-  artifacts:
-    paths:
-      - public
-    expire_in: 7 days
-
-# TODO adjust for monorepo
-.shd:tag:
-  extends: .shd:job_base
-  stage: release
-  only:
-    refs:
-      - main
-  script:
-    - cargo generate-lockfile
-    - "export PACKAGE_VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)"
-    - git remote add api-origin https://gitlab-ci-token:${CI_PUSH_TOKEN}@gitlab.informatik.uni-bremen.de/${CI_PROJECT_PATH}
-    - git tag $PACKAGE_VERSION
-    - git push api-origin $PACKAGE_VERSION

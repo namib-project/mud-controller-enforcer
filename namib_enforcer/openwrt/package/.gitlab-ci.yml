@@ -1,3 +1,6 @@
+include:
+  - local: ////.common.yml
+
 enf:openwrt_package_x86_64_21.02:
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-x86_64
@@ -24,15 +27,13 @@ enf:openwrt_package_bcm2711_21.02: # raspberry v4
 
 .enf:openwrt_package_base:
   stage: package
-  dependencies: [ ]
-  cache: { }
-  needs: [ ]
-  only:
-    refs:
-      - main
-      - tags
-    changes:
-      - "namib_enforcer/**/*"  
+  needs:
+    - enf:build
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
   before_script:
     # setup https credentials
     - git config --global credential.helper store
