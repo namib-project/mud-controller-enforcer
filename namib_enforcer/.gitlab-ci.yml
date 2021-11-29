@@ -40,7 +40,7 @@ enf:build:
     paths:
       - target/*/namib_enforcer
       - target/*/namib_dnsmasq_hook
-    expire_in: 7 days
+
 
 .enf:test_stage_job_base:
   extends: .enf:job_base

@@ -45,6 +45,10 @@ ctl:build:
       policy: pull-push
   script:
     - if [ -z "$CI_COMMIT_TAG" ]; then cargo build -p namib_controller --release; else cargo build -p namib_controller; fi
+  artifacts:
+    paths:
+      - "target/*/namib_controller"
+
 
 ctl:build_postgres:
   extends: .ctl:job_base
@@ -55,6 +59,10 @@ ctl:build_postgres:
       policy: pull-push
   script:
     - if [ -z "$CI_COMMIT_TAG" ]; then cargo build -p namib_controller --release; else cargo build -p namib_controller; fi
+  artifacts:
+    paths:
+      - "target/*/namib_controller"
+    
 
 .ctl:test_stage_job_base:
   extends: .ctl:job_base
@@ -119,6 +127,7 @@ ctl:formatting:
       - namib_controller/certs
       - namib_controller/static
       - namib_controller/db.sqlite
+
 
 ctl:release-bundle:
   extends: .ctl:release-bundle_base
@@ -198,6 +207,7 @@ ctl:release-bundle_postgres:
   artifacts:
     paths:
       - namib_controller/output
+
 
 ctl:debian-package_amd64:
   extends: .ctl:debian-package

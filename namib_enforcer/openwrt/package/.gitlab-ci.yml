@@ -62,4 +62,5 @@ enf:openwrt-package_bcm2711_21.02: # raspberry v4
   artifacts:
     paths:
       - output
+
     when: always
