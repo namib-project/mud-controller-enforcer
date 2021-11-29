@@ -3,7 +3,11 @@ include:
 
 .shd:job_base:
   rules:
-    - changes: ["namib_shared/**/*"]
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - &on_enforcer_change changes: ["namib_shared/**/*"]
+    - when: manual
+      allow_failure: true
   cache:
     - !reference [.pkg_cache]
     - &shared_cache

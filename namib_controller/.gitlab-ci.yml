@@ -46,7 +46,7 @@ ctl:build:
   script:
     - if [ -z "$CI_COMMIT_TAG" ]; then cargo build -p namib_controller --release; else cargo build -p namib_controller; fi
 
-ctl:build-postgres:
+ctl:build_postgres:
   extends: .ctl:job_base
   stage: build
   cache:
@@ -78,7 +78,7 @@ ctl:test:
   script:
     - cargo test -p namib_controller
 
-ctl:test-postgres:
+ctl:test_postgres:
   extends: .ctl:test_stage_job_base_postgres
   script:
     - cargo test -p namib_controller --no-default-features --features postgres
@@ -94,7 +94,7 @@ ctl:formatting:
   script:
     - cargo fmt -p namib_controller -- --check
 
-.ctl:build-release-base:
+.ctl:release-bundle_base:
   extends: .ctl:job_base
   stage: package
   rules:
@@ -120,31 +120,31 @@ ctl:formatting:
       - namib_controller/static
       - namib_controller/db.sqlite
 
-ctl:build-release:
-  extends: .ctl:build-release-base
+ctl:release-bundle:
+  extends: .ctl:release-bundle_base
   needs:
     - job: ctl:build
       artifacts: false
   variables:
     FEATURES: ""
 
-ctl:build-release-postgres:
-  extends: .ctl:build-release-base
+ctl:release-bundle_postgres:
+  extends: .ctl:release-bundle_base
   services:
     - postgres
   needs:
-    - job: ctl:build-postgres
+    - job: ctl:build_postgres
       artifacts: false
   variables:
     FEATURES: "--no-default-features --features postgres"
     <<: *ctl_postgres_vars
 
-.ctl:build-release-debian:
+.ctl:debian-package:
   extends: .ctl:job_base
   needs:
     - job: ctl:build
       artifacts: false
-    - job: ctl:build-postgres
+    - job: ctl:build_postgres
       artifacts: false
   stage: package
   rules:
@@ -199,20 +199,20 @@ ctl:build-release-postgres:
     paths:
       - namib_controller/output
 
-ctl:build-release-debian-amd64:
-  extends: .ctl:build-release-debian
+ctl:debian-package_amd64:
+  extends: .ctl:debian-package
   variables:
     DEBIAN_ARCH: amd64
     RUST_TRIPLE: x86_64-unknown-linux-gnu
 
-ctl:build-release-debian-arm64:
-  extends: .ctl:build-release-debian
+ctl:debian-package_arm64:
+  extends: .ctl:debian-package
   variables:
     DEBIAN_ARCH: arm64
     RUST_TRIPLE: aarch64-unknown-linux-gnu
 
-ctl:build-release-debian-armhf:
-  extends: .ctl:build-release-debian
+ctl:debian-package_armhf:
+  extends: .ctl:debian-package
   variables:
     DEBIAN_ARCH: armhf
     RUST_TRIPLE: armv7-unknown-linux-gnueabihf
@@ -223,9 +223,9 @@ ctl:build-release-debian-armhf:
   image: alpine:3
   stage: gh-release
   needs:
-    - "ctl:build-release-debian-amd64"
-    - "ctl:build-release-debian-arm64"
-    - "ctl:build-release-debian-armhf"
+    - "ctl:debian-package_amd64"
+    - "ctl:debian-package_arm64"
+    - "ctl:debian-package_armhf"
   only:
     refs:
       - tags
@@ -255,13 +255,13 @@ ctl:build-release-debian-armhf:
 ctl:controller-docker:
   extends: .ctl:controller_docker_job_base
   needs:
-    - ctl:build-release
+    - ctl:release-bundle
   variables:
     CTL_TAG: latest
 
-ctl:controller-docker-postgres:
+ctl:controller-docker_postgres:
   extends: .ctl:controller_docker_job_base
   needs:
-    - ctl:build-release-postgres
+    - ctl:release-bundle_postgres
   variables:
     CTL_TAG: postgres

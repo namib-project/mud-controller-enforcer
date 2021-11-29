@@ -1,25 +1,25 @@
 include:
   - local: ////.common.yml
 
-enf:openwrt_package_x86_64_21.02:
+enf:openwrt-package_x86_64_21.02:
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-x86_64
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
 
-enf:openwrt_package_bcm2708_21.02: # raspberry v1
+enf:openwrt-package_bcm2708_21.02: # raspberry v1
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-bcm27xx-bcm2708
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
 
-enf:openwrt_package_bcm2710_21.02: # raspberry v3
+enf:openwrt-package_bcm2710_21.02: # raspberry v3
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-bcm27xx-bcm2710
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
-enf:openwrt_package_bcm2711_21.02: # raspberry v4
+enf:openwrt-package_bcm2711_21.02: # raspberry v4
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.0-bcm27xx-bcm2711
   variables:
