@@ -46,7 +46,8 @@ enf:build:
   extends: .enf:job_base
   stage: test
   needs:
-    - enf:build
+    - job: enf:build
+      artifacts: false
 
 enf:test:
   extends: .enf:test_stage_job_base
@@ -56,6 +57,23 @@ enf:test:
   artifacts:
     reports:
       junit: target/enforcer-test-results.xml
+
+
+shd:coverage:
+  extends: .enf:test_stage_job_base
+  stage: test
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
+  script:
+    - cargo tarpaulin -p namib_enforcer --features dnsmasq_hook --out Xml
+    - mv cobertura.xml target/enf-coverage.xml
+  artifacts:
+    reports:
+      cobertura: target/enf-coverage.xml
+  allow_failure: true
 
 enf:warnings:
   extends: .enf:test_stage_job_base

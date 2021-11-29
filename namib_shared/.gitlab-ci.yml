@@ -36,7 +36,8 @@ shd:test:
   extends: .shd:job_base
   stage: test
   needs:
-    - shd:build
+    - job: shd:build
+      artifacts: false
   script:
     - cargo test -p namib_shared -- -Z unstable-options --format json --report-time | tee results.json
     - cat results.json | cargo2junit > target/shared-test-results.xml
@@ -45,11 +46,31 @@ shd:test:
       junit: target/shared-test-results.xml
   allow_failure: true
 
+shd:coverage:
+  extends: .shd:job_base
+  stage: test
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
+  needs:
+    - job: shd:build
+      artifacts: false
+  script:
+    - cargo tarpaulin -p namib_shared --out Xml
+    - mv cobertura.xml target/shared-coverage.xml
+  artifacts:
+    reports:
+      cobertura: target/shared-coverage.xml
+  allow_failure: true
+
 shd:warnings:
   extends: .shd:job_base
   stage: test
   needs:
-    - shd:build
+    - job: shd:build
+      artifacts: false
   script:
     - cargo clippy -p namib_shared -- -D warnings
   after_script:
@@ -63,6 +84,7 @@ shd:formatting:
   extends: .shd:job_base
   stage: test
   needs:
-    - shd:build
+    - job: shd:build
+      artifacts: false
   script:
     - cargo fmt -p namib_shared -- --check

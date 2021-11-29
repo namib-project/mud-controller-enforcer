@@ -90,6 +90,22 @@ ctl:test:
     reports:
       junit: target/controller-test-results.xml
 
+ctl:coverage:
+  extends: .ctl:test_stage_job_base
+  stage: test
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
+  script:
+    - cargo tarpaulin -p namib_controller --out Xml
+    - mv cobertura.xml target/ctl-coverage.xml
+  artifacts:
+    reports:
+      cobertura: target/ctl-coverage.xml
+  allow_failure: true
+
 ctl:test_postgres:
   extends: .ctl:test_stage_job_base_postgres
   script:
@@ -98,6 +114,22 @@ ctl:test_postgres:
   artifacts:
     reports:
       junit: target/controller-test-results_postgres.xml
+
+ctl:coverage_postgres:
+  extends: .ctl:test_stage_job_base_postgres
+  stage: test
+  rules:
+    - !reference [.on_tags]
+    - !reference [.on_default_branch]
+    - when: manual
+      allow_failure: true
+  script:
+    - cargo tarpaulin -p namib_controller --no-default-features --features postgres --out Xml
+    - mv cobertura.xml target/ctl-coverage_postgres.xml
+  artifacts:
+    reports:
+      cobertura: target/ctl-coverage_postgres.xml
+  allow_failure: true
 
 ctl:warnings:
   extends: .ctl:test_stage_job_base
