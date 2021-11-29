@@ -32,8 +32,7 @@ enf:openwrt-package_bcm2711_21.02: # raspberry v4
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   before_script:
     # setup https credentials
     - git config --global credential.helper store

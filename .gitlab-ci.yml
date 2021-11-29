@@ -77,8 +77,7 @@ docs:
   rules:
     - !reference [.on_default_branch]
     - !reference [.on_tags]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   script:
     - cargo doc --workspace --no-deps
   artifacts:

@@ -36,8 +36,7 @@ enf:openwrt-image_bcm2711_21.02:
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   script:
     - cd /home/build/openwrt
     - cp -r ${CI_PROJECT_DIR}/namib_enforcer/openwrt/image/files files

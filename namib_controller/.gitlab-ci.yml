@@ -7,8 +7,7 @@ include:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
     - &on_controller_change changes: [ "namib_controller/**/*" ]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   cache: &job_base_cache_settings
     - !reference [.pkg_cache]
     - &ctl_cache
@@ -96,8 +95,8 @@ ctl:coverage:
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.on_ready_mrs]
+    - !reference [.allow_manual_run]
   script:
     - cargo tarpaulin -p namib_controller --out Xml
     - mv cobertura.xml target/ctl-coverage.xml
@@ -121,8 +120,8 @@ ctl:coverage_postgres:
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.on_ready_mrs]
+    - !reference [.allow_manual_run]
   script:
     - cargo tarpaulin -p namib_controller --no-default-features --features postgres --out Xml
     - mv cobertura.xml target/ctl-coverage_postgres.xml
@@ -153,8 +152,7 @@ ctl:formatting:
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   script:
     - cargo install --path namib_controller --bin namib_controller --root ./namib_controller/install $FEATURES
     # download namib frontend
@@ -204,8 +202,7 @@ ctl:release-bundle_postgres:
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   services:
     - postgres
   cache:

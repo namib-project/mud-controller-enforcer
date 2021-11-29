@@ -9,8 +9,7 @@ include:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
     - &on_enforcer_change changes: ["namib_enforcer/**/*"]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   cache:
     - !reference [.pkg_cache]
     - &enf_cache
@@ -59,14 +58,14 @@ enf:test:
       junit: target/enforcer-test-results.xml
 
 
-shd:coverage:
+enf:coverage:
   extends: .enf:test_stage_job_base
   stage: test
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.on_ready_mrs]
+    - !reference [.allow_manual_run]
   script:
     - cargo tarpaulin -p namib_enforcer --features dnsmasq_hook --out Xml
     - mv cobertura.xml target/enf-coverage.xml

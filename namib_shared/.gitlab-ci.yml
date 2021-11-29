@@ -6,8 +6,7 @@ include:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
     - &on_enforcer_change changes: ["namib_shared/**/*"]
-    - when: manual
-      allow_failure: true
+    - !reference [.allow_manual_run]
   cache:
     - !reference [.pkg_cache]
     - &shared_cache
@@ -52,8 +51,8 @@ shd:coverage:
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
-    - when: manual
-      allow_failure: true
+    - !reference [.on_ready_mrs]
+    - !reference [.allow_manual_run]
   needs:
     - job: shd:build
       artifacts: false
