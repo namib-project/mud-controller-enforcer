@@ -18,8 +18,6 @@
     allow_failure: true
 
 .on_ready_mrs:
-  - if: '$CI_MERGE_REQUEST_TITLE =~ /^WIP:.*/'
-    when: never
-  - if: '$CI_MERGE_REQUEST_TITLE =~ /^Draft:.*/'
+  - if: '$CI_MERGE_REQUEST_TITLE =~ /^(?:WIP|Draft):.*/'
     when: never
   - if: '$CI_MERGE_REQUEST_ID'

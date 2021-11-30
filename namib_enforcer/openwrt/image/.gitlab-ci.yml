@@ -3,7 +3,7 @@ include:
 
 enf:openwrt-image_x86_64_21.02:
   extends: .enf:openwrt_image_base
-  image: openwrtorg/imagebuilder:x86-64-21.02.0 # - statt _ wie im sdk...
+  image: openwrtorg/imagebuilder:x86-64-21.02.0 # - unlike the sdk, "-" is used instead of "_" here...
   needs:
     - enf:openwrt-package_x86_64_21.02
 
@@ -39,7 +39,7 @@ enf:openwrt-image_bcm2711_21.02:
     - !reference [.allow_manual_run]
   script:
     - cd /home/build/openwrt
-    - cp -r ${CI_PROJECT_DIR}/namib_enforcer/openwrt/image/files files
+    - cp -r "${CI_PROJECT_DIR}/namib_enforcer/openwrt/image/files" files
     # copy the IPKs created by the needed build jobs
     - mkdir -p packages
     - cp ${CI_PROJECT_DIR}/output/dnsmasq-full_*.ipk packages/
@@ -50,9 +50,9 @@ enf:openwrt-image_bcm2711_21.02:
     - make image PROFILE=$PROFILE PACKAGES="dnsmasq-full namib luci nano -dnsmasq -odhcpd-ipv6only $EXTRA_PACKAGES" FILES=files
     - mkdir ${CI_PROJECT_DIR}/image
     # x86 puts it under bin, bcm under build_dir ...
-    - mv bin/targets/*/*/openwrt-*-combined-*.img.gz ${CI_PROJECT_DIR}/image || true
-    - mv build_dir/target-*/linux-*/tmp/openwrt-*-factory.img.gz ${CI_PROJECT_DIR}/image || true
-    - mv build_dir/target-x86_64_musl/root-x86 ${CI_PROJECT_DIR}/rootfs || true
+    - mv bin/targets/*/*/openwrt-*-combined-*.img.gz "${CI_PROJECT_DIR}/image" || true
+    - mv build_dir/target-*/linux-*/tmp/openwrt-*-factory.img.gz "${CI_PROJECT_DIR}/image" || true
+    - mv build_dir/target-x86_64_musl/root-x86 "${CI_PROJECT_DIR}/rootfs" || true
   artifacts:
     paths:
       - image
@@ -74,4 +74,4 @@ enf:openwrt-docker:
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/namib_enforcer/openwrt/image/Dockerfile --whitelist-var-run=false --destination "$CI_REGISTRY_IMAGE/enforcer:latest"
+    - /kaniko/executor --cache=true --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/namib_enforcer/openwrt/image/Dockerfile" --whitelist-var-run=false --destination "$CI_REGISTRY_IMAGE/enforcer:latest"

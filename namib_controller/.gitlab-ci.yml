@@ -301,7 +301,7 @@ ctl:debian-package_armhf:
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --cache=true --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/namib_controller/docker/Dockerfile --whitelist-var-run=false --destination $CI_REGISTRY_IMAGE/controller:$CTL_TAG
+    - /kaniko/executor --cache=true --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/namib_controller/docker/Dockerfile" --whitelist-var-run=false --destination "$CI_REGISTRY_IMAGE/controller:$CTL_TAG"
 
 
 ctl:controller-docker:

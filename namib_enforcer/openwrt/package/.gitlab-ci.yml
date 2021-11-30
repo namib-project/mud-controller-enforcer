@@ -46,10 +46,10 @@ enf:openwrt-package_bcm2711_21.02: # raspberry v4
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl nftables dnsmasq-full
-    - mv ${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/config.diff .config
-    - mv ${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/patches/* package/feeds/base/dnsmasq/patches/
-    - mv ${CI_PROJECT_DIR}/namib_enforcer/openwrt/package ./package/namib
-    - ln -s ${CI_PROJECT_DIR} package/namib/src
+    - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/config.diff" .config
+    - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/patches/"* package/feeds/base/dnsmasq/patches/
+    - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package" ./package/namib
+    - ln -s "${CI_PROJECT_DIR}" package/namib/src
     - make defconfig
     - make package/namib/compile -j8
     - make package/feeds/base/dnsmasq/compile -j8
