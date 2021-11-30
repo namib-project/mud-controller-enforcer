@@ -96,3 +96,14 @@ pages:
   artifacts:
     paths:
       - public
+
+gen-lsif:
+  stage: .post
+  allow_failure: true
+  cache: []
+  needs: []
+  script:
+    - rust-analyzer lsif . > controller.lsif
+  artifacts:
+    reports:
+      lsif: controller.lsif
