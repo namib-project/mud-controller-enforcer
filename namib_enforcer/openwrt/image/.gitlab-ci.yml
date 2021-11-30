@@ -63,7 +63,7 @@ enf:openwrt-docker:
   stage: image
   tags:
     - docker
-    - privileged
+    - unprivileged
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [ "" ]
