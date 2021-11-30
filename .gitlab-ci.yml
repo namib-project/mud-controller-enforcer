@@ -78,6 +78,10 @@ docs:
     - !reference [.on_default_branch]
     - !reference [.on_tags]
     - !reference [.allow_manual_run]
+  variables:
+    DATABASE_URL: sqlite:/tmp/db.sqlite
+  before_script:
+    - ./namib_controller/scripts/recreate_db.sh
   script:
     - cargo doc --workspace --no-deps
   artifacts:
