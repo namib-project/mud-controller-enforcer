@@ -292,7 +292,7 @@ ctl:debian-package_armhf:
   stage: image
   tags:
     - docker
-    - privileged
+    - unprivileged
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [ "" ]
