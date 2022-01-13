@@ -36,9 +36,49 @@ pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> Enfo
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 
-pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, _devices: &[DeviceWithRefs]) -> FirewallDevice {
-    let mut rule_counter = 0;
-    let mut rules: Vec<FirewallRule> = Vec::new();
+pub fn check_authority(device_to_check: &DeviceWithRefs, devices: &[DeviceWithRefs], ipv4: bool) -> Vec<IpAddr> {
+    let mut manu_match: Vec<IpAddr> = Vec::new();
+    let iter = devices.iter();
+    let mut mud_url: &str;
+    for device_with_refs in iter {
+        if device_to_check.id != device_with_refs.id {
+            if let Some(m_url) = &device_with_refs.inner.mud_url {
+                mud_url = m_url;
+            } else { mud_url = "No Mud URL"; }
+            if parse_authority(&device_to_check.mud_url.as_ref().unwrap(), mud_url)
+            {
+                if ipv4 {
+                    if let Some(ipv4_addr) = &device_with_refs.inner.ipv4_addr {
+                        manu_match.push(IpAddr::V4(ipv4_addr.clone()))
+                    };
+                } else {
+                    if let Some(ipv6_addr) = &device_with_refs.inner.ipv6_addr {
+                        manu_match.push(IpAddr::V6(ipv6_addr.clone()))
+                    };
+                }
+            }
+        }
+    }
+    return manu_match;
+}
+
+pub fn parse_authority(authority: &String, mud_url: &str) -> bool {
+    if mud_url == "No Mud URL" {
+        return false;
+    }
+    let split: Vec<&str> = mud_url.split("/").collect();
+    let authsplit: Vec<&str> = authority.split("/").collect();
+
+    if split[2] == authsplit[2] {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWithRefs]) -> FirewallDevice {
+    let mut index = 0;
+    let mut result: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
         None => {
@@ -66,7 +106,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, _devices: &[DeviceWit
                     AceProtocol::Tcp => Protocol::Tcp,
                     AceProtocol::Udp => Protocol::Udp,
                     AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
-                                                                       // TODO add support for more protocols
+                    // TODO add support for more protocols
                 },
             };
             let verdict = match ace.action {
@@ -74,6 +114,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, _devices: &[DeviceWit
                 AceAction::Deny => Verdict::Reject,
             };
 
+            < < < < < < < HEAD
             let src_ports: Option<String> = match ace.matches.source_port {
                 None => None,
                 Some(AcePort::Single(port)) => Some(port.to_string()),
@@ -133,6 +174,41 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, _devices: &[DeviceWit
                     }
                     _ => vec![],
                 }
+                .iter()
+                .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
+                .collect();
+
+            if let Some(_value) = ace.matches.ietf_mud.as_ref() {
+                if ace.matches.ietf_mud == Option::from(SameManufacturer(true)) && device.mud_url.is_some() {
+                    let targets: Vec<IpAddr>;
+                    if acl.acl_type == IPV4 {
+                        targets = check_authority(&device, devices, true);
+                    } else {
+                        targets = check_authority(&device, devices, false);
+                    }
+                    for ip_addr in targets {
+                        let rule_name = RuleName::new(format!("rule_{}", index));
+                        let route_network_fw_device = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None);
+                        let route_network_target_device = RuleTarget::new(Some(RuleTargetHost::Ip(ip_addr)), None);
+
+                        let (route_network_src, route_network_dest) = match acl.packet_direction {
+                            AclDirection::FromDevice => (route_network_fw_device, route_network_target_device),
+                            AclDirection::ToDevice => (route_network_target_device, route_network_fw_device),
+                        };
+
+                        let config_firewall = FirewallRule::new(
+                            rule_name.clone(),
+                            route_network_src,
+                            route_network_dest,
+                            protocol.clone(),
+                            target.clone(),
+                        );
+                        result.push(config_firewall);
+                        index += 1;
+                    }
+                }
+            }
+
                 .iter()
                 .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
                 .collect();
@@ -321,7 +397,11 @@ mod tests {
     #[test]
     fn test_overridden_acls_to_firewall_rules() -> Result<()> {
         let mud_data = MudData {
+<<<<<<< HEAD
             url: "example.com/.well-known/mud".to_string(),
+=======
+            url: "https://example.com/.well-known/mud".to_string(),
+>>>>>>> controller: refactor authority checking and tests
             masa_url: None,
             last_update: "some_last_update".to_string(),
             systeminfo: Some("some_systeminfo".to_string()),
@@ -343,7 +423,11 @@ mod tests {
                         dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
+<<<<<<< HEAD
                         matches_augmentation: None,
+=======
+                        ietf_mud: None,
+>>>>>>> controller: refactor authority checking and tests
                     },
                 }],
             }],
@@ -361,7 +445,11 @@ mod tests {
                         dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
+<<<<<<< HEAD
                         matches_augmentation: None,
+=======
+                        ietf_mud: None,
+>>>>>>> controller: refactor authority checking and tests
                     },
                 }],
             }],
@@ -427,7 +515,11 @@ mod tests {
     #[test]
     fn test_converting() -> Result<()> {
         let mud_data = MudData {
+<<<<<<< HEAD
             url: "example.com/.well-known/mud".to_string(),
+=======
+            url: "https://example.com/.well-known/mud".to_string(),
+>>>>>>> controller: refactor authority checking and tests
             masa_url: None,
             last_update: "some_last_update".to_string(),
             systeminfo: Some("some_systeminfo".to_string()),
@@ -435,6 +527,7 @@ mod tests {
             model_name: Some("some_model_name".to_string()),
             documentation: Some("some_documentation".to_string()),
             expiration: Utc::now(),
+<<<<<<< HEAD
             acllist: vec![
                 Acl {
                     name: "some_acl_name".to_string(),
@@ -473,6 +566,26 @@ mod tests {
                     }],
                 },
             ],
+=======
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::ToDevice,
+                acl_type: AclType::IPV6,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Tcp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: Some(String::from("www.example.test")),
+                        source_port: None,
+                        destination_port: None,
+                        ietf_mud: None,
+                    },
+                }],
+            }],
+>>>>>>> controller: refactor authority checking and tests
             acl_override: Vec::default(),
         };
 
@@ -588,7 +701,7 @@ mod tests {
                 ipv6_addr: None,
                 hostname: "".to_string(),
                 vendor_class: "".to_string(),
-                mud_url: None,
+                mud_url: Some("https://example.com/mud_url.json".to_string()),
                 collect_info: true,
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
@@ -630,7 +743,7 @@ mod tests {
 
         let device1 = DeviceWithRefs {
             inner: Device {
-                id: 0,
+                id: 1,
                 name: None,
                 mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
                 duid: None,
@@ -638,7 +751,7 @@ mod tests {
                 ipv6_addr: None,
                 hostname: "".to_string(),
                 vendor_class: "".to_string(),
-                mud_url: Some("http://example.com/mud_url.json".to_string()),
+                mud_url: Some("https://example.com/mud_url.json".to_string()),
                 collect_info: true,
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
@@ -647,10 +760,6 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
         };
-
-        let device1ip = device1.ipv4_addr.unwrap();
-
-        let x = convert_device_to_fw_rules(&device, &[device1]);
 
 
         let resulting_device = FirewallDevice {
@@ -661,7 +770,7 @@ mod tests {
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(Some(RuleTargetHost::Ip(IpAddr::V4(device1ip))), None),
+                   RuleTarget::new(Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap().clone()))), None),
                     Protocol::Tcp,
                     Verdict::Accept,
                 ),
@@ -682,6 +791,9 @@ mod tests {
             ],
             collect_data: true,
         };
+
+        let x = convert_device_to_fw_rules(&device, &[device.clone(),device1]);
+
         assert!(x.eq(&resulting_device));
 
         Ok(())
