@@ -11,7 +11,7 @@ use namib_shared::{
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AceProtocol, Acl, AclDirection, DeviceWithRefs},
+    models::{AceAction, AcePort, AceProtocol, Acl, AclDirection, DeviceWithRefs},
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
@@ -31,14 +31,14 @@ pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> Enfo
     let rules = devices
         .iter()
         .filter(|d| d.ipv4_addr.is_some() || d.ipv6_addr.is_some())
-        .map(|d| convert_device_to_fw_rules(d))
+        .map(|d| convert_device_to_fw_rules(d, devices))
         .collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 
-pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
-    let mut index = 0;
-    let mut result: Vec<FirewallRule> = Vec::new();
+pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, _devices: &[DeviceWithRefs]) -> FirewallDevice {
+    let mut rule_counter = 0;
+    let mut rules: Vec<FirewallRule> = Vec::new();
     let mud_data = match &device.mud_data {
         Some(mud_data) => mud_data,
         None => {
@@ -46,7 +46,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
                 id: device.id,
                 ipv4_addr: device.ipv4_addr,
                 ipv6_addr: device.ipv6_addr,
-                rules: result,
+                rules,
                 collect_data: device.collect_info,
             }
         }
@@ -60,7 +60,6 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
 
     for acl in &merged_acls {
         for ace in &acl.ace {
-            let rule_name = RuleName::new(format!("rule_{}", index));
             let protocol = match &ace.matches.protocol {
                 None => Protocol::All,
                 Some(proto) => match proto {
@@ -70,44 +69,100 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
                                                                        // TODO add support for more protocols
                 },
             };
-            let target = match ace.action {
+            let verdict = match ace.action {
                 AceAction::Accept => Verdict::Accept,
                 AceAction::Deny => Verdict::Reject,
             };
 
-            let route_network_fw_device = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None);
-            if let Some(dns_name) = &ace.matches.dnsname {
-                let route_network_remote_host = match dns_name.parse::<IpAddr>() {
-                    Ok(addr) => RuleTarget::new(Some(RuleTargetHost::Ip(addr)), None),
-                    Err(_) => RuleTarget::new(Some(RuleTargetHost::Hostname(dns_name.clone())), None),
-                };
+            let src_ports: Option<String> = match ace.matches.source_port {
+                None => None,
+                Some(AcePort::Single(port)) => Some(port.to_string()),
+                Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+            };
+            let dst_ports: Option<String> = match ace.matches.destination_port {
+                None => None,
+                Some(AcePort::Single(port)) => Some(port.to_string()),
+                Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+            };
 
-                let (route_network_src, route_network_dest) = match acl.packet_direction {
-                    AclDirection::FromDevice => (route_network_fw_device, route_network_remote_host),
-                    AclDirection::ToDevice => (route_network_remote_host, route_network_fw_device),
+            let (this_device_ports, other_device_ports) = match acl.packet_direction {
+                AclDirection::FromDevice => (src_ports, dst_ports),
+                AclDirection::ToDevice => (dst_ports, src_ports),
+            };
+
+            let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
+
+            let other_dev_rule_targets: Vec<RuleTarget> =
+                match (&ace.matches.dnsname, &ace.matches.matches_augmentation) {
+                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
+                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
+                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
+                    },
+                    (None, Some(augmentation)) => {
+                        let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
+                        if let Some(_host) = &augmentation.manufacturer {
+                            // TODO
+                        }
+                        if augmentation.same_manufacturer {
+                            // TODO
+                        }
+                        if let Some(_uri) = &augmentation.controller {
+                            // TODO
+                        }
+                        if augmentation.my_controller {
+                            // TODO
+                        }
+                        if augmentation.local {
+                            // TODO
+                        }
+                        if augmentation.model {
+                            // TODO
+                        }
+
+                        // return those devices matched by _all_ specified options
+                        match targets_per_option.len() {
+                            0 => vec![],
+                            1 => targets_per_option[0].clone(),
+                            _ => targets_per_option[0]
+                                .iter()
+                                .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
+                                .cloned()
+                                .collect(),
+                        }
+                    }
+                    _ => vec![],
+                }
+                .iter()
+                .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
+                .collect();
+
+            for other_dev_rule_target in &other_dev_rule_targets {
+                let (src, dst) = match acl.packet_direction {
+                    AclDirection::FromDevice => (&this_dev_rule_target, other_dev_rule_target),
+                    AclDirection::ToDevice => (other_dev_rule_target, &this_dev_rule_target),
                 };
-                let config_firewall = FirewallRule::new(
-                    rule_name.clone(),
-                    route_network_src,
-                    route_network_dest,
+                rules.push(FirewallRule::new(
+                    RuleName::new(format!("rule_{}", rule_counter)),
+                    src.clone(),
+                    dst.clone(),
                     protocol.clone(),
-                    target.clone(),
-                );
-                result.push(config_firewall);
+                    verdict.clone(),
+                ));
+                rule_counter += 1;
             }
-            index += 1;
         }
     }
-    result.push(FirewallRule::new(
-        RuleName::new(format!("rule_default_{}", index)),
+    rules.push(FirewallRule::new(
+        RuleName::new(format!("rule_default_{}", rule_counter)),
         RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
         RuleTarget::new(None, None),
         Protocol::All,
         Verdict::Reject,
     ));
-    index += 1;
-    result.push(FirewallRule::new(
-        RuleName::new(format!("rule_default_{}", index)),
+    rule_counter += 1;
+    rules.push(FirewallRule::new(
+        RuleName::new(format!("rule_default_{}", rule_counter)),
         RuleTarget::new(None, None),
         RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
         Protocol::All,
@@ -118,7 +173,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs) -> FirewallDevice {
         id: device.id,
         ipv4_addr: device.ipv4_addr,
         ipv6_addr: device.ipv6_addr,
-        rules: result,
+        rules,
         collect_data: device.collect_info,
     }
 }
@@ -167,6 +222,7 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        matches_augmentation: None,
                     },
                 }],
             },
@@ -184,6 +240,7 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        matches_augmentation: None,
                     },
                 }],
             },
@@ -204,6 +261,7 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        matches_augmentation: None,
                     },
                 }],
             },
@@ -221,6 +279,7 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        matches_augmentation: None,
                     },
                 }],
             },
@@ -283,6 +342,7 @@ mod tests {
                         dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
+                        matches_augmentation: None,
                     },
                 }],
             }],
@@ -300,6 +360,7 @@ mod tests {
                         dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
+                        matches_augmentation: None,
                     },
                 }],
             }],
@@ -325,7 +386,7 @@ mod tests {
             room: None,
         };
 
-        let x = convert_device_to_fw_rules(&device);
+        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
 
         let resulting_device = FirewallDevice {
             id: device.id,
@@ -373,23 +434,44 @@ mod tests {
             model_name: Some("some_model_name".to_string()),
             documentation: Some("some_documentation".to_string()),
             expiration: Utc::now(),
-            acllist: vec![Acl {
-                name: "some_acl_name".to_string(),
-                packet_direction: AclDirection::ToDevice,
-                acl_type: AclType::IPV6,
-                ace: vec![Ace {
-                    name: "some_ace_name".to_string(),
-                    action: AceAction::Accept,
-                    matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: Some(String::from("www.example.test")),
-                        source_port: None,
-                        destination_port: None,
-                    },
-                }],
-            }],
+            acllist: vec![
+                Acl {
+                    name: "some_acl_name".to_string(),
+                    packet_direction: AclDirection::ToDevice,
+                    acl_type: AclType::IPV6,
+                    ace: vec![Ace {
+                        name: "some_ace_name".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Tcp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                            source_port: Some(AcePort::Single(123)),
+                            destination_port: Some(AcePort::Range(50, 60)),
+                            matches_augmentation: None,
+                        },
+                    }],
+                },
+                Acl {
+                    name: "other_acl_name".to_string(),
+                    packet_direction: AclDirection::FromDevice,
+                    acl_type: AclType::IPV6,
+                    ace: vec![Ace {
+                        name: "other_ace_name".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Udp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                            source_port: Some(AcePort::Range(8000, 8080)),
+                            destination_port: Some(AcePort::Single(56)),
+                            matches_augmentation: None,
+                        },
+                    }],
+                },
+            ],
             acl_override: Vec::default(),
         };
 
@@ -413,7 +495,7 @@ mod tests {
             room: None,
         };
 
-        let x = convert_device_to_fw_rules(&device);
+        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
 
         let resulting_device = FirewallDevice {
             id: device.id,
@@ -422,20 +504,33 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     RuleName::new(String::from("rule_0")),
-                    RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                        Some("123".to_string()),
+                    ),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("50:60".to_string())),
                     Protocol::Tcp,
                     Verdict::Accept,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    RuleName::new(String::from("rule_1")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("8000:8080".to_string())),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                        Some("56".to_string()),
+                    ),
+                    Protocol::Udp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_2")),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    RuleName::new(String::from("rule_default_3")),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
