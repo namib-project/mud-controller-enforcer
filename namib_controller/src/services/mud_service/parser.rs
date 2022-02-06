@@ -168,6 +168,7 @@ fn parse_device_policy(
                             dnsname,
                             source_port,
                             destination_port,
+                            matches_augmentation: None,
                         },
                     })
                 }
@@ -249,6 +250,7 @@ mod tests {
             dnsname: None,
             source_port: None,
             destination_port: None,
+            matches_augmentation: None,
         };
 
         let mut ace_list_f: Vec<Ace> = Vec::new();

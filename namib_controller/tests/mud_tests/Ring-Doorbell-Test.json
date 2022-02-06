@@ -27,7 +27,8 @@
             "source_port": null,
             "destination_port": {
               "single": 67
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -44,7 +45,8 @@
             "source_port": null,
             "destination_port": {
               "single": 53
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -61,7 +63,8 @@
             "source_port": null,
             "destination_port": {
               "single": 67
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -78,7 +81,8 @@
             "source_port": null,
             "destination_port": {
               "single": 443
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -95,7 +99,8 @@
             "source_port": null,
             "destination_port": {
               "single": 80
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -112,7 +117,8 @@
             "source_port": null,
             "destination_port": {
               "single": 9998
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -129,7 +135,8 @@
             "source_port": null,
             "destination_port": {
               "single": 123
-            }
+            },
+            "matches_augmentation": null
           }
         },
         {
@@ -146,7 +153,8 @@
             "source_port": null,
             "destination_port": {
               "single": 53
-            }
+            },
+            "matches_augmentation": null
           }
         }
       ]
@@ -165,7 +173,8 @@
             "address_mask": null,
             "dnsname": null,
             "source_port": null,
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -177,7 +186,8 @@
             "address_mask": null,
             "dnsname": null,
             "source_port": null,
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         }
       ]
@@ -201,7 +211,8 @@
             "source_port": {
               "single": 80
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -218,7 +229,8 @@
             "source_port": {
               "single": 53
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -235,7 +247,8 @@
             "source_port": {
               "single": 123
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -252,7 +265,8 @@
             "source_port": {
               "single": 443
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -269,7 +283,8 @@
             "source_port": {
               "single": 67
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -286,7 +301,8 @@
             "source_port": {
               "single": 53
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         },
         {
@@ -303,7 +319,8 @@
             "source_port": {
               "single": 9998
             },
-            "destination_port": null
+            "destination_port": null,
+            "matches_augmentation": null
           }
         }
       ]

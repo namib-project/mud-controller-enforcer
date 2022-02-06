@@ -27,8 +27,11 @@ impl RuleName {
 /// Represents a target host for a firewall rule
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum RuleTargetHost {
+    /// An IP address.
     Ip(IpAddr),
+    /// A hostname.
     Hostname(String),
+    /// The `FirewallDevice` to which the rule in which this indicates the host belongs.
     FirewallDevice,
 }
 

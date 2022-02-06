@@ -71,6 +71,18 @@ pub struct AceMatches {
     pub dnsname: Option<String>,
     pub source_port: Option<AcePort>,
     pub destination_port: Option<AcePort>,
+    pub matches_augmentation: Option<MudAclMatchesAugmentation>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct MudAclMatchesAugmentation {
+    pub manufacturer: Option<String>,
+    pub same_manufacturer: bool,
+    pub controller: Option<String>,
+    pub my_controller: bool,
+    pub local: bool,
+    pub model: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
