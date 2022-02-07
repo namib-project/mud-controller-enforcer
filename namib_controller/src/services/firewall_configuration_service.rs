@@ -17,6 +17,8 @@ use crate::{
         config_service::{get_config_value, set_config_value, ConfigKeys},
     },
 };
+use crate::models::AclType::IPV4;
+use crate::models::MudAclMatchesAugmentation;
 
 pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
@@ -64,6 +66,24 @@ pub fn get_same_manufacturer_ruletargethosts(
         }
     }
     manu_match
+}
+
+pub fn get_model_ips(url: &String, devices: &[DeviceWithRefs], ipv4: bool) -> Vec<Option<RuleTargetHost>>{
+    let mut model_match: Vec<Option<RuleTargetHost>> = Vec::new();
+    for device_with_refs in devices {
+        if device_with_refs.inner.mud_url.is_some() &&
+            url.eq(&device_with_refs.mud_url.clone().unwrap())
+        {
+            if ipv4 {
+                if device_with_refs.inner.ipv4_addr.is_some() {
+                    model_match.push(Some(RuleTargetHost::Ip(device_with_refs.inner.ipv4_addr.unwrap().into())));
+                }
+            } else if device_with_refs.inner.ipv6_addr.is_some() {
+                model_match.push(Some(RuleTargetHost::Ip(device_with_refs.inner.ipv6_addr.unwrap().into())));
+            }
+        }
+    }
+    model_match
 }
 
 pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWithRefs]) -> FirewallDevice {
@@ -155,8 +175,10 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                         if augmentation.local {
                             // TODO
                         }
-                        if augmentation.model {
-                            // TODO
+                        if let Some(url) = &augmentation.model {
+                            targets_per_option.push(
+                                get_model_ips(url, &devices,acl.acl_type == IPV4)
+                            );
                         }
 
                         // return those devices matched by _all_ specified options
@@ -766,6 +788,33 @@ mod tests {
                     },
                 }],
             }],
+            acllist: vec![
+                Acl {
+                    name: "some_acl_name".to_string(),
+                    packet_direction: AclDirection::FromDevice,
+                    acl_type: AclType::IPV4,
+                    ace: vec![Ace {
+                        name: "some_ace_name".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Tcp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: None,
+                            source_port: Some(AcePort::Single(123)),
+                            destination_port: Some(AcePort::Range(50, 60)),
+                            matches_augmentation: Some(MudAclMatchesAugmentation{
+                                manufacturer: None,
+                                same_manufacturer: false,
+                                controller: None,
+                                my_controller: false,
+                                local: false,
+                                model: Some("https://example.com/.well-known/mud".to_string())
+                            }),
+                        },
+                    }],
+                }
+            ],
             acl_override: Vec::default(),
         };
 
@@ -874,6 +923,136 @@ mod tests {
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1]);
 
+        assert!(x.eq(&resulting_device));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_model_matching() -> Result<()> {
+        let mud_data = MudData {
+            url: "https://simple-example.com/.well-known/mud".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![
+                Acl {
+                    name: "some_acl_name".to_string(),
+                    packet_direction: AclDirection::FromDevice,
+                    acl_type: AclType::IPV4,
+                    ace: vec![Ace {
+                        name: "some_ace_name".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Tcp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: None,
+                            source_port: Some(AcePort::Single(123)),
+                            destination_port: Some(AcePort::Range(50, 60)),
+                            matches_augmentation: Some(MudAclMatchesAugmentation {
+                                manufacturer: None,
+                                same_manufacturer: false,
+                                controller: None,
+                                my_controller: false,
+                                local: false,
+                                model: Some("https://example.com/.well-known/mud".to_string())
+                            }),
+                        },
+                    }],
+                }
+            ],
+            acl_override: Vec::default(),
+        };
+
+        let device = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "127.0.0.1".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://simple-example.com/mud_url.json".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(mud_data),
+            room: None,
+        };
+
+        let mud_data1 = MudData {
+            url: "https://example.com/.well-known/mud".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![],
+            acl_override: Vec::default(),
+        };
+
+        let device1 = DeviceWithRefs {
+            inner: Device {
+                id: 1,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "127.0.0.2".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://example.com/.well-known/mud".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(mud_data1),
+            room: None,
+        };
+
+        let x = convert_device_to_fw_rules(&device, &[device.clone(),device1.clone()]);
+
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
+            rules: vec![
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_0")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("123".to_string())),
+                    RuleTarget::new(Some(RuleTargetHost::Ip(IpAddr::V4(device1.inner.ipv4_addr.clone().unwrap()))),Some("50:60".to_string())),
+                    Protocol::Tcp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_1")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
+                    Protocol::All,
+                    Verdict::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_2")),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    Protocol::All,
+                    Verdict::Reject,
+                ),
+            ],
+            collect_data: true,
+        };
         assert!(x.eq(&resulting_device));
 
         Ok(())
