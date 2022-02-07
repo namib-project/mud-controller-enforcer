@@ -37,8 +37,12 @@ pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> Enfo
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 
-pub fn get_same_manu_ips(device_to_check: &DeviceWithRefs, devices: &[DeviceWithRefs], ipv4: bool) -> Vec<IpAddr> {
-    let mut manu_match: Vec<IpAddr> = Vec::new();
+pub fn get_same_manufacturer_ruletargethosts(
+    device_to_check: &DeviceWithRefs,
+    devices: &[DeviceWithRefs],
+    ipv4: bool,
+) -> Vec<Option<RuleTargetHost>> {
+    let mut manu_match: Vec<Option<RuleTargetHost>> = Vec::new();
     if device_to_check.mud_url.is_some() {
         for device_with_refs in devices.iter() {
             if device_to_check.id != device_with_refs.id
@@ -48,10 +52,10 @@ pub fn get_same_manu_ips(device_to_check: &DeviceWithRefs, devices: &[DeviceWith
             {
                 if ipv4 {
                     if let Some(ipv4_addr) = &device_with_refs.inner.ipv4_addr {
-                        manu_match.push(IpAddr::V4(*ipv4_addr))
+                        manu_match.push(Some(RuleTargetHost::Ip(device_with_refs.ipv4_addr.unwrap().into())))
                     };
                 } else if let Some(ipv6_addr) = &device_with_refs.inner.ipv6_addr {
-                    manu_match.push(IpAddr::V6(*ipv6_addr))
+                    manu_match.push(Some(RuleTargetHost::Ip(device_with_refs.ipv6_addr.unwrap().into())))
                 }
             }
         }
@@ -128,11 +132,11 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                             // TODO
                         }
                         if augmentation.same_manufacturer {
-                            targets_per_option.push(
-                                get_same_manu_ips(&device, &devices, acl.acl_type == IPV4)
-                                    .iter()
-                                    .map(|ip_addr| Some(RuleTargetHost::Ip(*ip_addr)))
-                                    .collect());
+                            targets_per_option.push(get_same_manufacturer_ruletargethosts(
+                                &device,
+                                &devices,
+                                acl.acl_type == IPV4,
+                            ));
                         }
                         if let Some(_uri) = &augmentation.controller {
                             // TODO
@@ -598,13 +602,14 @@ mod tests {
                         dnsname: None,
                         source_port: Some(AcePort::Single(321)),
                         destination_port: Some(AcePort::Single(500)),
-                        matches_augmentation: Some(MudAclMatchesAugmentation
-                        {   manufacturer: None,
+                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                            manufacturer: None,
                             same_manufacturer: true,
                             controller: None,
                             my_controller: false,
                             local: false,
-                            model: false }),
+                            model: false,
+                        }),
                     },
                 }],
             }],
@@ -654,7 +659,7 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
-                        matches_augmentation: None
+                        matches_augmentation: None,
                     },
                 }],
             }],
