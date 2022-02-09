@@ -154,20 +154,21 @@ fn parse_device_policy(
                         dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
                     }
                     if let Some(mud) = &aceitem.matches.mud {
-                        // see https://github.com/CiscoDevNet/MUD-Manager/blob/master/src/mud_manager.c#L1472
                         let manufacturer = None;
                         let same_manufacturer = mud.same_manufacturer.is_some();
                         let controller = mud.controller.as_ref().map(std::string::ToString::to_string);
                         let my_controller = false;
                         let local = false;
-                        let model = false;
-
+                        let model = match &mud.model {
+                            Some(model) => Some(model.to_string()),
+                            _ => None,
+                        };
                         if manufacturer.is_some()
                             || same_manufacturer
                             || controller.is_some()
                             || my_controller
                             || local
-                            || model
+                            || model.is_some()
                         {
                             matches_augmentation = Some(MudAclMatchesAugmentation {
                                 manufacturer,
