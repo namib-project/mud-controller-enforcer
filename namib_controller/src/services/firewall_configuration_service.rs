@@ -8,6 +8,7 @@ use namib_shared::{
     EnforcerConfig,
 };
 
+use crate::models::AclType::IPV4;
 use crate::{
     db::DbConnection,
     error::Result,
@@ -17,7 +18,6 @@ use crate::{
         config_service::{get_config_value, set_config_value, ConfigKeys},
     },
 };
-use crate::models::AclType::IPV4;
 
 pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
@@ -67,12 +67,14 @@ pub fn get_same_manufacturer_ruletargethosts(
     manu_match
 }
 
-pub fn get_manufacturer_ruletargethosts(string_to_check: &str, devices: &[DeviceWithRefs], ipv4: bool) -> Vec<Option<RuleTargetHost>> {
+pub fn get_manufacturer_ruletargethosts(
+    string_to_check: &str,
+    devices: &[DeviceWithRefs],
+    ipv4: bool,
+) -> Vec<Option<RuleTargetHost>> {
     let mut manu_match: Vec<Option<RuleTargetHost>> = Vec::new();
     for device_with_refs in devices.iter() {
-        if device_with_refs.mud_url.is_some()
-            && device_with_refs.mud_url.clone().unwrap().contains(string_to_check)
-        {
+        if device_with_refs.mud_url.is_some() && device_with_refs.mud_url.clone().unwrap().contains(string_to_check) {
             if ipv4 {
                 if device_with_refs.inner.ipv4_addr.is_some() {
                     manu_match.push(Some(RuleTargetHost::Ip(device_with_refs.ipv4_addr.unwrap().into())))
@@ -175,9 +177,11 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                     (None, Some(augmentation)) => {
                         let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
                         if let Some(host) = &augmentation.manufacturer {
-                            targets_per_option.push(
-                                get_manufacturer_ruletargethosts(host, devices, acl.acl_type == IPV4)
-                            );
+                            targets_per_option.push(get_manufacturer_ruletargethosts(
+                                host,
+                                devices,
+                                acl.acl_type == IPV4,
+                            ));
                         }
                         if augmentation.same_manufacturer {
                             targets_per_option.push(get_same_manufacturer_ruletargethosts(
