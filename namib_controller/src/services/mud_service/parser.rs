@@ -154,7 +154,7 @@ fn parse_device_policy(
                         dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
                     }
                     if let Some(mud) = &aceitem.matches.mud {
-                        let manufacturer = None;
+                        let manufacturer = mud.manufacturer.as_ref().map(std::string::ToString::to_string);
                         let same_manufacturer = mud.same_manufacturer.is_some();
                         let controller = mud.controller.as_ref().map(std::string::ToString::to_string);
                         let my_controller = false;
