@@ -141,8 +141,13 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                                 &acl.acl_type,
                             ));
                         }
-                        if let Some(_uri) = &augmentation.controller {
-                            // TODO
+                        if let Some(uri) = &augmentation.controller {
+                            targets_per_option.push(get_controller_ruletargethosts(
+                                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                                devices,
+                                uri,
+                                acl.acl_type,
+                            ));
                         }
                         if augmentation.my_controller {
                             // TODO
@@ -212,6 +217,35 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
     }
 }
 
+fn get_controller_ruletargethosts(
+    mud_url: &str,
+    devices: &[DeviceWithRefs],
+    controller_uri: &str,
+    acl_type: AclType,
+) -> Vec<Option<RuleTargetHost>> {
+    // warn in case that the URI is a "MUD well-known URN" or some other URN
+    if controller_uri == "urn:ietf:params:mud:dns" || controller_uri == "urn:ietf:params:mud:ntp" {
+        warn!("processing device with MUD URL <{}>: `controller` URI <{}> is a MUD well-known URN, which will be ignored.", mud_url, controller_uri);
+    } else if controller_uri.starts_with("urn:") {
+        warn!("`controller` URI seems to be a URN, but not a MUD well-known URN. It is ignored in either case.");
+    }
+
+    devices
+        .iter()
+        .filter(|other_dev| match &other_dev.mud_url {
+            Some(url) => controller_uri == url,
+            None => false,
+        })
+        .map(
+            |controller_dev| match (controller_dev.ipv4_addr, controller_dev.ipv6_addr, acl_type) {
+                (Some(addr), _, AclType::IPV4) => Some(RuleTargetHost::Ip(addr.into())),
+                (_, Some(addr), AclType::IPV6) => Some(RuleTargetHost::Ip(addr.into())),
+                _ => Some(RuleTargetHost::Hostname(controller_uri.to_string())),
+            },
+        )
+        .collect()
+}
+
 pub async fn get_config_version(pool: &DbConnection) -> String {
     get_config_value(ConfigKeys::FirewallConfigVersion.as_ref(), pool)
         .await
@@ -237,8 +271,9 @@ mod tests {
     use namib_shared::macaddr::MacAddr;
 
     use super::*;
-    use crate::models::MudAclMatchesAugmentation;
-    use crate::models::{Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudData};
+    use crate::models::{
+        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudAclMatchesAugmentation, MudData,
+    };
 
     #[test]
     fn test_acl_merging() -> Result<()> {
@@ -580,6 +615,121 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_controller() -> Result<()> {
+        // create bulb
+        let bulb_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bulb".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Tcp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: None,
+                        source_port: None,
+                        destination_port: None,
+                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                            manufacturer: None,
+                            same_manufacturer: false,
+                            controller: Some("https://manufacturer.com/devices/bridge".to_string()),
+                            my_controller: false,
+                            local: false,
+                            model: false,
+                        }),
+                    },
+                }],
+            }],
+            acl_override: Vec::default(),
+        };
+        let bulb = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "10.0.0.3".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bulb".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(bulb_mud_data),
+            room: None,
+        };
+
+        // create bridge
+        let bridge_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bridge".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: Vec::default(),
+            }],
+            acl_override: Vec::default(),
+        };
+        let bridge = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("ff:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "10.0.0.2".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bridge".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(bridge_mud_data),
+            room: None,
+        };
+
+        let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
+
+        let rule_result: Vec<&FirewallRule> = bulb_firewall_rules_result
+            .rules
+            .iter()
+            .filter(|&r| {
+                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+            })
+            .collect();
+
+        assert!(rule_result.len() == 1);
+
+        let rule = rule_result[0];
+        assert_eq!(rule.verdict, Verdict::Accept);
+
+        return Ok(());
+    }
     #[test]
     fn test_same_manufacturer() -> Result<()> {
         let mud_data = MudData {

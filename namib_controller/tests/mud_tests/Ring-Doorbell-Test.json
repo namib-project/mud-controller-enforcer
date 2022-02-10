@@ -28,7 +28,14 @@
             "destination_port": {
               "single": 67
             },
-            "matches_augmentation": null
+            "matches_augmentation": {
+              "manufacturer": null,
+              "same_manufacturer": false,
+              "controller": "urn:ietf:params:mud:gateway",
+              "my_controller": false,
+              "model": false,
+              "local": false
+            }
           }
         },
         {
@@ -46,7 +53,14 @@
             "destination_port": {
               "single": 53
             },
-            "matches_augmentation": null
+            "matches_augmentation": {
+              "manufacturer": null,
+              "same_manufacturer": false,
+              "controller": "urn:ietf:params:mud:dns",
+              "my_controller": false,
+              "model": false,
+              "local": false
+            }
           }
         },
         {
@@ -230,7 +244,14 @@
               "single": 53
             },
             "destination_port": null,
-            "matches_augmentation": null
+            "matches_augmentation": {
+              "manufacturer": null,
+              "same_manufacturer": false,
+              "controller": "urn:ietf:params:mud:dns",
+              "my_controller": false,
+              "model": false,
+              "local": false
+            }
           }
         },
         {
@@ -284,7 +305,14 @@
               "single": 67
             },
             "destination_port": null,
-            "matches_augmentation": null
+            "matches_augmentation": {
+              "manufacturer": null,
+              "same_manufacturer": false,
+              "controller": "urn:ietf:params:mud:gateway",
+              "my_controller": false,
+              "model": false,
+              "local": false
+            }
           }
         },
         {

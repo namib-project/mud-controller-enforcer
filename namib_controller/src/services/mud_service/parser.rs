@@ -157,7 +157,7 @@ fn parse_device_policy(
                         // see https://github.com/CiscoDevNet/MUD-Manager/blob/master/src/mud_manager.c#L1472
                         let manufacturer = None;
                         let same_manufacturer = mud.same_manufacturer.is_some();
-                        let controller = None;
+                        let controller = mud.controller.as_ref().map(std::string::ToString::to_string);
                         let my_controller = false;
                         let local = false;
                         let model = false;
@@ -195,7 +195,7 @@ fn parse_device_policy(
                             destination_port,
                             matches_augmentation,
                         },
-                    })
+                    });
                 }
 
                 acllist.push(Acl {
