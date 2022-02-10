@@ -7,6 +7,7 @@ use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use super::json_models;
+use crate::models::MudAclMatchesAugmentation;
 use crate::{
     error,
     error::Result,
@@ -102,6 +103,7 @@ fn parse_device_policy(
                     let mut dnsname = None;
                     let mut source_port = None;
                     let mut destination_port = None;
+                    let mut matches_augmentation = None;
                     if let Some(udp) = &aceitem.matches.udp {
                         protocol = Some(AceProtocol::Udp);
                         source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
@@ -151,8 +153,31 @@ fn parse_device_policy(
                             .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
                         dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
                     }
-                    if let Some(_mud) = &aceitem.matches.mud {
+                    if let Some(mud) = &aceitem.matches.mud {
                         // see https://github.com/CiscoDevNet/MUD-Manager/blob/master/src/mud_manager.c#L1472
+                        let manufacturer = None;
+                        let same_manufacturer = mud.same_manufacturer.is_some();
+                        let controller = None;
+                        let my_controller = false;
+                        let local = false;
+                        let model = false;
+
+                        if manufacturer.is_some()
+                            || same_manufacturer
+                            || controller.is_some()
+                            || my_controller
+                            || local
+                            || model
+                        {
+                            matches_augmentation = Some(MudAclMatchesAugmentation {
+                                manufacturer,
+                                same_manufacturer,
+                                controller,
+                                my_controller,
+                                local,
+                                model,
+                            });
+                        }
                     }
                     ace.push(Ace {
                         name: aceitem.name.clone(),
@@ -168,7 +193,7 @@ fn parse_device_policy(
                             dnsname,
                             source_port,
                             destination_port,
-                            matches_augmentation: None,
+                            matches_augmentation,
                         },
                     })
                 }
@@ -250,7 +275,14 @@ mod tests {
             dnsname: None,
             source_port: None,
             destination_port: None,
-            matches_augmentation: None,
+            matches_augmentation: Some(MudAclMatchesAugmentation {
+                manufacturer: None,
+                same_manufacturer: true,
+                controller: None,
+                my_controller: false,
+                local: false,
+                model: false,
+            }),
         };
 
         let mut ace_list_f: Vec<Ace> = Vec::new();
