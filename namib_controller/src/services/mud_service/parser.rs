@@ -154,34 +154,18 @@ fn parse_device_policy(
                         dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
                     }
                     if let Some(mud) = &aceitem.matches.mud {
-<<<<<<< HEAD
-                        let manufacturer = None;
+                        let manufacturer = mud.manufacturer.as_ref().map(std::string::ToString::to_string);
                         let same_manufacturer = mud.same_manufacturer.is_some();
                         let controller = mud.controller.as_ref().map(std::string::ToString::to_string);
                         let my_controller = false;
                         let local = false;
                         let model = mud.model.as_ref().map(std::string::ToString::to_string);
-=======
-                        let manufacturer = match &mud.manufacturer  {
-                            Some(manufacturer) => Some(manufacturer.to_string()),
-                            _ => None,
-                        };
-                        let same_manufacturer = false;
-                        let controller = None;
-                        let my_controller = false;
-                        let local = false;
-                        let model = false;
->>>>>>> controller: Add manufacturer parsing
                         if manufacturer.is_some()
                             || same_manufacturer
                             || controller.is_some()
                             || my_controller
                             || local
-<<<<<<< HEAD
                             || model.is_some()
-=======
-                            || model
->>>>>>> controller: Add manufacturer parsing
                         {
                             matches_augmentation = Some(MudAclMatchesAugmentation {
                                 manufacturer,
