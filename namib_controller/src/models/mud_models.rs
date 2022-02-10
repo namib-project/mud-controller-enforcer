@@ -82,7 +82,7 @@ pub struct MudAclMatchesAugmentation {
     pub controller: Option<String>,
     pub my_controller: bool,
     pub local: bool,
-    pub model: bool,
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
