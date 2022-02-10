@@ -33,7 +33,7 @@
               "same_manufacturer": false,
               "controller": "urn:ietf:params:mud:gateway",
               "my_controller": false,
-              "model": false,
+              "model": null,
               "local": false
             }
           }
@@ -58,7 +58,7 @@
               "same_manufacturer": false,
               "controller": "urn:ietf:params:mud:dns",
               "my_controller": false,
-              "model": false,
+              "model": null,
               "local": false
             }
           }
@@ -249,7 +249,7 @@
               "same_manufacturer": false,
               "controller": "urn:ietf:params:mud:dns",
               "my_controller": false,
-              "model": false,
+              "model": null,
               "local": false
             }
           }
@@ -310,7 +310,7 @@
               "same_manufacturer": false,
               "controller": "urn:ietf:params:mud:gateway",
               "my_controller": false,
-              "model": false,
+              "model": null,
               "local": false
             }
           }

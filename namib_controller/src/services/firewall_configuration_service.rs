@@ -8,7 +8,6 @@ use namib_shared::{
     EnforcerConfig,
 };
 
-use crate::models::AclType::IPV4;
 use crate::{
     db::DbConnection,
     error::Result,
@@ -67,21 +66,24 @@ pub fn get_same_manufacturer_ruletargethosts(
     manu_match
 }
 
-
-pub fn get_model_ruletargethosts(url: &String, devices: &[DeviceWithRefs], ipv4: bool) -> Vec<Option<RuleTargetHost>> {
+pub fn get_model_ruletargethosts(
+    url: &str,
+    devices: &[DeviceWithRefs],
+    acl_type: &AclType,
+) -> Vec<Option<RuleTargetHost>> {
     let mut model_match: Vec<Option<RuleTargetHost>> = Vec::new();
     for device_with_refs in devices {
-        if device_with_refs.inner.mud_url.is_some() && url.eq(&device_with_refs.mud_url.clone().unwrap()) {
-            if ipv4 {
-                if device_with_refs.inner.ipv4_addr.is_some() {
-                    model_match.push(Some(RuleTargetHost::Ip(
-                        device_with_refs.inner.ipv4_addr.unwrap().into(),
-                    )));
+        if device_with_refs.inner.mud_url.is_some() && url.eq(device_with_refs.mud_url.as_ref().unwrap()) {
+            match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
+                (AclType::IPV4, Some(ipv4_addr), _) => {
+                    model_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
                 }
-            } else if device_with_refs.inner.ipv6_addr.is_some() {
-                model_match.push(Some(RuleTargetHost::Ip(
-                    device_with_refs.inner.ipv6_addr.unwrap().into(),
-                )));
+                (AclType::IPV6, _, Some(ipv6_addr)) => {
+                    model_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
+                }
+                _ => {
+                    model_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
+                }
             }
         }
     }
@@ -178,7 +180,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                             // TODO
                         }
                         if let Some(url) = &augmentation.model {
-                            targets_per_option.push(get_model_ruletargethosts(url, &devices, acl.acl_type == IPV4));
+                            targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
                         }
 
                         // return those devices matched by _all_ specified options
@@ -669,7 +671,7 @@ mod tests {
                             controller: Some("https://manufacturer.com/devices/bridge".to_string()),
                             my_controller: false,
                             local: false,
-                            model: false,
+                            model: None,
                         }),
                     },
                 }],
@@ -783,38 +785,11 @@ mod tests {
                             controller: None,
                             my_controller: false,
                             local: false,
-                            model: false,
+                            model: None,
                         }),
                     },
                 }],
             }],
-            acllist: vec![
-                Acl {
-                    name: "some_acl_name".to_string(),
-                    packet_direction: AclDirection::FromDevice,
-                    acl_type: AclType::IPV4,
-                    ace: vec![Ace {
-                        name: "some_ace_name".to_string(),
-                        action: AceAction::Accept,
-                        matches: AceMatches {
-                            protocol: Some(AceProtocol::Tcp),
-                            direction_initiated: None,
-                            address_mask: None,
-                            dnsname: None,
-                            source_port: Some(AcePort::Single(123)),
-                            destination_port: Some(AcePort::Range(50, 60)),
-                            matches_augmentation: Some(MudAclMatchesAugmentation{
-                                manufacturer: None,
-                                same_manufacturer: false,
-                                controller: None,
-                                my_controller: false,
-                                local: false,
-                                model: Some("https://example.com/.well-known/mud".to_string())
-                            }),
-                        },
-                    }],
-                }
-            ],
             acl_override: Vec::default(),
         };
 
@@ -1020,7 +995,6 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
         };
-
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1.clone()]);
 

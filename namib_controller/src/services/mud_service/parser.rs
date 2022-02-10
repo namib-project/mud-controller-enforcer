@@ -159,10 +159,7 @@ fn parse_device_policy(
                         let controller = mud.controller.as_ref().map(std::string::ToString::to_string);
                         let my_controller = false;
                         let local = false;
-                        let model = match &mud.model {
-                            Some(model) => Some(model.to_string()),
-                            _ => None,
-                        };
+                        let model = mud.model.as_ref().map(std::string::ToString::to_string);
                         if manufacturer.is_some()
                             || same_manufacturer
                             || controller.is_some()
@@ -282,7 +279,7 @@ mod tests {
                 controller: None,
                 my_controller: false,
                 local: false,
-                model: false,
+                model: None,
             }),
         };
 
