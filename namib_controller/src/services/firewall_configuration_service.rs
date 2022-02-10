@@ -8,11 +8,10 @@ use namib_shared::{
     EnforcerConfig,
 };
 
-use crate::models::AclType::IPV4;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AcePort, AceProtocol, Acl, AclDirection, DeviceWithRefs},
+    models::{AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, DeviceWithRefs},
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
@@ -40,22 +39,26 @@ pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> Enfo
 pub fn get_same_manufacturer_ruletargethosts(
     device_to_check: &DeviceWithRefs,
     devices: &[DeviceWithRefs],
-    ipv4: bool,
+    acl_type: &AclType,
 ) -> Vec<Option<RuleTargetHost>> {
     let mut manu_match: Vec<Option<RuleTargetHost>> = Vec::new();
-    if device_to_check.mud_url.is_some() {
-        for device_with_refs in devices.iter() {
-            if device_to_check.id != device_with_refs.id
-                && device_with_refs.mud_url.is_some()
-                && (device_to_check.mud_url.clone().unwrap().split('/').nth(2)
-                    == device_with_refs.mud_url.clone().unwrap().split('/').nth(2))
-            {
-                if ipv4 {
-                    if let Some(ipv4_addr) = &device_with_refs.inner.ipv4_addr {
-                        manu_match.push(Some(RuleTargetHost::Ip(device_with_refs.ipv4_addr.unwrap().into())))
-                    };
-                } else if let Some(ipv6_addr) = &device_with_refs.inner.ipv6_addr {
-                    manu_match.push(Some(RuleTargetHost::Ip(device_with_refs.ipv6_addr.unwrap().into())))
+    if let Some(device_to_check_url) = &device_to_check.mud_url {
+        let device_to_check_manu = device_to_check_url.split('/').nth(2);
+        for device_with_refs in devices
+            .iter()
+            .filter(|v| v.id != device_to_check.id && v.mud_url.is_some())
+        {
+            if device_to_check_manu == device_with_refs.mud_url.as_ref().unwrap().split('/').nth(2) {
+                match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
+                    (AclType::IPV4, Some(ipv4_addr), _) => {
+                        manu_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
+                    }
+                    (AclType::IPV6, _, Some(ipv6_addr)) => {
+                        manu_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
+                    }
+                    _ => {
+                        manu_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
+                    }
                 }
             }
         }
@@ -133,9 +136,9 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                         }
                         if augmentation.same_manufacturer {
                             targets_per_option.push(get_same_manufacturer_ruletargethosts(
-                                &device,
-                                &devices,
-                                acl.acl_type == IPV4,
+                                device,
+                                devices,
+                                &acl.acl_type,
                             ));
                         }
                         if let Some(_uri) = &augmentation.controller {
