@@ -32,6 +32,7 @@ pub struct Mud {
 }
 
 impl Mud {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(mud_version: i32, mud_url: String, mud_signature: String, cache_validity: i32, systeminfo: String, name: String, firmware_rev: String, software_rev: String, documentation: String) -> Mud {
         Mud {
             mud_version,

@@ -95,7 +95,7 @@ impl Device {
             None => None,
         };
         let mud_data = match &self.mud_url {
-            Some(mud_url) => Some(mud_service::get_or_fetch_mud(&mud_url, conn).await?),
+            Some(mud_url) => Some(mud_service::get_or_fetch_mud(mud_url, conn).await?),
             None => None,
         };
         Ok(DeviceWithRefs {

@@ -32,6 +32,7 @@ pub struct PatchedMud {
 }
 
 impl PatchedMud {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> PatchedMud {
         PatchedMud {
             mud_version: None,

@@ -63,7 +63,7 @@ async fn get_all_devices_inside_room(
     auth.require_permission(Permission::device__list)?;
     auth.require_permission(Permission::device__read)?;
 
-    room_service::find_by_id(id.0, &&pool).await.or_else(|_| {
+    room_service::find_by_id(id.0, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
             message: Some("Room can not be found.".to_string()),
@@ -114,7 +114,7 @@ async fn create_room(
             status: StatusCode::CONFLICT,
             message: Some("Room already exists.".to_string()),
         }
-        .fail()?
+        .fail()?;
     }
 
     let room = room_creation_update_dto.into_inner().into_room(0);
@@ -160,7 +160,7 @@ async fn update_room(
             status: StatusCode::CONFLICT,
             message: Some("Room already exists.".to_string()),
         }
-        .fail()?
+        .fail()?;
     }
 
     let updated = room_service::update(&room, &pool).await.or_else(|_| {

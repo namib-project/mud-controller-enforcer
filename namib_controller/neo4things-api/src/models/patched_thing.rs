@@ -24,6 +24,7 @@ pub struct PatchedThing {
 }
 
 impl PatchedThing {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> PatchedThing {
         PatchedThing {
             serial: None,

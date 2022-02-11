@@ -177,7 +177,7 @@ pub fn update_certs() -> Result<()> {
     csr.finalize_pkey(pkey, 5000)?.download_and_save_cert()?;
     // make the resolver reload the certificate
     if let Ok(mut g) = ACME_CERTIFIED_KEY.write() {
-        *g = None
+        *g = None;
     }
     Ok(())
 }

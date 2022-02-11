@@ -22,6 +22,7 @@ pub struct PaginatedMudByManufacturerList {
 }
 
 impl PaginatedMudByManufacturerList {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> PaginatedMudByManufacturerList {
         PaginatedMudByManufacturerList {
             count: None,

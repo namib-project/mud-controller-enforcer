@@ -22,6 +22,7 @@ pub struct PaginatedAclList {
 }
 
 impl PaginatedAclList {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> PaginatedAclList {
         PaginatedAclList {
             count: None,
