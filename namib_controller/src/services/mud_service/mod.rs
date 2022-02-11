@@ -175,7 +175,7 @@ pub fn get_custom_mud_expiration() -> DateTime<Utc> {
 
 pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
     debug!("Update outdated profiles");
-    let mud_data = get_all_mud_expiration(&db_pool).await?;
+    let mud_data = get_all_mud_expiration(db_pool).await?;
     let mud_vec: Vec<String> = mud_data
         .into_iter()
         .filter(|mud| mud.expiration < Utc::now().naive_utc())
@@ -184,8 +184,8 @@ pub async fn update_outdated_profiles(db_pool: &DbConnection) -> Result<()> {
     if mud_vec.is_empty() {
         return Ok(());
     }
-    update_mud_urls(mud_vec, &db_pool).await?;
-    update_config_version(&db_pool).await
+    update_mud_urls(mud_vec, db_pool).await?;
+    update_config_version(db_pool).await
 }
 
 async fn update_mud_urls(vec_url: Vec<String>, db_pool: &DbConnection) -> Result<()> {

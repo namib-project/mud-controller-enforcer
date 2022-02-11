@@ -54,7 +54,7 @@ pub async fn add_device(id: i64, device: Device) {
     })
     .await
     {
-        error!("Failed to add thing {:?}", e)
+        error!("Failed to add thing {:?}", e);
     }
 }
 
@@ -81,7 +81,7 @@ pub async fn add_device_connection(device: Device, connection: String) {
     })
     .await
     {
-        error!("Failed to add thing connection {:?}", e)
+        error!("Failed to add thing connection {:?}", e);
     }
 }
 
@@ -122,7 +122,7 @@ pub async fn describe_thing(mac_or_duid: String, mud_url: String) {
     })
     .await
     {
-        error!("Failed to describe thing {:?}", e)
+        error!("Failed to describe thing {:?}", e);
     }
 }
 

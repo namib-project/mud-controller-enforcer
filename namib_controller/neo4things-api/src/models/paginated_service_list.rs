@@ -22,6 +22,7 @@ pub struct PaginatedServiceList {
 }
 
 impl PaginatedServiceList {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> PaginatedServiceList {
         PaginatedServiceList {
             count: None,

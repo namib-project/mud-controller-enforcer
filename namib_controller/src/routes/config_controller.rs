@@ -57,7 +57,7 @@ async fn set_configs(
     auth.require_permission(Permission::config__write)?;
 
     for (key, value) in config_set_dto.iter() {
-        config_service::set_config_value(&key, value, &pool).await?;
+        config_service::set_config_value(key, value, &pool).await?;
     }
 
     let mut config_map: HashMap<String, Option<String>> = HashMap::new();

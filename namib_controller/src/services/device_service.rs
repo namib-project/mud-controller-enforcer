@@ -5,6 +5,8 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use namib_shared::{macaddr::SerdeMacAddr, models::DhcpLeaseInformation};
 
+use std::string::ToString;
+
 use crate::{
     db::DbConnection,
     error::Result,
@@ -16,7 +18,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
     debug!("dhcp request device mud file: {:?}", lease_info.mud_url);
 
     if let Ok(mut device) =
-        find_by_mac_or_duid(lease_info.mac_address, lease_info.duid().map(|d| d.to_string()), pool).await
+        find_by_mac_or_duid(lease_info.mac_address, lease_info.duid().map(ToString::to_string), pool).await
     {
         device.apply(lease_info);
 

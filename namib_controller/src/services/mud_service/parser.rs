@@ -129,7 +129,7 @@ fn parse_device_policy(
                             error::MudError {
                                 message: String::from("IPv6 ACE in IPv4 ACL"),
                             }
-                            .fail()?
+                            .fail()?;
                         }
                         protocol = ipv6.protocol.map(AceProtocol::Protocol);
                         address_mask = ipv6
@@ -143,7 +143,7 @@ fn parse_device_policy(
                             error::MudError {
                                 message: String::from("IPv4 ACE in IPv6 ACL"),
                             }
-                            .fail()?
+                            .fail()?;
                         }
                         protocol = ipv4.protocol.map(AceProtocol::Protocol);
                         address_mask = ipv4

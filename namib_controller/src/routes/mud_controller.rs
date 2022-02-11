@@ -36,7 +36,7 @@ pub async fn get_muds(
     auth.require_permission(Permission::mud__read)?;
 
     if let Some(url) = &query.mud_url {
-        let mud = mud_service::get_or_fetch_mud(&url, &pool).await.or_else(|_| {
+        let mud = mud_service::get_or_fetch_mud(url, &pool).await.or_else(|_| {
             error::ResponseError {
                 status: StatusCode::NOT_FOUND,
                 message: Some("Couldn't find MUD-Profile".to_string()),

@@ -28,7 +28,7 @@ const ACCEPT_LANGUAGE_HEADER_VALUE: &str = "en, de, *;q=0.5";
 const USER_AGENT_HEADER_VALUE: &str = concatcp!("NAMIB-MUD-Controller/", VERSION);
 
 /// Fetch MUD-URL Data respecting timeout, redirects and maximum response length.
-/// Respects the request headers specified by https://tools.ietf.org/html/rfc8520#section-1.6
+/// Respects the request headers specified by <https://tools.ietf.org/html/rfc8520#section-1.6>
 pub async fn fetch_mud(url: &str) -> Result<String> {
     // start the response
     let mut response = reqwest::Client::builder()

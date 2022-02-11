@@ -190,7 +190,7 @@ pub async fn update_username(id: i64, username: &str, conn: &DbConnection) -> Re
 
 pub async fn update_password(id: i64, password: &str, conn: &DbConnection) -> Result<bool> {
     let salt = User::generate_salt();
-    let password = User::hash_password(&password, &salt)?;
+    let password = User::hash_password(password, &salt)?;
     let upd_count = sqlx::query!(
         "UPDATE users SET password = $1, salt = $2 where id = $3",
         password,

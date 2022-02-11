@@ -77,7 +77,7 @@ impl AuthToken {
             self,
             &get_config_value("jwt_secret", conn)
                 .await
-                .and_then(|s: String| jwt::EncodingKey::from_base64_secret(&s).map_err(|e| e.into()))
+                .and_then(|s: String| jwt::EncodingKey::from_base64_secret(&s).map_err(std::convert::Into::into))
                 .expect("env JWT_SECRET is not valid base64"),
         )
         .expect("jwt")
@@ -91,7 +91,7 @@ impl AuthToken {
             token,
             &get_config_value("jwt_secret", conn)
                 .await
-                .and_then(|s: String| jwt::DecodingKey::from_base64_secret(&s).map_err(|e| e.into()))
+                .and_then(|s: String| jwt::DecodingKey::from_base64_secret(&s).map_err(std::convert::Into::into))
                 .expect("env JWT_SECRET is not valid base64"),
             &Validation::new(Algorithm::HS256),
         )
@@ -114,7 +114,7 @@ async fn extract_auth_from_request(conn: &DbConnection, request: &HttpRequest) -
         .and_then(|header| header.to_str().ok())
         .and_then(extract_token_from_header);
     if let Some(token_str) = token {
-        AuthToken::decode_token(token_str, &conn).await
+        AuthToken::decode_token(token_str, conn).await
     } else {
         None
     }
@@ -134,9 +134,9 @@ impl FromRequest for AuthToken {
         let req = req.clone();
         Box::pin(async move {
             let conn = req.app_data::<web::Data<DbConnection>>().unwrap();
-            match extract_auth_from_request(&conn, &req).await {
+            match extract_auth_from_request(conn, &req).await {
                 Some(auth) => {
-                    user_service::update_last_interaction_stamp(auth.sub, &conn).await?;
+                    user_service::update_last_interaction_stamp(auth.sub, conn).await?;
                     Ok(auth)
                 }
                 None => Err(ErrorUnauthorized("Unauthorized")),
@@ -146,7 +146,7 @@ impl FromRequest for AuthToken {
 }
 
 pub async fn initialize_jwt_secret(conn: &DbConnection) -> Result<()> {
-    let jwt_secret: Result<String> = get_config_value("jwt_secret", &conn).await;
+    let jwt_secret: Result<String> = get_config_value("jwt_secret", conn).await;
     match jwt_secret {
         Err(DatabaseError {
             source: sqlx::error::Error::RowNotFound,
@@ -154,7 +154,7 @@ pub async fn initialize_jwt_secret(conn: &DbConnection) -> Result<()> {
         }) => {
             let mut jwt_secret = [0; 256];
             thread_rng().fill_bytes(&mut jwt_secret);
-            set_config_value("jwt_secret", base64::encode(&jwt_secret), &conn).await?;
+            set_config_value("jwt_secret", base64::encode(&jwt_secret), conn).await?;
             Ok(())
         }
         x => x.map(|_v| ()),

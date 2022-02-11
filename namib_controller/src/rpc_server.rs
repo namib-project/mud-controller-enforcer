@@ -66,6 +66,7 @@ impl NamibRpc for NamibRpcServer {
     }
 
     /// Called when the enforcer receives a dhcp lease event.
+    #[allow(clippy::pedantic)]
     async fn dhcp_request(self, _: context::Context, dhcp_event: DhcpEvent) {
         debug!("dhcp_request from: {:?}. Data: {:?}", self.client_ip, dhcp_event);
 
@@ -88,7 +89,7 @@ impl NamibRpc for NamibRpcServer {
             self.client_id,
             logs.len(),
         );
-        log_service::add_new_logs(self.client_id, logs, &self.db_connection).await
+        log_service::add_new_logs(self.client_id, logs, &self.db_connection).await;
     }
 }
 
