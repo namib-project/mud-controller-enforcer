@@ -59,6 +59,7 @@ pub struct DeviceWithRefs {
     pub inner: Device,
     pub room: Option<Room>,
     pub mud_data: Option<MudData>,
+    pub controller_uris: Vec<String>,
 }
 
 impl Deref for DeviceWithRefs {
@@ -102,6 +103,7 @@ impl Device {
             inner: self,
             room,
             mud_data,
+            controller_uris: None, // TODO
         })
     }
 }

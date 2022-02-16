@@ -502,6 +502,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
@@ -611,6 +612,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
@@ -720,6 +722,7 @@ mod tests {
             },
             mud_data: Some(bulb_mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         // create bridge
@@ -758,6 +761,7 @@ mod tests {
             },
             mud_data: Some(bridge_mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
@@ -835,6 +839,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let mud_data1 = MudData {
@@ -885,6 +890,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
+            controller_uris: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -985,6 +991,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1018,6 +1025,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
+            controller_uris: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1.clone()]);
@@ -1116,6 +1124,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1166,6 +1175,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
+            controller_uris: vec![],
         };
 
         let resulting_device = FirewallDevice {
