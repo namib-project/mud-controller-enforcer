@@ -99,11 +99,15 @@ impl Device {
             Some(mud_url) => Some(mud_service::get_or_fetch_mud(mud_url, conn).await?),
             None => None,
         };
+        let controller_uris: Vec<String> = match &self.mud_url {
+            Some(mud_url) => mud_service::get_controllers(mud_url, conn).await?,
+            None => vec![],
+        };
         Ok(DeviceWithRefs {
             inner: self,
             room,
             mud_data,
-            controller_uris: None, // TODO
+            controller_uris,
         })
     }
 }
