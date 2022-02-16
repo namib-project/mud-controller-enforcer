@@ -3,7 +3,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 
-use actix_web::http::StatusCode;
+pub use actix_web::http::StatusCode;
 use namib_shared::macaddr::ParseError;
 use paperclip::actix::{api_v2_errors, web::HttpResponse};
 use snafu::{Backtrace, Snafu};
@@ -60,7 +60,7 @@ pub enum Error {
     ResponseError {
         message: Option<String>,
         status: StatusCode,
-        backtrace: Backtrace,
+        backtrace: Option<Backtrace>,
     },
     #[snafu(display("MudError {}", message), visibility(pub))]
     MudError { message: String, backtrace: Backtrace },
@@ -113,7 +113,68 @@ pub enum Error {
     CertificateRequestError { backtrace: Backtrace },
     #[snafu(display("EnforcerNotAllowed"), visibility(pub))]
     EnforcerNotAllowed { backtrace: Backtrace },
+    #[snafu(display("{:?}", message), visibility(pub))]
+    InvalidUserInput {
+        message: String,
+        field: String,
+        status: StatusCode,
+    },
 }
+
+macro_rules! invalid_user_input {
+    ($message: tt, $field: tt, $status: expr) => {
+        |_| {
+            Err(crate::error::Error::InvalidUserInput {
+                message: String::from($message),
+                field: String::from($field),
+                status: $status,
+            })
+        }
+    };
+    ($message: tt, $field: tt) => {
+        error::invalid_user_input!($message, $field, crate::error::StatusCode::UNPROCESSABLE_ENTITY)
+    };
+}
+
+macro_rules! response_error {
+    () => {
+        error::response_error!(StatusCode::BAD_REQUEST, None)
+    };
+    ($status: expr) => {
+        error::response_error!($status, None)
+    };
+    ($status: expr, $message: tt) => {
+        |_| {
+            Err(error::Error::ResponseError {
+                status: $status,
+                message: $message,
+                backtrace: None,
+            })
+        }
+    };
+}
+
+macro_rules! map_internal {
+    () => {
+        error::map_internal!(StatusCode::BAD_REQUEST, None)
+    };
+    ($status: expr, $message: tt) => {
+        |err| {
+            Err(match err {
+                error::Error::InvalidUserInput { .. } => err,
+                _ => error::Error::ResponseError {
+                    status: $status,
+                    message: $message,
+                    backtrace: None,
+                },
+            })
+        }
+    };
+}
+
+pub(crate) use invalid_user_input;
+pub(crate) use map_internal;
+pub(crate) use response_error;
 
 /// A failable action
 pub type Result<T> = std::result::Result<T, Error>;
@@ -125,6 +186,7 @@ pub fn none_error() -> Error {
 #[derive(Serialize, Deserialize)]
 pub struct ErrorDto {
     pub error: String,
+    pub field: Option<String>,
 }
 
 impl actix_web::ResponseError for Error {
@@ -138,15 +200,28 @@ impl actix_web::ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
         error!("Error during request: {:?}", self);
         let (mut rb, body) = match self {
+            Error::InvalidUserInput { message, field, status, .. } => {
+                let message = message.clone();
+                let field = field.clone();
+
+                (
+                    HttpResponse::build(*status),
+                    ErrorDto {
+                        error: message,
+                        field: Some(field),
+                    }
+                )
+            },
             Error::ResponseError { status, message, .. } => {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
 
-                (HttpResponse::build(*status), ErrorDto { error: message })
-            },
+                (HttpResponse::build(*status), ErrorDto { error: message, field: None })
+            }
             _ => (
                 HttpResponse::InternalServerError(),
                 ErrorDto {
                     error: String::from("An error occurred"),
+                    field: None,
                 },
             ),
         };

@@ -11,8 +11,7 @@ use validator::Validate;
 use crate::{
     auth::AuthToken,
     db::DbConnection,
-    error,
-    error::Result,
+    error::{self, Result},
     models::User,
     routes::dtos::{
         LoginDto, SignupDto, SuccessDto, TokenDto, UpdatePasswordDto, UpdateUserDto, UserConfigDto, UserConfigValueDto,
@@ -45,23 +44,14 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
         }
     );
 
-    signup_dto.validate().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    signup_dto.validate()
+        .or_else(error::response_error!())?;
 
     let user = User::new(signup_dto.0.username, &signup_dto.0.password)?;
 
-    user_service::insert(user, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    user_service::insert(user, &pool)
+        .await
+        .or_else(error::map_internal!())?;
 
     Ok(Json(SuccessDto {
         status: String::from("ok"),
@@ -70,31 +60,15 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
 
 #[api_v2_operation(summary = "Login with username and password", tags(Users))]
 pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
-    login_dto.validate().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    login_dto.validate()
+        .or_else(error::response_error!())?;
 
     let user = user_service::find_by_username(&login_dto.username, &pool)
         .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::UNAUTHORIZED,
-                message: None,
-            }
-            .fail()
-        })?;
+        .or_else(error::invalid_user_input!("Your username and/or password is incorrect!", "password", StatusCode::UNAUTHORIZED))?;
 
-    user.verify_password(&login_dto.password).or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::UNAUTHORIZED,
-            message: None,
-        }
-        .fail()
-    })?;
+    user.verify_password(&login_dto.password)
+        .or_else(error::invalid_user_input!("Your username and/or password is incorrect!", "password", StatusCode::UNAUTHORIZED))?;
 
     user_service::update_last_interaction_stamp(user.id, &pool).await?;
 
@@ -109,13 +83,9 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 
 #[api_v2_operation(summary = "Refreshes the jwt token if it is not expired.", tags(Users))]
 pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<TokenDto>> {
-    let user = user_service::find_by_id(auth.sub, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    let user = user_service::find_by_id(auth.sub, &pool)
+        .await
+        .or_else(error::response_error!())?;
 
     Ok(Json(TokenDto {
         token: AuthToken::encode_token(
@@ -139,13 +109,8 @@ pub fn update_me(
     auth: AuthToken,
     update_user_dto: Json<UpdateUserDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_user_dto.validate().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    update_user_dto.validate()
+        .or_else(error::response_error!())?;
 
     let mut user = user_service::find_by_id(auth.sub, &pool).await?;
 
@@ -166,23 +131,13 @@ pub fn update_password(
     auth: AuthToken,
     update_password_dto: Json<UpdatePasswordDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_password_dto.validate().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    update_password_dto.validate()
+        .or_else(error::response_error!())?;
 
     let user = user_service::find_by_id(auth.sub, &pool).await?;
 
-    user.verify_password(&update_password_dto.old_password).or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::UNAUTHORIZED,
-            message: None,
-        }
-        .fail()
-    })?;
+    user.verify_password(&update_password_dto.old_password)
+        .or_else(error::response_error!())?;
 
     user_service::update_password(auth.sub, &update_password_dto.new_password, &pool).await?;
 
