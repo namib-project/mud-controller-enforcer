@@ -1,12 +1,32 @@
 # Metaproject
 
-## Git Secrets
+## Build dependencies (Debian/Ubuntu)
 
-### Install
-
-```shell
-sudo apt-get update && sudo apt-get install git-secret -y
+```bash
+sudo apt-get update && sudo apt-get install -y \
+      git-secret cmake clang \
+      libavahi-compat-libdnssd-dev \
+      libnftnl-dev libmnl-dev libssl-dev \
+      nftables jq sqlite3 unzip \
+&& curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh \
+&& rustup component add clippy rustfmt rust-src
 ```
+
+## Run locally for development
+
+To build and run the NAMIB controller and enforcer locally, use the `run_local.sh` script to run the components in separate terminals.
+
+```bash
+./run_local.sh controller  # run controller in terminal 1
+./run_local.sh enforcer  # run controller in terminal 2
+./run_local.sh whitelist  # whitelist enforcer in database after first contact
+```
+
+The components are communicating successfully when you see this message:
+
+> DEBUG namib_enforcer::rpc::rpc_client] Heartbeat OK!
+
+## Git Secrets
 
 ### Add a new user
 
