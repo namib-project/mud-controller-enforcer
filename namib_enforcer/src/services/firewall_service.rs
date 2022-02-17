@@ -33,7 +33,14 @@ use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
 /// @author Namib Group 3.
 
 const TABLE_NAME: &str = "namib";
+const TABLE_NAME_LOCAL: &str = "namib_local";
 const BASE_CHAIN_NAME: &str = "base_chain";
+const BASE_CHAIN_NAME_LOCAL: &str = "base_chain";
+
+const NF_INET_IPV4 : u8 = libc::NFPROTO_IPV4 as u8;
+const NF_INET_IPV6 : u8 = libc::NFPROTO_IPV6 as u8;
+const NF_BRIDGE_IPV4 : u16 = (libc::ETH_P_IP as u16).swap_bytes();
+const NF_BRIDGE_IPV6 : u16 = (libc::ETH_P_IPV6 as u16).swap_bytes();
 
 /// Service which provides firewall configuration functionality by integrating into the linux system
 /// firewall (nftables).
@@ -109,19 +116,33 @@ impl FirewallService {
     }
 }
 
+#[derive(PartialEq)]
+enum FirewallRuleScope {
+    Global,
+    Local,
+}
+
+enum FirewallRuleProto {
+    IPv4,
+    IPv6,
+}
+
 #[cfg(feature = "nftables")]
 pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
-    let mut batch = Batch::new();
-    add_old_config_deletion_instructions(&mut batch)?;
-    let mut device_batches = Vec::new();
-    convert_config_to_nftnl_commands(&mut batch, &config, dns_watcher, &mut device_batches).await?;
-    let batch = batch.finalize();
-    if let Err(e) = send_and_process(batch, &device_batches) {
-        error!("Error sending firewall configuration to netfilter: {:?}", e);
-        Err(e)
-    } else {
-        Ok(())
+    for scope in [FirewallRuleScope::Global, FirewallRuleScope::Local] {
+        debug!("Creating rules for table {}", match scope {FirewallRuleScope::Local => TABLE_NAME_LOCAL, FirewallRuleScope::Global => TABLE_NAME});
+        let mut batch = Batch::new();
+        add_old_config_deletion_instructions(&mut batch, &scope);
+        let mut device_batches = Vec::new();
+        convert_config_to_nftnl_commands(&mut batch, &config, &scope, dns_watcher, &mut device_batches).await?;
+        let batch = batch.finalize();
+        debug!("Applying rules for table {}", match scope {FirewallRuleScope::Local => TABLE_NAME_LOCAL, FirewallRuleScope::Global => TABLE_NAME});
+        if let Err(e) = send_and_process(batch, &device_batches) {
+            error!("Error sending firewall configuration to netfilter: {:?}", e);
+            return Err(e);
+        }
     }
+    Ok(())
 }
 
 #[cfg(not(feature = "nftables"))]
@@ -134,15 +155,43 @@ pub async fn apply_firewall_config_inner(
 
 /// Creates nftnl expressions which delete the current namib firewall table if it exists and adds them to the given batch.
 #[cfg(feature = "nftables")]
-fn add_old_config_deletion_instructions(batch: &mut Batch) -> Result<()> {
+fn add_old_config_deletion_instructions(batch: &mut Batch, scope: &FirewallRuleScope) {
     // Create the table if it doesn't exist, otherwise removing the table might cause a NotFound error.
     // If the table already exists, this doesn't do anything.
-    let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+    let table = create_table(scope);
     batch.add(&table, nftnl::MsgType::Add);
     // Delete the table.
-    let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+    let table = create_table(scope);
     batch.add(&table, nftnl::MsgType::Del);
-    Ok(())
+}
+
+#[cfg(feature = "nftables")]
+fn create_table(scope: &FirewallRuleScope) -> Table {
+    match scope {
+        FirewallRuleScope::Global => Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet),
+        FirewallRuleScope::Local => Table::new(&CString::new(TABLE_NAME_LOCAL).unwrap(), ProtoFamily::Bridge),
+    }
+}
+
+// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
+#[cfg(feature = "nftables")]
+fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
+    match scope {
+        FirewallRuleScope::Global => {
+            rule.add_expr(&nft_expr!(meta nfproto));
+            match proto {
+                FirewallRuleProto::IPv4 => {rule.add_expr(&nft_expr!(cmp == NF_INET_IPV4));},
+                FirewallRuleProto::IPv6 => {rule.add_expr(&nft_expr!(cmp == NF_INET_IPV6));},
+            }
+        },
+        FirewallRuleScope::Local => {
+            rule.add_expr(&nft_expr!(meta proto));
+            match proto {
+                FirewallRuleProto::IPv4 => {rule.add_expr(&nft_expr!(cmp == NF_BRIDGE_IPV4));},
+                FirewallRuleProto::IPv6 => {rule.add_expr(&nft_expr!(cmp == NF_BRIDGE_IPV6));},
+            }
+        },
+    }
 }
 
 /// Converts the given firewall config into nftnl expressions and applies them to the supplied batch.
@@ -150,17 +199,26 @@ fn add_old_config_deletion_instructions(batch: &mut Batch) -> Result<()> {
 async fn convert_config_to_nftnl_commands(
     batch: &mut Batch,
     config: &EnforcerConfig,
+    scope: &FirewallRuleScope,
     dns_watcher: &DnsWatcher,
     device_batches: &mut Vec<FinalizedBatch>,
 ) -> Result<()> {
     // Create new firewall table.
-    let table = Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet);
+    let table = create_table(scope);
     batch.add(&table, nftnl::MsgType::Add);
 
     // Create base chain. This base chain is the entry point for the firewall table and will redirect all
     // packets corresponding to a configured device in the firewall config to its separate chain.
-    let mut base_chain = Chain::new(&CString::new(BASE_CHAIN_NAME).unwrap(), &table);
-    base_chain.set_hook(nftnl::Hook::Forward, 0);
+    let base_chain_name = match scope {
+        FirewallRuleScope::Global => BASE_CHAIN_NAME,
+        FirewallRuleScope::Local => BASE_CHAIN_NAME_LOCAL,
+    };
+    let mut base_chain = Chain::new(&CString::new(base_chain_name).unwrap(), &table);
+    let base_chain_hook = match scope {
+        FirewallRuleScope::Global => nftnl::Hook::Forward,
+        FirewallRuleScope::Local => nftnl::Hook::In,
+    };
+    base_chain.set_hook(base_chain_hook, 0);
     // If a device is not one of the configured devices, accept packets by default.
     base_chain.set_policy(nftnl::Policy::Accept);
     batch.add(&base_chain, nftnl::MsgType::Add);
@@ -183,16 +241,12 @@ async fn convert_config_to_nftnl_commands(
         if let Some(v4addr) = device.ipv4_addr {
             // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
             let mut device_jump_rule_src = Rule::new(&base_chain);
-            device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
             let mut device_jump_rule_dst = Rule::new(&base_chain);
-            device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
             // Match rule if source or target address is configured device.
-            device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-            device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+            nf_match_proto(&mut device_jump_rule_src, scope, &FirewallRuleProto::IPv4);
             device_jump_rule_src.add_expr(&nft_expr!(payload ipv4 saddr));
             device_jump_rule_src.add_expr(&nft_expr!(cmp == v4addr));
-            device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-            device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+            nf_match_proto(&mut device_jump_rule_dst, scope, &FirewallRuleProto::IPv4);
             device_jump_rule_dst.add_expr(&nft_expr!(payload ipv4 daddr));
             device_jump_rule_dst.add_expr(&nft_expr!(cmp == v4addr));
             // If these rules apply, jump to the chain responsible for handling this device.
@@ -206,16 +260,12 @@ async fn convert_config_to_nftnl_commands(
         if let Some(v6addr) = device.ipv6_addr {
             // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
             let mut device_jump_rule_src = Rule::new(&base_chain);
-            device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
             let mut device_jump_rule_dst = Rule::new(&base_chain);
-            device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
             // Match rule if source or target address is configured device.
-            device_jump_rule_src.add_expr(&nft_expr!(meta nfproto));
-            device_jump_rule_src.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+            nf_match_proto(&mut device_jump_rule_src, scope, &FirewallRuleProto::IPv6);
             device_jump_rule_src.add_expr(&nft_expr!(payload ipv6 saddr));
             device_jump_rule_src.add_expr(&nft_expr!(cmp == v6addr));
-            device_jump_rule_dst.add_expr(&nft_expr!(meta nfproto));
-            device_jump_rule_dst.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+            nf_match_proto(&mut device_jump_rule_dst, scope, &FirewallRuleProto::IPv6);
             device_jump_rule_dst.add_expr(&nft_expr!(payload ipv6 daddr));
             device_jump_rule_dst.add_expr(&nft_expr!(cmp == v6addr));
             // If these rules apply, jump to the chain responsible for handling this device.
@@ -229,7 +279,7 @@ async fn convert_config_to_nftnl_commands(
 
         // Iterate over device rules.
         for rule_spec in &device.rules {
-            add_rule_to_batch(&device_chain, &mut device_batch, &device, &rule_spec, dns_watcher).await?;
+            add_rule_to_batch(&device_chain, &mut device_batch, &device, &scope, &rule_spec, dns_watcher).await?;
         }
         device_batches.push(device_batch.finalize());
     }
@@ -243,6 +293,7 @@ async fn add_rule_to_batch(
     device_chain: &Chain<'_>,
     device_batch: &mut Batch,
     device: &FirewallDevice,
+    scope: &FirewallRuleScope,
     rule_spec: &FirewallRule,
     dns_watcher: &DnsWatcher,
 ) -> Result<()> {
@@ -343,14 +394,12 @@ async fn add_rule_to_batch(
             // Create expressions to match source IP.
             match source_ip {
                 RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
-                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                    nf_match_proto(&mut current_rule, &scope, &FirewallRuleProto::IPv4);
                     current_rule.add_expr(&nft_expr!(payload ipv4 saddr));
                     current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
                 },
                 RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
-                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                    nf_match_proto(&mut current_rule, &scope, &FirewallRuleProto::IPv6);
                     current_rule.add_expr(&nft_expr!(payload ipv6 saddr));
                     current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
                 },
@@ -359,14 +408,12 @@ async fn add_rule_to_batch(
             // Create expressions to match destination IP.
             match dest_ip {
                 RuleAddrEntry::AddrEntry(IpAddr::V4(v4addr)) => {
-                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
+                    nf_match_proto(&mut current_rule, &scope, &FirewallRuleProto::IPv4);
                     current_rule.add_expr(&nft_expr!(payload ipv4 daddr));
                     current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
                 },
                 RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
-                    current_rule.add_expr(&nft_expr!(meta nfproto));
-                    current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
+                    nf_match_proto(&mut current_rule, &scope, &FirewallRuleProto::IPv6);
                     current_rule.add_expr(&nft_expr!(payload ipv6 daddr));
                     current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
                 },
