@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jasper Wiegratz
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #[cfg(feature = "nftables")]
@@ -36,11 +36,6 @@ const TABLE_NAME: &str = "namib";
 const TABLE_NAME_LOCAL: &str = "namib_local";
 const BASE_CHAIN_NAME: &str = "base_chain";
 const BASE_CHAIN_NAME_LOCAL: &str = "base_chain";
-
-const NF_INET_IPV4 : u8 = libc::NFPROTO_IPV4 as u8;
-const NF_INET_IPV6 : u8 = libc::NFPROTO_IPV6 as u8;
-const NF_BRIDGE_IPV4 : u16 = (libc::ETH_P_IP as u16).swap_bytes();
-const NF_BRIDGE_IPV6 : u16 = (libc::ETH_P_IPV6 as u16).swap_bytes();
 
 /// Service which provides firewall configuration functionality by integrating into the linux system
 /// firewall (nftables).
@@ -130,13 +125,17 @@ enum FirewallRuleProto {
 #[cfg(feature = "nftables")]
 pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
     for scope in [FirewallRuleScope::Global, FirewallRuleScope::Local] {
-        debug!("Creating rules for table {}", match scope {FirewallRuleScope::Local => TABLE_NAME_LOCAL, FirewallRuleScope::Global => TABLE_NAME});
+        let table_name = match scope {
+            FirewallRuleScope::Local => TABLE_NAME_LOCAL,
+            FirewallRuleScope::Global => TABLE_NAME,
+        };
+        debug!("Creating rules for table {}", table_name);
         let mut batch = Batch::new();
         add_old_config_deletion_instructions(&mut batch, &scope);
         let mut device_batches = Vec::new();
         convert_config_to_nftnl_commands(&mut batch, &config, &scope, dns_watcher, &mut device_batches).await?;
         let batch = batch.finalize();
-        debug!("Applying rules for table {}", match scope {FirewallRuleScope::Local => TABLE_NAME_LOCAL, FirewallRuleScope::Global => TABLE_NAME});
+        debug!("Applying rules for table {}", table_name);
         if let Err(e) = send_and_process(batch, &device_batches) {
             error!("Error sending firewall configuration to netfilter: {:?}", e);
             return Err(e);
@@ -176,21 +175,90 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
 // Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
-    match scope {
-        FirewallRuleScope::Global => {
-            rule.add_expr(&nft_expr!(meta nfproto));
+    rule.add_expr(&nft_expr!(meta proto));
+    rule.add_expr(&nft_expr!(cmp == proto.ethertype_code(&scope)));
+}
+
+// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
+#[cfg(feature = "nftables")]
+fn nf_match_l4proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto, l4proto: &Protocol) {
+    nf_match_proto(rule, &scope, &FirewallRuleProto::IPv4);
+    match l4proto {
+        Protocol::Tcp | Protocol::Udp => {
             match proto {
-                FirewallRuleProto::IPv4 => {rule.add_expr(&nft_expr!(cmp == NF_INET_IPV4));},
-                FirewallRuleProto::IPv6 => {rule.add_expr(&nft_expr!(cmp == NF_INET_IPV6));},
+                FirewallRuleProto::IPv4 => rule.add_expr(&nft_expr!(payload ipv4 protocol)),
+                FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
+            }
+            rule.add_expr(&nft_expr!(cmp == l4proto.proto_code()));
+        }
+        Protocol::All => {}, // TODO expand with further options (icmp, sctp)
+    }
+}
+
+trait EtherTypeCode {
+    fn ethertype_code(&self, scope: &FirewallRuleScope) -> u16;
+}
+
+#[allow(clippy::cast_possible_truncation)]
+impl EtherTypeCode for FirewallRuleProto {
+    fn ethertype_code(&self, scope: &FirewallRuleScope) -> u16 {
+        match self {
+            FirewallRuleProto::IPv4 => {
+                match scope {
+                    FirewallRuleScope::Global => libc::NFPROTO_IPV4 as u16,
+                    FirewallRuleScope::Local => (libc::ETH_P_IP as u16).swap_bytes(),
+                }
+            },
+            FirewallRuleProto::IPv6 => {
+                match scope {
+                    FirewallRuleScope::Global => libc::NFPROTO_IPV6 as u16,
+                    FirewallRuleScope::Local => (libc::ETH_P_IPV6 as u16).swap_bytes(),
+                }
+            }
+        }
+    }
+}
+
+trait ProtocolCode {
+    // Returns IP protocol code
+    fn proto_code(&self) -> u32;
+}
+
+impl ProtocolCode for Protocol {
+    fn proto_code(&self) -> u32 {
+        match self {
+            Protocol::Tcp => libc::IPPROTO_TCP as u32,
+            Protocol::Udp => libc::IPPROTO_UDP as u32,
+            _ => { panic!("Unknown protocol {:?}", self) }
+        }
+    }
+}
+
+// Adds netfilter expressions to match for port numbers.
+#[cfg(feature = "nftables")]
+fn nf_match_ports(rule: &mut Rule, rule_spec: &FirewallRule) {
+    match rule_spec.protocol {
+        Protocol::Tcp => {
+            if let Some(port) = &rule_spec.dst.port {
+                rule.add_expr(&nft_expr!(payload tcp dport));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
+            }
+            if let Some(port) = &rule_spec.src.port {
+                rule.add_expr(&nft_expr!(payload tcp sport));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
             }
         },
-        FirewallRuleScope::Local => {
-            rule.add_expr(&nft_expr!(meta proto));
-            match proto {
-                FirewallRuleProto::IPv4 => {rule.add_expr(&nft_expr!(cmp == NF_BRIDGE_IPV4));},
-                FirewallRuleProto::IPv6 => {rule.add_expr(&nft_expr!(cmp == NF_BRIDGE_IPV6));},
+        Protocol::Udp => {
+            if let Some(port) = &rule_spec.dst.port {
+                rule.add_expr(&nft_expr!(payload udp dport));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
+            }
+            if let Some(port) = &rule_spec.src.port {
+                rule.add_expr(&nft_expr!(payload udp sport));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
             }
         },
+        _ => {},
     }
 }
 
@@ -279,7 +347,15 @@ async fn convert_config_to_nftnl_commands(
 
         // Iterate over device rules.
         for rule_spec in &device.rules {
-            add_rule_to_batch(&device_chain, &mut device_batch, &device, &scope, &rule_spec, dns_watcher).await?;
+            add_rule_to_batch(
+                &device_chain,
+                &mut device_batch,
+                &device,
+                &scope,
+                &rule_spec,
+                dns_watcher,
+            )
+            .await?;
         }
         device_batches.push(device_batch.finalize());
     }
@@ -287,7 +363,7 @@ async fn convert_config_to_nftnl_commands(
     Ok(())
 }
 
-/// Adds a rule based on the given rule_spec to the given device_batch as part of the given device_chain
+// Adds a rule based on the given `rule_spec` to the given `device_batch` as part of the given `device_chain`
 #[cfg(feature = "nftables")]
 async fn add_rule_to_batch(
     device_chain: &Chain<'_>,
@@ -363,31 +439,10 @@ async fn add_rule_to_batch(
             // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
             match protocol_reference_ip {
                 Some(IpAddr::V4(_v4addr)) => {
-                    // Match for protocol.
-                    match rule_spec.protocol {
-                        Protocol::Tcp => {
-                            current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
-                            current_rule.add_expr(&nft_expr!(cmp == "tcp"));
-                        },
-                        Protocol::Udp => {
-                            current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
-                            current_rule.add_expr(&nft_expr!(cmp == "udp"));
-                        },
-                        _ => {}, // TODO expand with further options (icmp, sctp)
-                    }
+                    nf_match_l4proto(&mut current_rule, &scope, &FirewallRuleProto::IPv4, &rule_spec.protocol);
                 },
                 Some(IpAddr::V6(_v6addr)) => {
-                    match rule_spec.protocol {
-                        Protocol::Tcp => {
-                            current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
-                            current_rule.add_expr(&nft_expr!(cmp == "tcp"));
-                        },
-                        Protocol::Udp => {
-                            current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
-                            current_rule.add_expr(&nft_expr!(cmp == "udp"));
-                        },
-                        _ => {}, // TODO expand with further options (icmp, sctp)
-                    }
+                    nf_match_l4proto(&mut current_rule, &scope, &FirewallRuleProto::IPv6, &rule_spec.protocol);
                 },
                 _ => {},
             }
@@ -420,35 +475,13 @@ async fn add_rule_to_batch(
                 RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match for port numbers.
-            match rule_spec.protocol {
-                Protocol::Tcp => {
-                    if let Some(port) = &rule_spec.dst.port {
-                        current_rule.add_expr(&nft_expr!(payload tcp dport));
-                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                    }
-                    if let Some(port) = &rule_spec.src.port {
-                        current_rule.add_expr(&nft_expr!(payload tcp dport));
-                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                    }
-                },
-                Protocol::Udp => {
-                    if let Some(port) = &rule_spec.dst.port {
-                        current_rule.add_expr(&nft_expr!(payload udp dport));
-                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                    }
-                    if let Some(port) = &rule_spec.src.port {
-                        current_rule.add_expr(&nft_expr!(payload udp dport));
-                        current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
-                    }
-                },
-                _ => {},
-            }
+            nf_match_ports(&mut current_rule, rule_spec);
 
             // Set verdict if current rule matches.
             match rule_spec.verdict {
                 Verdict::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
                 Verdict::Reject => {
-                    current_rule.add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
+                    current_rule.add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)));
                 },
                 Verdict::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
             }
