@@ -1,10 +1,11 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 pub mod config_controller;
 pub mod device_controller;
 pub mod dtos;
 pub mod enforcer_controller;
+pub mod floor_controller;
 pub mod mud_controller;
 pub mod quarantine_controller;
 pub mod role_manager_controller;

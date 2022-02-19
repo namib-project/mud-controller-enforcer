@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::{
@@ -23,9 +23,9 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
     Ok(room)
 }
 
-///returns room by name from the database
-pub async fn find_by_name(name: &str, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE name = $1", name)
+///returns room by number from the database
+pub async fn find_by_number(number: &str, pool: &DbConnection) -> Result<Room> {
+    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE number = $1", number)
         .fetch_one(pool)
         .await?;
 
@@ -35,9 +35,10 @@ pub async fn find_by_name(name: &str, pool: &DbConnection) -> Result<Room> {
 ///updates a room with a new name and color in the database
 pub async fn update(room: &Room, pool: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "UPDATE rooms SET name = $1, color = $2 WHERE room_id = $3",
-        room.name,
-        room.color,
+        "UPDATE rooms SET floor_id = $1, number = $2, guest = $3 WHERE room_id = $4",
+        room.floor_id,
+        room.number,
+        room.guest,
         room.room_id
     )
     .execute(pool)
@@ -57,16 +58,16 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 
 ///Creates a new room with a given name and color in the database
 pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
-    let insert = sqlx::query!("INSERT INTO rooms (name, color) VALUES ($1, $2)", room.name, room.color)
+    let insert = sqlx::query!("INSERT INTO rooms (floor_id, number) VALUES ($1, $2)", room.floor_id, room.number)
         .execute(pool)
         .await?;
 
     Ok(insert.rows_affected())
 }
 
-///Deletes a room with a given name from database
-pub async fn delete_room(name: &str, pool: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("DELETE FROM rooms WHERE name = $1", name)
+///Deletes a room with a given number from database
+pub async fn delete_room(number: &str, pool: &DbConnection) -> Result<u64> {
+    let del_count = sqlx::query!("DELETE FROM rooms WHERE number = $1", number)
         .execute(pool)
         .await?;
 

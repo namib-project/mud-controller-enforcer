@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 pub mod acme_service;
@@ -12,6 +12,7 @@ pub mod log_service;
 pub mod mud_service;
 pub mod neo4things_service;
 pub mod role_service;
+pub mod floor_service;
 pub mod room_service;
 pub mod user_config_service;
 pub mod user_service;
