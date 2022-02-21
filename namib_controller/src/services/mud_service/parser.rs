@@ -157,7 +157,7 @@ fn parse_device_policy(
                         let manufacturer = mud.manufacturer.as_ref().map(std::string::ToString::to_string);
                         let same_manufacturer = mud.same_manufacturer.is_some();
                         let controller = mud.controller.as_ref().map(std::string::ToString::to_string);
-                        let my_controller = false;
+                        let my_controller = mud.my_controller.is_some();
                         let local = false;
                         let model = mud.model.as_ref().map(std::string::ToString::to_string);
                         if manufacturer.is_some()

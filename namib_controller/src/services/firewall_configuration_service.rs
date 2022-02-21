@@ -198,7 +198,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                             ));
                         }
                         if augmentation.my_controller {
-                            // TODO
+                            targets_per_option.push(get_my_controller_ruletargethosts(device, devices, acl.acl_type));
                         }
                         if augmentation.local {
                             // TODO
@@ -263,6 +263,25 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
         rules,
         collect_data: device.collect_info,
     }
+}
+
+fn get_my_controller_ruletargethosts(
+    device: &DeviceWithRefs,
+    devices: &[DeviceWithRefs],
+    acl_type: AclType,
+) -> Vec<Option<RuleTargetHost>> {
+    device
+        .controller_uris
+        .iter()
+        .flat_map(|uri| {
+            get_controller_ruletargethosts(
+                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                devices,
+                uri,
+                acl_type,
+            )
+        })
+        .collect()
 }
 
 fn get_controller_ruletargethosts(
@@ -502,6 +521,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
@@ -611,6 +631,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
@@ -659,6 +680,124 @@ mod tests {
         };
 
         assert!(x.eq(&resulting_device));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_my_controller() -> Result<()> {
+        // create bulb
+        let bulb_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bulb".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Tcp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: None,
+                        source_port: None,
+                        destination_port: None,
+                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                            manufacturer: None,
+                            same_manufacturer: false,
+                            controller: None,
+                            my_controller: true,
+                            local: false,
+                            model: None,
+                        }),
+                    },
+                }],
+            }],
+            acl_override: Vec::default(),
+        };
+        let bulb = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "10.0.0.3".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bulb".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(bulb_mud_data),
+            room: None,
+            controller_uris: vec!["https://manufacturer.com/devices/bridge".to_string()],
+        };
+
+        // create bridge
+        let bridge_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bridge".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: Vec::default(),
+            }],
+            acl_override: Vec::default(),
+        };
+        let bridge = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("ff:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "10.0.0.2".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bridge".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(bridge_mud_data),
+            room: None,
+            controller_uris: vec![],
+        };
+
+        let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
+
+        let rule_result: Vec<&FirewallRule> = bulb_firewall_rules_result
+            .rules
+            .iter()
+            .filter(|&r| {
+                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+            })
+            .collect();
+
+        assert!(rule_result.len() == 1);
+
+        let rule = rule_result[0];
+        assert_eq!(rule.verdict, Verdict::Accept);
 
         Ok(())
     }
@@ -720,6 +859,7 @@ mod tests {
             },
             mud_data: Some(bulb_mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         // create bridge
@@ -758,6 +898,7 @@ mod tests {
             },
             mud_data: Some(bridge_mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
@@ -835,6 +976,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let mud_data1 = MudData {
@@ -885,6 +1027,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
+            controller_uris: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -985,6 +1128,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1018,6 +1162,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
+            controller_uris: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1.clone()]);
@@ -1116,6 +1261,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
+            controller_uris: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1166,6 +1312,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
+            controller_uris: vec![],
         };
 
         let resulting_device = FirewallDevice {
