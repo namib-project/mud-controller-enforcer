@@ -19,6 +19,8 @@ use nftnl::{
     expr::{IcmpCode, RejectionType, Verdict as VerdictExpr},
     nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
 };
+#[cfg(feature = "nftables")]
+use pnet_datalink::interfaces;
 use tokio::{
     select,
     sync::{Notify, RwLock},
@@ -49,7 +51,7 @@ pub struct FirewallService {
 }
 
 /// Helper enum for rule conversion.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum RuleAddrEntry {
     AnyAddr,
     AddrEntry(IpAddr),
@@ -107,7 +109,7 @@ impl FirewallService {
         let config = &self.enforcer_state.read().await.config;
         debug!("{:?}", config);
         self.dns_watcher.clear_watched_names().await;
-        apply_firewall_config_inner(&config, &self.dns_watcher).await
+        apply_firewall_config_inner(config, &self.dns_watcher).await
     }
 }
 
@@ -117,9 +119,91 @@ enum FirewallRuleScope {
     Local,
 }
 
+trait AddressPairInScope {
+    fn address_pair_in_scope(&self, src_addr: IpAddr, dest_addr: IpAddr) -> bool;
+    fn rule_address_pair_in_scope(&self, src_addr: RuleAddrEntry, dest_addr: RuleAddrEntry) -> bool;
+}
+
+impl AddressPairInScope for FirewallRuleScope {
+    // In Local scope returns true iff source and destination addr are both contained in a local subnet, else false.
+    // In Global scope returns true if source and destination are in non-local or different subnets, else false.
+    fn address_pair_in_scope(&self, src_addr: IpAddr, dest_addr: IpAddr) -> bool {
+        for interface in interfaces() {
+            for ip in interface.ips {
+                if ip.contains(src_addr) && ip.contains(dest_addr) {
+                    return match *self {
+                        FirewallRuleScope::Local => true,
+                        FirewallRuleScope::Global => false,
+                    };
+                }
+            }
+        }
+        // No local interface with saddr and daddr found
+        match *self {
+            FirewallRuleScope::Local => false,
+            FirewallRuleScope::Global => true,
+        }
+    }
+
+    fn rule_address_pair_in_scope(&self, src_addr: RuleAddrEntry, dest_addr: RuleAddrEntry) -> bool {
+        if src_addr == RuleAddrEntry::AnyAddr || dest_addr == RuleAddrEntry::AnyAddr {
+            return true; // address with 'any' is relevant in all scopes
+        }
+        match (src_addr, dest_addr) {
+            (RuleAddrEntry::AddrEntry(src_addr), RuleAddrEntry::AddrEntry(dest_addr)) => {
+                self.address_pair_in_scope(src_addr, dest_addr)
+            },
+            _ => panic!("Reached unreachable condition in address pair scope matching."),
+        }
+    }
+}
+
 enum FirewallRuleProto {
     IPv4,
     IPv6,
+}
+
+// Protocol code for either IP protocol or ethertype
+enum EtherNfType {
+    NfType(u8),
+    EtherType(u16),
+}
+
+trait EtherTypeCode {
+    fn ethertype_code(&self, scope: &FirewallRuleScope) -> EtherNfType;
+}
+
+#[allow(clippy::cast_possible_truncation)]
+impl EtherTypeCode for FirewallRuleProto {
+    fn ethertype_code(&self, scope: &FirewallRuleScope) -> EtherNfType {
+        match self {
+            FirewallRuleProto::IPv4 => match scope {
+                FirewallRuleScope::Global => EtherNfType::NfType(libc::NFPROTO_IPV4 as u8),
+                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IP as u16).swap_bytes()),
+            },
+            FirewallRuleProto::IPv6 => match scope {
+                FirewallRuleScope::Global => EtherNfType::NfType(libc::NFPROTO_IPV6 as u8),
+                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IPV6 as u16).swap_bytes()),
+            },
+        }
+    }
+}
+
+trait ProtocolCode {
+    // Returns IP protocol code
+    fn proto_code(&self) -> u32;
+}
+
+impl ProtocolCode for Protocol {
+    fn proto_code(&self) -> u32 {
+        match self {
+            Protocol::Tcp => libc::IPPROTO_TCP as u32,
+            Protocol::Udp => libc::IPPROTO_UDP as u32,
+            Protocol::All => {
+                panic!("Unknown protocol {:?}", self)
+            },
+        }
+    }
 }
 
 #[cfg(feature = "nftables")]
@@ -133,7 +217,7 @@ pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_wat
         let mut batch = Batch::new();
         add_old_config_deletion_instructions(&mut batch, &scope);
         let mut device_batches = Vec::new();
-        convert_config_to_nftnl_commands(&mut batch, &config, &scope, dns_watcher, &mut device_batches).await?;
+        convert_config_to_nftnl_commands(&mut batch, config, &scope, dns_watcher, &mut device_batches).await?;
         let batch = batch.finalize();
         debug!("Applying rules for table {}", table_name);
         if let Err(e) = send_and_process(batch, &device_batches) {
@@ -175,14 +259,20 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
 // Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
-    rule.add_expr(&nft_expr!(meta proto));
-    rule.add_expr(&nft_expr!(cmp == proto.ethertype_code(&scope)));
+    match scope {
+        FirewallRuleScope::Local => rule.add_expr(&nft_expr!(meta proto)),  // bridge uses ethertype
+        FirewallRuleScope::Global => rule.add_expr(&nft_expr!(meta nfproto)),  // inet uses ip code
+    }
+    match proto.ethertype_code(scope) {
+        EtherNfType::EtherType(proto_code) => rule.add_expr(&nft_expr!(cmp == proto_code)),
+        EtherNfType::NfType(proto_code) => rule.add_expr(&nft_expr!(cmp == proto_code)),
+    };
 }
 
 // Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_l4proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto, l4proto: &Protocol) {
-    nf_match_proto(rule, &scope, &FirewallRuleProto::IPv4);
+    nf_match_proto(rule, scope, &FirewallRuleProto::IPv4);
     match l4proto {
         Protocol::Tcp | Protocol::Udp => {
             match proto {
@@ -190,47 +280,8 @@ fn nf_match_l4proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &Firewall
                 FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
             }
             rule.add_expr(&nft_expr!(cmp == l4proto.proto_code()));
-        }
+        },
         Protocol::All => {}, // TODO expand with further options (icmp, sctp)
-    }
-}
-
-trait EtherTypeCode {
-    fn ethertype_code(&self, scope: &FirewallRuleScope) -> u16;
-}
-
-#[allow(clippy::cast_possible_truncation)]
-impl EtherTypeCode for FirewallRuleProto {
-    fn ethertype_code(&self, scope: &FirewallRuleScope) -> u16 {
-        match self {
-            FirewallRuleProto::IPv4 => {
-                match scope {
-                    FirewallRuleScope::Global => libc::NFPROTO_IPV4 as u16,
-                    FirewallRuleScope::Local => (libc::ETH_P_IP as u16).swap_bytes(),
-                }
-            },
-            FirewallRuleProto::IPv6 => {
-                match scope {
-                    FirewallRuleScope::Global => libc::NFPROTO_IPV6 as u16,
-                    FirewallRuleScope::Local => (libc::ETH_P_IPV6 as u16).swap_bytes(),
-                }
-            }
-        }
-    }
-}
-
-trait ProtocolCode {
-    // Returns IP protocol code
-    fn proto_code(&self) -> u32;
-}
-
-impl ProtocolCode for Protocol {
-    fn proto_code(&self) -> u32 {
-        match self {
-            Protocol::Tcp => libc::IPPROTO_TCP as u32,
-            Protocol::Udp => libc::IPPROTO_UDP as u32,
-            _ => { panic!("Unknown protocol {:?}", self) }
-        }
     }
 }
 
@@ -350,9 +401,9 @@ async fn convert_config_to_nftnl_commands(
             add_rule_to_batch(
                 &device_chain,
                 &mut device_batch,
-                &device,
-                &scope,
-                &rule_spec,
+                device,
+                scope,
+                rule_spec,
                 dns_watcher,
             )
             .await?;
@@ -434,6 +485,12 @@ async fn add_rule_to_batch(
             } else {
                 protocol_reference_ip = None;
             }
+
+            // skip rule if it doesn't match the current scope
+            if !scope.rule_address_pair_in_scope(source_ip.clone(), dest_ip.clone()) {
+                continue;
+            }
+
             // Create rule for current address combination.
             let mut current_rule = Rule::new(&device_chain);
             // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
@@ -526,7 +583,7 @@ fn send_and_process(table_batch: FinalizedBatch, device_batches: &[FinalizedBatc
 }
 
 /// Sends a single nftables batch to the kernel for execution
-/// Used by send_and_process and adapted from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+/// Used by `send_and_process` and adapted from [add-rules.rs in nftnl-rs](https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs)
 #[cfg(feature = "nftables")]
 fn send_and_process_batch(
     batch: &FinalizedBatch,
@@ -544,7 +601,7 @@ fn send_and_process_batch(
         // This fix was actually mentioned in another issue in another project that uses the netlink API:
         // https://github.com/acassen/keepalived/issues/392#issuecomment-239609235
         loop {
-            match socket_recv(&socket, buffer) {
+            match socket_recv(socket, buffer) {
                 Ok(Some(message)) => {
                     match mnl::cb_run(message, *seq_num, portid) {
                         Ok(mnl::CbResult::Stop) => {
@@ -569,8 +626,8 @@ fn send_and_process_batch(
     Ok(())
 }
 
-/// Helper function for send_and_process().
-/// Taken from https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs
+/// Helper function for `send_and_process()`.
+/// Taken from [add-rules.rs in nftnl-rs](https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs)
 #[cfg(feature = "nftables")]
 fn socket_recv<'a>(socket: &mnl::Socket, buf: &'a mut [u8]) -> Result<Option<&'a [u8]>> {
     let ret = socket.recv(buf)?;
