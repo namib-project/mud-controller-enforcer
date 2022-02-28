@@ -3,6 +3,7 @@
 
 pub mod acme_service;
 pub mod config_service;
+pub mod device_config_service;
 pub mod device_service;
 pub mod enforcer_service;
 pub mod firewall_configuration_service;
