@@ -178,7 +178,7 @@ async fn update_floor(
 }
 
 #[api_v2_operation(summary = "Deletes a floor.", tags(Floors))]
-async fn delete_floor(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<HttpResponse> {
+async fn delete_floor(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<FloorDto>> {
     auth.require_permission(Permission::floor__delete)?;
 
     let find_floor = floor_service::find_by_id(id.0, &pool).await.or_else(|_| {
@@ -190,5 +190,5 @@ async fn delete_floor(pool: web::Data<DbConnection>, auth: AuthToken, id: web::P
     })?;
     debug!("{:?}", find_floor);
     floor_service::delete_floor(&find_floor.label, &pool).await?;
-    Ok(HttpResponse::NoContent().finish())
+    Ok(Json(FloorDto::from(find_floor)))
 }

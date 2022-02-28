@@ -11,6 +11,7 @@ use crate::models::Room;
 pub struct RoomDto {
     pub id: i64,
     pub floor_id: i64,
+    pub floor_label: String,
     #[validate(length(max = 50))]
     pub number: String,
     #[validate(length(max = 255))]
@@ -22,6 +23,7 @@ impl From<Room> for RoomDto {
         RoomDto {
             id: room.room_id,
             floor_id: room.floor_id,
+            floor_label: room.floor_label,
             number: room.number,
             guest: room.guest,
         }
@@ -39,9 +41,11 @@ pub struct RoomCreationUpdateDto {
 
 impl RoomCreationUpdateDto {
     pub fn into_room(self, id: i64) -> Room {
+        // TODO: fix label
         Room {
             room_id: id,
             floor_id: self.floor_id,
+            floor_label: "".to_string(),
             number: self.number,
             guest: self.guest,
         }

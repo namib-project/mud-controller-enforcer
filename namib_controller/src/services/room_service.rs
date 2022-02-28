@@ -9,14 +9,16 @@ use crate::{
 
 ///returns all rooms from the database
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let room_data = sqlx::query_as!(Room, "SELECT * FROM rooms").fetch_all(pool).await?;
+    let room_data = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r 
+        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label").fetch_all(pool).await?;
 
     Ok(room_data)
 }
 
 ///returns room by id from the database
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE room_id = $1", id)
+    let room = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE room_id = $1", id)
         .fetch_one(pool)
         .await?;
 
@@ -25,7 +27,8 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
 
 ///returns room by number from the database
 pub async fn find_by_number(number: &str, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE number = $1", number)
+    let room = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE number = $1", number)
         .fetch_one(pool)
         .await?;
 

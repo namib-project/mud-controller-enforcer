@@ -132,20 +132,20 @@ macro_rules! invalid_user_input {
         }
     };
     ($message: tt, $field: tt) => {
-        error::invalid_user_input!($message, $field, crate::error::StatusCode::UNPROCESSABLE_ENTITY)
+        crate::error::invalid_user_input!($message, $field, crate::error::StatusCode::UNPROCESSABLE_ENTITY)
     };
 }
 
 macro_rules! response_error {
     () => {
-        error::response_error!(StatusCode::BAD_REQUEST, None)
+        crate::error::response_error!(crate::error::StatusCode::BAD_REQUEST, None)
     };
     ($status: expr) => {
-        error::response_error!($status, None)
+        crate::error::response_error!($status, None)
     };
     ($status: expr, $message: tt) => {
         |_| {
-            Err(error::Error::ResponseError {
+            Err(crate::error::Error::ResponseError {
                 status: $status,
                 message: $message,
                 backtrace: None,
@@ -156,13 +156,13 @@ macro_rules! response_error {
 
 macro_rules! map_internal {
     () => {
-        error::map_internal!(StatusCode::BAD_REQUEST, None)
+        crate::error::map_internal!(crate::error::StatusCode::BAD_REQUEST, None)
     };
     ($status: expr, $message: tt) => {
         |err| {
             Err(match err {
-                error::Error::InvalidUserInput { .. } => err,
-                _ => error::Error::ResponseError {
+                crate::error::Error::InvalidUserInput { .. } => err,
+                _ => crate::error::Error::ResponseError {
                     status: $status,
                     message: $message,
                     backtrace: None,

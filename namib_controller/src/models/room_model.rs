@@ -7,6 +7,7 @@ use paperclip::actix::Apiv2Schema;
 pub struct Room {
     pub room_id: i64,
     pub floor_id: i64,
+    pub floor_label: String,
     pub number: String,
     pub guest: Option<String>,
 }
