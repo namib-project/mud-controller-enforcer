@@ -8,7 +8,7 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    models::{Acl, DeviceControllerDbo, MudData, MudDbo, MudDboRefresh},
+    models::{Acl, MudData, MudDbo, MudDboRefresh},
     services::{firewall_configuration_service::update_config_version, mud_service::fetch::fetch_mud},
 };
 
@@ -147,18 +147,6 @@ pub async fn get_or_fetch_mud(url: &str, pool: &DbConnection) -> Result<MudData>
     Ok(data)
 }
 
-pub async fn get_controllers(url: &str, pool: &DbConnection) -> Result<Vec<String>> {
-    Ok(sqlx::query_as!(
-        DeviceControllerDbo,
-        "SELECT * FROM device_controllers WHERE url = $1",
-        url
-    )
-    .fetch_all(pool)
-    .await?
-    .iter()
-    .map(|c| c.controller_uri.clone())
-    .collect())
-}
 /// Checks if the given string is an URL. Used to check if the MUD-Profile being created is local or needs to be fetched.
 pub fn is_url(url: &str) -> bool {
     Url::parse(url).is_ok()

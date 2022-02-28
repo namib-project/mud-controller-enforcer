@@ -17,7 +17,7 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{mud_models::MudData, Room},
-    services::{mud_service, room_service},
+    services::{device_config_service, mud_service, room_service},
 };
 
 #[derive(Debug, Clone)]
@@ -102,7 +102,7 @@ impl Device {
             None => None,
         };
         let controller_uris: Vec<String> = match &self.mud_url {
-            Some(mud_url) => mud_service::get_controllers(mud_url, conn).await?,
+            Some(mud_url) => device_config_service::get_controllers(mud_url, conn).await?,
             None => vec![],
         };
         Ok(DeviceWithRefs {
