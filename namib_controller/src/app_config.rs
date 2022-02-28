@@ -52,6 +52,9 @@ pub struct AppConfig {
     /// `NAMIB_ACME_DIR`: The directory that ACME generated certs (letsencrypt certs) are saved
     #[serde(default = "default_acme_dir")]
     pub namib_acme_dir: String,
+    /// `NAMIB_DEVICE_CONFIG`: The YAML file in which NAMIB checks for additional device configuration.
+    #[serde(default = "default_device_config")]
+    pub namib_device_config: String,
 }
 
 fn default_ratelimiter_requests_per_minute() -> usize {
@@ -80,6 +83,10 @@ fn default_is_staging() -> bool {
 
 fn default_acme_dir() -> String {
     "./acme".to_string()
+}
+
+fn default_device_config() -> String {
+    "./device-config.yaml".to_string()
 }
 
 fn default_server_cert() -> String {
