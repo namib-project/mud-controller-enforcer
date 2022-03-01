@@ -77,6 +77,8 @@ pub struct AceMatches {
     pub dnsname: Option<String>,
     pub source_port: Option<AcePort>,
     pub destination_port: Option<AcePort>,
+    pub icmp_type: Option<u8>,
+    pub icmp_code: Option<u8>,
     pub matches_augmentation: Option<MudAclMatchesAugmentation>,
 }
 
@@ -118,6 +120,7 @@ impl Apiv2Schema for AcePort {
 pub enum AceProtocol {
     Tcp,
     Udp,
+    Icmp,
     Protocol(u32),
 }
 

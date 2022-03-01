@@ -104,6 +104,8 @@ fn parse_device_policy(
                     let mut source_port = None;
                     let mut destination_port = None;
                     let mut matches_augmentation = None;
+                    let mut icmp_type = None;
+                    let mut code = None;
                     if let Some(udp) = &aceitem.matches.udp {
                         protocol = Some(AceProtocol::Udp);
                         source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
@@ -123,6 +125,10 @@ fn parse_device_policy(
 
                         source_port = tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
                         destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                    } else if let Some(icmp) = &aceitem.matches.icmp {
+                        protocol = Some(AceProtocol::Icmp);
+                        icmp_type = Some(icmp.icmp_type);
+                        code = Some(icmp.code);
                     }
                     if let Some(ipv6) = &aceitem.matches.ipv6 {
                         if acl_type != AclType::IPV6 {
@@ -191,6 +197,8 @@ fn parse_device_policy(
                             dnsname,
                             source_port,
                             destination_port,
+                            icmp_type,
+                            icmp_code: code,
                             matches_augmentation,
                         },
                     });
@@ -273,6 +281,8 @@ mod tests {
             dnsname: None,
             source_port: None,
             destination_port: None,
+            icmp_type: None,
+            icmp_code: None,
             matches_augmentation: Some(MudAclMatchesAugmentation {
                 manufacturer: None,
                 same_manufacturer: true,
