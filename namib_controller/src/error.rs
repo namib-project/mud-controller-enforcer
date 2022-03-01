@@ -69,6 +69,8 @@ pub enum Error {
         source: serde_json::Error,
         backtrace: Backtrace,
     },
+    #[snafu(display("SerdeYamlError {}", source), context(false))]
+    SerdeYamlError { source: serde_yaml::Error },
     #[snafu(display("JsonWebTokenError {}", source), context(false))]
     JsonWebTokenError {
         source: jsonwebtoken::errors::Error,

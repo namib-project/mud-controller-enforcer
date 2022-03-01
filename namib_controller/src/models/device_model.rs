@@ -102,7 +102,7 @@ impl Device {
             None => None,
         };
         let controller_uris: Vec<String> = match &self.mud_url {
-            Some(mud_url) => device_config_service::get_controllers(mud_url, conn).await?,
+            Some(mud_url) => device_config_service::get_configured_controllers_for_device(mud_url, conn).await?,
             None => vec![],
         };
         Ok(DeviceWithRefs {
