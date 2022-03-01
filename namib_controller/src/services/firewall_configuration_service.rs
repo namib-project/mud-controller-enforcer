@@ -4,7 +4,7 @@
 use std::net::IpAddr;
 
 use namib_shared::{
-    firewall_config::{FirewallDevice, FirewallRule, Protocol, RuleName, RuleTarget, RuleTargetHost, Verdict},
+    firewall_config::{FirewallDevice, FirewallRule, Icmp, Protocol, RuleName, RuleTarget, RuleTargetHost, Verdict},
     EnforcerConfig,
 };
 
@@ -138,11 +138,20 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
 
     for acl in &merged_acls {
         for ace in &acl.ace {
+            let icmp_type: Option<String> = match ace.matches.icmp_type {
+                None => None,
+                Some(icmp_type) => Some(icmp_type.to_string()),
+            };
+            let icmp_code: Option<String> = match ace.matches.icmp_code {
+                None => None,
+                Some(icmp_code) => Some(icmp_code.to_string()),
+            };
             let protocol = match &ace.matches.protocol {
                 None => Protocol::All,
                 Some(proto) => match proto {
                     AceProtocol::Tcp => Protocol::Tcp,
                     AceProtocol::Udp => Protocol::Udp,
+                    AceProtocol::Icmp => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
                     AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
                                                                        // TODO add support for more protocols
                 },
@@ -359,6 +368,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -377,6 +388,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -398,6 +411,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -416,6 +431,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -479,6 +496,8 @@ mod tests {
                         dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -497,6 +516,8 @@ mod tests {
                         dnsname: Some(String::from("www.example.test")),
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -587,6 +608,8 @@ mod tests {
                             dnsname: Some(String::from("www.example.test")),
                             source_port: Some(AcePort::Single(123)),
                             destination_port: Some(AcePort::Range(50, 60)),
+                            icmp_type: None,
+                            icmp_code: None,
                             matches_augmentation: None,
                         },
                     }],
@@ -605,6 +628,8 @@ mod tests {
                             dnsname: Some(String::from("www.example.test")),
                             source_port: Some(AcePort::Range(8000, 8080)),
                             destination_port: Some(AcePort::Single(56)),
+                            icmp_type: None,
+                            icmp_code: None,
                             matches_augmentation: None,
                         },
                     }],
@@ -828,6 +853,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -944,6 +971,8 @@ mod tests {
                         dnsname: None,
                         source_port: Some(AcePort::Single(321)),
                         destination_port: Some(AcePort::Single(500)),
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: true,
@@ -1002,6 +1031,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -1096,6 +1127,8 @@ mod tests {
                         dnsname: None,
                         source_port: Some(AcePort::Single(123)),
                         destination_port: Some(AcePort::Range(50, 60)),
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1229,6 +1262,8 @@ mod tests {
                         dnsname: None,
                         source_port: Some(AcePort::Single(321)),
                         destination_port: Some(AcePort::Single(500)),
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: Some("simple-example.com".to_string()),
                             same_manufacturer: false,
@@ -1287,6 +1322,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: None,
                     },
                 }],
