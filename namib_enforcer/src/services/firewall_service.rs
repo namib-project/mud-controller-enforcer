@@ -8,6 +8,8 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "nftables")]
+use ipnetwork::IpNetwork;
 use namib_shared::firewall_config::{FirewallDevice, FirewallRule};
 #[cfg(feature = "nftables")]
 use namib_shared::{
@@ -124,18 +126,24 @@ trait AddressPairInScope {
     fn rule_address_pair_in_scope(&self, src_addr: RuleAddrEntry, dest_addr: RuleAddrEntry) -> bool;
 }
 
+fn get_local_ips() -> Vec<IpNetwork> {
+    let mut ips: Vec<IpNetwork> = Vec::new();
+    for interface in interfaces() {
+        ips.append(&mut interface.ips.clone());
+    }
+    ips
+}
+
 impl AddressPairInScope for FirewallRuleScope {
     // In Local scope returns true iff source and destination addr are both contained in a local subnet, else false.
     // In Global scope returns true if source and destination are in non-local or different subnets, else false.
     fn address_pair_in_scope(&self, src_addr: IpAddr, dest_addr: IpAddr) -> bool {
-        for interface in interfaces() {
-            for ip in interface.ips {
-                if ip.contains(src_addr) && ip.contains(dest_addr) {
-                    return match *self {
-                        FirewallRuleScope::Local => true,
-                        FirewallRuleScope::Global => false,
-                    };
-                }
+        for ip in get_local_ips() {
+            if ip.contains(src_addr) && ip.contains(dest_addr) {
+                return match *self {
+                    FirewallRuleScope::Local => true,
+                    FirewallRuleScope::Global => false,
+                };
             }
         }
         // No local interface with saddr and daddr found
@@ -260,8 +268,8 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
 #[cfg(feature = "nftables")]
 fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
     match scope {
-        FirewallRuleScope::Local => rule.add_expr(&nft_expr!(meta proto)),  // bridge uses ethertype
-        FirewallRuleScope::Global => rule.add_expr(&nft_expr!(meta nfproto)),  // inet uses ip code
+        FirewallRuleScope::Local => rule.add_expr(&nft_expr!(meta proto)), // bridge uses ethertype
+        FirewallRuleScope::Global => rule.add_expr(&nft_expr!(meta nfproto)), // inet uses ip code
     }
     match proto.ethertype_code(scope) {
         EtherNfType::EtherType(proto_code) => rule.add_expr(&nft_expr!(cmp == proto_code)),
@@ -398,15 +406,7 @@ async fn convert_config_to_nftnl_commands(
 
         // Iterate over device rules.
         for rule_spec in &device.rules {
-            add_rule_to_batch(
-                &device_chain,
-                &mut device_batch,
-                device,
-                scope,
-                rule_spec,
-                dns_watcher,
-            )
-            .await?;
+            add_rule_to_batch(&device_chain, &mut device_batch, device, scope, rule_spec, dns_watcher).await?;
         }
         device_batches.push(device_batch.finalize());
     }
@@ -635,5 +635,169 @@ fn socket_recv<'a>(socket: &mnl::Socket, buf: &'a mut [u8]) -> Result<Option<&'a
         Ok(Some(&buf[..ret]))
     } else {
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{json, Value};
+    use serial_test::serial;
+    use std::process::Command;
+
+    use super::*;
+    use crate::services::dns::DnsService;
+    use namib_shared::firewall_config::*;
+
+    fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
+        let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"));
+        let watcher = DnsService::new().unwrap().create_watcher();
+        (config, watcher)
+    }
+
+    // these tests require access to nft command.
+    // run with "sudo -E `which cargo` test -p namib_enforcer -- --ignored"
+
+    #[tokio::test]
+    #[ignore]
+    #[serial]
+    async fn check_empty_devices() {
+        let devices: Vec<FirewallDevice> = Vec::new();
+        let (config, watcher) = setup(devices);
+        apply_firewall_config_inner(&config, &watcher)
+            .await
+            .expect("Could not apply config.");
+
+        for family_info in [
+            ("inet", super::TABLE_NAME, super::BASE_CHAIN_NAME),
+            ("bridge", super::TABLE_NAME_LOCAL, super::BASE_CHAIN_NAME_LOCAL),
+        ] {
+            let family = family_info.0;
+            let table_name = family_info.1;
+            let chain_name = family_info.2;
+
+            let output = Command::new("nft")
+                .args(["-j", "list", "chain", family, table_name, chain_name])
+                .output()
+                .expect("failed to execute process");
+            let parsed: Value = serde_json::from_slice(&output.stdout).expect("failed to parse command output as JSON");
+            let expected = json!({
+            "chain": {
+                "family": family,
+                "table": table_name,
+                "name": chain_name,
+                "handle": 1,
+                "type": "filter",
+                "hook": match family {
+                    "inet" => "forward",
+                    "bridge" => "input",
+                    _ => panic!("unsupported family")
+                },
+                "prio": 0,
+                "policy": "accept"
+            }
+            });
+
+            assert_eq!(parsed["nftables"][1], expected);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    #[serial]
+    async fn check_device_with_tcp_rule() {
+        let mut rules: Vec<FirewallRule> = Vec::new();
+        rules.push(FirewallRule {
+            rule_name: RuleName::new("rule_0".to_string()),
+            src: RuleTarget {
+                host: Some(RuleTargetHost::FirewallDevice),
+                port: None,
+            },
+            dst: RuleTarget {
+                host: Some(RuleTargetHost::Ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))),
+                port: Some("53".to_string()),
+            },
+            protocol: Protocol::Tcp,
+            verdict: Verdict::Accept,
+        });
+        let device_id = 1234;
+        let device = FirewallDevice {
+            id: device_id,
+            ipv4_addr: Some(Ipv4Addr::new(8, 8, 4, 4)),
+            ipv6_addr: None,
+            rules,
+            collect_data: false,
+        };
+        let devices: Vec<FirewallDevice> = [device].to_vec();
+
+        let (config, watcher) = setup(devices);
+        apply_firewall_config_inner(&config, &watcher)
+            .await
+            .expect("Could not apply config.");
+
+        for family_info in [
+            ("inet", super::TABLE_NAME, super::BASE_CHAIN_NAME),
+            ("bridge", super::TABLE_NAME_LOCAL, super::BASE_CHAIN_NAME_LOCAL),
+        ] {
+            let family = family_info.0;
+            let table_name = family_info.1;
+            let base_chain = family_info.2;
+            let device_id = device_id.to_string();
+
+            for chain in [base_chain, &device_id] {
+                let device_chain = &format!("device_{}", &chain).to_owned();
+                let chain_name = match chain {
+                    x if x == base_chain => base_chain,
+                    _ => device_chain,
+                };
+                let cmd_args = ["-j", "list", "chain", family, table_name, chain_name];
+                let output = Command::new("nft")
+                    .args(cmd_args)
+                    .output()
+                    .expect("failed to execute process");
+                let parsed: Value = match serde_json::from_slice(&output.stdout) {
+                    Ok(p) => p,
+                    Err(error) => panic!(
+                        "failed to parse command output as JSON: command `nft {}`, output {}, error {}",
+                        cmd_args.join(" "),
+                        std::str::from_utf8(&output.stdout).expect("failed to read JSON bytes as UTF8"),
+                        error
+                    ),
+                };
+                let expected_chain = match chain {
+                    x if x == base_chain => json!({
+                    "chain": {
+                        "family": family,
+                        "table": table_name,
+                        "name": chain_name,
+                        "handle": 1,
+                        "type": "filter",
+                        "hook": match family {
+                            "inet" => "forward",
+                            "bridge" => "input",
+                            _ => panic!("unsupported family")
+                        },
+                        "prio": 0,
+                        "policy": "accept"
+                    }}),
+                    x if x == &device_id => {
+                        json!({"chain": {"family": family, "handle": 2, "name": chain_name, "table": table_name}})
+                    },
+                    _ => panic!("unsupported chain"),
+                };
+                assert_eq!(parsed["nftables"][1], expected_chain);
+
+                if chain == &device_id {
+                    match family {
+                        "inet" => {
+                            assert!(!parsed["nftables"][2]["rule"]["expr"][0].is_null());
+                            // rule added to inet chain
+                            // TODO: check content of rule spec
+                        },
+                        "bridge" => assert!(parsed["nftables"][2].is_null()), // rule not added to bridge chain
+                        _ => panic!("unsupported chain"),
+                    }
+                }
+            }
+        }
     }
 }
