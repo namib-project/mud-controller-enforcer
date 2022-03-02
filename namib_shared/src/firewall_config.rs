@@ -59,8 +59,8 @@ pub enum Protocol {
 
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct Icmp {
-    pub icmp_type: Option<String>,
-    pub icmp_code: Option<String>,
+    pub icmp_type: Option<u8>,
+    pub icmp_code: Option<u8>,
 }
 
 /// Verdict that the firewall shall perform for a given rule.

@@ -110,7 +110,7 @@ pub struct Udp {
     pub destination_port: Option<Port>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
 pub struct Icmp {
     #[serde(rename = "type")]
     pub icmp_type: u8,

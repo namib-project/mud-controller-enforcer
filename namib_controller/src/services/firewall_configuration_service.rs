@@ -138,14 +138,9 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
 
     for acl in &merged_acls {
         for ace in &acl.ace {
-            let icmp_type: Option<String> = match ace.matches.icmp_type {
-                None => None,
-                Some(icmp_type) => Some(icmp_type.to_string()),
-            };
-            let icmp_code: Option<String> = match ace.matches.icmp_code {
-                None => None,
-                Some(icmp_code) => Some(icmp_code.to_string()),
-            };
+            let icmp_type: Option<u8> = ace.matches.icmp_type;
+            let icmp_code: Option<u8> = ace.matches.icmp_code;
+
             let protocol = match &ace.matches.protocol {
                 None => Protocol::All,
                 Some(proto) => match proto {
@@ -735,6 +730,8 @@ mod tests {
                         dnsname: None,
                         source_port: None,
                         destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1386,6 +1383,101 @@ mod tests {
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1]);
+
+        assert!(x.eq(&resulting_device));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_icmp_matching() -> Result<()> {
+        let mud_data = MudData {
+            url: "https://example.com/.well-known/mud".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Icmp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: Some(String::from("www.example.test")),
+                        source_port: None,
+                        destination_port: None,
+                        icmp_type: Some(8),
+                        icmp_code: Some(0),
+                        matches_augmentation: None,
+                    },
+                }],
+            }],
+            acl_override: Vec::default(),
+        };
+
+        let device = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "127.0.0.1".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://example.com/mud_url.json".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+            },
+            mud_data: Some(mud_data),
+            room: None,
+            controller_uris: vec![],
+        };
+
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
+            rules: vec![
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_0")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
+                    Protocol::Icmp(Icmp {
+                        icmp_type: Some(8),
+                        icmp_code: Some(0),
+                    }),
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_1")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
+                    Protocol::All,
+                    Verdict::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_2")),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    Protocol::All,
+                    Verdict::Reject,
+                ),
+            ],
+            collect_data: true,
+        };
+
+        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
 
         assert!(x.eq(&resulting_device));
 
