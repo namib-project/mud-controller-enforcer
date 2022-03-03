@@ -21,6 +21,11 @@ pub struct MudDboRefresh {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ConfiguredServerDbo {
+    pub server: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct DeviceControllerDbo {
     pub url: String,
     pub controller_mapping: String,
