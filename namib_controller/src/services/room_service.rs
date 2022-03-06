@@ -9,8 +9,8 @@ use crate::{
 
 ///returns all rooms from the database
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let room_data = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r 
-        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label").fetch_all(pool).await?;
+    let room_data = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label, r.number").fetch_all(pool).await?;
 
     Ok(room_data)
 }
