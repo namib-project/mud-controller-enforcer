@@ -187,11 +187,11 @@ impl EtherTypeCode for FirewallRuleProto {
         match self {
             FirewallRuleProto::IPv4 => match scope {
                 FirewallRuleScope::Global => EtherNfType::NfType(libc::NFPROTO_IPV4 as u8),
-                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IP as u16).swap_bytes()),
+                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IP as u16).to_be()),
             },
             FirewallRuleProto::IPv6 => match scope {
                 FirewallRuleScope::Global => EtherNfType::NfType(libc::NFPROTO_IPV6 as u8),
-                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IPV6 as u16).swap_bytes()),
+                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IPV6 as u16).to_be()),
             },
         }
     }
@@ -300,21 +300,21 @@ fn nf_match_ports(rule: &mut Rule, rule_spec: &FirewallRule) {
         Protocol::Tcp => {
             if let Some(port) = &rule_spec.dst.port {
                 rule.add_expr(&nft_expr!(payload tcp dport));
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
             }
             if let Some(port) = &rule_spec.src.port {
                 rule.add_expr(&nft_expr!(payload tcp sport));
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
             }
         },
         Protocol::Udp => {
             if let Some(port) = &rule_spec.dst.port {
                 rule.add_expr(&nft_expr!(payload udp dport));
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
             }
             if let Some(port) = &rule_spec.src.port {
                 rule.add_expr(&nft_expr!(payload udp sport));
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().swap_bytes()));
+                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
             }
         },
         Protocol::All => {},
