@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![warn(clippy::all, clippy::style, clippy::pedantic)]
-#![allow(dead_code, clippy::module_name_repetitions, clippy::filter_map)]
+#![allow(dead_code, clippy::module_name_repetitions)]
 
 #[macro_use]
 extern crate log;
@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
     // Enforcer is now guaranteed to have an RPC client and a server address.
     {
         let enforcer_read_lock = enforcer.read().await;
-        apply_secure_name_config(&enforcer_read_lock.config.secure_name(), enforcer_read_lock.addr)?;
+        apply_secure_name_config(enforcer_read_lock.config.secure_name(), enforcer_read_lock.addr)?;
     }
 
     // Create the firewall service

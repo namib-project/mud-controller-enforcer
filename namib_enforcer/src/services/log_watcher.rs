@@ -37,15 +37,15 @@ pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
             sleep(Duration::from_secs(10));
             continue;
         }
-        if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
+        if let Err(e) = read_log_file(enforcer, path, tmp_path) {
             warn!("failed to process file {:?}", e);
         }
 
         loop {
             match rx.recv() {
-                Ok(DebouncedEvent::Write(_)) | Ok(DebouncedEvent::NoticeWrite(_)) => {
+                Ok(DebouncedEvent::Write(_) | DebouncedEvent::NoticeWrite(_)) => {
                     // inner function to make use of Result
-                    if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
+                    if let Err(e) = read_log_file(enforcer, path, tmp_path) {
                         debug!("failed to process file {:?}", e);
                     }
                 },
@@ -66,7 +66,7 @@ fn read_log_file(enforcer: &Arc<RwLock<Enforcer>>, path: &Path, tmp_path: &Path)
     Builder::new_current_thread()
         .enable_all()
         .build()?
-        .block_on(handle_log_lines(&enforcer, lines))?;
+        .block_on(handle_log_lines(enforcer, lines))?;
     Ok(())
 }
 
@@ -130,7 +130,7 @@ pub async fn watch_np0f(enforcer: Arc<RwLock<Enforcer>>) {
         let enforcer = enforcer.clone();
         active_listeners.push(tokio::spawn(async move {
             if let Err(e) = handle_np0f_log_connection(enforcer, event_stream).await {
-                warn!("Failed to receive np0f logs: {:?}", e)
+                warn!("Failed to receive np0f logs: {:?}", e);
             }
         }));
     }
