@@ -48,8 +48,8 @@ pub fn watch(enforcer: &Arc<RwLock<Enforcer>>) {
                     if let Err(e) = read_log_file(&enforcer, path, tmp_path) {
                         debug!("failed to process file {:?}", e);
                     }
-                }
-                Ok(_) => {}
+                },
+                Ok(_) => {},
                 Err(e) => warn!("watch error: {:?}", e),
             }
         }

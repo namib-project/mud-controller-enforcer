@@ -149,21 +149,21 @@ mod test_dnsmasq_hook {
             } => {
                 args.push("add".to_string());
                 lease_info
-            }
+            },
             DhcpEvent::LeaseDestroyed {
                 event_timestamp: _,
                 lease_info,
             } => {
                 args.push("del".to_string());
                 lease_info
-            }
+            },
             DhcpEvent::ExistingLeaseUpdate {
                 event_timestamp: _,
                 lease_info,
             } => {
                 args.push("old".to_string());
                 lease_info
-            }
+            },
         };
         if let Some(receiver_interface) = &lease_info.receiver_interface {
             envs.insert("DNSMASQ_INTERFACE".to_string(), receiver_interface.clone());
@@ -176,10 +176,10 @@ mod test_dnsmasq_hook {
         match &lease_info.lease_expiry {
             LeaseExpiryTime::LeaseExpiryTime(datetime) => {
                 envs.insert("DNSMASQ_LEASE_EXPIRES".to_string(), datetime.timestamp().to_string());
-            }
+            },
             LeaseExpiryTime::LeaseLength(duration) => {
                 envs.insert("DNSMASQ_LEASE_LENGTH".to_string(), duration.as_secs().to_string());
-            }
+            },
         }
         if let Some(mud_url) = &lease_info.mud_url {
             envs.insert("DNSMASQ_MUD_URL".to_string(), mud_url.to_string());
@@ -212,14 +212,14 @@ mod test_dnsmasq_hook {
                         .to_string(),
                 );
                 args.push(v4info.ip_addr.to_string());
-            }
+            },
             DhcpLeaseVersionSpecificInformation::V6(v6info) => {
                 if let Some(mac_addr) = &lease_info.mac_address {
                     envs.insert("DNSMASQ_MAC".to_string(), mac_addr.to_string());
                 }
                 args.push(v6info.duid.to_string());
                 args.push(v6info.ip_addr.to_string());
-            }
+            },
         };
 
         if let Some(hostname) = &lease_info.hostname {
@@ -264,21 +264,21 @@ mod test_dnsmasq_hook {
             } => {
                 actual_event_type = "add";
                 actual_lease_info
-            }
+            },
             DhcpEvent::ExistingLeaseUpdate {
                 event_timestamp: _,
                 lease_info: actual_lease_info,
             } => {
                 actual_event_type = "old";
                 actual_lease_info
-            }
+            },
             DhcpEvent::LeaseDestroyed {
                 event_timestamp: _,
                 lease_info: actual_lease_info,
             } => {
                 actual_event_type = "del";
                 actual_lease_info
-            }
+            },
         };
         let received_event = dhcp_listener_result
             .join()
@@ -292,21 +292,21 @@ mod test_dnsmasq_hook {
             } => {
                 received_event_type = "add";
                 received_lease_info
-            }
+            },
             DhcpEvent::ExistingLeaseUpdate {
                 event_timestamp: _,
                 lease_info: received_lease_info,
             } => {
                 received_event_type = "old";
                 received_lease_info
-            }
+            },
             DhcpEvent::LeaseDestroyed {
                 event_timestamp: _,
                 lease_info: received_lease_info,
             } => {
                 received_event_type = "del";
                 received_lease_info
-            }
+            },
         };
         assert_eq!(actual_event_type, received_event_type);
         assert_eq!(actual_lease_info, received_lease_info);

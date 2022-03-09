@@ -75,6 +75,6 @@ async fn main() -> Result<()> {
                 e
             );
             wrp.stop_server().await
-        }
+        },
     }
 }
