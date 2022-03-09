@@ -105,7 +105,7 @@ impl ResolvesServerCert for CertResolver {
                         Err(e) => {
                             error!("Could not load certificate from persisted certificate {:?}", e);
                             return None;
-                        }
+                        },
                     }),
                 ),
                 _ => return None,

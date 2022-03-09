@@ -52,13 +52,13 @@ pub fn get_same_manufacturer_ruletargethosts(
                 match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
                     (AclType::IPV4, Some(ipv4_addr), _) => {
                         manu_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
-                    }
+                    },
                     (AclType::IPV6, _, Some(ipv6_addr)) => {
                         manu_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
-                    }
+                    },
                     _ => {
                         manu_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
-                    }
+                    },
                 }
             }
         }
@@ -77,13 +77,13 @@ pub fn get_manufacturer_ruletargethosts(
             match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
                 (AclType::IPV4, Some(ipv4_addr), _) => {
                     manu_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
-                }
+                },
                 (AclType::IPV6, _, Some(ipv6_addr)) => {
                     manu_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
-                }
+                },
                 _ => {
                     manu_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
-                }
+                },
             }
         }
     }
@@ -101,13 +101,13 @@ pub fn get_model_ruletargethosts(
             match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
                 (AclType::IPV4, Some(ipv4_addr), _) => {
                     model_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
-                }
+                },
                 (AclType::IPV6, _, Some(ipv6_addr)) => {
                     model_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
-                }
+                },
                 _ => {
                     model_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
-                }
+                },
             }
         }
     }
@@ -127,7 +127,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                 rules,
                 collect_data: device.collect_info,
             }
-        }
+        },
     };
 
     let merged_acls = if mud_data.acl_override.is_empty() {
@@ -217,7 +217,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                                 .cloned()
                                 .collect(),
                         }
-                    }
+                    },
                     _ => vec![],
                 }
                 .iter()

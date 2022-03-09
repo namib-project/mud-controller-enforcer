@@ -251,7 +251,7 @@ async fn add_rule_to_batch(
     let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
         Some(RuleTargetHost::Ip(ipaddr)) => {
             vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
-        }
+        },
         // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
         // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
         Some(RuleTargetHost::Hostname(dns_name)) => dns_watcher
@@ -270,7 +270,7 @@ async fn add_rule_to_batch(
     let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
         Some(RuleTargetHost::Ip(ipaddr)) => {
             vec![RuleAddrEntry::AddrEntry(ipaddr.clone())]
-        }
+        },
         // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
         // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
         Some(RuleTargetHost::Hostname(dns_name)) => dns_watcher
@@ -317,28 +317,28 @@ async fn add_rule_to_batch(
                         Protocol::Tcp => {
                             current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
                             current_rule.add_expr(&nft_expr!(cmp == "tcp"));
-                        }
+                        },
                         Protocol::Udp => {
                             current_rule.add_expr(&nft_expr!(payload ipv4 protocol));
                             current_rule.add_expr(&nft_expr!(cmp == "udp"));
-                        }
-                        _ => {} // TODO expand with further options (icmp, sctp)
+                        },
+                        _ => {}, // TODO expand with further options (icmp, sctp)
                     }
-                }
+                },
                 Some(IpAddr::V6(_v6addr)) => {
                     match rule_spec.protocol {
                         Protocol::Tcp => {
                             current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
                             current_rule.add_expr(&nft_expr!(cmp == "tcp"));
-                        }
+                        },
                         Protocol::Udp => {
                             current_rule.add_expr(&nft_expr!(payload ipv6 nextheader));
                             current_rule.add_expr(&nft_expr!(cmp == "udp"));
-                        }
-                        _ => {} // TODO expand with further options (icmp, sctp)
+                        },
+                        _ => {}, // TODO expand with further options (icmp, sctp)
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
             // Create expressions to match source IP.
             match source_ip {
@@ -347,14 +347,14 @@ async fn add_rule_to_batch(
                     current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
                     current_rule.add_expr(&nft_expr!(payload ipv4 saddr));
                     current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
-                }
+                },
                 RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
                     current_rule.add_expr(&nft_expr!(meta nfproto));
                     current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
                     current_rule.add_expr(&nft_expr!(payload ipv6 saddr));
                     current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
-                }
-                RuleAddrEntry::AnyAddr => {}
+                },
+                RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match destination IP.
             match dest_ip {
@@ -363,14 +363,14 @@ async fn add_rule_to_batch(
                     current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV4 as u8));
                     current_rule.add_expr(&nft_expr!(payload ipv4 daddr));
                     current_rule.add_expr(&nft_expr!(cmp == v4addr.clone()));
-                }
+                },
                 RuleAddrEntry::AddrEntry(IpAddr::V6(v6addr)) => {
                     current_rule.add_expr(&nft_expr!(meta nfproto));
                     current_rule.add_expr(&nft_expr!(cmp == libc::NFPROTO_IPV6 as u8));
                     current_rule.add_expr(&nft_expr!(payload ipv6 daddr));
                     current_rule.add_expr(&nft_expr!(cmp == v6addr.clone()));
-                }
-                RuleAddrEntry::AnyAddr => {}
+                },
+                RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match for port numbers.
             match rule_spec.protocol {
@@ -383,7 +383,7 @@ async fn add_rule_to_batch(
                         current_rule.add_expr(&nft_expr!(payload tcp dport));
                         current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
                     }
-                }
+                },
                 Protocol::Udp => {
                     if let Some(port) = &rule_spec.dst.port {
                         current_rule.add_expr(&nft_expr!(payload udp dport));
@@ -393,8 +393,8 @@ async fn add_rule_to_batch(
                         current_rule.add_expr(&nft_expr!(payload udp dport));
                         current_rule.add_expr(&nft_expr!(cmp == port.as_str()));
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
 
             // Set verdict if current rule matches.
@@ -402,7 +402,7 @@ async fn add_rule_to_batch(
                 Verdict::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
                 Verdict::Reject => {
                     current_rule.add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)))
-                }
+                },
                 Verdict::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
             }
             device_batch.add(&current_rule, nftnl::MsgType::Add);
@@ -469,20 +469,20 @@ fn send_and_process_batch(
                     match mnl::cb_run(message, *seq_num, portid) {
                         Ok(mnl::CbResult::Stop) => {
                             break;
-                        }
+                        },
                         Ok(mnl::CbResult::Ok) => (),
                         Err(e) => {
                             return Err(e.into());
-                        }
+                        },
                     }
                     *seq_num += 1;
-                }
+                },
                 Err(e) => {
                     return Err(e.into());
-                }
+                },
                 _ => {
                     break;
-                }
+                },
             }
         }
     }
