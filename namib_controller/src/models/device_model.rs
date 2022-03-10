@@ -35,6 +35,7 @@ pub struct DeviceDbo {
     pub last_interaction: NaiveDateTime,
     pub room_id: Option<i64>,
     pub clipart: Option<String>,
+    pub q_bit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,7 @@ pub struct Device {
     pub last_interaction: NaiveDateTime,
     pub room_id: Option<i64>,
     pub clipart: Option<String>,
+    pub q_bit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -130,6 +132,7 @@ impl From<DeviceDbo> for Device {
             last_interaction: device.last_interaction,
             room_id: device.room_id,
             clipart: device.clipart,
+            q_bit: device.q_bit,
         }
     }
 }
@@ -162,6 +165,7 @@ impl Device {
             last_interaction: Utc::now().naive_utc(),
             room_id: None,
             clipart: None,
+            q_bit: false,
         }
     }
 

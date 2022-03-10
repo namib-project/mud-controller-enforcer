@@ -137,7 +137,7 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
 
     #[cfg(feature = "postgres")]
     let result = sqlx::query!(
-        "INSERT INTO devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+        "INSERT INTO devices (name, ipv4_addr, ipv6_addr, mac_addr, duid, hostname, vendor_class, mud_url, collect_info, last_interaction, room_id, clipart, q_bit) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id",
         device_data.name,
         ipv4_addr,
         ipv6_addr,
@@ -150,6 +150,7 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
         device_data.last_interaction,
         device_data.room_id,
         device_data.clipart,
+        device_data.q_bit,
     )
     .fetch_one(pool)
     .await?
@@ -171,7 +172,7 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
 
     let upd_count = sqlx::query!(
-        "UPDATE DEVICES SET name = $1, ipv4_addr = $2, ipv6_addr = $3, mac_addr = $4, duid = $5, hostname = $6, vendor_class = $7, mud_url = $8, collect_info = $9, last_interaction = $10, room_id = $11, clipart = $12 where id = $13",
+        "UPDATE DEVICES SET name = $1, ipv4_addr = $2, ipv6_addr = $3, mac_addr = $4, duid = $5, hostname = $6, vendor_class = $7, mud_url = $8, collect_info = $9, last_interaction = $10, room_id = $11, clipart = $12, q_bit = $13 where id = $14",
         device_data.name,
         ipv4_addr,
         ipv6_addr,
@@ -184,6 +185,7 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
         device_data.last_interaction,
         device_data.room_id,
         device_data.clipart,
+        device_data.q_bit,
         device_data.id
     )
     .execute(pool)
