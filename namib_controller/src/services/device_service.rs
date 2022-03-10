@@ -65,6 +65,14 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     Ok(devices.into_iter().map(Device::from).collect())
 }
 
+pub async fn get_all_quarantined_devices(pool: &DbConnection) -> Result<Vec<Device>> {
+    let devices = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE q_bit = true")
+        .fetch_all(pool)
+        .await?;
+
+    Ok(devices.into_iter().map(Device::from).collect())
+}
+
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
     let device: DeviceDbo = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE id = $1", id)
         .fetch_one(pool)
@@ -172,7 +180,7 @@ pub async fn update_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
 
     let upd_count = sqlx::query!(
-        "UPDATE DEVICES SET name = $1, ipv4_addr = $2, ipv6_addr = $3, mac_addr = $4, duid = $5, hostname = $6, vendor_class = $7, mud_url = $8, collect_info = $9, last_interaction = $10, room_id = $11, clipart = $12, q_bit = $13 where id = $14",
+        "UPDATE devices SET name = $1, ipv4_addr = $2, ipv6_addr = $3, mac_addr = $4, duid = $5, hostname = $6, vendor_class = $7, mud_url = $8, collect_info = $9, last_interaction = $10, room_id = $11, clipart = $12, q_bit = $13 WHERE id = $14",
         device_data.name,
         ipv4_addr,
         ipv6_addr,
@@ -204,4 +212,14 @@ pub async fn delete_device(id: i64, pool: &DbConnection) -> Result<bool> {
     firewall_configuration_service::update_config_version(pool).await?;
 
     Ok(del_count.rows_affected() == 1)
+}
+
+pub async fn change_quarantine_status_device(id: i64, pool: &DbConnection, status: bool) -> Result<bool> {
+    let upd_count = sqlx::query!("UPDATE devices SET q_bit = $1 WHERE id = $2", status, id)
+        .execute(pool)
+        .await?;
+
+    firewall_configuration_service::update_config_version(pool).await?;
+
+    Ok(upd_count.rows_affected() == 1)
 }

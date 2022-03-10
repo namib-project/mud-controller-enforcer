@@ -128,7 +128,7 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                     rules,
                     collect_data: device.collect_info,
                 }
-            }
+            },
         };
 
         let merged_acls = if mud_data.acl_override.is_empty() {
@@ -137,50 +137,50 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
             merge_acls(&mud_data.acllist, &mud_data.acl_override)
         };
 
-    for acl in &merged_acls {
-        for ace in &acl.ace {
-            let icmp_type: Option<u8> = ace.matches.icmp_type;
-            let icmp_code: Option<u8> = ace.matches.icmp_code;
+        for acl in &merged_acls {
+            for ace in &acl.ace {
+                let icmp_type: Option<u8> = ace.matches.icmp_type;
+                let icmp_code: Option<u8> = ace.matches.icmp_code;
 
-            let protocol = match &ace.matches.protocol {
-                None => Protocol::All,
-                Some(proto) => match proto {
-                    AceProtocol::Tcp => Protocol::Tcp,
-                    AceProtocol::Udp => Protocol::Udp,
-                    AceProtocol::Icmp => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
-                    AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
-                                                                       // TODO add support for more protocols
-                },
-            };
-            let verdict = match ace.action {
-                AceAction::Accept => Verdict::Accept,
-                AceAction::Deny => Verdict::Reject,
-            };
+                let protocol = match &ace.matches.protocol {
+                    None => Protocol::All,
+                    Some(proto) => match proto {
+                        AceProtocol::Tcp => Protocol::Tcp,
+                        AceProtocol::Udp => Protocol::Udp,
+                        AceProtocol::Icmp => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
+                        AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
+                                                                           // TODO add support for more protocols
+                    },
+                };
+                let verdict = match ace.action {
+                    AceAction::Accept => Verdict::Accept,
+                    AceAction::Deny => Verdict::Reject,
+                };
 
-            let src_ports: Option<String> = match ace.matches.source_port {
-                None => None,
-                Some(AcePort::Single(port)) => Some(port.to_string()),
-                Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-            };
-            let dst_ports: Option<String> = match ace.matches.destination_port {
-                None => None,
-                Some(AcePort::Single(port)) => Some(port.to_string()),
-                Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-            };
+                let src_ports: Option<String> = match ace.matches.source_port {
+                    None => None,
+                    Some(AcePort::Single(port)) => Some(port.to_string()),
+                    Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                };
+                let dst_ports: Option<String> = match ace.matches.destination_port {
+                    None => None,
+                    Some(AcePort::Single(port)) => Some(port.to_string()),
+                    Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                };
 
-            let (this_device_ports, other_device_ports) = match acl.packet_direction {
-                AclDirection::FromDevice => (src_ports, dst_ports),
-                AclDirection::ToDevice => (dst_ports, src_ports),
-            };
+                let (this_device_ports, other_device_ports) = match acl.packet_direction {
+                    AclDirection::FromDevice => (src_ports, dst_ports),
+                    AclDirection::ToDevice => (dst_ports, src_ports),
+                };
 
-            let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
+                let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
 
-            let other_dev_rule_targets: Vec<RuleTarget> =
-                match (&ace.matches.dnsname, &ace.matches.matches_augmentation) {
-                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
-                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
-                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
+                let other_dev_rule_targets: Vec<RuleTarget> =
+                    match (&ace.matches.dnsname, &ace.matches.matches_augmentation) {
+                        // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
+                        (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
+                            Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                            Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
                         },
                         (None, Some(augmentation)) => {
                             let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
@@ -203,7 +203,11 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                                 ));
                             }
                             if augmentation.my_controller {
-                                targets_per_option.push(get_my_controller_ruletargethosts(device, devices, acl.acl_type));
+                                targets_per_option.push(get_my_controller_ruletargethosts(
+                                    device,
+                                    devices,
+                                    acl.acl_type,
+                                ));
                             }
                             if augmentation.local {
                                 // TODO
@@ -222,12 +226,12 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                                     .cloned()
                                     .collect(),
                             }
-                        }
+                        },
                         _ => vec![],
                     }
-                        .iter()
-                        .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
-                        .collect();
+                    .iter()
+                    .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
+                    .collect();
 
                 for other_dev_rule_target in &other_dev_rule_targets {
                     let (src, dst) = match acl.packet_direction {
@@ -1573,7 +1577,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
-                    ),
+                ),
             ],
             collect_data: true,
         };

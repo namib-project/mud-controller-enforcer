@@ -133,7 +133,7 @@ impl DeviceCreationUpdateDto {
             device.collect_info = collect_info;
         }
         if let Some(q_bit) = self.q_bit {
-            device.q_bit = q_bit
+            device.q_bit = q_bit;
         }
     }
 }

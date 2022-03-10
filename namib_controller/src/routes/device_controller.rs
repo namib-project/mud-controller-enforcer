@@ -149,7 +149,7 @@ async fn guess_thing(
 }
 
 /// Helper method for finding a device with a given ip, or returning a 404 error if not found.
-async fn find_device(id: i64, pool: &DbConnection) -> Result<Device> {
+pub async fn find_device(id: i64, pool: &DbConnection) -> Result<Device> {
     device_service::find_by_id(id, pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
