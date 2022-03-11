@@ -37,9 +37,9 @@ use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
 /// @author Namib Group 3.
 
 const TABLE_NAME: &str = "namib";
-const TABLE_NAME_LOCAL: &str = "namib_local";
+const TABLE_NAME_BRIDGE: &str = "namib_local";
 const BASE_CHAIN_NAME: &str = "base_chain";
-const BASE_CHAIN_NAME_LOCAL: &str = "base_chain";
+const BASE_CHAIN_NAME_BRIDGE: &str = "base_chain";
 
 /// Service which provides firewall configuration functionality by integrating into the linux system
 /// firewall (nftables).
@@ -117,8 +117,8 @@ impl FirewallService {
 
 #[derive(PartialEq)]
 enum FirewallRuleScope {
-    Global,
-    Local,
+    Inet,
+    Bridge,
 }
 
 trait AddressPairInScope {
@@ -135,21 +135,21 @@ fn get_local_ips() -> Vec<IpNetwork> {
 }
 
 impl AddressPairInScope for FirewallRuleScope {
-    // In Local scope returns true iff source and destination addr are both contained in a local subnet, else false.
-    // In Global scope returns true if source and destination are in non-local or different subnets, else false.
+    // In `Bridge` scope returns true iff source and destination addr are both contained in a local subnet, else false.
+    // In `Inet` scope returns true if source and destination are in non-local or different subnets, else false.
     fn address_pair_in_scope(&self, src_addr: IpAddr, dest_addr: IpAddr) -> bool {
         for ip in get_local_ips() {
             if ip.contains(src_addr) && ip.contains(dest_addr) {
                 return match *self {
-                    FirewallRuleScope::Local => true,
-                    FirewallRuleScope::Global => false,
+                    FirewallRuleScope::Bridge => true,
+                    FirewallRuleScope::Inet => false,
                 };
             }
         }
         // No local interface with saddr and daddr found
         match *self {
-            FirewallRuleScope::Local => false,
-            FirewallRuleScope::Global => true,
+            FirewallRuleScope::Bridge => false,
+            FirewallRuleScope::Inet => true,
         }
     }
 
@@ -186,12 +186,12 @@ impl EtherTypeCode for FirewallRuleProto {
     fn ethertype_code(&self, scope: &FirewallRuleScope) -> EtherNfType {
         match self {
             FirewallRuleProto::IPv4 => match scope {
-                FirewallRuleScope::Global => EtherNfType::NfType(libc::NFPROTO_IPV4 as u8),
-                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IP as u16).to_be()),
+                FirewallRuleScope::Inet => EtherNfType::NfType(libc::NFPROTO_IPV4 as u8),
+                FirewallRuleScope::Bridge => EtherNfType::EtherType((libc::ETH_P_IP as u16).to_be()),
             },
             FirewallRuleProto::IPv6 => match scope {
-                FirewallRuleScope::Global => EtherNfType::NfType(libc::NFPROTO_IPV6 as u8),
-                FirewallRuleScope::Local => EtherNfType::EtherType((libc::ETH_P_IPV6 as u16).to_be()),
+                FirewallRuleScope::Inet => EtherNfType::NfType(libc::NFPROTO_IPV6 as u8),
+                FirewallRuleScope::Bridge => EtherNfType::EtherType((libc::ETH_P_IPV6 as u16).to_be()),
             },
         }
     }
@@ -216,10 +216,10 @@ impl ProtocolCode for Protocol {
 
 #[cfg(feature = "nftables")]
 pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
-    for scope in [FirewallRuleScope::Global, FirewallRuleScope::Local] {
+    for scope in [FirewallRuleScope::Inet, FirewallRuleScope::Bridge] {
         let table_name = match scope {
-            FirewallRuleScope::Local => TABLE_NAME_LOCAL,
-            FirewallRuleScope::Global => TABLE_NAME,
+            FirewallRuleScope::Bridge => TABLE_NAME_BRIDGE,
+            FirewallRuleScope::Inet => TABLE_NAME,
         };
         debug!("Creating rules for table {}", table_name);
         let mut batch = Batch::new();
@@ -259,8 +259,8 @@ fn add_old_config_deletion_instructions(batch: &mut Batch, scope: &FirewallRuleS
 #[cfg(feature = "nftables")]
 fn create_table(scope: &FirewallRuleScope) -> Table {
     match scope {
-        FirewallRuleScope::Global => Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet),
-        FirewallRuleScope::Local => Table::new(&CString::new(TABLE_NAME_LOCAL).unwrap(), ProtoFamily::Bridge),
+        FirewallRuleScope::Inet => Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet),
+        FirewallRuleScope::Bridge => Table::new(&CString::new(TABLE_NAME_BRIDGE).unwrap(), ProtoFamily::Bridge),
     }
 }
 
@@ -268,8 +268,8 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
 #[cfg(feature = "nftables")]
 fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
     match scope {
-        FirewallRuleScope::Local => rule.add_expr(&nft_expr!(meta proto)), // bridge uses ethertype
-        FirewallRuleScope::Global => rule.add_expr(&nft_expr!(meta nfproto)), // inet uses ip code
+        FirewallRuleScope::Bridge => rule.add_expr(&nft_expr!(meta proto)), // bridge uses ethertype
+        FirewallRuleScope::Inet => rule.add_expr(&nft_expr!(meta nfproto)), // inet uses ip code
     }
     match proto.ethertype_code(scope) {
         EtherNfType::EtherType(proto_code) => rule.add_expr(&nft_expr!(cmp == proto_code)),
@@ -386,13 +386,13 @@ async fn convert_config_to_nftnl_commands(
     // Create base chain. This base chain is the entry point for the firewall table and will redirect all
     // packets corresponding to a configured device in the firewall config to its separate chain.
     let base_chain_name = match scope {
-        FirewallRuleScope::Global => BASE_CHAIN_NAME,
-        FirewallRuleScope::Local => BASE_CHAIN_NAME_LOCAL,
+        FirewallRuleScope::Inet => BASE_CHAIN_NAME,
+        FirewallRuleScope::Bridge => BASE_CHAIN_NAME_BRIDGE,
     };
     let mut base_chain = Chain::new(&CString::new(base_chain_name).unwrap(), &table);
     let base_chain_hook = match scope {
-        FirewallRuleScope::Global => nftnl::Hook::Forward,
-        FirewallRuleScope::Local => nftnl::Hook::In,
+        FirewallRuleScope::Inet => nftnl::Hook::Forward,
+        FirewallRuleScope::Bridge => nftnl::Hook::In,
     };
     base_chain.set_hook(base_chain_hook, 0);
     // If a device is not one of the configured devices, accept packets by default.
@@ -672,7 +672,7 @@ mod tests {
 
         for family_info in [
             ("inet", super::TABLE_NAME, super::BASE_CHAIN_NAME),
-            ("bridge", super::TABLE_NAME_LOCAL, super::BASE_CHAIN_NAME_LOCAL),
+            ("bridge", super::TABLE_NAME_BRIDGE, super::BASE_CHAIN_NAME_BRIDGE),
         ] {
             let family = family_info.0;
             let table_name = family_info.1;
@@ -738,7 +738,7 @@ mod tests {
 
         for family_info in [
             ("inet", super::TABLE_NAME, super::BASE_CHAIN_NAME),
-            ("bridge", super::TABLE_NAME_LOCAL, super::BASE_CHAIN_NAME_LOCAL),
+            ("bridge", super::TABLE_NAME_BRIDGE, super::BASE_CHAIN_NAME_BRIDGE),
         ] {
             let family = family_info.0;
             let table_name = family_info.1;
