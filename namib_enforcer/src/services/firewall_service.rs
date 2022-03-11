@@ -122,8 +122,8 @@ enum FirewallRuleScope {
 }
 
 trait AddressPairInScope {
-    fn address_pair_in_scope(&self, src_addr: IpAddr, dest_addr: IpAddr) -> bool;
-    fn rule_address_pair_in_scope(&self, src_addr: RuleAddrEntry, dest_addr: RuleAddrEntry) -> bool;
+    fn address_pair_in_scope(&self, src_addr: &IpAddr, dest_addr: &IpAddr) -> bool;
+    fn rule_address_pair_in_scope(&self, src_addr: &RuleAddrEntry, dest_addr: &RuleAddrEntry) -> bool;
 }
 
 fn get_local_ips() -> Vec<IpNetwork> {
@@ -135,11 +135,11 @@ fn get_local_ips() -> Vec<IpNetwork> {
 }
 
 impl AddressPairInScope for FirewallRuleScope {
-    // In `Bridge` scope returns true iff source and destination addr are both contained in a local subnet, else false.
-    // In `Inet` scope returns true if source and destination are in non-local or different subnets, else false.
-    fn address_pair_in_scope(&self, src_addr: IpAddr, dest_addr: IpAddr) -> bool {
+    /// In `Bridge` scope returns true iff source and destination addr are both contained in a local subnet, else false.
+    /// In `Inet` scope returns true if source and destination are in non-local or different subnets, else false.
+    fn address_pair_in_scope(&self, src_addr: &IpAddr, dest_addr: &IpAddr) -> bool {
         for ip in get_local_ips() {
-            if ip.contains(src_addr) && ip.contains(dest_addr) {
+            if ip.contains(*src_addr) && ip.contains(*dest_addr) {
                 return match *self {
                     FirewallRuleScope::Bridge => true,
                     FirewallRuleScope::Inet => false,
@@ -153,8 +153,8 @@ impl AddressPairInScope for FirewallRuleScope {
         }
     }
 
-    fn rule_address_pair_in_scope(&self, src_addr: RuleAddrEntry, dest_addr: RuleAddrEntry) -> bool {
-        if src_addr == RuleAddrEntry::AnyAddr || dest_addr == RuleAddrEntry::AnyAddr {
+    fn rule_address_pair_in_scope(&self, src_addr: &RuleAddrEntry, dest_addr: &RuleAddrEntry) -> bool {
+        if src_addr == &RuleAddrEntry::AnyAddr || dest_addr == &RuleAddrEntry::AnyAddr {
             return true; // address with 'any' is relevant in all scopes
         }
         match (src_addr, dest_addr) {
@@ -166,12 +166,13 @@ impl AddressPairInScope for FirewallRuleScope {
     }
 }
 
+/// Layer 3 protocol a rule operates on
 enum FirewallRuleProto {
     IPv4,
     IPv6,
 }
 
-// Protocol code for either IP protocol or ethertype
+/// Protocol code for either IP protocol or ethertype
 enum EtherNfType {
     NfType(u8),
     EtherType(u16),
@@ -198,7 +199,7 @@ impl EtherTypeCode for FirewallRuleProto {
 }
 
 trait ProtocolCode {
-    // Returns IP protocol code
+    /// Returns IP protocol code
     fn proto_code(&self) -> u32;
 }
 
@@ -244,7 +245,7 @@ pub async fn apply_firewall_config_inner(
     Ok(())
 }
 
-/// Creates nftnl expressions which delete the current namib firewall table if it exists and adds them to the given batch.
+/// Creates nftnl expressions which delete the current namib firewall table (for the given scope) if it exists and adds them to the given batch.
 #[cfg(feature = "nftables")]
 fn add_old_config_deletion_instructions(batch: &mut Batch, scope: &FirewallRuleScope) {
     // Create the table if it doesn't exist, otherwise removing the table might cause a NotFound error.
@@ -264,7 +265,7 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
     }
 }
 
-// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
+/// Adds netfilter instructions to match the given layer 4 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
     match scope {
@@ -277,7 +278,7 @@ fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRu
     };
 }
 
-// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
+/// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_l4proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto, l4proto: &Protocol) {
     nf_match_proto(rule, scope, &FirewallRuleProto::IPv4);
@@ -293,7 +294,7 @@ fn nf_match_l4proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &Firewall
     }
 }
 
-// Adds netfilter expressions to match for port numbers.
+/// Adds netfilter expressions to match for port numbers.
 #[cfg(feature = "nftables")]
 fn nf_match_ports(rule: &mut Rule, rule_spec: &FirewallRule) {
     match rule_spec.protocol {
@@ -505,7 +506,7 @@ async fn add_rule_to_batch(
             }
 
             // skip rule if it doesn't match the current scope
-            if !scope.rule_address_pair_in_scope(source_ip.clone(), dest_ip.clone()) {
+            if !scope.rule_address_pair_in_scope(source_ip, dest_ip) {
                 continue;
             }
 
