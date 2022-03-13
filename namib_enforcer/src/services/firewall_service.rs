@@ -395,7 +395,11 @@ async fn convert_config_to_nftnl_commands(
         FirewallRuleScope::Inet => nftnl::Hook::Forward,
         FirewallRuleScope::Bridge => nftnl::Hook::In,
     };
-    base_chain.set_hook(base_chain_hook, 0);
+    let priority: i32 = match scope {
+        FirewallRuleScope::Inet => 0,      // NF_IP_PRI_FILTER
+        FirewallRuleScope::Bridge => -200, // NF_BR_PRI_FILTER_BRIDGED
+    };
+    base_chain.set_hook(base_chain_hook, priority);
     // If a device is not one of the configured devices, accept packets by default.
     base_chain.set_policy(nftnl::Policy::Accept);
     batch.add(&base_chain, nftnl::MsgType::Add);
