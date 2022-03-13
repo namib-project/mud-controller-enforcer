@@ -41,6 +41,7 @@ function import() {
   INSERT INTO users_roles (user_id, role_id) SELECT id, 0 FROM users WHERE username = 'admin';
   INSERT INTO users_roles (user_id, role_id) SELECT id, 1 FROM users WHERE username = 'reader';
 EOF
+  echo "INFO: mock data import finished."
 }
 
 if [ "$1" == "docker" ]; then
