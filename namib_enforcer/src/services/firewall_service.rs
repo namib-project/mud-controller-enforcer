@@ -172,6 +172,15 @@ enum FirewallRuleProto {
     IPv6,
 }
 
+impl From<IpAddr> for FirewallRuleProto {
+    fn from(ipaddr: IpAddr) -> Self {
+        match ipaddr {
+            IpAddr::V4(_) => FirewallRuleProto::IPv4,
+            IpAddr::V6(_) => FirewallRuleProto::IPv6,
+        }
+    }
+}
+
 /// Protocol code for either IP protocol or ethertype
 enum EtherNfType {
     NfType(u8),
@@ -267,7 +276,7 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
 
 /// Adds netfilter instructions to match the given layer 4 protocol in rule.
 #[cfg(feature = "nftables")]
-fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
+fn nf_match_l3proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
     match scope {
         FirewallRuleScope::Bridge => rule.add_expr(&nft_expr!(meta proto)), // bridge uses ethertype
         FirewallRuleScope::Inet => rule.add_expr(&nft_expr!(meta nfproto)), // inet uses ip code
@@ -280,11 +289,10 @@ fn nf_match_proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRu
 
 /// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
-fn nf_match_l4proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto, l4proto: &Protocol) {
-    nf_match_proto(rule, scope, &FirewallRuleProto::IPv4);
+fn nf_match_l4proto(rule: &mut Rule, l3proto: &FirewallRuleProto, l4proto: &Protocol) {
     match l4proto {
         Protocol::Tcp | Protocol::Udp => {
-            match proto {
+            match l3proto {
                 FirewallRuleProto::IPv4 => rule.add_expr(&nft_expr!(payload ipv4 protocol)),
                 FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
             }
@@ -322,29 +330,28 @@ fn nf_match_ports(rule: &mut Rule, rule_spec: &FirewallRule) {
     }
 }
 
+/// Indicates if `nf_match_addresses()` should match on source or destination address.
+enum AddressMatchOn {
+    Src,
+    Dest,
+}
+
+/// Adds netfilter instructions to a rule to match on the given IPv4/IPv6 address as source or destination address
 #[cfg(feature = "nftables")]
-fn nf_match_addresses(rule: &mut Rule, scope: &FirewallRuleScope, device_addr: &IpAddr, match_src: bool) {
+fn nf_match_addresses(rule: &mut Rule, device_addr: &IpAddr, match_on: &AddressMatchOn) {
     // Match rule if source or target address is configured device.
     match device_addr {
         IpAddr::V4(v4addr) => {
-            if match_src {
-                // match on saddr
-                nf_match_proto(rule, scope, &FirewallRuleProto::IPv4);
-                rule.add_expr(&nft_expr!(payload ipv4 saddr));
-                rule.add_expr(&nft_expr!(cmp == *v4addr));
-            } else {
-                // match on daddr
-                nf_match_proto(rule, scope, &FirewallRuleProto::IPv4);
-                rule.add_expr(&nft_expr!(payload ipv4 daddr));
-                rule.add_expr(&nft_expr!(cmp == *v4addr));
+            match match_on {
+                AddressMatchOn::Src => rule.add_expr(&nft_expr!(payload ipv4 saddr)),
+                AddressMatchOn::Dest => rule.add_expr(&nft_expr!(payload ipv4 daddr)),
             }
         },
         IpAddr::V6(v6addr) => {
-            nf_match_proto(rule, scope, &FirewallRuleProto::IPv6);
-            rule.add_expr(&nft_expr!(payload ipv6 saddr));
-            rule.add_expr(&nft_expr!(cmp == *v6addr));
-            nf_match_proto(rule, scope, &FirewallRuleProto::IPv6);
-            rule.add_expr(&nft_expr!(payload ipv6 daddr));
+            match match_on {
+                AddressMatchOn::Src => rule.add_expr(&nft_expr!(payload ipv6 saddr)),
+                AddressMatchOn::Dest => rule.add_expr(&nft_expr!(payload ipv6 daddr)),
+            }
             rule.add_expr(&nft_expr!(cmp == *v6addr));
         },
     }
@@ -362,8 +369,11 @@ fn add_device_jump_rule(
     let mut device_jump_rule_src = Rule::new(base_chain);
     let mut device_jump_rule_dst = Rule::new(base_chain);
     // Match rule if source or target address is configured device.
-    nf_match_addresses(&mut device_jump_rule_src, scope, &device_addr, true);
-    nf_match_addresses(&mut device_jump_rule_dst, scope, &device_addr, false);
+    let l3proto: FirewallRuleProto = device_addr.into();
+    nf_match_l3proto(&mut device_jump_rule_src, scope, &l3proto);
+    nf_match_l3proto(&mut device_jump_rule_dst, scope, &l3proto);
+    nf_match_addresses(&mut device_jump_rule_src, &device_addr, &AddressMatchOn::Src);
+    nf_match_addresses(&mut device_jump_rule_dst, &device_addr, &AddressMatchOn::Dest);
     // If these rules apply, jump to the chain responsible for handling this device.
     device_jump_rule_src.add_expr(&nft_expr!(verdict jump CString::new(target_chain).unwrap()));
     device_jump_rule_dst.add_expr(&nft_expr!(verdict jump CString::new(target_chain).unwrap()));
@@ -517,26 +527,21 @@ async fn add_rule_to_batch(
             // Create rule for current address combination.
             let mut current_rule = Rule::new(device_chain);
             // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
-            match protocol_reference_ip {
-                Some(IpAddr::V4(_v4addr)) => {
-                    nf_match_l4proto(&mut current_rule, scope, &FirewallRuleProto::IPv4, &rule_spec.protocol);
-                },
-                Some(IpAddr::V6(_v6addr)) => {
-                    nf_match_l4proto(&mut current_rule, scope, &FirewallRuleProto::IPv6, &rule_spec.protocol);
-                },
-                _ => {},
+            if let Some(ipaddr) = protocol_reference_ip {
+                nf_match_l3proto(&mut current_rule, scope, &ipaddr.into());
+                nf_match_l4proto(&mut current_rule, &ipaddr.into(), &rule_spec.protocol);
             }
             // Create expressions to match source IP.
             match source_ip {
                 RuleAddrEntry::AddrEntry(device_addr) => {
-                    nf_match_addresses(&mut current_rule, scope, device_addr, true);
+                    nf_match_addresses(&mut current_rule, device_addr, &AddressMatchOn::Src);
                 },
                 RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match destination IP.
             match dest_ip {
                 RuleAddrEntry::AddrEntry(device_addr) => {
-                    nf_match_addresses(&mut current_rule, scope, device_addr, false);
+                    nf_match_addresses(&mut current_rule, device_addr, &AddressMatchOn::Dest);
                 },
                 RuleAddrEntry::AnyAddr => {},
             }
