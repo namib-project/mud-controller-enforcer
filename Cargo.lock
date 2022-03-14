@@ -1220,9 +1220,9 @@ dependencies = [
 
 [[package]]
 name = "err-derive"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcc7f65832b62ed38939f98966824eb6294911c3629b0e9a262bfb80836d9686"
+checksum = "c34a887c8df3ed90498c1c437ce21f211c8e27672921a8ffa293cb8d6d4caa9e"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -2286,8 +2286,8 @@ dependencies = [
 
 [[package]]
 name = "nftnl"
-version = "0.6.1"
-source = "git+https://github.com/namib-project/nftnl-rs.git?branch=fix-musl-targets#ccf660b781ba1c60ad61b32ac0f30eaa8629f1f1"
+version = "0.6.2"
+source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl#343139653de9842e6e20b8b47869297a54cfdd04"
 dependencies = [
  "bitflags",
  "err-derive",
@@ -2297,8 +2297,8 @@ dependencies = [
 
 [[package]]
 name = "nftnl-sys"
-version = "0.6.0"
-source = "git+https://github.com/namib-project/nftnl-rs.git?branch=fix-musl-targets#ccf660b781ba1c60ad61b32ac0f30eaa8629f1f1"
+version = "0.6.1"
+source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl#343139653de9842e6e20b8b47869297a54cfdd04"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
