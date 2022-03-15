@@ -161,7 +161,7 @@ impl AddressPairInScope for FirewallRuleScope {
             (RuleAddrEntry::AddrEntry(src_addr), RuleAddrEntry::AddrEntry(dest_addr)) => {
                 self.address_pair_in_scope(src_addr, dest_addr)
             },
-            _ => panic!("Reached unreachable condition in address pair scope matching."),
+            _ => unreachable!("Reached unreachable condition in address pair scope matching."),
         }
     }
 }
@@ -346,6 +346,7 @@ fn nf_match_addresses(rule: &mut Rule, device_addr: &IpAddr, match_on: &AddressM
                 AddressMatchOn::Src => rule.add_expr(&nft_expr!(payload ipv4 saddr)),
                 AddressMatchOn::Dest => rule.add_expr(&nft_expr!(payload ipv4 daddr)),
             }
+            rule.add_expr(&nft_expr!(cmp == *v4addr));
         },
         IpAddr::V6(v6addr) => {
             match match_on {
