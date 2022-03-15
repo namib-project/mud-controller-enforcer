@@ -280,7 +280,7 @@ impl DnsWatcher {
     /// Yield until a change to any of the watched DNS entries of this watcher occurs.
     /// Returns immediately in case a change has already happened but was not waited for.
     pub async fn address_changed(&self) {
-        self.sender.notify.notified().await
+        self.sender.notify.notified().await;
     }
 }
 
