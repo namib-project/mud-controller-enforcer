@@ -28,6 +28,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -46,6 +48,8 @@
             "destination_port": {
               "single": 67
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -64,6 +68,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -82,6 +88,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -100,6 +108,8 @@
             "destination_port": {
               "single": 53
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": {
               "manufacturer": null,
               "same_manufacturer": false,
@@ -125,6 +135,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -143,6 +155,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -159,6 +173,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": 0,
+            "icmp_type": 8,
             "matches_augmentation": null
           }
         },
@@ -177,6 +193,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -193,6 +211,8 @@
             "dnsname": "doorbells.august.com",
             "source_port": null,
             "destination_port": null,
+            "icmp_code": 0,
+            "icmp_type": 8,
             "matches_augmentation": null
           }
         },
@@ -211,6 +231,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -229,6 +251,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -247,6 +271,8 @@
             "destination_port": {
               "single": 53
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -265,6 +291,8 @@
             "destination_port": {
               "single": 67
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": {
               "manufacturer": null,
               "same_manufacturer": false,
@@ -290,6 +318,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -308,6 +338,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -326,6 +358,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -344,6 +378,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -362,6 +398,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -380,6 +418,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -398,6 +438,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -416,6 +458,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -434,6 +478,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -452,6 +498,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -470,6 +518,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -488,6 +538,8 @@
             "destination_port": {
               "single": 443
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -504,6 +556,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": 0,
+            "icmp_type": 8,
             "matches_augmentation": null
           }
         }
@@ -529,6 +583,8 @@
             "destination_port": {
               "single": 547
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -545,6 +601,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -561,6 +619,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -579,6 +639,8 @@
             "destination_port": {
               "single": 53
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -595,6 +657,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -613,6 +677,8 @@
             "destination_port": {
               "single": 53
             },
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -629,6 +695,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         }
@@ -649,6 +717,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -662,6 +732,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         }
@@ -687,6 +759,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -705,6 +779,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -723,6 +799,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -741,6 +819,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -759,6 +839,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -777,6 +859,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -795,6 +879,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -813,6 +899,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -831,6 +919,8 @@
               "single": 67
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": {
               "manufacturer": null,
               "same_manufacturer": false,
@@ -854,6 +944,8 @@
             "dnsname": "doorbells.august.com",
             "source_port": null,
             "destination_port": null,
+            "icmp_code": 0,
+            "icmp_type": 0,
             "matches_augmentation": null
           }
         },
@@ -872,6 +964,8 @@
               "single": 53
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -890,6 +984,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -908,6 +1004,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -926,6 +1024,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -944,6 +1044,8 @@
               "single": 53
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": {
               "manufacturer": null,
               "same_manufacturer": false,
@@ -969,6 +1071,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -987,6 +1091,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1005,6 +1111,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1023,6 +1131,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1041,6 +1151,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1059,6 +1171,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1077,6 +1191,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1093,6 +1209,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": 0,
+            "icmp_type": 0,
             "matches_augmentation": null
           }
         },
@@ -1109,6 +1227,8 @@
             "dnsname": null,
             "source_port": null,
             "destination_port": null,
+            "icmp_code": 0,
+            "icmp_type": 0,
             "matches_augmentation": null
           }
         },
@@ -1127,6 +1247,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1145,6 +1267,8 @@
               "single": 443
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         }
@@ -1170,6 +1294,8 @@
               "single": 547
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": {
               "manufacturer": null,
               "same_manufacturer": false,
@@ -1195,6 +1321,8 @@
               "single": 53
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         },
@@ -1213,6 +1341,8 @@
               "single": 53
             },
             "destination_port": null,
+            "icmp_code": null,
+            "icmp_type": null,
             "matches_augmentation": null
           }
         }

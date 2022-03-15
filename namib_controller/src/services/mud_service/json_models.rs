@@ -87,6 +87,7 @@ pub struct Matches {
     pub ipv6: Option<Ipv6>,
     pub tcp: Option<Tcp>,
     pub udp: Option<Udp>,
+    pub icmp: Option<Icmp>,
     #[serde(rename = "ietf-mud:mud")]
     pub mud: Option<MudExtension>,
 }
@@ -107,6 +108,13 @@ pub struct Udp {
     pub source_port: Option<Port>,
     #[serde(rename = "destination-port")]
     pub destination_port: Option<Port>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
+pub struct Icmp {
+    #[serde(rename = "type")]
+    pub icmp_type: u8,
+    pub code: u8,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
