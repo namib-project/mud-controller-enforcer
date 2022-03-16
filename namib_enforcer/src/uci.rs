@@ -7,7 +7,7 @@ pub use mock::*;
 pub use rust_uci::*;
 
 #[cfg(not(feature = "uci"))]
-#[allow(clippy::unused_self)]
+#[allow(clippy::unused_self, clippy::unnecessary_wraps)]
 mod mock {
 
     use crate::error::{self, Result};
@@ -41,7 +41,7 @@ mod mock {
 
         pub fn get(&mut self, key: &str) -> Result<String> {
             debug!("get {}", key);
-            error::NoneError {}.fail()
+            error::None {}.fail()
         }
 
         pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
@@ -87,10 +87,10 @@ mod tests {
         assert_eq!(uci.get("network.@interface[-1].proto")?, "dhcp");
         assert_eq!(uci.get("network.lan.proto")?, "static");
         assert_eq!(uci.get("network.@interface[0].proto")?, "static");
-        assert_eq!(uci.get("broken.a").is_err(), true);
-        assert_eq!(uci.get("broken.a.b").is_err(), true);
-        assert_eq!(uci.get("inexistant.c").is_err(), true);
-        assert_eq!(uci.get("inexistant.c.d").is_err(), true);
+        assert!(uci.get("broken.a").is_err());
+        assert!(uci.get("broken.a.b").is_err());
+        assert!(uci.get("inexistant.c").is_err());
+        assert!(uci.get("inexistant.c.d").is_err());
         Ok(())
     }
 
@@ -142,8 +142,8 @@ mod tests {
         assert_eq!(uci.get("network.wan.proto")?, "dhcp");
         assert_eq!(uci.get("network.wan.ifname")?, "eth1");
         uci.delete("network.wan")?;
-        assert_eq!(uci.get("network.wan.proto").is_err(), true);
-        assert_eq!(uci.get("network.wan.ifname").is_err(), true);
+        assert!(uci.get("network.wan.proto").is_err());
+        assert!(uci.get("network.wan.ifname").is_err());
         uci.revert("network")?;
         assert_eq!(uci.get("network.wan.proto")?, "dhcp");
         assert_eq!(uci.get("network.wan.ifname")?, "eth1");

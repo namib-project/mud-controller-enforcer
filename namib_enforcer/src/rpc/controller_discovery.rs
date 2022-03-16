@@ -57,5 +57,5 @@ pub fn discover_controllers(reg_type: &str) -> impl Stream<Item = Result<ScopedS
                 }
             })
         })
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }
