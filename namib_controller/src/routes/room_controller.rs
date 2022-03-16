@@ -10,6 +10,7 @@ use paperclip::actix::{
     web::{HttpResponse, Json},
 };
 use snafu::ensure;
+use sqlx::encode::IsNull::No;
 use validator::Validate;
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    routes::dtos::{DeviceDto, RoomCreationUpdateDto, RoomDto},
+    routes::dtos::{DeviceDto, RoomCreationUpdateDto, RoomDto, RoomGuestUpdateDto},
     services::{role_service::Permission, room_service},
 };
 
@@ -28,6 +29,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::post().to(create_room));
     cfg.route("/{id}", web::put().to(update_room));
     cfg.route("/{id}", web::delete().to(delete_room));
+    cfg.route("/{id}/guest", web::put().to(change_guest));
 }
 
 #[api_v2_operation(summary = "Return all rooms.", tags(Rooms))]
@@ -196,4 +198,50 @@ async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Pa
     debug!("{:?}", find_room);
     room_service::delete_room(&find_room.number, &pool).await?;
     Ok(HttpResponse::NoContent().finish())
+}
+
+#[api_v2_operation(summary = "Changes the guest in a room.", tags(Rooms))]
+async fn change_guest(pool:
+    web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+    mut guest_update_dto: Json<RoomGuestUpdateDto>,
+) -> Result<Json<RoomDto>> {
+    auth.require_permission(Permission::room__write)?;
+
+    guest_update_dto.validate().or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    let mut find_room = room_service::find_by_id(id.0, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: None,
+        }
+        .fail()
+    })?;
+
+    find_room.guest = guest_update_dto.guest.take();
+
+    let updated = room_service::update(&find_room, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::BAD_REQUEST,
+            message: Some("Could not update room.".to_string()),
+        }
+        .fail()
+    })?;
+
+    ensure!(
+        updated,
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("Room can not be found.".to_string()),
+        }
+    );
+
+    Ok(Json(RoomDto::from(find_room)))
 }

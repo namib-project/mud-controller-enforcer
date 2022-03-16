@@ -51,3 +51,9 @@ impl RoomCreationUpdateDto {
         }
     }
 }
+
+#[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema)]
+pub struct RoomGuestUpdateDto {
+    #[validate(length(max = 255))]
+    pub guest: Option<String>,
+}
