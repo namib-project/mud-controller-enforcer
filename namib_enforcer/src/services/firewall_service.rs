@@ -167,6 +167,7 @@ impl AddressPairInScope for FirewallRuleScope {
 }
 
 /// Layer 3 protocol a rule operates on
+#[derive(Clone)]
 enum FirewallRuleProto {
     IPv4,
     IPv6,
@@ -209,14 +210,18 @@ impl EtherTypeCode for FirewallRuleProto {
 
 trait ProtocolCode {
     /// Returns IP protocol code
-    fn proto_code(&self) -> u32;
+    fn proto_code(&self, l3proto: &FirewallRuleProto) -> u32;
 }
 
 impl ProtocolCode for Protocol {
-    fn proto_code(&self) -> u32 {
+    fn proto_code(&self, l3proto: &FirewallRuleProto) -> u32 {
         match self {
             Protocol::Tcp => libc::IPPROTO_TCP as u32,
             Protocol::Udp => libc::IPPROTO_UDP as u32,
+            Protocol::Icmp(_) => match l3proto {
+                FirewallRuleProto::IPv4 => libc::IPPROTO_ICMP as u32,
+                FirewallRuleProto::IPv6 => libc::IPPROTO_ICMPV6 as u32,
+            },
             Protocol::All => {
                 panic!("Unknown protocol {:?}", self)
             },
@@ -274,7 +279,7 @@ fn create_table(scope: &FirewallRuleScope) -> Table {
     }
 }
 
-/// Adds netfilter instructions to match the given layer 4 protocol in rule.
+/// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_l3proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
     match scope {
@@ -287,43 +292,69 @@ fn nf_match_l3proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &Firewall
     };
 }
 
-/// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
+/// Adds netfilter instructions to match the given layer 4 protocol in rule.
 #[cfg(feature = "nftables")]
 fn nf_match_l4proto(rule: &mut Rule, l3proto: &FirewallRuleProto, l4proto: &Protocol) {
     match l4proto {
-        Protocol::Tcp | Protocol::Udp => {
+        Protocol::Tcp | Protocol::Udp | Protocol::Icmp(_) => {
             match l3proto {
                 FirewallRuleProto::IPv4 => rule.add_expr(&nft_expr!(payload ipv4 protocol)),
                 FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
             }
-            rule.add_expr(&nft_expr!(cmp == l4proto.proto_code()));
+            rule.add_expr(&nft_expr!(cmp == l4proto.proto_code(l3proto)));
         },
-        Protocol::All => {}, // TODO expand with further options (icmp, sctp)
+        Protocol::All => {},
     }
 }
 
-/// Adds netfilter expressions to match for port numbers.
+/// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
 #[cfg(feature = "nftables")]
-fn nf_match_ports(rule: &mut Rule, rule_spec: &FirewallRule) {
-    match rule_spec.protocol {
-        Protocol::Tcp => {
+fn nf_match_l4payload(rule: &mut Rule, rule_spec: &FirewallRule, l3proto: &Option<FirewallRuleProto>) {
+    match &rule_spec.protocol {
+        Protocol::Tcp | Protocol::Udp => {
             if let Some(port) = &rule_spec.dst.port {
-                rule.add_expr(&nft_expr!(payload tcp dport));
+                if rule_spec.protocol == Protocol::Tcp {
+                    rule.add_expr(&nft_expr!(payload tcp dport));
+                } else {
+                    rule.add_expr(&nft_expr!(payload udp dport));
+                }
                 rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
             }
             if let Some(port) = &rule_spec.src.port {
-                rule.add_expr(&nft_expr!(payload tcp sport));
+                if rule_spec.protocol == Protocol::Tcp {
+                    rule.add_expr(&nft_expr!(payload tcp sport));
+                } else {
+                    rule.add_expr(&nft_expr!(payload udp sport));
+                }
                 rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
             }
         },
-        Protocol::Udp => {
-            if let Some(port) = &rule_spec.dst.port {
-                rule.add_expr(&nft_expr!(payload udp dport));
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
-            }
-            if let Some(port) = &rule_spec.src.port {
-                rule.add_expr(&nft_expr!(payload udp sport));
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
+        Protocol::Icmp(icmp_spec) => {
+            /// TODO: this produces the following `nft list ruleset` output for code==123 and type==234: `@th,0,8 234 @th,8,8 123`
+            use nftnl::expr::IcmpHeaderField;
+            for icmp_data in [
+                (IcmpHeaderField::Type, icmp_spec.icmp_type),
+                (IcmpHeaderField::Code, icmp_spec.icmp_code),
+            ] {
+                match (l3proto, icmp_data) {
+                    (Some(FirewallRuleProto::IPv4), (IcmpHeaderField::Type, Some(_))) => {
+                        rule.add_expr(&nft_expr!(payload icmp icmptype));
+                    },
+                    (Some(FirewallRuleProto::IPv4), (IcmpHeaderField::Code, Some(_))) => {
+                        rule.add_expr(&nft_expr!(payload icmp code));
+                    },
+                    (Some(FirewallRuleProto::IPv6), (IcmpHeaderField::Type, Some(_))) => {
+                        rule.add_expr(&nft_expr!(payload icmpv6 icmptype));
+                    },
+                    (Some(FirewallRuleProto::IPv6), (IcmpHeaderField::Code, Some(_))) => {
+                        rule.add_expr(&nft_expr!(payload icmpv6 code));
+                    },
+                    (None, (_, _)) => panic!("L3 protocol not specified for ICMP rule."),
+                    _ => {},
+                }
+                if let Some(icmp_data) = icmp_data.1 {
+                    rule.add_expr(&nft_expr!(cmp == icmp_data));
+                }
             }
         },
         Protocol::All => {},
@@ -547,7 +578,11 @@ async fn add_rule_to_batch(
                 RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match for port numbers.
-            nf_match_ports(&mut current_rule, rule_spec);
+            nf_match_l4payload(
+                &mut current_rule,
+                rule_spec,
+                &protocol_reference_ip.map(FirewallRuleProto::from),
+            );
 
             // Set verdict if current rule matches.
             match rule_spec.verdict {
