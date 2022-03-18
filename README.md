@@ -89,7 +89,7 @@ This project is currently maintained by the following developers:
 
 |       Name       |     Email Address      |                 GitHub Username                  |
 |:----------------:|:----------------------:|:------------------------------------------------:|
-| Jan Hensel       |         [TODO]         |        [@ja-he](https://github.com/ja-he)        |
+| Jan Hensel       |  ja_he@uni-bremen.de   |        [@ja-he](https://github.com/ja-he)        |
 | Hannes Masuch    |   hama@uni-bremen.de   | [@HannesMasuch](https://github.com/HannesMasuch) |
 | Jasper Wiegratz  | wiegratz@uni-bremen.de |         [@jwhb](https://github.com/jwhb)         |
 | Hugo Damer       |  hdamer@uni-bremen.de  |   [@pulsastrix](https://github.com/pulsastrix)   |
