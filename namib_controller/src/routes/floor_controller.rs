@@ -6,7 +6,7 @@
 use actix_web::http::StatusCode;
 use paperclip::actix::{
     api_v2_operation, web,
-    web::{HttpResponse, Json},
+    web::{Json},
 };
 use snafu::ensure;
 use validator::Validate;

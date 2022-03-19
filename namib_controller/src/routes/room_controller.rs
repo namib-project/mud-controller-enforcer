@@ -10,7 +10,6 @@ use paperclip::actix::{
     web::{HttpResponse, Json},
 };
 use snafu::ensure;
-use sqlx::encode::IsNull::No;
 use validator::Validate;
 
 use crate::{

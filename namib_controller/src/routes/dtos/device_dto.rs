@@ -25,7 +25,7 @@ pub struct DeviceDto {
     pub mud_url: Option<String>,
     pub last_interaction: NaiveDateTime,
     pub mud_data: Option<MudData>,
-    pub clipart: Option<String>,
+    pub fa_icon: Option<String>,
     pub room: Option<Room>,
     pub q_bit: bool,
     #[serde(rename = "type")]
@@ -47,7 +47,7 @@ impl From<DeviceWithRefs> for DeviceDto {
             mud_url: d.inner.mud_url,
             last_interaction: d.inner.last_interaction,
             mud_data: d.mud_data,
-            clipart: d.inner.clipart,
+            fa_icon: d.inner.fa_icon,
             room: d.room,
             q_bit: d.inner.q_bit,
             type_,
@@ -67,7 +67,7 @@ pub struct DeviceCreationUpdateDto {
     pub mud_url: Option<String>,
     pub mud_url_from_guess: Option<bool>,
     #[validate(length(max = 512))]
-    pub clipart: Option<String>,
+    pub fa_icon: Option<String>,
     pub room_id: Option<i64>,
     pub collect_info: Option<bool>,
     pub q_bit: Option<bool>,
@@ -92,7 +92,7 @@ impl DeviceCreationUpdateDto {
             mud_url: self.mud_url,
             collect_info: self.collect_info.unwrap_or(collect_info),
             last_interaction: Utc::now().naive_utc(),
-            clipart: self.clipart.clone(),
+            fa_icon: self.fa_icon.clone(),
             room_id: self.room_id,
             q_bit: self.q_bit.unwrap_or(false),
         })
@@ -117,8 +117,8 @@ impl DeviceCreationUpdateDto {
         if let Some(vendor_class) = self.vendor_class {
             device.vendor_class = vendor_class;
         }
-        if let Some(clipart) = self.clipart {
-            device.clipart = Some(clipart);
+        if let Some(fa_icon) = self.fa_icon {
+            device.fa_icon = Some(fa_icon);
         }
         if let Some(room_id) = self.room_id {
             device.room_id = Some(room_id);
