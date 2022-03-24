@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use std::{
@@ -167,6 +167,7 @@ pub fn start_app(
                 .service(web::scope("/quarantine").configure(routes::quarantine_controller::init))
                 .service(web::scope("/floors").configure(routes::floor_controller::init))
                 .service(web::scope("/notifications").configure(routes::notification_controller::init))
+                .service(web::scope("/anomalies").configure(routes::anomaly_controller::init))
                 .with_json_spec_at("/api/spec")
                 .build()
                 .route(

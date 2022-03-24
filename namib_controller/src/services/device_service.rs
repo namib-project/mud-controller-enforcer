@@ -97,10 +97,14 @@ pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
         ip,
         ip
     )
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await?;
 
-    Ok(Device::from(device))
+    if let Some(device) = device {
+        Ok(Device::from(device))
+    } else {
+        Err(sqlx::error::Error::RowNotFound.into())
+    }
 }
 
 pub async fn find_by_mac_or_duid(
