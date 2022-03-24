@@ -9,7 +9,7 @@ use crate::models::Room;
 
 #[derive(Validate, Debug, Serialize, Deserialize, Apiv2Schema, PartialEq)]
 pub struct RoomDto {
-    pub id: i64,
+    pub room_id: i64,
     pub floor_id: i64,
     pub floor_label: String,
     #[validate(length(max = 50))]
@@ -21,7 +21,7 @@ pub struct RoomDto {
 impl From<Room> for RoomDto {
     fn from(room: Room) -> Self {
         RoomDto {
-            id: room.room_id,
+            room_id: room.room_id,
             floor_id: room.floor_id,
             floor_label: room.floor_label,
             number: room.number,
