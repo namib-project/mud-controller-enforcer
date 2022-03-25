@@ -65,8 +65,18 @@ pub async fn get_all_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     Ok(devices.into_iter().map(Device::from).collect())
 }
 
+
 pub async fn get_all_quarantined_devices(pool: &DbConnection) -> Result<Vec<Device>> {
     let devices = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE q_bit = true")
+        .fetch_all(pool)
+        .await?;
+
+    Ok(devices.into_iter().map(Device::from).collect())
+}
+
+pub async fn get_unidentified_devices(pool: &DbConnection) -> Result<Vec<Device>> {
+    // TODO: Define when a device is unidentified
+    let devices = sqlx::query_as!(DeviceDbo, "SELECT * FROM devices WHERE mud_url IS NULL")
         .fetch_all(pool)
         .await?;
 
