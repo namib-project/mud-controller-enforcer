@@ -38,7 +38,7 @@ pub struct DeviceDbo {
     pub q_bit: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Deserialize)]
 pub struct Device {
     pub id: i64,
     pub name: Option<String>,

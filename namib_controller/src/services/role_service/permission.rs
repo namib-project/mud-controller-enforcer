@@ -112,4 +112,16 @@ pub enum Permission {
     /// enforcer/update
     #[strum(serialize = "enforcer/update")]
     enforcer__update,
+    /// notification/list
+    #[strum(serialize = "notification/list")]
+    notification__list,
+    /// notification/read
+    #[strum(serialize = "notification/read")]
+    notification__read,
+    /// notification/write
+    #[strum(serialize = "notification/write")]
+    notification__write,
+    /// notification/delete
+    #[strum(serialize = "notification/delete")]
+    notification__delete,
 }

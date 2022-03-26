@@ -10,6 +10,7 @@ pub mod firewall_configuration_service;
 pub mod job_service;
 pub mod log_service;
 pub mod mud_service;
+pub mod notification_service;
 pub mod neo4things_service;
 pub mod role_service;
 pub mod floor_service;
