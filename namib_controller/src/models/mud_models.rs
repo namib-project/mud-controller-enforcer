@@ -3,6 +3,8 @@
 
 #![allow(clippy::field_reassign_with_default)]
 
+use std::net::IpAddr;
+
 use chrono::{DateTime, NaiveDateTime, Utc};
 use paperclip::{
     actix::Apiv2Schema,
@@ -164,6 +166,18 @@ pub enum AclType {
 pub enum AclDirection {
     FromDevice,
     ToDevice,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AdministrativeContext {
+    pub dns_mappings: Vec<DefinedServer>,
+    pub ntp_mappings: Vec<DefinedServer>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DefinedServer {
+    Ip(IpAddr),
+    Url(String),
 }
 
 #[cfg(test)]
