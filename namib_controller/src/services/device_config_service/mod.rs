@@ -7,15 +7,17 @@
 //   node augmentation.
 
 use std::io::Read;
+use std::net::IpAddr;
+use std::str::FromStr;
 
 use crate::db::DbConnection;
-use crate::models::DeviceControllerDbo;
+use crate::models::{ConfiguredControllerMapping, DeviceControllerDbo};
 
 /// Get the configured controllers for the device specified by the given MUD URL.
 pub async fn get_configured_controllers_for_device(
     mud_url: &str,
     pool: &DbConnection,
-) -> crate::error::Result<Vec<String>> {
+) -> crate::error::Result<Vec<ConfiguredControllerMapping>> {
     Ok(sqlx::query_as!(
         DeviceControllerDbo,
         "SELECT * FROM device_controllers WHERE url = $1",
@@ -24,7 +26,13 @@ pub async fn get_configured_controllers_for_device(
     .fetch_all(pool)
     .await?
     .iter()
-    .map(|c| c.controller_uri.clone())
+    .map(|c| {
+        if let Ok(ip) = IpAddr::from_str(&c.controller_mapping) {
+            ConfiguredControllerMapping::Ip(ip)
+        } else {
+            ConfiguredControllerMapping::Uri(c.controller_mapping.clone())
+        }
+    })
     .collect())
 }
 
@@ -52,12 +60,12 @@ async fn set_device_configurations(pool: &DbConnection, config: &DeviceConfigura
     remove_device_configurations(pool).await?;
 
     for mapping in &config.my_controller_mappings {
-        for controller_uri in &mapping.my_controller {
-            debug!("inserting my-controller mapping {}->{}", mapping.url, controller_uri);
+        for target in &mapping.my_controller {
+            debug!("inserting my-controller mapping {}->{}", mapping.url, target);
             sqlx::query!(
-                "INSERT INTO device_controllers (url, controller_uri) VALUES ($1, $2)",
+                "INSERT INTO device_controllers (url, controller_mapping) VALUES ($1, $2)",
                 mapping.url,
-                controller_uri
+                target,
             )
             .execute(pool)
             .await?;
@@ -105,6 +113,7 @@ fn test_parse_device_configuration_yaml_example() {
     my-controller:
       - "https://manufacturer.com/bridge"
       - "urn:ietf:params:mud:ntp"
+      - "192.168.2.12"
   # that other device
   - url: "https://company.com/thing"
     # allow it to use DNS
@@ -117,6 +126,7 @@ fn test_parse_device_configuration_yaml_example() {
                 my_controller: vec![
                     "https://manufacturer.com/bridge".to_string(),
                     "urn:ietf:params:mud:ntp".to_string(),
+                    "192.168.2.12".to_string(),
                 ],
             },
             ControllerMapping {

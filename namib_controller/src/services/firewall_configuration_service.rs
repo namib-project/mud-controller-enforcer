@@ -11,7 +11,9 @@ use namib_shared::{
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, DeviceWithRefs},
+    models::{
+        AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, ConfiguredControllerMapping, DeviceWithRefs,
+    },
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
@@ -281,15 +283,16 @@ fn get_my_controller_ruletargethosts(
     acl_type: AclType,
 ) -> Vec<Option<RuleTargetHost>> {
     device
-        .controller_uris
+        .controller_mappings
         .iter()
-        .flat_map(|uri| {
-            get_controller_ruletargethosts(
+        .flat_map(|configured_controller_mapping| match configured_controller_mapping {
+            ConfiguredControllerMapping::Ip(addr) => vec![Some(RuleTargetHost::Ip(*addr))],
+            ConfiguredControllerMapping::Uri(uri) => get_controller_ruletargethosts(
                 device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
                 devices,
                 uri,
                 acl_type,
-            )
+            ),
         })
         .collect()
 }
@@ -544,7 +547,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
@@ -659,7 +662,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
@@ -772,7 +775,9 @@ mod tests {
             },
             mud_data: Some(bulb_mud_data),
             room: None,
-            controller_uris: vec!["https://manufacturer.com/devices/bridge".to_string()],
+            controller_mappings: vec![ConfiguredControllerMapping::Uri(
+                "https://manufacturer.com/devices/bridge".to_string(),
+            )],
         };
 
         // create bridge
@@ -812,7 +817,7 @@ mod tests {
             },
             mud_data: Some(bridge_mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
@@ -894,7 +899,7 @@ mod tests {
             },
             mud_data: Some(bulb_mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         // create bridge
@@ -934,7 +939,7 @@ mod tests {
             },
             mud_data: Some(bridge_mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
@@ -1015,7 +1020,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1069,7 +1074,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1173,7 +1178,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1208,7 +1213,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1.clone()]);
@@ -1310,7 +1315,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1364,7 +1369,7 @@ mod tests {
             },
             mud_data: Some(mud_data1),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1460,7 +1465,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1556,7 +1561,7 @@ mod tests {
             },
             mud_data: Some(mud_data),
             room: None,
-            controller_uris: vec![],
+            controller_mappings: vec![],
         };
 
         let resulting_device = FirewallDevice {

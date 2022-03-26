@@ -61,7 +61,13 @@ pub struct DeviceWithRefs {
     pub inner: Device,
     pub room: Option<Room>,
     pub mud_data: Option<MudData>,
-    pub controller_uris: Vec<String>,
+    pub controller_mappings: Vec<ConfiguredControllerMapping>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConfiguredControllerMapping {
+    Ip(IpAddr),
+    Uri(String),
 }
 
 impl Deref for DeviceWithRefs {
@@ -101,7 +107,7 @@ impl Device {
             Some(mud_url) => Some(mud_service::get_or_fetch_mud(mud_url, conn).await?),
             None => None,
         };
-        let controller_uris: Vec<String> = match &self.mud_url {
+        let controller_mappings: Vec<ConfiguredControllerMapping> = match &self.mud_url {
             Some(mud_url) => device_config_service::get_configured_controllers_for_device(mud_url, conn).await?,
             None => vec![],
         };
@@ -109,7 +115,7 @@ impl Device {
             inner: self,
             room,
             mud_data,
-            controller_uris,
+            controller_mappings,
         })
     }
 }
