@@ -211,6 +211,7 @@ pub fn convert_device_to_fw_rules(
                                     devices,
                                     uri,
                                     acl.acl_type,
+                                    &verdict,
                                     administrative_context,
                                 ));
                             }
@@ -219,6 +220,7 @@ pub fn convert_device_to_fw_rules(
                                     device,
                                     devices,
                                     acl.acl_type,
+                                    &verdict,
                                     administrative_context,
                                 ));
                             }
@@ -292,6 +294,7 @@ fn get_my_controller_ruletargethosts(
     device: &DeviceWithRefs,
     devices: &[DeviceWithRefs],
     acl_type: AclType,
+    verdict: &Verdict,
     administrative_context: &AdministrativeContext,
 ) -> Vec<Option<RuleTargetHost>> {
     device
@@ -304,6 +307,7 @@ fn get_my_controller_ruletargethosts(
                 devices,
                 uri,
                 acl_type,
+                verdict,
                 administrative_context,
             ),
         })
@@ -315,9 +319,16 @@ fn get_controller_ruletargethosts(
     devices: &[DeviceWithRefs],
     controller_uri: &str,
     acl_type: AclType,
+    verdict: &Verdict,
     administrative_context: &AdministrativeContext,
 ) -> Vec<Option<RuleTargetHost>> {
     if controller_uri.starts_with("urn:") {
+        if *verdict == Verdict::Reject || *verdict == Verdict::Drop {
+            warn!(
+                "using a reject (or drop) verdict with a URN ({}) probably makes little sense and won't work in the NAMIB system.",
+                controller_uri,
+            );
+        }
         match controller_uri {
             "urn:ietf:params:mud:dns" => administrative_context
                 .dns_mappings
