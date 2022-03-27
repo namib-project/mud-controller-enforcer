@@ -264,6 +264,43 @@ pub fn convert_device_to_fw_rules(
                 }
             }
         }
+
+        for server in &administrative_context.dns_mappings {
+            rules.push(FirewallRule::new(
+                RuleName::new(format!("rule_dns_default_accept_{}", rule_counter)),
+                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                RuleTarget::new(Some(server.into()), Some("53".to_string())),
+                Protocol::Tcp,
+                Verdict::Accept,
+            ));
+            rule_counter += 1;
+            rules.push(FirewallRule::new(
+                RuleName::new(format!("rule_dns_default_accept_{}", rule_counter)),
+                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                RuleTarget::new(Some(server.into()), Some("53".to_string())),
+                Protocol::Udp,
+                Verdict::Accept,
+            ));
+            rule_counter += 1;
+        }
+        for server in &administrative_context.ntp_mappings {
+            rules.push(FirewallRule::new(
+                RuleName::new(format!("rule_ntp_default_accept_{}", rule_counter)),
+                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                RuleTarget::new(Some(server.into()), Some("123".to_string())),
+                Protocol::Tcp,
+                Verdict::Accept,
+            ));
+            rule_counter += 1;
+            rules.push(FirewallRule::new(
+                RuleName::new(format!("rule_ntp_default_accept_{}", rule_counter)),
+                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                RuleTarget::new(Some(server.into()), Some("123".to_string())),
+                Protocol::Udp,
+                Verdict::Accept,
+            ));
+            rule_counter += 1;
+        }
     }
     rules.push(FirewallRule::new(
         RuleName::new(format!("rule_default_{}", rule_counter)),
@@ -601,7 +638,15 @@ mod tests {
             controller_mappings: vec![],
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
+        let admin_context = AdministrativeContext {
+            dns_mappings: vec![
+                DefinedServer::Url("https://me.org/mud-devices/my-dns-server.json".to_string()),
+                DefinedServer::Ip("192.168.0.1".parse().unwrap()),
+            ],
+            ntp_mappings: vec![DefinedServer::Ip("123.45.67.89".parse().unwrap())],
+        };
+
+        let x = convert_device_to_fw_rules(&device, &[device.clone()], &admin_context);
 
         let resulting_device = FirewallDevice {
             id: device.id,
@@ -616,14 +661,78 @@ mod tests {
                     Verdict::Reject,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    RuleName::new(String::from("rule_dns_default_accept_1")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Hostname(String::from(
+                            "https://me.org/mud-devices/my-dns-server.json",
+                        ))),
+                        Some(String::from("53")),
+                    ),
+                    Protocol::Tcp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_dns_default_accept_2")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Hostname(String::from(
+                            "https://me.org/mud-devices/my-dns-server.json",
+                        ))),
+                        Some(String::from("53")),
+                    ),
+                    Protocol::Udp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_dns_default_accept_3")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
+                        Some(String::from("53")),
+                    ),
+                    Protocol::Tcp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_dns_default_accept_4")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
+                        Some(String::from("53")),
+                    ),
+                    Protocol::Udp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_ntp_default_accept_5")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
+                        Some(String::from("123")),
+                    ),
+                    Protocol::Tcp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_ntp_default_accept_6")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
+                        Some(String::from("123")),
+                    ),
+                    Protocol::Udp,
+                    Verdict::Accept,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_7")),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    RuleName::new(String::from("rule_default_8")),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
