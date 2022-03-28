@@ -1,7 +1,6 @@
 // Copyright 2022, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use paperclip::actix::Apiv2Schema;
 use std::{
     ops::Deref,
 };
@@ -9,7 +8,6 @@ use chrono::NaiveDateTime;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{Device},
     services::{device_service},
 };
 use crate::models::DeviceWithRefs;

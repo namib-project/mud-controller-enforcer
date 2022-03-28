@@ -9,7 +9,6 @@ use paperclip::actix::{
     api_v2_operation, web,
     web::{Json},
 };
-use snafu::ensure;
 use validator::Validate;
 
 use crate::{
@@ -34,10 +33,11 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 async fn get_all_notifications(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<NotificationDto>>> {
     auth.require_permission(Permission::notification__list)?;
     auth.require_permission(Permission::notification__read)?;
+
     let notifications = notification_service::get_all_notifications(&pool).await?;
     Ok(Json(
         stream::iter(notifications)
-            .then(|d| d.load_refs(&pool))
+            .then(|n| n.load_refs(&pool))
             .map_ok(NotificationDto::from)
             .try_collect()
             .await?,
@@ -72,7 +72,7 @@ async fn create_notification(
     let notification = notification_creation_update_dto.into_inner().into_notification();
     let id = notification_service::insert_notification(&notification, &pool).await?;
 
-    let created_notification = find_notification(id, &pool);
+    let created_notification = find_notification(id, &pool).await?;
     Ok(Json(NotificationDto::from(created_notification.load_refs(&pool).await?)))
 }
 
@@ -82,7 +82,7 @@ async fn mark_as_read(pool: web::Data<DbConnection>, auth: AuthToken, id: web::P
 
     let notification = find_notification(id.0, &pool).await?;
 
-    let updated = notification_service::mark_as_read(&notification, &pool).await.or_else(|_| {
+    notification_service::mark_as_read(&notification, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::BAD_REQUEST,
             message: Some("Could not update notification.".to_string()),

@@ -7,5 +7,5 @@ create table notifications
     -- sources: new_device, anomaly_fw, anomaly_shai
     source      VARCHAR(255)    NOT NULL,
     timestamp   DATETIME        DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    read        BOOLEAN         DEFAULT 0
+    read        BOOLEAN         DEFAULT 0 NOT NULL
 );

@@ -166,6 +166,7 @@ pub fn start_app(
                 .service(web::scope("/rooms").configure(routes::room_controller::init))
                 .service(web::scope("/quarantine").configure(routes::quarantine_controller::init))
                 .service(web::scope("/floors").configure(routes::floor_controller::init))
+                .service(web::scope("/notifications").configure(routes::notification_controller::init))
                 .with_json_spec_at("/api/spec")
                 .build()
                 .route(

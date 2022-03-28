@@ -7,11 +7,10 @@ use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 
 use crate::{
-    error::Result,
-    models::{NotificationWithRefs, Device},
-    routes::dtos::DeviceDto,
+    models::{NotificationWithRefs},
 };
-use crate::models::Notification;
+use crate::models::{Notification};
+use crate::routes::dtos::DeviceDto;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct NotificationDto {
@@ -24,10 +23,11 @@ pub struct NotificationDto {
 
 impl From<NotificationWithRefs> for NotificationDto {
     fn from(notification: NotificationWithRefs) -> Self {
-        NotificationDto {
+        let source = String::from(notification.source.as_str());
+        Self {
             id: notification.id,
-            device: DeviceDto::from(notification.device),
-            source: notification.source.clone(),
+            device: DeviceDto::from(notification.device.clone()),
+            source,
             timestamp: notification.timestamp,
             read: notification.read,
         }

@@ -4,12 +4,12 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{Device, Notification},
+    models::{Notification},
 };
 
 ///returns all notifications from the database
 pub async fn get_all_notifications(pool: &DbConnection) -> Result<Vec<Notification>> {
-    let notification_data = sqlx::query_as!(Notification, "SELECT * FROM notifications")
+    let notification_data = sqlx::query_as!(Notification, "SELECT * FROM notifications ORDER BY timestamp DESC")
         .fetch_all(pool)
         .await?;
 
