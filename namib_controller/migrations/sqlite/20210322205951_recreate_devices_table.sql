@@ -17,6 +17,7 @@ CREATE TABLE devices
     clipart          TEXT,
     collect_info     BOOLEAN  NOT NULL DEFAULT FALSE,
     room_id          INTEGER REFERENCES rooms (room_id) ON DELETE SET NULL ON UPDATE NO ACTION,
+    q_bit            BOOLEAN NOT NULL DEFAULT FALSE,
     UNIQUE (mac_addr, duid)
 );
 

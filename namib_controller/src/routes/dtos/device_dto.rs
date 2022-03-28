@@ -27,6 +27,7 @@ pub struct DeviceDto {
     pub mud_data: Option<MudData>,
     pub clipart: Option<String>,
     pub room: Option<Room>,
+    pub q_bit: bool,
     #[serde(rename = "type")]
     pub type_: DeviceType,
 }
@@ -48,6 +49,7 @@ impl From<DeviceWithRefs> for DeviceDto {
             mud_data: d.mud_data,
             clipart: d.inner.clipart,
             room: d.room,
+            q_bit: d.inner.q_bit,
             type_,
         }
     }
@@ -68,6 +70,7 @@ pub struct DeviceCreationUpdateDto {
     pub clipart: Option<String>,
     pub room_id: Option<i64>,
     pub collect_info: Option<bool>,
+    pub q_bit: Option<bool>,
 }
 
 impl DeviceCreationUpdateDto {
@@ -91,6 +94,7 @@ impl DeviceCreationUpdateDto {
             last_interaction: Utc::now().naive_utc(),
             clipart: self.clipart.clone(),
             room_id: self.room_id,
+            q_bit: self.q_bit.unwrap_or(false),
         })
     }
 
@@ -127,6 +131,9 @@ impl DeviceCreationUpdateDto {
         }
         if let Some(collect_info) = self.collect_info {
             device.collect_info = collect_info;
+        }
+        if let Some(q_bit) = self.q_bit {
+            device.q_bit = q_bit;
         }
     }
 }

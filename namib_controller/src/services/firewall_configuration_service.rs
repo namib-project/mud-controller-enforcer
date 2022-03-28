@@ -117,130 +117,136 @@ pub fn get_model_ruletargethosts(
 pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWithRefs]) -> FirewallDevice {
     let mut rule_counter = 0;
     let mut rules: Vec<FirewallRule> = Vec::new();
-    let mud_data = match &device.mud_data {
-        Some(mud_data) => mud_data,
-        None => {
-            return FirewallDevice {
-                id: device.id,
-                ipv4_addr: device.ipv4_addr,
-                ipv6_addr: device.ipv6_addr,
-                rules,
-                collect_data: device.collect_info,
-            }
-        },
-    };
-
-    let merged_acls = if mud_data.acl_override.is_empty() {
-        mud_data.acllist.iter().collect()
-    } else {
-        merge_acls(&mud_data.acllist, &mud_data.acl_override)
-    };
-
-    for acl in &merged_acls {
-        for ace in &acl.ace {
-            let icmp_type: Option<u8> = ace.matches.icmp_type;
-            let icmp_code: Option<u8> = ace.matches.icmp_code;
-
-            let protocol = match &ace.matches.protocol {
-                None => Protocol::All,
-                Some(proto) => match proto {
-                    AceProtocol::Tcp => Protocol::Tcp,
-                    AceProtocol::Udp => Protocol::Udp,
-                    AceProtocol::Icmp => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
-                    AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
-                                                                       // TODO add support for more protocols
-                },
-            };
-            let verdict = match ace.action {
-                AceAction::Accept => Verdict::Accept,
-                AceAction::Deny => Verdict::Reject,
-            };
-
-            let src_ports: Option<String> = match ace.matches.source_port {
-                None => None,
-                Some(AcePort::Single(port)) => Some(port.to_string()),
-                Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-            };
-            let dst_ports: Option<String> = match ace.matches.destination_port {
-                None => None,
-                Some(AcePort::Single(port)) => Some(port.to_string()),
-                Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-            };
-
-            let (this_device_ports, other_device_ports) = match acl.packet_direction {
-                AclDirection::FromDevice => (src_ports, dst_ports),
-                AclDirection::ToDevice => (dst_ports, src_ports),
-            };
-
-            let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
-
-            let other_dev_rule_targets: Vec<RuleTarget> =
-                match (&ace.matches.dnsname, &ace.matches.matches_augmentation) {
-                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
-                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
-                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
-                    },
-                    (None, Some(augmentation)) => {
-                        let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
-                        if let Some(host) = &augmentation.manufacturer {
-                            targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
-                        }
-                        if augmentation.same_manufacturer {
-                            targets_per_option.push(get_same_manufacturer_ruletargethosts(
-                                device,
-                                devices,
-                                &acl.acl_type,
-                            ));
-                        }
-                        if let Some(uri) = &augmentation.controller {
-                            targets_per_option.push(get_controller_ruletargethosts(
-                                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
-                                devices,
-                                uri,
-                                acl.acl_type,
-                            ));
-                        }
-                        if augmentation.my_controller {
-                            targets_per_option.push(get_my_controller_ruletargethosts(device, devices, acl.acl_type));
-                        }
-                        if augmentation.local {
-                            // TODO
-                        }
-                        if let Some(url) = &augmentation.model {
-                            targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
-                        }
-
-                        // return those devices matched by _all_ specified options
-                        match targets_per_option.len() {
-                            0 => vec![],
-                            1 => targets_per_option[0].clone(),
-                            _ => targets_per_option[0]
-                                .iter()
-                                .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
-                                .cloned()
-                                .collect(),
-                        }
-                    },
-                    _ => vec![],
+    if !device.q_bit {
+        let mud_data = match &device.mud_data {
+            Some(mud_data) => mud_data,
+            None => {
+                return FirewallDevice {
+                    id: device.id,
+                    ipv4_addr: device.ipv4_addr,
+                    ipv6_addr: device.ipv6_addr,
+                    rules,
+                    collect_data: device.collect_info,
                 }
-                .iter()
-                .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
-                .collect();
+            },
+        };
 
-            for other_dev_rule_target in &other_dev_rule_targets {
-                let (src, dst) = match acl.packet_direction {
-                    AclDirection::FromDevice => (&this_dev_rule_target, other_dev_rule_target),
-                    AclDirection::ToDevice => (other_dev_rule_target, &this_dev_rule_target),
+        let merged_acls = if mud_data.acl_override.is_empty() {
+            mud_data.acllist.iter().collect()
+        } else {
+            merge_acls(&mud_data.acllist, &mud_data.acl_override)
+        };
+
+        for acl in &merged_acls {
+            for ace in &acl.ace {
+                let icmp_type: Option<u8> = ace.matches.icmp_type;
+                let icmp_code: Option<u8> = ace.matches.icmp_code;
+
+                let protocol = match &ace.matches.protocol {
+                    None => Protocol::All,
+                    Some(proto) => match proto {
+                        AceProtocol::Tcp => Protocol::Tcp,
+                        AceProtocol::Udp => Protocol::Udp,
+                        AceProtocol::Icmp => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
+                        AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
+                                                                           // TODO add support for more protocols
+                    },
                 };
-                rules.push(FirewallRule::new(
-                    RuleName::new(format!("rule_{}", rule_counter)),
-                    src.clone(),
-                    dst.clone(),
-                    protocol.clone(),
-                    verdict.clone(),
-                ));
-                rule_counter += 1;
+                let verdict = match ace.action {
+                    AceAction::Accept => Verdict::Accept,
+                    AceAction::Deny => Verdict::Reject,
+                };
+
+                let src_ports: Option<String> = match ace.matches.source_port {
+                    None => None,
+                    Some(AcePort::Single(port)) => Some(port.to_string()),
+                    Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                };
+                let dst_ports: Option<String> = match ace.matches.destination_port {
+                    None => None,
+                    Some(AcePort::Single(port)) => Some(port.to_string()),
+                    Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                };
+
+                let (this_device_ports, other_device_ports) = match acl.packet_direction {
+                    AclDirection::FromDevice => (src_ports, dst_ports),
+                    AclDirection::ToDevice => (dst_ports, src_ports),
+                };
+
+                let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
+
+                let other_dev_rule_targets: Vec<RuleTarget> =
+                    match (&ace.matches.dnsname, &ace.matches.matches_augmentation) {
+                        // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
+                        (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
+                            Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                            Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
+                        },
+                        (None, Some(augmentation)) => {
+                            let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
+                            if let Some(host) = &augmentation.manufacturer {
+                                targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
+                            }
+                            if augmentation.same_manufacturer {
+                                targets_per_option.push(get_same_manufacturer_ruletargethosts(
+                                    device,
+                                    devices,
+                                    &acl.acl_type,
+                                ));
+                            }
+                            if let Some(uri) = &augmentation.controller {
+                                targets_per_option.push(get_controller_ruletargethosts(
+                                    device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                                    devices,
+                                    uri,
+                                    acl.acl_type,
+                                ));
+                            }
+                            if augmentation.my_controller {
+                                targets_per_option.push(get_my_controller_ruletargethosts(
+                                    device,
+                                    devices,
+                                    acl.acl_type,
+                                ));
+                            }
+                            if augmentation.local {
+                                // TODO
+                            }
+                            if let Some(url) = &augmentation.model {
+                                targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
+                            }
+
+                            // return those devices matched by _all_ specified options
+                            match targets_per_option.len() {
+                                0 => vec![],
+                                1 => targets_per_option[0].clone(),
+                                _ => targets_per_option[0]
+                                    .iter()
+                                    .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
+                                    .cloned()
+                                    .collect(),
+                            }
+                        },
+                        _ => vec![],
+                    }
+                    .iter()
+                    .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
+                    .collect();
+
+                for other_dev_rule_target in &other_dev_rule_targets {
+                    let (src, dst) = match acl.packet_direction {
+                        AclDirection::FromDevice => (&this_dev_rule_target, other_dev_rule_target),
+                        AclDirection::ToDevice => (other_dev_rule_target, &this_dev_rule_target),
+                    };
+                    rules.push(FirewallRule::new(
+                        RuleName::new(format!("rule_{}", rule_counter)),
+                        src.clone(),
+                        dst.clone(),
+                        protocol.clone(),
+                        verdict.clone(),
+                    ));
+                    rule_counter += 1;
+                }
             }
         }
     }
@@ -534,6 +540,7 @@ mod tests {
                 collect_info: false,
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data),
             room: None,
@@ -648,6 +655,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data),
             room: None,
@@ -760,6 +768,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(bulb_mud_data),
             room: None,
@@ -799,6 +808,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(bridge_mud_data),
             room: None,
@@ -880,6 +890,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(bulb_mud_data),
             room: None,
@@ -919,6 +930,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(bridge_mud_data),
             room: None,
@@ -999,6 +1011,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data),
             room: None,
@@ -1052,6 +1065,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data1),
             room: None,
@@ -1155,6 +1169,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data),
             room: None,
@@ -1189,6 +1204,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data1),
             room: None,
@@ -1290,6 +1306,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data),
             room: None,
@@ -1343,6 +1360,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data1),
             room: None,
@@ -1438,6 +1456,7 @@ mod tests {
                 last_interaction: Utc::now().naive_utc(),
                 clipart: None,
                 room_id: None,
+                q_bit: false,
             },
             mud_data: Some(mud_data),
             room: None,
@@ -1480,6 +1499,92 @@ mod tests {
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
 
         assert!(x.eq(&resulting_device));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_q_bit() -> Result<()> {
+        let mud_data = MudData {
+            url: "https://example.com/.well-known/mud".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Icmp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: Some(String::from("www.example.test")),
+                        source_port: None,
+                        destination_port: None,
+                        icmp_type: Some(8),
+                        icmp_code: Some(0),
+                        matches_augmentation: None,
+                    },
+                }],
+            }],
+            acl_override: Vec::default(),
+        };
+
+        let device = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "127.0.0.1".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://example.com/mud_url.json".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+                q_bit: true,
+            },
+            mud_data: Some(mud_data),
+            room: None,
+            controller_uris: vec![],
+        };
+
+        let resulting_device = FirewallDevice {
+            id: device.id,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
+            rules: vec![
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_0")),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(None, None),
+                    Protocol::All,
+                    Verdict::Reject,
+                ),
+                FirewallRule::new(
+                    RuleName::new(String::from("rule_default_1")),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    Protocol::All,
+                    Verdict::Reject,
+                ),
+            ],
+            collect_data: true,
+        };
+
+        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
+
+        assert_eq!(x, resulting_device);
 
         Ok(())
     }
