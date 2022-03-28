@@ -1,8 +1,8 @@
-// Copyright 2020-2022, Hannes Masuch
+// Copyright 2022, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::{error::Result, models::Anomaly};
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
@@ -36,30 +36,27 @@ impl From<&Anomaly> for AnomalyDto {
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct AnomalyCreationDto {
-    pub source_ip: Option<String>,
+    pub source_ip: String,
     pub source_port: Option<i64>,
     pub source_id: Option<i64>,
-    pub destination_ip: Option<String>,
+    pub destination_ip: String,
     pub destination_port: Option<i64>,
     pub destination_id: Option<i64>,
-    pub protocol: Option<String>,
-    pub date_time_created: Option<NaiveDateTime>,
+    pub protocol: String,
 }
 
 impl AnomalyCreationDto {
-    pub fn into_anomaly(&self, id: i64) -> Result<Anomaly> {
+    pub fn into_anomaly(&self, id: i64, date_time_created: NaiveDateTime) -> Result<Anomaly> {
         Ok(Anomaly {
             id,
-            source_ip: self.source_ip.as_ref().unwrap().parse().unwrap(),
+            source_ip: self.source_ip.parse().ok().unwrap(),
             source_port: self.source_port,
             source_id: self.source_id,
-            destination_ip: self.destination_ip.as_ref().unwrap().parse().unwrap(),
+            destination_ip: self.destination_ip.parse().ok().unwrap(),
             destination_port: self.destination_port,
             destination_id: self.destination_id,
-            protocol: self.protocol.as_ref().unwrap().clone(),
-            date_time_created: self
-                .date_time_created
-                .unwrap_or_else(|| Utc::now().naive_utc() + Duration::hours(1)),
+            protocol: self.protocol.clone(),
+            date_time_created,
         })
     }
 }

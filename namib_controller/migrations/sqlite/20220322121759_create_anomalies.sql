@@ -9,5 +9,5 @@ create table anomalies
     destination_id      INTEGER REFERENCES devices (id) ON DELETE SET NULL,
     destination_port    INTEGER,
     protocol            TEXT NOT NULL,
-    date_time_created   DATETIME NOT NULL
+    date_time_created   DATETIME NOT NULL DEFAULT current_timestamp
 )

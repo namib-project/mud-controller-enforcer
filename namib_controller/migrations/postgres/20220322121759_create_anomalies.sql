@@ -9,5 +9,5 @@ create table anomalies
     destination_id      BIGINT REFERENCES devices (id) ON DELETE SET NULL,
     destination_port    BIGINT,
     protocol            TEXT NOT NULL,
-    date_time_created   TIMESTAMP NOT NULL
+    date_time_created   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )
