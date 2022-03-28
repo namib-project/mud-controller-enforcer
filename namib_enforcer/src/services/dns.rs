@@ -53,6 +53,7 @@ impl PartialOrd for DnsRefreshQueueEntry {
 
 /// Represents an entry in the DNS cache.
 #[derive(Debug, Clone)]
+#[allow(clippy::type_complexity)]
 struct DnsCacheEntry {
     /// The (host-)name for which this entry is a cached result.
     name: String,

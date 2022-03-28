@@ -6,27 +6,27 @@ use snafu::{Backtrace, Snafu};
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("IoError: {}", source), context(false))]
-    IoError {
+    Io {
         source: std::io::Error,
         backtrace: Backtrace,
     },
     #[snafu(display("NativeTlsError: {}", source), context(false))]
-    NativeTlsError {
+    NativeTls {
         source: tokio_native_tls::native_tls::Error,
         backtrace: Backtrace,
     },
     #[snafu(display("JoinError: {}", source), context(false))]
-    JoinError {
+    Join {
         source: tokio::task::JoinError,
         backtrace: Backtrace,
     },
     #[snafu(display("ConnectionError {}", message), visibility(pub))]
-    ConnectionError {
+    Connection {
         message: &'static str,
         backtrace: Backtrace,
     },
     #[snafu(display("DotEnvError: {}", source), context(false))]
-    DotEnvError {
+    DotEnv {
         source: dotenv::Error,
         backtrace: Backtrace,
     },
@@ -37,29 +37,29 @@ pub enum Error {
     },
     #[cfg(feature = "uci")]
     #[snafu(display("UciError: {}", source), context(false))]
-    UciError {
+    Uci {
         source: rust_uci::error::Error,
         backtrace: Backtrace,
     },
     #[snafu(display("IntoStringError: {}", source), context(false))]
-    IntoStringError {
+    IntoString {
         source: std::ffi::IntoStringError,
         backtrace: Backtrace,
     },
     #[snafu(display("Utf8Error: {}", source), context(false))]
-    Utf8Error {
+    Utf8 {
         source: std::str::Utf8Error,
         backtrace: Backtrace,
     },
     #[snafu(display("NulError: {}", source), context(false))]
-    NulError {
+    Nul {
         source: std::ffi::NulError,
         backtrace: Backtrace,
     },
     #[snafu(display("NoneError"), visibility(pub))]
-    NoneError { backtrace: Backtrace },
+    None { backtrace: Backtrace },
     #[snafu(display("SerdeError {}", source), context(false))]
-    SerdeError {
+    Serde {
         source: serde_json::Error,
         backtrace: Backtrace,
     },
