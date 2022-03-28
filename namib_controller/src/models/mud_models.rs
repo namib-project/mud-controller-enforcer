@@ -6,6 +6,7 @@
 use std::net::IpAddr;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
+use namib_shared::firewall_config::RuleTargetHost;
 use paperclip::{
     actix::Apiv2Schema,
     v2::{
@@ -178,6 +179,15 @@ pub struct AdministrativeContext {
 pub enum DefinedServer {
     Ip(IpAddr),
     Url(String),
+}
+
+impl From<&DefinedServer> for RuleTargetHost {
+    fn from(s: &DefinedServer) -> Self {
+        match s {
+            DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
+            DefinedServer::Url(mud_url) => RuleTargetHost::Hostname(mud_url.clone()),
+        }
+    }
 }
 
 #[cfg(test)]
