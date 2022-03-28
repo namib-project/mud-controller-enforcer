@@ -148,7 +148,7 @@ async fn guess_thing(
     Ok(Json(guesses))
 }
 
-/// Helper method for finding a device with a given ip, or returning a 404 error if not found.
+/// Find a device with a given ID, or return a 404 error if not found.
 pub async fn find_device(id: i64, pool: &DbConnection) -> Result<Device> {
     device_service::find_by_id(id, pool).await.or_else(|_| {
         error::ResponseError {

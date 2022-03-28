@@ -1584,7 +1584,7 @@ mod tests {
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()]);
 
-        assert!(x.eq(&resulting_device));
+        assert_eq!(x, resulting_device);
 
         Ok(())
     }

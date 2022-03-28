@@ -214,6 +214,8 @@ pub async fn delete_device(id: i64, pool: &DbConnection) -> Result<bool> {
     Ok(del_count.rows_affected() == 1)
 }
 
+/// Sets the quarantine status of the device with the given ID.
+/// Returns whether the device's quarantine status was changed by this.
 pub async fn change_quarantine_status_device(id: i64, pool: &DbConnection, status: bool) -> Result<bool> {
     let upd_count = sqlx::query!("UPDATE devices SET q_bit = $1 WHERE id = $2", status, id)
         .execute(pool)
