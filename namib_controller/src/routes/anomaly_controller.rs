@@ -20,7 +20,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::post().to(create_anomaly));
     cfg.route("/{id}", web::get().to(get_anomaly));
     cfg.route("/{id}", web::delete().to(delete_anomaly));
-    cfg.route("/device/{id}", web::get().to(get_all_device_anomalies));
 }
 
 #[api_v2_operation(summary = "List all anomalies", tags(Anomalies))]
@@ -28,43 +27,23 @@ async fn get_all_anomalies(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
     auth.require_permission(Permission::anomaly__list)?;
     auth.require_permission(Permission::anomaly__read)?;
 
-    let anomalies = anomaly_service::get_all_anomalies(&pool).await?;
-    let mut anomalies_dtos: Vec<AnomalyDto> = vec![];
-
-    for anomaly in anomalies {
-        anomalies_dtos.push(AnomalyDto::from(&anomaly));
-    }
-
-    Ok(Json(anomalies_dtos))
-}
-
-#[api_v2_operation(summary = "List all anomalies associated with the device with ID", tags(Anomalies))]
-async fn get_all_device_anomalies(
-    pool: web::Data<DbConnection>,
-    auth: AuthToken,
-    id: web::Path<i64>,
-) -> Result<Json<Vec<AnomalyDto>>> {
-    auth.require_permission(Permission::anomaly__list)?;
-    auth.require_permission(Permission::anomaly__read)?;
-
-    let anomalies = anomaly_service::get_all_device_anomalies(&pool, id.into_inner()).await?;
-    let mut anomalies_device_dtos: Vec<AnomalyDto> = vec![];
-
-    for anomaly in anomalies {
-        anomalies_device_dtos.push(AnomalyDto::from(&anomaly));
-    }
-
-    Ok(Json(anomalies_device_dtos))
+    Ok(Json(
+        anomaly_service::get_all_anomalies(&pool)
+            .await?
+            .iter()
+            .map(AnomalyDto::from)
+            .collect(),
+    ))
 }
 
 #[api_v2_operation(summary = "Get an anomaly through the id", tags(Anomalies))]
 async fn get_anomaly(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<AnomalyDto>> {
     auth.require_permission(Permission::anomaly__read)?;
 
-    let anomaly = anomaly_service::find_by_id(id.into_inner(), &pool).await.or_else(|_| {
+    let anomaly = anomaly_service::find_by_id(*id, &pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: Some("Anomaly can not be found.".to_string()),
+            message: Some(format!("Anomaly with Id {} can not be found.", *id)),
         }
         .fail()
     })?;
@@ -79,7 +58,6 @@ async fn create_anomaly(
     anomaly_creation_dto: Json<AnomalyCreationDto>,
 ) -> Result<Json<AnomalyDto>> {
     auth.require_permission(Permission::anomaly__write)?;
-    let anomaly = anomaly_service::insert_anomaly(anomaly_creation_dto, &pool).await?;
 
     Ok(Json(AnomalyDto::from(
         &anomaly_service::insert_anomaly(anomaly_creation_dto, &pool).await?,
