@@ -41,7 +41,7 @@ mod mock {
 
         pub fn get(&mut self, key: &str) -> Result<String> {
             debug!("get {}", key);
-            error::None {}.fail()
+            error::NoneSnafu {}.fail()
         }
 
         pub fn set(&mut self, key: &str, value: &str) -> Result<()> {
