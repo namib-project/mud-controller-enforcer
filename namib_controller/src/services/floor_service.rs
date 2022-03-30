@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Matthias Reichmann
+// Copyright 2022, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::{
@@ -47,7 +47,7 @@ pub async fn update(floor: &Floor, pool: &DbConnection) -> Result<bool> {
 
 ///returns all rooms that are associated with a given floor from the database
 pub async fn get_all_rooms_of_floor(floor_id: i64, pool: &DbConnection) -> Result<Vec<Room>> {
-    let device_dbo: Vec<Room> = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r 
+    let device_dbo: Vec<Room> = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
         JOIN floors f ON f.id = r.floor_id WHERE floor_id = $1", floor_id)
         .fetch_all(pool)
         .await?;
