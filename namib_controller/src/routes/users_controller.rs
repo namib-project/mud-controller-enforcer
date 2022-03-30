@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![allow(clippy::field_reassign_with_default)]
@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
+    cfg.route("", web::get().to(get_all_users));
     cfg.route("/signup", web::post().to(signup));
     cfg.route("/login", web::post().to(login));
     cfg.route("/refresh_token", web::get().to(refresh_token));
@@ -94,6 +95,13 @@ pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Re
         )
         .await,
     }))
+}
+
+#[api_v2_operation(summary = "Retrieve information about all users", tags(Users))]
+pub async fn get_all_users(pool: web::Data<DbConnection>) -> Result<Json<Vec<User>>> {
+    let user = user_service::get_all(&pool).await?;
+
+    Ok(Json(user))
 }
 
 #[api_v2_operation(summary = "Retrieve information about the logged-in user", tags(Users))]
