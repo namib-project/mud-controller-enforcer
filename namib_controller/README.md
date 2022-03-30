@@ -143,6 +143,44 @@ cd neo4things-api
 ./generate-rust-code.sh new
 ```
 
+## Additional Configuration of Devices
+
+Additional configuration of devices in the system can be specified in the NAMIB
+system in a YAML file.
+The path to this file can be specified using `NAMIB_DEVICE_CONFIG` and defaults
+to `./device-config.yaml`.
+
+### 'my-controller' Mappings
+
+MUD specifies a 'my-controller' value on which it allows matching (either to
+reject or, more likely, accept network communication between the device in
+question and the 'my-controller' device).
+
+### Example
+
+```yaml
+my-controller-mappings:
+  - url: "https://manufacturer.de/devices/bulb"
+    my-controller:
+      - "https://cool-oss-initiative.org/bridge"
+```
+
+Here we map the device identified by the `...bulb` MUD-URL to its 'controller',
+to a bridge device not by the original manufacturer[^oss-example].
+
+Besides MUD URLs, you could also specify the other possibly type of value as
+controller: a MUD well-known URN, namely DNS or NTP, identified by one of the
+strings `urn:ietf:params:mud:{dns,ntp}`.
+
+You could also specify an IP address as controller.
+
+[^oss-example]:
+    This example has the rough idea that there might be some open-source
+    initiatives producing alternative controlling devices, perhaps supporting
+    more functions.
+    It is meant to showcase that 'my-controller' is a mechanism to conveniently
+    specify those devices
+
 ## License
 
 The debian package postinstall-script in debian/postinst is licensed under GPL-2.0-or-later as indicated by the copyright file.

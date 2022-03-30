@@ -7,13 +7,27 @@ use clokwerk::{Scheduler, TimeUnits};
 use tokio::time::sleep;
 
 use crate::{
+    app_config::APP_CONFIG,
     db::DbConnection,
-    services::{acme_service, mud_service},
+    services::{acme_service, device_config_service, mud_service},
 };
 
 /// Create new job scheduler that update the expired mud profiles.
 /// conn is the current database connection.
 pub async fn start_jobs(conn: DbConnection) {
+    if let Err(err) =
+        device_config_service::update_device_configurations_from_file(&conn, &APP_CONFIG.namib_device_config).await
+    {
+        let current_dir = match std::env::current_dir() {
+            Ok(dir) => dir.to_str().unwrap_or("[unknown]").to_string(),
+            Err(_) => "[unknown]".to_string(),
+        };
+        warn!(
+            "Unable to load device configuration from file: '{}' (in cwd '{}')",
+            err, current_dir
+        );
+    }
+
     info!("Start scheduler");
     let mut scheduler = Scheduler::new();
     scheduler.every(1.hour()).run(move || {
