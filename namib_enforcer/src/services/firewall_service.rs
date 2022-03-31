@@ -695,7 +695,7 @@ mod tests {
 
     use super::*;
     use crate::services::dns::DnsService;
-    use namib_shared::firewall_config::{RuleName, RuleTarget};
+    use namib_shared::firewall_config::{RuleName, RuleTarget, ScopeConstraint};
 
     fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
         let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"));
@@ -766,6 +766,7 @@ mod tests {
             },
             protocol: Protocol::Tcp,
             verdict: Verdict::Accept,
+            scope: ScopeConstraint::None,
         }];
         let device_id = 1234;
         let device = FirewallDevice {
