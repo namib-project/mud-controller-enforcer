@@ -3,23 +3,20 @@
 
 #![allow(clippy::needless_pass_by_value)]
 
-use futures::{stream, StreamExt, TryStreamExt};
 use actix_web::http::StatusCode;
-use paperclip::actix::{
-    api_v2_operation, web,
-    web::{Json},
-};
+use futures::{stream, StreamExt, TryStreamExt};
+use paperclip::actix::{api_v2_operation, web, web::Json};
 use validator::Validate;
 
+use crate::models::Notification;
 use crate::{
     auth::AuthToken,
     db::DbConnection,
     error,
     error::Result,
-    routes::dtos::{NotificationDto, NotificationCreationDto},
+    routes::dtos::{NotificationCreationDto, NotificationDto},
     services::{notification_service, role_service::Permission},
 };
-use crate::models::Notification;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_notifications));
@@ -45,7 +42,11 @@ async fn get_all_notifications(pool: web::Data<DbConnection>, auth: AuthToken) -
 }
 
 #[api_v2_operation(summary = "Get a notification through the notification id.", tags(Notifications))]
-async fn get_notification(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<NotificationDto>> {
+async fn get_notification(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<Json<NotificationDto>> {
     auth.require_permission(Permission::notification__read)?;
 
     let notification = find_notification(id.into_inner(), &pool).await?;
@@ -73,29 +74,41 @@ async fn create_notification(
     let id = notification_service::insert_notification(&notification, &pool).await?;
 
     let created_notification = find_notification(id, &pool).await?;
-    Ok(Json(NotificationDto::from(created_notification.load_refs(&pool).await?)))
+    Ok(Json(NotificationDto::from(
+        created_notification.load_refs(&pool).await?,
+    )))
 }
 
 #[api_v2_operation(summary = "Marks the notification as read.", tags(Notifications))]
-async fn mark_as_read(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>, ) -> Result<Json<NotificationDto>> {
+async fn mark_as_read(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<Json<NotificationDto>> {
     auth.require_permission(Permission::notification__write)?;
 
     let notification = find_notification(id.0, &pool).await?;
 
-    notification_service::mark_as_read(&notification, &pool).await.or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: Some("Could not update notification.".to_string()),
-        }
-        .fail()
-    })?;
+    notification_service::mark_as_read(&notification, &pool)
+        .await
+        .or_else(|_| {
+            error::ResponseError {
+                status: StatusCode::BAD_REQUEST,
+                message: Some("Could not update notification.".to_string()),
+            }
+            .fail()
+        })?;
 
     let notification_with_refs = notification.load_refs(&pool).await?;
     Ok(Json(NotificationDto::from(notification_with_refs)))
 }
 
 #[api_v2_operation(summary = "Deletes a notification.", tags(Notifications))]
-async fn delete_notification(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<NotificationDto>> {
+async fn delete_notification(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<Json<NotificationDto>> {
     auth.require_permission(Permission::notification__delete)?;
 
     let notification = find_notification(id.0, &pool).await?;
@@ -112,6 +125,6 @@ async fn find_notification(id: i64, pool: &DbConnection) -> Result<Notification>
             status: StatusCode::NOT_FOUND,
             message: Some("No notification with this id found".to_string()),
         }
-            .fail()
+        .fail()
     })
 }

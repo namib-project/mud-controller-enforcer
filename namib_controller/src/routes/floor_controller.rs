@@ -4,10 +4,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::http::StatusCode;
-use paperclip::actix::{
-    api_v2_operation, web,
-    web::{Json},
-};
+use paperclip::actix::{api_v2_operation, web, web::Json};
 use snafu::ensure;
 use validator::Validate;
 
@@ -16,8 +13,8 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    routes::dtos::{RoomDto, FloorCreationUpdateDto, FloorDto},
-    services::{role_service::Permission, floor_service},
+    routes::dtos::{FloorCreationUpdateDto, FloorDto, RoomDto},
+    services::{floor_service, role_service::Permission},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -70,19 +67,15 @@ async fn get_all_rooms_of_floor(
         .fail()
     })?;
 
-    let res = floor_service::get_all_rooms_of_floor(id.0, &pool)
-        .await
-        .or_else(|_| {
-            error::ResponseError {
-                status: StatusCode::NOT_FOUND,
-                message: Some("No rooms found in the floor.".to_string()),
-            }
-            .fail()
-        })?;
+    let res = floor_service::get_all_rooms_of_floor(id.0, &pool).await.or_else(|_| {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some("No rooms found in the floor.".to_string()),
+        }
+        .fail()
+    })?;
     debug!("{:?}", res);
-    Ok(Json(
-        res.into_iter().map(|r| RoomDto::from(r)).collect()
-    ))
+    Ok(Json(res.into_iter().map(|r| RoomDto::from(r)).collect()))
 }
 
 #[api_v2_operation(summary = "Creates a new floor.", tags(Floors))]

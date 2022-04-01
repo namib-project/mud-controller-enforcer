@@ -6,10 +6,8 @@
 use chrono::NaiveDateTime;
 use paperclip::actix::Apiv2Schema;
 
-use crate::{
-    models::{NotificationWithRefs},
-};
-use crate::models::{Notification};
+use crate::models::Notification;
+use crate::models::NotificationWithRefs;
 use crate::routes::dtos::DeviceDto;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]

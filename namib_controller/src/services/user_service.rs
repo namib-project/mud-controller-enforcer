@@ -5,7 +5,7 @@ use chrono::Utc;
 
 use crate::{
     db::DbConnection,
-    error::{Result, self},
+    error::{self, Result},
     models::{Role, RoleDbo, User, UserDbo},
     services::role_service,
 };
@@ -146,8 +146,11 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
     unused_username(&user.username, conn)
         .await
-        .or_else(error::invalid_user_input!("Username is already in use. Please choose another one.", "username"))?;
-        
+        .or_else(error::invalid_user_input!(
+            "Username is already in use. Please choose another one.",
+            "username"
+        ))?;
+
     #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",

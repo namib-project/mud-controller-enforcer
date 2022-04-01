@@ -45,8 +45,7 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
         }
     );
 
-    signup_dto.validate()
-        .or_else(error::response_error!())?;
+    signup_dto.validate().or_else(error::response_error!())?;
 
     let user = User::new(signup_dto.0.username, &signup_dto.0.password)?;
 
@@ -61,15 +60,22 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
 
 #[api_v2_operation(summary = "Login with username and password", tags(Users))]
 pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
-    login_dto.validate()
-        .or_else(error::response_error!())?;
+    login_dto.validate().or_else(error::response_error!())?;
 
     let user = user_service::find_by_username(&login_dto.username, &pool)
         .await
-        .or_else(error::invalid_user_input!("Your username and/or password is incorrect!", "password", StatusCode::UNAUTHORIZED))?;
+        .or_else(error::invalid_user_input!(
+            "Your username and/or password is incorrect!",
+            "password",
+            StatusCode::UNAUTHORIZED
+        ))?;
 
     user.verify_password(&login_dto.password)
-        .or_else(error::invalid_user_input!("Your username and/or password is incorrect!", "password", StatusCode::UNAUTHORIZED))?;
+        .or_else(error::invalid_user_input!(
+            "Your username and/or password is incorrect!",
+            "password",
+            StatusCode::UNAUTHORIZED
+        ))?;
 
     user_service::update_last_interaction_stamp(user.id, &pool).await?;
 
@@ -117,8 +123,7 @@ pub fn update_me(
     auth: AuthToken,
     update_user_dto: Json<UpdateUserDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_user_dto.validate()
-        .or_else(error::response_error!())?;
+    update_user_dto.validate().or_else(error::response_error!())?;
 
     let mut user = user_service::find_by_id(auth.sub, &pool).await?;
 
@@ -139,8 +144,7 @@ pub fn update_password(
     auth: AuthToken,
     update_password_dto: Json<UpdatePasswordDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_password_dto.validate()
-        .or_else(error::response_error!())?;
+    update_password_dto.validate().or_else(error::response_error!())?;
 
     let user = user_service::find_by_id(auth.sub, &pool).await?;
 

@@ -200,7 +200,9 @@ impl actix_web::ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
         error!("Error during request: {:?}", self);
         let (mut rb, body) = match self {
-            Error::InvalidUserInput { message, field, status, .. } => {
+            Error::InvalidUserInput {
+                message, field, status, ..
+            } => {
                 let message = message.clone();
                 let field = field.clone();
 
@@ -209,14 +211,20 @@ impl actix_web::ResponseError for Error {
                     ErrorDto {
                         error: message,
                         field: Some(field),
-                    }
+                    },
                 )
             },
             Error::ResponseError { status, message, .. } => {
                 let message = message.clone().unwrap_or_else(|| String::from("An error occurred"));
 
-                (HttpResponse::build(*status), ErrorDto { error: message, field: None })
-            }
+                (
+                    HttpResponse::build(*status),
+                    ErrorDto {
+                        error: message,
+                        field: None,
+                    },
+                )
+            },
             _ => (
                 HttpResponse::InternalServerError(),
                 ErrorDto {

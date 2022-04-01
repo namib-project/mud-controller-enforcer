@@ -31,9 +31,6 @@ pub struct FloorCreationUpdateDto {
 
 impl FloorCreationUpdateDto {
     pub fn into_floor(self, id: i64) -> Floor {
-        Floor {
-            id: id,
-            label: self.label,
-        }
+        Floor { id, label: self.label }
     }
 }

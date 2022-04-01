@@ -1,16 +1,10 @@
 // Copyright 2022, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use std::{
-    ops::Deref,
-};
-use chrono::NaiveDateTime;
-use crate::{
-    db::DbConnection,
-    error::Result,
-    services::{device_service},
-};
 use crate::models::DeviceWithRefs;
+use crate::{db::DbConnection, error::Result, services::device_service};
+use chrono::NaiveDateTime;
+use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct Notification {

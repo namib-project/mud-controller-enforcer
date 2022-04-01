@@ -200,8 +200,8 @@ async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Pa
 }
 
 #[api_v2_operation(summary = "Changes the guest in a room.", tags(Rooms))]
-async fn change_guest(pool:
-    web::Data<DbConnection>,
+async fn change_guest(
+    pool: web::Data<DbConnection>,
     auth: AuthToken,
     id: web::Path<i64>,
     mut guest_update_dto: Json<RoomGuestUpdateDto>,

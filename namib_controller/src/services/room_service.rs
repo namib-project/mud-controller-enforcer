@@ -9,28 +9,41 @@ use crate::{
 
 ///returns all rooms from the database
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let room_data = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
-        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label, r.number").fetch_all(pool).await?;
+    let room_data = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label, r.number"
+    )
+    .fetch_all(pool)
+    .await?;
 
     Ok(room_data)
 }
 
 ///returns room by id from the database
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
-        JOIN floors f ON f.id = r.floor_id WHERE room_id = $1", id)
-        .fetch_one(pool)
-        .await?;
+    let room = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE room_id = $1",
+        id
+    )
+    .fetch_one(pool)
+    .await?;
 
     Ok(room)
 }
 
 ///returns room by number from the database
 pub async fn find_by_number(number: &str, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
-        JOIN floors f ON f.id = r.floor_id WHERE number = $1", number)
-        .fetch_one(pool)
-        .await?;
+    let room = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE number = $1",
+        number
+    )
+    .fetch_one(pool)
+    .await?;
 
     Ok(room)
 }
@@ -61,9 +74,13 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 
 ///Creates a new room with a given name and color in the database
 pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
-    let insert = sqlx::query!("INSERT INTO rooms (floor_id, number) VALUES ($1, $2)", room.floor_id, room.number)
-        .execute(pool)
-        .await?;
+    let insert = sqlx::query!(
+        "INSERT INTO rooms (floor_id, number) VALUES ($1, $2)",
+        room.floor_id,
+        room.number
+    )
+    .execute(pool)
+    .await?;
 
     Ok(insert.rows_affected())
 }

@@ -1,11 +1,7 @@
 // Copyright 2022, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use crate::{
-    db::DbConnection,
-    error::Result,
-    models::{Notification},
-};
+use crate::{db::DbConnection, error::Result, models::Notification};
 
 ///returns all notifications from the database
 pub async fn get_all_notifications(pool: &DbConnection) -> Result<Vec<Notification>> {
@@ -27,23 +23,25 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Notification> {
 
 ///marks a notification as read
 pub async fn mark_as_read(notification: &Notification, pool: &DbConnection) -> Result<bool> {
-    let upd_count = sqlx::query!(
-        "UPDATE notifications SET read = TRUE WHERE id = $1",
-        notification.id
-    )
-    .execute(pool)
-    .await?;
+    let upd_count = sqlx::query!("UPDATE notifications SET read = TRUE WHERE id = $1", notification.id)
+        .execute(pool)
+        .await?;
 
     Ok(upd_count.rows_affected() == 1)
 }
 
 ///Creates a new notification in the database
 pub async fn insert_notification(notification: &Notification, pool: &DbConnection) -> Result<i64> {
-    let insert = sqlx::query!("INSERT INTO notifications (device_id, source, timestamp, read) VALUES ($1, $2, $3, $4) RETURNING id",
-        notification.device_id, notification.source, notification.timestamp, notification.read)
-        .fetch_one(pool)
-        .await?
-        .id;
+    let insert = sqlx::query!(
+        "INSERT INTO notifications (device_id, source, timestamp, read) VALUES ($1, $2, $3, $4) RETURNING id",
+        notification.device_id,
+        notification.source,
+        notification.timestamp,
+        notification.read
+    )
+    .fetch_one(pool)
+    .await?
+    .id;
 
     Ok(insert)
 }

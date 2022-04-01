@@ -4,7 +4,7 @@
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{Room, Floor},
+    models::{Floor, Room},
 };
 
 ///returns all floors from the database
@@ -34,23 +34,23 @@ pub async fn find_by_label(label: &str, pool: &DbConnection) -> Result<Floor> {
 
 ///updates a floor with a new name and color in the database
 pub async fn update(floor: &Floor, pool: &DbConnection) -> Result<bool> {
-    let upd_count = sqlx::query!(
-        "UPDATE floors SET label = $1 WHERE id = $2",
-        floor.label,
-        floor.id
-    )
-    .execute(pool)
-    .await?;
+    let upd_count = sqlx::query!("UPDATE floors SET label = $1 WHERE id = $2", floor.label, floor.id)
+        .execute(pool)
+        .await?;
 
     Ok(upd_count.rows_affected() == 1)
 }
 
 ///returns all rooms that are associated with a given floor from the database
 pub async fn get_all_rooms_of_floor(floor_id: i64, pool: &DbConnection) -> Result<Vec<Room>> {
-    let device_dbo: Vec<Room> = sqlx::query_as!(Room, "SELECT r.*, f.label floor_label FROM rooms r
-        JOIN floors f ON f.id = r.floor_id WHERE floor_id = $1", floor_id)
-        .fetch_all(pool)
-        .await?;
+    let device_dbo: Vec<Room> = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE floor_id = $1",
+        floor_id
+    )
+    .fetch_all(pool)
+    .await?;
 
     Ok(device_dbo)
 }
