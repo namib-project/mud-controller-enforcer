@@ -75,7 +75,7 @@ async fn get_all_rooms_of_floor(
         .fail()
     })?;
     debug!("{:?}", res);
-    Ok(Json(res.into_iter().map(|r| RoomDto::from(r)).collect()))
+    Ok(Json(res.into_iter().map(RoomDto::from).collect()))
 }
 
 #[api_v2_operation(summary = "Creates a new floor.", tags(Floors))]
