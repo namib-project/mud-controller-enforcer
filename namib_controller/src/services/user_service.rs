@@ -64,7 +64,7 @@ from
 }
 
 pub async fn unused_username(name: &str, conn: &DbConnection) -> Result<bool> {
-    let user_count = sqlx::query!(r#"SELECT COUNT(*) AS "count!" FROM users WHERE username = ?"#, name)
+    let user_count = sqlx::query!(r#"SELECT COUNT(*) AS "count!" FROM users WHERE username = $1"#, name)
         .fetch_one(conn)
         .await?
         .count;

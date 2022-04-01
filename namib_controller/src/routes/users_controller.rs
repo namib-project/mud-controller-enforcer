@@ -149,7 +149,7 @@ pub fn update_password(
     let user = user_service::find_by_id(auth.sub, &pool).await?;
 
     user.verify_password(&update_password_dto.old_password)
-        .or_else(error::response_error!())?;
+        .or_else(error::response_error!(StatusCode::UNAUTHORIZED))?;
 
     user_service::update_password(auth.sub, &update_password_dto.new_password, &pool).await?;
 
