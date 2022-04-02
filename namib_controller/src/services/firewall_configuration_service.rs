@@ -12,7 +12,8 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{
-        AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, ConfiguredControllerMapping, DeviceWithRefs,
+        AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, AdministrativeContext,
+        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs,
     },
     services::{
         acme_service,
@@ -29,11 +30,15 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
         .collect()
 }
 
-pub fn create_configuration(version: String, devices: &[DeviceWithRefs]) -> EnforcerConfig {
+pub fn create_configuration(
+    version: String,
+    devices: &[DeviceWithRefs],
+    administrative_context: &AdministrativeContext,
+) -> EnforcerConfig {
     let rules = devices
         .iter()
         .filter(|d| d.ipv4_addr.is_some() || d.ipv6_addr.is_some())
-        .map(|d| convert_device_to_fw_rules(d, devices))
+        .map(|d| convert_device_to_fw_rules(d, devices, administrative_context))
         .collect();
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
@@ -116,7 +121,11 @@ pub fn get_model_ruletargethosts(
     model_match
 }
 
-pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWithRefs]) -> FirewallDevice {
+pub fn convert_device_to_fw_rules(
+    device: &DeviceWithRefs,
+    devices: &[DeviceWithRefs],
+    administrative_context: &AdministrativeContext,
+) -> FirewallDevice {
     let mut rule_counter = 0;
     let mut rules: Vec<FirewallRule> = Vec::new();
     if !device.q_bit {
@@ -202,6 +211,8 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                                     devices,
                                     uri,
                                     acl.acl_type,
+                                    &verdict,
+                                    administrative_context,
                                 ));
                             }
                             if augmentation.my_controller {
@@ -209,6 +220,8 @@ pub fn convert_device_to_fw_rules(device: &DeviceWithRefs, devices: &[DeviceWith
                                     device,
                                     devices,
                                     acl.acl_type,
+                                    &verdict,
+                                    administrative_context,
                                 ));
                             }
                             if augmentation.local {
@@ -281,6 +294,8 @@ fn get_my_controller_ruletargethosts(
     device: &DeviceWithRefs,
     devices: &[DeviceWithRefs],
     acl_type: AclType,
+    verdict: &Verdict,
+    administrative_context: &AdministrativeContext,
 ) -> Vec<Option<RuleTargetHost>> {
     device
         .controller_mappings
@@ -292,6 +307,8 @@ fn get_my_controller_ruletargethosts(
                 devices,
                 uri,
                 acl_type,
+                verdict,
+                administrative_context,
             ),
         })
         .collect()
@@ -302,28 +319,62 @@ fn get_controller_ruletargethosts(
     devices: &[DeviceWithRefs],
     controller_uri: &str,
     acl_type: AclType,
+    verdict: &Verdict,
+    administrative_context: &AdministrativeContext,
 ) -> Vec<Option<RuleTargetHost>> {
-    // warn in case that the URI is a "MUD well-known URN" or some other URN
-    if controller_uri == "urn:ietf:params:mud:dns" || controller_uri == "urn:ietf:params:mud:ntp" {
-        warn!("processing device with MUD URL <{}>: `controller` URI <{}> is a MUD well-known URN, which will be ignored.", mud_url, controller_uri);
-    } else if controller_uri.starts_with("urn:") {
-        warn!("`controller` URI seems to be a URN, but not a MUD well-known URN. It is ignored in either case.");
-    }
-
-    devices
-        .iter()
-        .filter(|other_dev| match &other_dev.mud_url {
-            Some(url) => controller_uri == url,
-            None => false,
-        })
-        .map(
-            |controller_dev| match (controller_dev.ipv4_addr, controller_dev.ipv6_addr, acl_type) {
-                (Some(addr), _, AclType::IPV4) => Some(RuleTargetHost::Ip(addr.into())),
-                (_, Some(addr), AclType::IPV6) => Some(RuleTargetHost::Ip(addr.into())),
-                _ => Some(RuleTargetHost::Hostname(controller_uri.to_string())),
+    if controller_uri.starts_with("urn:") {
+        if *verdict == Verdict::Reject || *verdict == Verdict::Drop {
+            warn!(
+                "using a reject (or drop) verdict with a URN ({}) probably makes little sense and won't work in the NAMIB system.",
+                controller_uri,
+            );
+        }
+        match controller_uri {
+            "urn:ietf:params:mud:dns" => administrative_context
+                .dns_mappings
+                .iter()
+                .map(|server| {
+                    Some(match server {
+                        DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
+                        DefinedServer::Url(url) => RuleTargetHost::Hostname(url.clone()),
+                    })
+                })
+                .collect(),
+            "urn:ietf:params:mud:ntp" => administrative_context
+                .ntp_mappings
+                .iter()
+                .map(|server| {
+                    Some(match server {
+                        DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
+                        DefinedServer::Url(url) => RuleTargetHost::Hostname(url.clone()),
+                    })
+                })
+                .collect(),
+            _ => {
+                warn!(
+                    "`controller` URI '{}' for device with MUD URL '{}' seems to be a URN, but not a MUD well-known URN. It is ignored.",
+                    controller_uri,
+                    mud_url,
+                );
+                vec![]
             },
-        )
-        .collect()
+        }
+    } else {
+        devices
+            .iter()
+            .filter(|other_dev| match &other_dev.mud_url {
+                Some(url) => controller_uri == url,
+                None => false,
+            })
+            .map(
+                |controller_dev| match (controller_dev.ipv4_addr, controller_dev.ipv6_addr, acl_type) {
+                    (Some(addr), _, AclType::IPV4) => Some(RuleTargetHost::Ip(addr.into())),
+                    (_, Some(addr), AclType::IPV6) => Some(RuleTargetHost::Ip(addr.into())),
+                    _ => Some(RuleTargetHost::Hostname(controller_uri.to_string())),
+                },
+            )
+            .collect()
+    }
 }
 
 pub async fn get_config_version(pool: &DbConnection) -> String {
@@ -550,7 +601,7 @@ mod tests {
             controller_mappings: vec![],
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
+        let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
         let resulting_device = FirewallDevice {
             id: device.id,
@@ -665,7 +716,7 @@ mod tests {
             controller_mappings: vec![],
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
+        let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
         let resulting_device = FirewallDevice {
             id: device.id,
@@ -820,7 +871,11 @@ mod tests {
             controller_mappings: vec![],
         };
 
-        let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
+        let bulb_firewall_rules_result = convert_device_to_fw_rules(
+            &bulb,
+            &[bulb.clone(), bridge.clone()],
+            &AdministrativeContext::default(),
+        );
 
         let rule_result: Vec<&FirewallRule> = bulb_firewall_rules_result
             .rules
@@ -942,7 +997,11 @@ mod tests {
             controller_mappings: vec![],
         };
 
-        let bulb_firewall_rules_result = convert_device_to_fw_rules(&bulb, &[bulb.clone(), bridge.clone()]);
+        let bulb_firewall_rules_result = convert_device_to_fw_rules(
+            &bulb,
+            &[bulb.clone(), bridge.clone()],
+            &AdministrativeContext::default(),
+        );
 
         let rule_result: Vec<&FirewallRule> = bulb_firewall_rules_result
             .rules
@@ -1110,7 +1169,7 @@ mod tests {
             collect_data: true,
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone(), device1]);
+        let x = convert_device_to_fw_rules(&device, &[device.clone(), device1], &AdministrativeContext::default());
 
         assert!(x.eq(&resulting_device));
 
@@ -1216,7 +1275,11 @@ mod tests {
             controller_mappings: vec![],
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone(), device1.clone()]);
+        let x = convert_device_to_fw_rules(
+            &device,
+            &[device.clone(), device1.clone()],
+            &AdministrativeContext::default(),
+        );
 
         let resulting_device = FirewallDevice {
             id: device.id,
@@ -1405,7 +1468,7 @@ mod tests {
             collect_data: true,
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone(), device1]);
+        let x = convert_device_to_fw_rules(&device, &[device.clone(), device1], &AdministrativeContext::default());
 
         assert!(x.eq(&resulting_device));
 
@@ -1501,7 +1564,7 @@ mod tests {
             collect_data: true,
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
+        let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
         assert!(x.eq(&resulting_device));
 
@@ -1587,7 +1650,7 @@ mod tests {
             collect_data: true,
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone()]);
+        let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
         assert_eq!(x, resulting_device);
 

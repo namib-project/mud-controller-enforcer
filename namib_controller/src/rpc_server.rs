@@ -1,7 +1,10 @@
 // Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use futures::{future, stream, StreamExt, TryStreamExt};
 use namib_shared::{
@@ -26,6 +29,7 @@ use crate::{
     app_config::APP_CONFIG,
     db::DbConnection,
     error::Result,
+    models::{AdministrativeContext, ConfiguredServerDbo, DefinedServer},
     services::{acme_service::CertId, device_service, enforcer_service, firewall_configuration_service, log_service},
     util::open_file_with,
 };
@@ -56,8 +60,18 @@ impl NamibRpc for NamibRpcServer {
                 .try_collect()
                 .await
                 .unwrap_or_default();
-            let new_config =
-                firewall_configuration_service::create_configuration(current_config_version, &init_devices);
+            let administrative_context =
+                create_administrative_context(&self.db_connection)
+                    .await
+                    .unwrap_or_else(|err| {
+                        error!("there was an error creating the administrative context: '{}'", err);
+                        AdministrativeContext::default()
+                    });
+            let new_config = firewall_configuration_service::create_configuration(
+                current_config_version,
+                &init_devices,
+                &administrative_context,
+            );
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }
@@ -91,6 +105,37 @@ impl NamibRpc for NamibRpcServer {
         );
         log_service::add_new_logs(self.client_id, logs, &self.db_connection).await;
     }
+}
+
+async fn create_administrative_context(pool: &DbConnection) -> Result<AdministrativeContext> {
+    let context = AdministrativeContext {
+        dns_mappings: sqlx::query_as!(ConfiguredServerDbo, "SELECT * FROM dns_servers")
+            .fetch_all(pool)
+            .await?
+            .iter()
+            .map(|dbo| {
+                if let Ok(ip) = dbo.server.parse::<IpAddr>() {
+                    DefinedServer::Ip(ip)
+                } else {
+                    DefinedServer::Url(dbo.server.clone())
+                }
+            })
+            .collect(),
+        ntp_mappings: sqlx::query_as!(ConfiguredServerDbo, "SELECT * FROM ntp_servers")
+            .fetch_all(pool)
+            .await?
+            .iter()
+            .map(|dbo| {
+                if let Ok(ip) = dbo.server.parse::<IpAddr>() {
+                    DefinedServer::Ip(ip)
+                } else {
+                    DefinedServer::Url(dbo.server.clone())
+                }
+            })
+            .collect(),
+    };
+
+    Ok(context)
 }
 
 /// Advertise the rpc server via dnssd and listen for incoming rpc connections.

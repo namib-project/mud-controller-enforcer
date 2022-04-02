@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use std::str::FromStr;
 
 use crate::db::DbConnection;
-use crate::models::{ConfiguredControllerMapping, DeviceControllerDbo};
+use crate::models::{ConfiguredControllerMapping, ConfiguredServerDbo, DeviceControllerDbo};
 
 /// Get the configured controllers for the device specified by the given MUD URL.
 pub async fn get_configured_controllers_for_device(
@@ -34,6 +34,26 @@ pub async fn get_configured_controllers_for_device(
         }
     })
     .collect())
+}
+
+/// Get the configured NTP servers.
+pub async fn get_configured_ntp_servers(pool: &DbConnection) -> crate::error::Result<Vec<String>> {
+    Ok(sqlx::query_as!(ConfiguredServerDbo, "SELECT * FROM ntp_servers",)
+        .fetch_all(pool)
+        .await?
+        .iter()
+        .map(|c| c.server.clone())
+        .collect())
+}
+
+/// Get the configured DNS servers.
+pub async fn get_configured_dns_servers(pool: &DbConnection) -> crate::error::Result<Vec<String>> {
+    Ok(sqlx::query_as!(ConfiguredServerDbo, "SELECT * FROM dns_servers",)
+        .fetch_all(pool)
+        .await?
+        .iter()
+        .map(|c| c.server.clone())
+        .collect())
 }
 
 /// Invoke an update of the device configurations with the data in the given configuration file.
@@ -71,6 +91,21 @@ async fn set_device_configurations(pool: &DbConnection, config: &DeviceConfigura
             .await?;
         }
     }
+
+    for server in &config.servers.ntp {
+        debug!("inserting NTP server '{}'", server);
+        sqlx::query!("INSERT INTO ntp_servers (server) VALUES ($1)", server,)
+            .execute(pool)
+            .await?;
+    }
+
+    for server in &config.servers.dns {
+        debug!("inserting DNS server '{}'", server);
+        sqlx::query!("INSERT INTO dns_servers (server) VALUES ($1)", server,)
+            .execute(pool)
+            .await?;
+    }
+
     Ok(())
 }
 
@@ -83,6 +118,25 @@ async fn remove_device_controller_mappings(pool: &DbConnection) -> crate::error:
 struct DeviceConfigurationData {
     #[serde(rename = "my-controller-mappings", default = "Vec::new")]
     my_controller_mappings: Vec<ControllerMapping>,
+    #[serde(default = "MudWellKnownUrnServerMappings::new")]
+    servers: MudWellKnownUrnServerMappings,
+}
+
+impl MudWellKnownUrnServerMappings {
+    fn new() -> MudWellKnownUrnServerMappings {
+        MudWellKnownUrnServerMappings {
+            dns: vec![],
+            ntp: vec![],
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct MudWellKnownUrnServerMappings {
+    #[serde(default = "Vec::new")]
+    dns: Vec<String>,
+    #[serde(default = "Vec::new")]
+    ntp: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -118,6 +172,21 @@ fn test_parse_device_configuration_yaml_example() {
   - url: "https://company.com/thing"
     # allow it to use DNS
     my-controller: [ "urn:ietf:params:mud:dns" ]
+
+servers:
+  ntp:
+    # maybe I set up a local NTP server and went through the trouble
+    # of writing a MUD file for it, so I name it by MUD-URL?
+    - "https://jan.org/my-ntp-server-device"
+    # maybe i went through the trouble of checking what IP-address a
+    # manufacturer's NTP server has, and hardcode that here?
+    - "123.45.67.89"
+  dns:
+    # maybe I just want to specify Google's Servers?
+    - "8.8.8.8"
+    - "8.8.4.4"
+    - "2001:4860:4860::8888"
+    - "2001:4860:4860::8844"
 "#;
     let expected = DeviceConfigurationData {
         my_controller_mappings: vec![
@@ -134,6 +203,18 @@ fn test_parse_device_configuration_yaml_example() {
                 my_controller: vec!["urn:ietf:params:mud:dns".to_string()],
             },
         ],
+        servers: MudWellKnownUrnServerMappings {
+            ntp: vec![
+                "https://jan.org/my-ntp-server-device".to_string(),
+                "123.45.67.89".to_string(),
+            ],
+            dns: vec![
+                "8.8.8.8".to_string(),
+                "8.8.4.4".to_string(),
+                "2001:4860:4860::8888".to_string(),
+                "2001:4860:4860::8844".to_string(),
+            ],
+        },
     };
 
     let result = parse_device_configuration_yaml(input);
@@ -151,6 +232,7 @@ fn test_parse_device_configuration_yaml_empty() {
     let input = r#"foo: "hi, serde doesn't support deserializing empty yaml, even if we have no required fields, so here's a fun little string""#;
     let expected = DeviceConfigurationData {
         my_controller_mappings: vec![],
+        servers: MudWellKnownUrnServerMappings::new(),
     };
 
     let result = parse_device_configuration_yaml(input);
