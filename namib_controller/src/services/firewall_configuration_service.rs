@@ -447,6 +447,7 @@ pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
 mod tests {
     use chrono::Utc;
     use namib_shared::macaddr::MacAddr;
+    use regex::Regex;
 
     use super::*;
     use crate::models::{
@@ -1454,6 +1455,135 @@ mod tests {
         assert!(x.eq(&resulting_device));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_local_networks() {
+        // create bulb
+        let bulb_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bulb".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Tcp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: None,
+                        source_port: None,
+                        destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
+                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                            manufacturer: None,
+                            same_manufacturer: false,
+                            controller: Some("https://manufacturer.com/devices/bridge".to_string()),
+                            my_controller: false,
+                            local: true, // the important definition for this test
+                            model: None,
+                        }),
+                    },
+                }],
+            }],
+            acl_override: Vec::default(),
+        };
+        let bulb = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "123.45.6.78".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bulb".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+                q_bit: false,
+            },
+            mud_data: Some(bulb_mud_data),
+            room: None,
+            controller_mappings: vec![],
+        };
+
+        // create bridge
+        let bridge_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bridge".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: Vec::default(),
+            }],
+            acl_override: Vec::default(),
+        };
+        let bridge = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("ff:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "123.45.67.8".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bridge".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+                q_bit: false,
+            },
+            mud_data: Some(bridge_mud_data),
+            room: None,
+            controller_mappings: vec![],
+        };
+
+        let bulb_firewall_rules_result = convert_device_to_fw_rules(
+            &bulb,
+            &[bulb.clone(), bridge.clone()],
+            &AdministrativeContext::default(),
+        );
+
+        let controller_rule = bulb_firewall_rules_result
+            .rules
+            .iter()
+            .find(|&r| {
+                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+            })
+            .expect("could not find firewall rule filtered for bridge target");
+        assert_eq!(controller_rule.scope, ScopeConstraint::Local);
+
+        let default_rule_regex = Regex::new(r"rule_default_\d+").unwrap();
+        for default_rule in bulb_firewall_rules_result
+            .rules
+            .iter()
+            .filter(|&r| default_rule_regex.is_match(&r.rule_name.to_string()))
+        {
+            assert_eq!(default_rule.scope, ScopeConstraint::None);
+        }
     }
 
     #[test]
