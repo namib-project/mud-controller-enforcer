@@ -24,6 +24,12 @@ impl RuleName {
     }
 }
 
+impl ToString for RuleName {
+    fn to_string(&self) -> String {
+        self.0.clone()
+    }
+}
+
 /// Represents a target host for a firewall rule
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum RuleTargetHost {
