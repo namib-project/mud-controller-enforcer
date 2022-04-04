@@ -40,14 +40,14 @@ pub struct NotificationCreationDto {
     pub read: Option<bool>,
 }
 
-impl NotificationCreationDto {
-    pub fn into_notification(self) -> Notification {
+impl From<NotificationCreationDto> for Notification {
+    fn from(creation: NotificationCreationDto) -> Self {
         Notification {
             id: 0,
-            device_id: self.device_id,
-            source: self.source,
-            timestamp: self.timestamp,
-            read: self.read.unwrap_or(false),
+            device_id: creation.device_id,
+            source: creation.source,
+            timestamp: creation.timestamp,
+            read: creation.read.unwrap_or(false),
         }
     }
 }

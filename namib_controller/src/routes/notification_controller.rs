@@ -70,7 +70,7 @@ async fn create_notification(
         .fail()
     })?;
 
-    let notification = notification_creation_update_dto.into_inner().into_notification();
+    let notification = Notification::from(notification_creation_update_dto.into_inner());
     let id = notification_service::insert_notification(&notification, &pool).await?;
 
     let created_notification = find_notification(id, &pool).await?;

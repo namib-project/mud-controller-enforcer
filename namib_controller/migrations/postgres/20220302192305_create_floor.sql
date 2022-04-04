@@ -5,6 +5,7 @@ CREATE TABLE floors
     label VARCHAR(128) NOT NULL UNIQUE
 );
 
+-- Necessary so INSERT in line 22 passes.
 INSERT INTO floors (id, label) VALUES (1, '1st floor') ON CONFLICT DO NOTHING;
 
 ALTER TABLE rooms
