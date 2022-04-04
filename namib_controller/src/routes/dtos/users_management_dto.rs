@@ -19,4 +19,5 @@ pub struct MgmUpdateUserBasicDto {
     #[validate(length(min = 1, max = 128))]
     pub username: String,
     pub password: Option<String>,
+    pub change_next_login: bool,
 }

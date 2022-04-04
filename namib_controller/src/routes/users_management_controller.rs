@@ -18,11 +18,11 @@ use crate::{
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.route("/", web::get().to(get_all_users));
-    cfg.route("/", web::post().to(create_user));
-    cfg.route("/{user_id}", web::get().to(get_user_by_id));
-    cfg.route("/{user_id}", web::put().to(update_user_by_id));
-    cfg.route("/{user_id}", web::delete().to(delete_user_by_id));
+    cfg.route("/users", web::get().to(get_all_users));
+    cfg.route("/users", web::post().to(create_user));
+    cfg.route("/users/{user_id}", web::get().to(get_user_by_id));
+    cfg.route("/users/{user_id}", web::put().to(update_user_by_id));
+    cfg.route("/users/{user_id}", web::delete().to(delete_user_by_id));
 }
 
 #[api_v2_operation(summary = "List of all users", tags(Management))]
@@ -78,7 +78,7 @@ pub async fn update_user_by_id(
     auth: AuthToken,
     user_id: web::Path<i64>,
     update_user_dto: Json<MgmUpdateUserBasicDto>,
-) -> Result<HttpResponse> {
+) -> Result<Json<User>> {
     auth.require_permission(Permission::user__management__write)?;
 
     update_user_dto.validate().or_else(|_| {
@@ -91,12 +91,16 @@ pub async fn update_user_by_id(
 
     if let Ok(same_name_user_db) = user_service::find_by_username(&update_user_dto.username, &pool).await {
         if same_name_user_db.id != user_id.0 {
-            return Ok(HttpResponse::Conflict().reason("Username already in use!").finish());
+            return error::invalid_user_input!("Username already in use!", "username");
         }
     }
 
     let mut user = user_service::find_by_id(user_id.0, &pool).await?;
     user.username = update_user_dto.0.username;
+
+    if update_user_dto.0.change_next_login {
+        user.change_next_login = true;
+    }
 
     if let Some(password) = update_user_dto.0.password {
         user.update_password(&password)?;
@@ -104,7 +108,7 @@ pub async fn update_user_by_id(
 
     user_service::update(&user, &pool).await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(Json(user_service::find_by_id(user.id, &pool).await?))
 }
 
 #[api_v2_operation(summary = "Delete a user", tags(Management))]

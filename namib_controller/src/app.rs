@@ -158,7 +158,7 @@ pub fn start_app(
                 .service(web::scope("/status").configure(routes::status_controller::init))
                 .service(web::scope("/enforcers").configure(routes::enforcer_controller::init))
                 .service(web::scope("/users").configure(routes::users_controller::init))
-                .service(web::scope("/management/users").configure(routes::users_management_controller::init))
+                .service(web::scope("/management").configure(routes::users_management_controller::init))
                 .service(web::scope("/devices").configure(routes::device_controller::init))
                 .service(web::scope("/mud").configure(routes::mud_controller::init))
                 .service(web::scope("/config").configure(routes::config_controller::init))

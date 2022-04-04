@@ -20,6 +20,7 @@ pub struct UserDbo {
     pub password: String,
     pub salt: Vec<u8>,
     pub last_interaction: NaiveDateTime,
+    pub change_next_login: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -33,6 +34,8 @@ pub struct User {
     pub last_interaction: NaiveDateTime,
     pub roles: Vec<Role>,
     pub permissions: Vec<String>,
+    #[serde(skip_serializing)]
+    pub change_next_login: bool,
 }
 
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -70,6 +73,7 @@ impl User {
             last_interaction: utc_now,
             roles: Vec::new(),
             permissions: Vec::new(),
+            change_next_login: false,
         })
     }
 

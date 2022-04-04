@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN change_next_login BOOLEAN NOT NULL DEFAULT FALSE;

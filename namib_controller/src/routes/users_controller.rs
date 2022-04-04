@@ -63,14 +63,14 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 
     let user = user_service::find_by_username(&login_dto.username, &pool)
         .await
-        .or_else(error::invalid_user_input!(
+        .or_else(|_| error::invalid_user_input!(
             "Your username and/or password is incorrect!",
             "password",
             StatusCode::UNAUTHORIZED
         ))?;
 
     user.verify_password(&login_dto.password)
-        .or_else(error::invalid_user_input!(
+        .or_else(|_| error::invalid_user_input!(
             "Your username and/or password is incorrect!",
             "password",
             StatusCode::UNAUTHORIZED

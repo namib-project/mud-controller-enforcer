@@ -123,13 +123,11 @@ pub enum Error {
 
 macro_rules! invalid_user_input {
     ($message: tt, $field: tt, $status: expr) => {
-        |_| {
-            Err(crate::error::Error::InvalidUserInput {
-                message: String::from($message),
-                field: String::from($field),
-                status: $status,
-            })
-        }
+        Err(crate::error::Error::InvalidUserInput {
+            message: String::from($message),
+            field: String::from($field),
+            status: $status,
+        })
     };
     ($message: tt, $field: tt) => {
         crate::error::invalid_user_input!($message, $field, crate::error::StatusCode::UNPROCESSABLE_ENTITY)

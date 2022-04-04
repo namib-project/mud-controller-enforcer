@@ -59,6 +59,7 @@ from
                 .filter(|p| !p.is_empty())
                 .map(ToOwned::to_owned)
                 .collect(),
+            change_next_login: false,
         })
         .collect())
 }
@@ -138,6 +139,7 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
             .collect(),
         roles: roles.into_iter().map(Role::from).collect(),
+        change_next_login: usr.change_next_login,
     };
 
     Ok(user)
@@ -146,7 +148,7 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
     unused_username(&user.username, conn)
         .await
-        .or_else(error::invalid_user_input!(
+        .or_else(|_| error::invalid_user_input!(
             "Username is already in use. Please choose another one.",
             "username"
         ))?;
@@ -187,10 +189,11 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
 
 pub async fn update(user: &User, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "update users SET username = $1, password = $2, salt = $3 WHERE id = $4",
+        "update users SET username = $1, password = $2, salt = $3, change_next_login = $4 WHERE id = $5",
         user.username,
         user.password,
         user.salt,
+        user.change_next_login,
         user.id
     )
     .execute(conn)
