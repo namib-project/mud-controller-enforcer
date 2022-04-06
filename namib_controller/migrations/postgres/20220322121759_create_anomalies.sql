@@ -8,6 +8,6 @@ create table anomalies
     destination_ip      TEXT NOT NULL,
     destination_id      BIGINT REFERENCES devices (id) ON DELETE SET NULL,
     destination_port    BIGINT,
-    protocol            TEXT NOT NULL,
+    l4protocol          BIGINT,
     date_time_created   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 )

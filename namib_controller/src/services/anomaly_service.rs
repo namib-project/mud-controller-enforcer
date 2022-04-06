@@ -49,16 +49,28 @@ pub async fn insert_anomaly(mut anomaly_data: Json<AnomalyCreationDto>, pool: &D
     } else {
         anomaly_data.destination_id = None;
     }
+    let source_port = match anomaly_data.source_port {
+        Some(source_port) => Option::from(i64::from(source_port)),
+        _ => None,
+    };
+    let destination_port = match anomaly_data.destination_port {
+        Some(destination_port) => Option::from(i64::from(destination_port)),
+        _ => None,
+    };
+    let l4protocol = match anomaly_data.l4protocol {
+        Some(protocol) => Option::from(i64::from(protocol)),
+        _ => None,
+    };
 
     let anomaly = sqlx::query_as!(AnomalyDbo,
-        "INSERT INTO anomalies (source_ip, source_port, source_id, destination_ip, destination_port, destination_id, protocol) values ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+        "INSERT INTO anomalies (source_ip, source_port, source_id, destination_ip, destination_port, destination_id, l4protocol) values ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
         anomaly_data.source_ip,
-        anomaly_data.source_port,
+        source_port,
         anomaly_data.source_id,
         anomaly_data.destination_ip,
-        anomaly_data.destination_port,
+        destination_port,
         anomaly_data.destination_id,
-        anomaly_data.protocol,
+        l4protocol,
     )
     .fetch_one(pool)
     .await?;
