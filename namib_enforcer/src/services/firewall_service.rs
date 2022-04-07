@@ -10,7 +10,7 @@ use std::{
 
 #[cfg(feature = "nftables")]
 use ipnetwork::IpNetwork;
-use namib_shared::firewall_config::{FirewallDevice, FirewallRule};
+use namib_shared::firewall_config::{FirewallDevice, FirewallRule, ScopeConstraint};
 #[cfg(feature = "nftables")]
 use namib_shared::{
     firewall_config::{Protocol, RuleTargetHost, Verdict},
@@ -489,6 +489,11 @@ async fn add_rule_to_batch(
     rule_spec: &FirewallRule,
     dns_watcher: &DnsWatcher,
 ) -> Result<()> {
+    // if the rule is constrained to local scope, only add it to the bridge chain.
+    if rule_spec.scope == ScopeConstraint::Local && *scope != FirewallRuleScope::Bridge {
+        return Ok(());
+    }
+
     // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
     // for the packet source or destination, create a vector of ip addresses for this identifier.
     let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
@@ -695,7 +700,7 @@ mod tests {
 
     use super::*;
     use crate::services::dns::DnsService;
-    use namib_shared::firewall_config::{RuleName, RuleTarget};
+    use namib_shared::firewall_config::{RuleName, RuleTarget, ScopeConstraint};
 
     fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
         let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"));
@@ -766,6 +771,7 @@ mod tests {
             },
             protocol: Protocol::Tcp,
             verdict: Verdict::Accept,
+            scope: ScopeConstraint::None,
         }];
         let device_id = 1234;
         let device = FirewallDevice {

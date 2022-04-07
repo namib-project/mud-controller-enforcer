@@ -24,6 +24,12 @@ impl RuleName {
     }
 }
 
+impl ToString for RuleName {
+    fn to_string(&self) -> String {
+        self.0.clone()
+    }
+}
+
 /// Represents a target host for a firewall rule
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum RuleTargetHost {
@@ -71,6 +77,12 @@ pub enum Verdict {
     Drop,
 }
 
+#[derive(Eq, PartialEq, Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum ScopeConstraint {
+    Local,
+    None,
+}
+
 /// A single firewall rule entry.
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
@@ -79,6 +91,7 @@ pub struct FirewallRule {
     pub dst: RuleTarget,
     pub protocol: Protocol,
     pub verdict: Verdict,
+    pub scope: ScopeConstraint,
 }
 
 impl FirewallRule {
@@ -89,6 +102,7 @@ impl FirewallRule {
         dst: RuleTarget,
         protocol: Protocol,
         verdict: Verdict,
+        scope: ScopeConstraint,
     ) -> FirewallRule {
         FirewallRule {
             rule_name,
@@ -96,6 +110,7 @@ impl FirewallRule {
             dst,
             protocol,
             verdict,
+            scope,
         }
     }
 

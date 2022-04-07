@@ -4,7 +4,9 @@
 use std::net::IpAddr;
 
 use namib_shared::{
-    firewall_config::{FirewallDevice, FirewallRule, Icmp, Protocol, RuleName, RuleTarget, RuleTargetHost, Verdict},
+    firewall_config::{
+        FirewallDevice, FirewallRule, Icmp, Protocol, RuleName, RuleTarget, RuleTargetHost, ScopeConstraint, Verdict,
+    },
     EnforcerConfig,
 };
 
@@ -167,6 +169,7 @@ pub fn convert_device_to_fw_rules(
                     AceAction::Accept => Verdict::Accept,
                     AceAction::Deny => Verdict::Reject,
                 };
+                let mut scope = ScopeConstraint::None;
 
                 let src_ports: Option<String> = match ace.matches.source_port {
                     None => None,
@@ -225,7 +228,7 @@ pub fn convert_device_to_fw_rules(
                                 ));
                             }
                             if augmentation.local {
-                                // TODO
+                                scope = ScopeConstraint::Local;
                             }
                             if let Some(url) = &augmentation.model {
                                 targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
@@ -259,6 +262,7 @@ pub fn convert_device_to_fw_rules(
                         dst.clone(),
                         protocol.clone(),
                         verdict.clone(),
+                        scope,
                     ));
                     rule_counter += 1;
                 }
@@ -272,6 +276,7 @@ pub fn convert_device_to_fw_rules(
                 RuleTarget::new(Some(server.into()), Some("53".to_string())),
                 Protocol::Tcp,
                 Verdict::Accept,
+                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
@@ -280,6 +285,7 @@ pub fn convert_device_to_fw_rules(
                 RuleTarget::new(Some(server.into()), Some("53".to_string())),
                 Protocol::Udp,
                 Verdict::Accept,
+                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
         }
@@ -290,6 +296,7 @@ pub fn convert_device_to_fw_rules(
                 RuleTarget::new(Some(server.into()), Some("123".to_string())),
                 Protocol::Tcp,
                 Verdict::Accept,
+                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
@@ -298,6 +305,7 @@ pub fn convert_device_to_fw_rules(
                 RuleTarget::new(Some(server.into()), Some("123".to_string())),
                 Protocol::Udp,
                 Verdict::Accept,
+                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
         }
@@ -308,6 +316,7 @@ pub fn convert_device_to_fw_rules(
         RuleTarget::new(None, None),
         Protocol::All,
         Verdict::Reject,
+        ScopeConstraint::None,
     ));
     rule_counter += 1;
     rules.push(FirewallRule::new(
@@ -316,6 +325,7 @@ pub fn convert_device_to_fw_rules(
         RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
         Protocol::All,
         Verdict::Reject,
+        ScopeConstraint::None,
     ));
 
     FirewallDevice {
@@ -437,6 +447,7 @@ pub async fn update_config_version(pool: &DbConnection) -> Result<()> {
 mod tests {
     use chrono::Utc;
     use namib_shared::macaddr::MacAddr;
+    use regex::Regex;
 
     use super::*;
     use crate::models::{
@@ -659,6 +670,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::Udp,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_dns_default_accept_1")),
@@ -671,6 +683,7 @@ mod tests {
                     ),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_dns_default_accept_2")),
@@ -683,6 +696,7 @@ mod tests {
                     ),
                     Protocol::Udp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_dns_default_accept_3")),
@@ -693,6 +707,7 @@ mod tests {
                     ),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_dns_default_accept_4")),
@@ -703,6 +718,7 @@ mod tests {
                     ),
                     Protocol::Udp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_ntp_default_accept_5")),
@@ -713,6 +729,7 @@ mod tests {
                     ),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_ntp_default_accept_6")),
@@ -723,6 +740,7 @@ mod tests {
                     ),
                     Protocol::Udp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_7")),
@@ -730,6 +748,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_8")),
@@ -737,6 +756,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: false,
@@ -841,6 +861,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("50:60".to_string())),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_1")),
@@ -851,6 +872,7 @@ mod tests {
                     ),
                     Protocol::Udp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
@@ -858,6 +880,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_3")),
@@ -865,6 +888,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1259,6 +1283,7 @@ mod tests {
                     ),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
@@ -1266,6 +1291,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
@@ -1273,6 +1299,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1404,6 +1431,7 @@ mod tests {
                     ),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
@@ -1411,6 +1439,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
@@ -1418,6 +1447,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1425,6 +1455,135 @@ mod tests {
         assert!(x.eq(&resulting_device));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_local_networks() {
+        // create bulb
+        let bulb_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bulb".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: vec![Ace {
+                    name: "some_ace_name".to_string(),
+                    action: AceAction::Accept,
+                    matches: AceMatches {
+                        protocol: Some(AceProtocol::Tcp),
+                        direction_initiated: None,
+                        address_mask: None,
+                        dnsname: None,
+                        source_port: None,
+                        destination_port: None,
+                        icmp_type: None,
+                        icmp_code: None,
+                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                            manufacturer: None,
+                            same_manufacturer: false,
+                            controller: Some("https://manufacturer.com/devices/bridge".to_string()),
+                            my_controller: false,
+                            local: true, // the important definition for this test
+                            model: None,
+                        }),
+                    },
+                }],
+            }],
+            acl_override: Vec::default(),
+        };
+        let bulb = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("aa:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "123.45.6.78".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bulb".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+                q_bit: false,
+            },
+            mud_data: Some(bulb_mud_data),
+            room: None,
+            controller_mappings: vec![],
+        };
+
+        // create bridge
+        let bridge_mud_data = MudData {
+            url: "https://manufacturer.com/devices/bridge".to_string(),
+            masa_url: None,
+            last_update: "some_last_update".to_string(),
+            systeminfo: Some("some_systeminfo".to_string()),
+            mfg_name: Some("some_mfg_name".to_string()),
+            model_name: Some("some_model_name".to_string()),
+            documentation: Some("some_documentation".to_string()),
+            expiration: Utc::now(),
+            acllist: vec![Acl {
+                name: "some_acl_name".to_string(),
+                packet_direction: AclDirection::FromDevice,
+                acl_type: AclType::IPV4,
+                ace: Vec::default(),
+            }],
+            acl_override: Vec::default(),
+        };
+        let bridge = DeviceWithRefs {
+            inner: Device {
+                id: 0,
+                name: None,
+                mac_addr: Some("ff:bb:cc:dd:ee:ff".parse::<MacAddr>().unwrap().into()),
+                duid: None,
+                ipv4_addr: "123.45.67.8".parse().ok(),
+                ipv6_addr: None,
+                hostname: "".to_string(),
+                vendor_class: "".to_string(),
+                mud_url: Some("https://manufacturer.com/devices/bridge".to_string()),
+                collect_info: true,
+                last_interaction: Utc::now().naive_utc(),
+                clipart: None,
+                room_id: None,
+                q_bit: false,
+            },
+            mud_data: Some(bridge_mud_data),
+            room: None,
+            controller_mappings: vec![],
+        };
+
+        let bulb_firewall_rules_result = convert_device_to_fw_rules(
+            &bulb,
+            &[bulb.clone(), bridge.clone()],
+            &AdministrativeContext::default(),
+        );
+
+        let controller_rule = bulb_firewall_rules_result
+            .rules
+            .iter()
+            .find(|&r| {
+                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+            })
+            .expect("could not find firewall rule filtered for bridge target");
+        assert_eq!(controller_rule.scope, ScopeConstraint::Local);
+
+        let default_rule_regex = Regex::new(r"rule_default_\d+").unwrap();
+        for default_rule in bulb_firewall_rules_result
+            .rules
+            .iter()
+            .filter(|&r| default_rule_regex.is_match(&r.rule_name.to_string()))
+        {
+            assert_eq!(default_rule.scope, ScopeConstraint::None);
+        }
     }
 
     #[test]
@@ -1558,6 +1717,7 @@ mod tests {
                     ),
                     Protocol::Tcp,
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
@@ -1565,6 +1725,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
@@ -1572,6 +1733,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1654,6 +1816,7 @@ mod tests {
                         icmp_code: Some(0),
                     }),
                     Verdict::Accept,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
@@ -1661,6 +1824,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_2")),
@@ -1668,6 +1832,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1747,6 +1912,7 @@ mod tests {
                     RuleTarget::new(None, None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     RuleName::new(String::from("rule_default_1")),
@@ -1754,6 +1920,7 @@ mod tests {
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
                     Verdict::Reject,
+                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
