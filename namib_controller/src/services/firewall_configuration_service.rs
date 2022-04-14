@@ -309,6 +309,32 @@ pub fn convert_device_to_fw_rules(
             ));
             rule_counter += 1;
         }
+    } else if !device.quarantine_exceptions.is_empty() {
+        for exception in &device.quarantine_exceptions {
+            let exception_target = match exception.exception_target.parse::<IpAddr>() {
+                Ok(addr) => RuleTargetHost::Ip(addr),
+                Err(_) => RuleTargetHost::Hostname(exception.exception_target.clone()),
+            };
+            let (src, dst) = match exception.direction {
+                AclDirection::FromDevice => (
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(Some(exception_target), None),
+                ),
+                AclDirection::ToDevice => (
+                    RuleTarget::new(Some(exception_target), None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                ),
+            };
+            rules.push(FirewallRule::new(
+                RuleName::new(format!("rule_quarantine_exception_{}", rule_counter)),
+                src,
+                dst,
+                Protocol::All,
+                Verdict::Accept,
+                ScopeConstraint::None,
+            ));
+            rule_counter += 1;
+        }
     }
     rules.push(FirewallRule::new(
         format!("rule_default_{}", rule_counter),
@@ -647,6 +673,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let admin_context = AdministrativeContext {
@@ -843,6 +870,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
@@ -962,6 +990,7 @@ mod tests {
             controller_mappings: vec![ConfiguredControllerMapping::Uri(
                 "https://manufacturer.com/devices/bridge".to_string(),
             )],
+            quarantine_exceptions: vec![],
         };
 
         // create bridge
@@ -1002,6 +1031,7 @@ mod tests {
             mud_data: Some(bridge_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1088,6 +1118,7 @@ mod tests {
             mud_data: Some(bulb_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         // create bridge
@@ -1128,6 +1159,7 @@ mod tests {
             mud_data: Some(bridge_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1213,6 +1245,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1267,6 +1300,7 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1374,6 +1408,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1409,6 +1444,7 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let x = convert_device_to_fw_rules(
@@ -1518,6 +1554,7 @@ mod tests {
             mud_data: Some(bulb_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         // create bridge
@@ -1558,6 +1595,7 @@ mod tests {
             mud_data: Some(bridge_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1647,6 +1685,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1701,6 +1740,7 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1800,6 +1840,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1899,6 +1940,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
