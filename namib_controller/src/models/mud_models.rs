@@ -3,6 +3,7 @@
 
 #![allow(clippy::field_reassign_with_default)]
 
+use std::fmt;
 use std::net::IpAddr;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -163,10 +164,11 @@ pub enum AclType {
     IPV4,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Apiv2Schema, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Apiv2Schema, Eq, PartialEq, sqlx::Type)]
+#[repr(i64)]
 pub enum AclDirection {
-    FromDevice,
-    ToDevice,
+    FromDevice = 0,
+    ToDevice = 1,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -187,6 +189,12 @@ impl From<&DefinedServer> for RuleTargetHost {
             DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
             DefinedServer::Url(mud_url) => RuleTargetHost::Hostname(mud_url.clone()),
         }
+    }
+}
+
+impl fmt::Display for AclDirection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

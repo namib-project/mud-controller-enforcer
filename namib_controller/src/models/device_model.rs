@@ -16,8 +16,8 @@ use paperclip::actix::Apiv2Schema;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{mud_models::MudData, Room},
-    services::{device_config_service, mud_service, room_service},
+    models::{mud_models::MudData, quarantine_exception_model::QuarantineException, Room},
+    services::{device_config_service, mud_service, quarantine_service, room_service},
 };
 
 #[derive(Debug, Clone)]
@@ -62,6 +62,7 @@ pub struct DeviceWithRefs {
     pub room: Option<Room>,
     pub mud_data: Option<MudData>,
     pub controller_mappings: Vec<ConfiguredControllerMapping>,
+    pub quarantine_exceptions: Vec<QuarantineException>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -111,11 +112,15 @@ impl Device {
             Some(mud_url) => device_config_service::get_configured_controllers_for_device(mud_url, conn).await?,
             None => vec![],
         };
+        let quarantine_exceptions: Vec<QuarantineException> =
+            quarantine_service::get_quarantine_exceptions_for_device(self.id, conn).await?;
+
         Ok(DeviceWithRefs {
             inner: self,
             room,
             mud_data,
             controller_mappings,
+            quarantine_exceptions,
         })
     }
 }
