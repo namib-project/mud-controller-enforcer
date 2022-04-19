@@ -13,7 +13,7 @@ pub struct RoomDto {
     pub floor_id: i64,
     pub floor_label: String,
     #[validate(length(max = 50))]
-    pub number: String,
+    pub name: String,
     #[validate(length(max = 255))]
     pub guest: Option<String>,
 }
@@ -24,7 +24,7 @@ impl From<Room> for RoomDto {
             room_id: room.room_id,
             floor_id: room.floor_id,
             floor_label: room.floor_label,
-            number: room.number,
+            name: room.name,
             guest: room.guest,
         }
     }
@@ -34,7 +34,7 @@ impl From<Room> for RoomDto {
 pub struct RoomCreationUpdateDto {
     pub floor_id: i64,
     #[validate(length(max = 50))]
-    pub number: String,
+    pub name: String,
     #[validate(length(max = 255))]
     pub guest: Option<String>,
 }
@@ -46,7 +46,7 @@ impl RoomCreationUpdateDto {
             room_id: id,
             floor_id: self.floor_id,
             floor_label: "".to_string(),
-            number: self.number,
+            name: self.name,
             guest: self.guest,
         }
     }

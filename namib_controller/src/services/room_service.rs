@@ -12,7 +12,7 @@ pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
     let room_data = sqlx::query_as!(
         Room,
         "SELECT r.*, f.label floor_label FROM rooms r
-        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label, r.number"
+        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label, r.name"
     )
     .fetch_all(pool)
     .await?;
@@ -34,13 +34,13 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
     Ok(room)
 }
 
-///returns room by number from the database
-pub async fn find_by_number(number: &str, pool: &DbConnection) -> Result<Room> {
+///returns room by name from the database
+pub async fn find_by_name(name: &str, pool: &DbConnection) -> Result<Room> {
     let room = sqlx::query_as!(
         Room,
         "SELECT r.*, f.label floor_label FROM rooms r
-        JOIN floors f ON f.id = r.floor_id WHERE number = $1",
-        number
+        JOIN floors f ON f.id = r.floor_id WHERE name = $1",
+        name
     )
     .fetch_one(pool)
     .await?;
@@ -51,9 +51,9 @@ pub async fn find_by_number(number: &str, pool: &DbConnection) -> Result<Room> {
 ///updates a room with a new name and color in the database
 pub async fn update(room: &Room, pool: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "UPDATE rooms SET floor_id = $1, number = $2, guest = $3 WHERE room_id = $4",
+        "UPDATE rooms SET floor_id = $1, name = $2, guest = $3 WHERE room_id = $4",
         room.floor_id,
-        room.number,
+        room.name,
         room.guest,
         room.room_id
     )
@@ -75,9 +75,9 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 ///Creates a new room with a given name and color in the database
 pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
     let insert = sqlx::query!(
-        "INSERT INTO rooms (floor_id, number) VALUES ($1, $2)",
+        "INSERT INTO rooms (floor_id, name) VALUES ($1, $2)",
         room.floor_id,
-        room.number
+        room.name
     )
     .execute(pool)
     .await?;
@@ -85,9 +85,9 @@ pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
     Ok(insert.rows_affected())
 }
 
-///Deletes a room with a given number from database
-pub async fn delete_room(number: &str, pool: &DbConnection) -> Result<u64> {
-    let del_count = sqlx::query!("DELETE FROM rooms WHERE number = $1", number)
+///Deletes a room with a given name from database
+pub async fn delete_room(name: &str, pool: &DbConnection) -> Result<u64> {
+    let del_count = sqlx::query!("DELETE FROM rooms WHERE name = $1", name)
         .execute(pool)
         .await?;
 

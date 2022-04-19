@@ -13,12 +13,12 @@ ALTER TABLE rooms
 
 CREATE TABLE rooms (
     room_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    number varchar(50) NOT NULL UNIQUE,
+    name varchar(50) NOT NULL UNIQUE,
     floor_id INTEGER NOT NULL REFERENCES floors (id) ON DELETE CASCADE ON UPDATE CASCADE,
     guest VARCHAR(255) DEFAULT NULL
 );
 
-INSERT INTO rooms (room_id, number, floor_id, guest)
+INSERT INTO rooms (room_id, name, floor_id, guest)
 SELECT room_id, name, 1, null
 FROM _rooms_old;
 
