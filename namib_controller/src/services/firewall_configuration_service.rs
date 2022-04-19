@@ -326,7 +326,7 @@ pub fn convert_device_to_fw_rules(
                 ),
             };
             rules.push(FirewallRule::new(
-                RuleName::new(format!("rule_quarantine_exception_{}", rule_counter)),
+                format!("rule_quarantine_exception_{}", rule_counter),
                 src,
                 dst,
                 Protocol::All,
@@ -477,7 +477,8 @@ mod tests {
 
     use super::*;
     use crate::models::{
-        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudAclMatchesAugmentation, MudData,
+        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudAclMatchesAugmentation,
+        MudData, QuarantineException,
     };
 
     #[test]
@@ -1901,21 +1902,38 @@ mod tests {
                 name: "some_acl_name".to_string(),
                 packet_direction: AclDirection::FromDevice,
                 acl_type: AclType::IPV4,
-                ace: vec![Ace {
-                    name: "some_ace_name".to_string(),
-                    action: AceAction::Accept,
-                    matches: AceMatches {
-                        protocol: Some(AceProtocol::Icmp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: Some(String::from("www.example.test")),
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: Some(8),
-                        icmp_code: Some(0),
-                        matches_augmentation: None,
+                ace: vec![
+                    Ace {
+                        name: "some_ace_name_1".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Icmp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: Some(8),
+                            icmp_code: Some(0),
+                            matches_augmentation: None,
+                        },
                     },
-                }],
+                    Ace {
+                        name: "some_ace_name_2".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Icmp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: Some(8),
+                            icmp_code: Some(0),
+                            matches_augmentation: None,
+                        },
+                    },
+                ],
             }],
             acl_override: Vec::default(),
         };
@@ -1940,7 +1958,11 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
-            quarantine_exceptions: vec![],
+            quarantine_exceptions: vec![QuarantineException {
+                id: 1,
+                exception_target: "www.example.test/update-service".to_string(),
+                direction: AclDirection::FromDevice,
+            }],
         };
 
         let resulting_device = FirewallDevice {
@@ -1949,7 +1971,18 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    String::from("rule_default_0"),
+                    String::from("rule_quarantine_exception_0"),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Hostname("www.example.test/update-service".to_string())),
+                        None,
+                    ),
+                    Protocol::All,
+                    Verdict::Accept,
+                    ScopeConstraint::None,
+                ),
+                FirewallRule::new(
+                    String::from("rule_default_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1957,7 +1990,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    String::from("rule_default_1"),
+                    String::from("rule_default_2"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
