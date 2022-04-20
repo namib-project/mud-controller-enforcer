@@ -126,7 +126,7 @@ async fn test_signup_already_created() {
         &client,
         format!("http://{}/users/signup", ctx.server_addr).as_str(),
         &signup_dto,
-        StatusCode::BAD_REQUEST,
+        StatusCode::UNPROCESSABLE_ENTITY,
     )
     .await;
 

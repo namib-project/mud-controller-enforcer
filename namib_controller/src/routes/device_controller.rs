@@ -24,6 +24,7 @@ use crate::{
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));
     cfg.route("", web::post().to(create_device));
+    cfg.route("/unidentified", web::get().to(get_unidentified_devices));
     cfg.route("/{id}", web::get().to(get_device));
     cfg.route("/{id}", web::put().to(update_device));
     cfg.route("/{id}", web::delete().to(delete_device));
@@ -36,6 +37,21 @@ async fn get_all_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Resu
     auth.require_permission(Permission::device__read)?;
 
     let devices = device_service::get_all_devices(&pool).await?;
+    Ok(Json(
+        stream::iter(devices)
+            .then(|d| d.load_refs(&pool))
+            .map_ok(DeviceDto::from)
+            .try_collect()
+            .await?,
+    ))
+}
+
+#[api_v2_operation(summary = "List unidentified devices", tags(Devices))]
+async fn get_unidentified_devices(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<Vec<DeviceDto>>> {
+    auth.require_permission(Permission::device__list)?;
+    auth.require_permission(Permission::device__read)?;
+
+    let devices = device_service::get_unidentified_devices(&pool).await?;
     Ok(Json(
         stream::iter(devices)
             .then(|d| d.load_refs(&pool))

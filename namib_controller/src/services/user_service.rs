@@ -1,11 +1,11 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use chrono::Utc;
 
 use crate::{
     db::DbConnection,
-    error::Result,
+    error::{self, Result},
     models::{Role, RoleDbo, User, UserDbo},
     services::role_service,
 };
@@ -61,6 +61,18 @@ from
                 .collect(),
         })
         .collect())
+}
+
+pub async fn unused_username(name: &str, conn: &DbConnection) -> Result<bool> {
+    let user_count = sqlx::query!(r#"SELECT COUNT(*) AS "count!" FROM users WHERE username = $1"#, name)
+        .fetch_one(conn)
+        .await?
+        .count;
+
+    match user_count {
+        0 => Ok(true),
+        _ => Err(error::none_error()),
+    }
 }
 
 fn get_roles(ids: &str, names: &str) -> Vec<Role> {
@@ -132,6 +144,13 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
+    unused_username(&user.username, conn)
+        .await
+        .or_else(error::invalid_user_input!(
+            "Username is already in use. Please choose another one.",
+            "username"
+        ))?;
+
     #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
         "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",

@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #[allow(non_camel_case_types)]
@@ -73,6 +73,21 @@ pub enum Permission {
     /// user/management/delete
     #[strum(serialize = "user/management/delete")]
     user__management__delete,
+    /// floor/list
+    #[strum(serialize = "floor/list")]
+    floor__list,
+    /// floor/read
+    #[strum(serialize = "floor/read")]
+    floor__read,
+    /// floor/write
+    #[strum(serialize = "floor/write")]
+    floor__write,
+    /// floor/delete
+    #[strum(serialize = "floor/delete")]
+    floor__delete,
+    /// floor/delete
+    #[strum(serialize = "floor/create")]
+    floor__create,
     /// room/list
     #[strum(serialize = "room/list")]
     room__list,
@@ -97,4 +112,16 @@ pub enum Permission {
     /// enforcer/update
     #[strum(serialize = "enforcer/update")]
     enforcer__update,
+    /// notification/list
+    #[strum(serialize = "notification/list")]
+    notification__list,
+    /// notification/read
+    #[strum(serialize = "notification/read")]
+    notification__read,
+    /// notification/write
+    #[strum(serialize = "notification/write")]
+    notification__write,
+    /// notification/delete
+    #[strum(serialize = "notification/delete")]
+    notification__delete,
 }

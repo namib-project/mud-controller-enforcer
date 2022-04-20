@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::{
@@ -9,25 +9,41 @@ use crate::{
 
 ///returns all rooms from the database
 pub async fn get_all_rooms(pool: &DbConnection) -> Result<Vec<Room>> {
-    let room_data = sqlx::query_as!(Room, "SELECT * FROM rooms").fetch_all(pool).await?;
+    let room_data = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id ORDER BY floor_label, r.name"
+    )
+    .fetch_all(pool)
+    .await?;
 
     Ok(room_data)
 }
 
 ///returns room by id from the database
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE room_id = $1", id)
-        .fetch_one(pool)
-        .await?;
+    let room = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE room_id = $1",
+        id
+    )
+    .fetch_one(pool)
+    .await?;
 
     Ok(room)
 }
 
 ///returns room by name from the database
 pub async fn find_by_name(name: &str, pool: &DbConnection) -> Result<Room> {
-    let room = sqlx::query_as!(Room, "SELECT * FROM rooms WHERE name = $1", name)
-        .fetch_one(pool)
-        .await?;
+    let room = sqlx::query_as!(
+        Room,
+        "SELECT r.*, f.label floor_label FROM rooms r
+        JOIN floors f ON f.id = r.floor_id WHERE name = $1",
+        name
+    )
+    .fetch_one(pool)
+    .await?;
 
     Ok(room)
 }
@@ -35,9 +51,10 @@ pub async fn find_by_name(name: &str, pool: &DbConnection) -> Result<Room> {
 ///updates a room with a new name and color in the database
 pub async fn update(room: &Room, pool: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "UPDATE rooms SET name = $1, color = $2 WHERE room_id = $3",
+        "UPDATE rooms SET floor_id = $1, name = $2, guest = $3 WHERE room_id = $4",
+        room.floor_id,
         room.name,
-        room.color,
+        room.guest,
         room.room_id
     )
     .execute(pool)
@@ -57,9 +74,13 @@ pub async fn get_all_devices_inside_room(room_id: i64, pool: &DbConnection) -> R
 
 ///Creates a new room with a given name and color in the database
 pub async fn insert_room(room: &Room, pool: &DbConnection) -> Result<u64> {
-    let insert = sqlx::query!("INSERT INTO rooms (name, color) VALUES ($1, $2)", room.name, room.color)
-        .execute(pool)
-        .await?;
+    let insert = sqlx::query!(
+        "INSERT INTO rooms (floor_id, name) VALUES ($1, $2)",
+        room.floor_id,
+        room.name
+    )
+    .execute(pool)
+    .await?;
 
     Ok(insert.rows_affected())
 }

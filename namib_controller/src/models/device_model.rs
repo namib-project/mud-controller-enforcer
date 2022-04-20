@@ -34,11 +34,11 @@ pub struct DeviceDbo {
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
     pub room_id: Option<i64>,
-    pub clipart: Option<String>,
+    pub fa_icon: Option<String>,
     pub q_bit: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Device {
     pub id: i64,
     pub name: Option<String>,
@@ -52,7 +52,7 @@ pub struct Device {
     pub collect_info: bool,
     pub last_interaction: NaiveDateTime,
     pub room_id: Option<i64>,
-    pub clipart: Option<String>,
+    pub fa_icon: Option<String>,
     pub q_bit: bool,
 }
 
@@ -137,7 +137,7 @@ impl From<DeviceDbo> for Device {
             collect_info: device.collect_info,
             last_interaction: device.last_interaction,
             room_id: device.room_id,
-            clipart: device.clipart,
+            fa_icon: device.fa_icon,
             q_bit: device.q_bit,
         }
     }
@@ -170,7 +170,7 @@ impl Device {
             collect_info,
             last_interaction: Utc::now().naive_utc(),
             room_id: None,
-            clipart: None,
+            fa_icon: Some(String::from("fas fa-house-signal")),
             q_bit: false,
         }
     }
