@@ -9,6 +9,7 @@ pub mod device_service;
 pub mod enforcer_service;
 pub mod firewall_configuration_service;
 pub mod floor_service;
+pub mod flow_scope_service;
 pub mod job_service;
 pub mod log_service;
 pub mod mud_service;
