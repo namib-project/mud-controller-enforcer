@@ -1,6 +1,7 @@
-// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+mod anomaly_model;
 mod config_model;
 mod device_model;
 mod floor_model;
@@ -10,6 +11,7 @@ mod room_model;
 mod user_config_model;
 mod user_model;
 
+pub use anomaly_model::*;
 pub use config_model::*;
 pub use device_model::*;
 pub use floor_model::*;

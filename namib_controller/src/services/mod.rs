@@ -1,7 +1,8 @@
-// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 pub mod acme_service;
+pub mod anomaly_service;
 pub mod config_service;
 pub mod device_config_service;
 pub mod device_service;

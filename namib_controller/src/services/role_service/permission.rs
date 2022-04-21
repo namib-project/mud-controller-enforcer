@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #[allow(non_camel_case_types)]
@@ -124,4 +124,19 @@ pub enum Permission {
     /// notification/delete
     #[strum(serialize = "notification/delete")]
     notification__delete,
+    /// anomaly/list
+    #[strum(serialize = "anomaly/list")]
+    anomaly__list,
+    /// anomaly/read
+    #[strum(serialize = "anomaly/read")]
+    anomaly__read,
+    /// anomaly/write
+    #[strum(serialize = "anomaly/write")]
+    anomaly__write,
+    /// anomaly/delete
+    #[strum(serialize = "anomaly/delete")]
+    anomaly__delete,
+    /// anomaly/create
+    #[strum(serialize = "anomaly/create")]
+    anomaly__create,
 }

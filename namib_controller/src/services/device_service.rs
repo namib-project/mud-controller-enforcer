@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -97,10 +97,14 @@ pub async fn find_by_ip(ip: &str, pool: &DbConnection) -> Result<Device> {
         ip,
         ip
     )
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await?;
 
-    Ok(Device::from(device))
+    if let Some(device) = device {
+        Ok(Device::from(device))
+    } else {
+        Err(sqlx::error::Error::RowNotFound.into())
+    }
 }
 
 pub async fn find_by_mac_or_duid(

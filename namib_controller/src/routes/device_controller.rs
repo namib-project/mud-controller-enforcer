@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![allow(clippy::needless_pass_by_value)]
@@ -17,8 +17,8 @@ use crate::{
     error,
     error::Result,
     models::Device,
-    routes::dtos::{DeviceCreationUpdateDto, DeviceDto, GuessDto},
-    services::{device_service, neo4things_service, role_service::Permission},
+    routes::dtos::{AnomalyDto, DeviceCreationUpdateDto, DeviceDto, GuessDto},
+    services::{anomaly_service, device_service, neo4things_service, role_service::Permission},
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -29,6 +29,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{id}", web::put().to(update_device));
     cfg.route("/{id}", web::delete().to(delete_device));
     cfg.route("/{id}/guesses", web::get().to(guess_thing));
+    cfg.route("/{id}/anomalies", web::get().to(get_anomalies_of_device));
 }
 
 #[api_v2_operation(summary = "List all devices", tags(Devices))]
@@ -164,12 +165,38 @@ async fn guess_thing(
     Ok(Json(guesses))
 }
 
+#[api_v2_operation(summary = "List all anomalies of a device by id", tags(Devices))]
+async fn get_anomalies_of_device(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<Json<Vec<AnomalyDto>>> {
+    auth.require_permission(Permission::anomaly__list)?;
+    auth.require_permission(Permission::anomaly__read)?;
+
+    if device_service::find_by_id(*id, &pool).await.is_err() {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Device with Id {} can not be found.", *id)),
+        }
+        .fail()
+    } else {
+        Ok(Json(
+            anomaly_service::get_all_device_anomalies(&pool, id.into_inner())
+                .await?
+                .iter()
+                .map(AnomalyDto::from)
+                .collect(),
+        ))
+    }
+}
+
 /// Find a device with a given ID, or return a 404 error if not found.
 pub async fn find_device(id: i64, pool: &DbConnection) -> Result<Device> {
     device_service::find_by_id(id, pool).await.or_else(|_| {
         error::ResponseError {
             status: StatusCode::NOT_FOUND,
-            message: Some("No device with this Id found".to_string()),
+            message: Some(format!("Device with Id {} can not be found.", id)),
         }
         .fail()
     })
