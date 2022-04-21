@@ -62,7 +62,7 @@ pub struct RoleDbo {
 
 // Local methods
 impl User {
-    pub fn new(username: String, password: &str) -> Result<Self> {
+    pub fn new(username: String, password: &str, pwd_change_required: bool) -> Result<Self> {
         let salt = User::generate_salt();
         let utc_now = chrono::Utc::now().naive_utc();
         Ok(Self {
@@ -73,7 +73,7 @@ impl User {
             last_interaction: utc_now,
             roles: Vec::new(),
             permissions: Vec::new(),
-            pwd_change_required: false,
+            pwd_change_required,
         })
     }
 

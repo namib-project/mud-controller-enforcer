@@ -155,10 +155,11 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
 
     #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
-        "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
+        "INSERT INTO users (username, password, salt, pwd_change_required) VALUES (?, ?, ?, ?)",
         user.username,
         user.password,
-        user.salt
+        user.salt,
+        user.pwd_change_required
     )
     .execute(conn)
     .await?
@@ -166,10 +167,11 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
 
     #[cfg(feature = "postgres")]
     let result = sqlx::query!(
-        "INSERT INTO users (username, password, salt) VALUES ($1, $2, $3) RETURNING id",
+        "INSERT INTO users (username, password, salt, pwd_change_required) VALUES ($1, $2, $3, $4) RETURNING id",
         user.username,
         user.password,
-        user.salt
+        user.salt,
+        user.pwd_change_required
     )
     .fetch_one(conn)
     .await?

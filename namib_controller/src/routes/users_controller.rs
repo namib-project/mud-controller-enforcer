@@ -46,7 +46,7 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
 
     signup_dto.validate().or_else(error::response_error!())?;
 
-    let user = User::new(signup_dto.0.username, &signup_dto.0.password)?;
+    let user = User::new(signup_dto.0.username, &signup_dto.0.password, false)?;
 
     user_service::insert(user, &pool)
         .await

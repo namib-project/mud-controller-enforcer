@@ -60,7 +60,7 @@ pub async fn create_user(
     })?;
 
     let dto = create_user_dto.into_inner();
-    let user = User::new(dto.username, dto.password.as_str())?;
+    let user = User::new(dto.username, dto.password.as_str(), true)?;
     let new_user_id = user_service::insert(user, &pool).await?;
 
     if auth.require_permission(Permission::role__assign).is_ok() {
