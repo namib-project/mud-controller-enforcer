@@ -23,6 +23,8 @@ pub struct LoginDto {
 
 #[derive(Validate, Serialize, Deserialize, Apiv2Schema)]
 pub struct UpdatePasswordDto {
+    #[validate(length(min = 1, max = 128))]
+    pub username: String,
     #[validate(length(min = 6))]
     pub old_password: String,
     #[validate(length(min = 6))]

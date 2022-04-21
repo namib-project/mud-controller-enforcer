@@ -59,7 +59,7 @@ from
                 .filter(|p| !p.is_empty())
                 .map(ToOwned::to_owned)
                 .collect(),
-            change_next_login: false,
+            pwd_change_required: false,
         })
         .collect())
 }
@@ -139,7 +139,7 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
             .collect(),
         roles: roles.into_iter().map(Role::from).collect(),
-        change_next_login: usr.change_next_login,
+        pwd_change_required: usr.pwd_change_required,
     };
 
     Ok(user)
@@ -189,11 +189,11 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
 
 pub async fn update(user: &User, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "update users SET username = $1, password = $2, salt = $3, change_next_login = $4 WHERE id = $5",
+        "update users SET username = $1, password = $2, salt = $3, pwd_change_required = $4 WHERE id = $5",
         user.username,
         user.password,
         user.salt,
-        user.change_next_login,
+        user.pwd_change_required,
         user.id
     )
     .execute(conn)
@@ -214,7 +214,7 @@ pub async fn update_password(id: i64, password: &str, conn: &DbConnection) -> Re
     let salt = User::generate_salt();
     let password = User::hash_password(password, &salt)?;
     let upd_count = sqlx::query!(
-        "UPDATE users SET password = $1, salt = $2 where id = $3",
+        "UPDATE users SET password = $1, salt = $2, pwd_change_required = false where id = $3",
         password,
         salt,
         id

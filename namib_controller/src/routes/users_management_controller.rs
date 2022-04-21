@@ -98,8 +98,8 @@ pub async fn update_user_by_id(
     let mut user = user_service::find_by_id(user_id.0, &pool).await?;
     user.username = update_user_dto.0.username;
 
-    if update_user_dto.0.change_next_login {
-        user.change_next_login = true;
+    if update_user_dto.0.pwd_change_required {
+        user.pwd_change_required = true;
     }
 
     if let Some(password) = update_user_dto.0.password {

@@ -76,6 +76,14 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
             StatusCode::UNAUTHORIZED
         ))?;
 
+    if user.pwd_change_required {
+        return error::invalid_user_input!(
+            "Your password must be changed.",
+            "password_change",
+            StatusCode::PAYMENT_REQUIRED
+        );
+    }
+
     user_service::update_last_interaction_stamp(user.id, &pool).await?;
 
     Ok(Json(TokenDto {
@@ -130,23 +138,36 @@ pub fn update_me(
     }))
 }
 
-#[api_v2_operation(summary = "Update the user's password", tags(Users))]
+#[api_v2_operation(summary = "Update the user's password.", tags(Users))]
 pub fn update_password(
     pool: web::Data<DbConnection>,
-    auth: AuthToken,
     update_password_dto: Json<UpdatePasswordDto>,
-) -> Result<Json<SuccessDto>> {
+) -> Result<Json<TokenDto>> {
     update_password_dto.validate().or_else(error::response_error!())?;
 
-    let user = user_service::find_by_id(auth.sub, &pool).await?;
+    let user = user_service::find_by_username(&update_password_dto.username, &pool)
+        .await
+        .or_else(|_| error::invalid_user_input!(
+            "Your username and/or password is incorrect!",
+            "password",
+            StatusCode::UNAUTHORIZED
+        ))?;
 
     user.verify_password(&update_password_dto.old_password)
-        .or_else(error::response_error!(StatusCode::UNAUTHORIZED))?;
+        .or_else(|_| error::invalid_user_input!(
+            "Your username and/or password is incorrect!",
+            "password",
+            StatusCode::UNAUTHORIZED
+        ))?;
 
-    user_service::update_password(auth.sub, &update_password_dto.new_password, &pool).await?;
+    user_service::update_password(user.id, &update_password_dto.new_password, &pool).await?;
 
-    Ok(Json(SuccessDto {
-        status: String::from("ok"),
+    Ok(Json(TokenDto {
+        token: AuthToken::encode_token(
+            &AuthToken::generate_access_token(user.id, user.username, user.permissions),
+            &pool,
+        )
+        .await,
     }))
 }
 

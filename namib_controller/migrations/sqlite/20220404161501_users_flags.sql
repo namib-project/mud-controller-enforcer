@@ -1,2 +1,2 @@
 ALTER TABLE users
-    ADD COLUMN change_next_login BOOLEAN NOT NULL DEFAULT FALSE;
+    ADD COLUMN pwd_change_required BOOLEAN NOT NULL DEFAULT FALSE;
