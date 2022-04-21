@@ -8,7 +8,7 @@ function import() {
   local CMD=$1
   $CMD <<'EOF'
   INSERT OR REPLACE INTO floors(id, label) VALUES (1, '1st floor');
-  INSERT INTO rooms (number, floor_id) VALUES
+  INSERT INTO rooms (name, floor_id) VALUES
     ('100', 1),
     ('101', 1);
   INSERT INTO mud_data (url, data, created_at, expiration) VALUES
@@ -31,10 +31,10 @@ function import() {
     ('192.168.1.113', '25:f0:f0:0c:20:33', 'Device 13', 'Manufacturer 10', 'https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/belkincameraMud.json', '2021-03-27T14:20:00', false),
     ('192.168.1.114', '25:f0:f0:0c:20:34', 'Device 14', 'Manufacturer 11', 'https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/augustdoorbellcamMud.json', '2021-03-27T14:20:00', false),
     ('192.168.1.115', '25:f0:f0:0c:20:35', 'Device 15', 'Manufacturer 12', 'https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/augustdoorbellcamMud.json', '2021-03-27T14:20:00', false);
-  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE number = '100') WHERE mac_addr = '2b:7d:c4:83:85:1e';
-  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE number = '101') WHERE mac_addr = '7d:1a:51:55:5a:4e';
-  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE number = '100') WHERE mac_addr = 'ce:cf:88:01:2c:2e';
-  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE number = '101') WHERE mac_addr = 'b1:3a:ba:55:56:62';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = '100') WHERE mac_addr = '2b:7d:c4:83:85:1e';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = '101') WHERE mac_addr = '7d:1a:51:55:5a:4e';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = '100') WHERE mac_addr = 'ce:cf:88:01:2c:2e';
+  UPDATE devices SET room_id = (SELECT room_id FROM rooms WHERE name = '101') WHERE mac_addr = 'b1:3a:ba:55:56:62';
   INSERT INTO users (username, password, salt) VALUES
     ('admin', '$argon2i$v=19$m=4096,t=3,p=1$SOG5O7ZAUZ6elXQZMHF55K7KUjftvXqQwWS1SUhJKW0$eyE76g3JUALKvM5xgsccQhh8fB1hsRV4pIeWxVOtl8M', '48E1B93BB640519E9E957419307179E4AECA5237EDBD7A90C164B5494849296D'),
     ('reader', '$argon2i$v=19$m=4096,t=3,p=1$OP4TABHMAKSSP5re6J7ciiuI58u9iWSKBoVv2m55bMA$P+0/apaZHvO1zuF8T1pvrts9YR8zzuKUxs+IlZHodpU', '38FE130011CC00A4923F9ADEE89EDC8A2B88E7CBBD89648A06856FDA6E796CC0'),
