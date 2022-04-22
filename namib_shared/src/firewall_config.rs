@@ -13,23 +13,6 @@ use serde::{Deserialize, Serialize};
 ///
 /// @author Namib Group 3.
 
-/// Represents a name of a Rule.
-#[derive(Eq, PartialEq, Clone, Debug, Hash, Deserialize, Serialize)]
-pub struct RuleName(String);
-
-impl RuleName {
-    /// Create new `RuleName`.
-    pub fn new(name: String) -> Self {
-        RuleName(name)
-    }
-}
-
-impl ToString for RuleName {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
 /// Represents a target host for a firewall rule
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum RuleTargetHost {
@@ -86,7 +69,7 @@ pub enum ScopeConstraint {
 /// A single firewall rule entry.
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct FirewallRule {
-    pub rule_name: RuleName,
+    pub rule_name: String,
     pub src: RuleTarget,
     pub dst: RuleTarget,
     pub protocol: Protocol,
@@ -97,7 +80,7 @@ pub struct FirewallRule {
 impl FirewallRule {
     /// Create a new `FirewallRule`.
     pub fn new(
-        rule_name: RuleName,
+        rule_name: String,
         src: RuleTarget,
         dst: RuleTarget,
         protocol: Protocol,
@@ -117,12 +100,12 @@ impl FirewallRule {
     /// Creates a hash of this firewall rule
     pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
-        self.rule_name().0.hash(&mut hasher);
+        self.rule_name().hash(&mut hasher);
         hasher.finish().to_string()
     }
 
     /// Returns this rule's name
-    pub fn rule_name(&self) -> &RuleName {
+    pub fn rule_name(&self) -> &String {
         &self.rule_name
     }
 }
