@@ -5,7 +5,7 @@ use std::net::IpAddr;
 
 use namib_shared::{
     firewall_config::{
-        FirewallDevice, FirewallRule, Icmp, Protocol, RuleName, RuleTarget, RuleTargetHost, ScopeConstraint, Verdict,
+        FirewallDevice, FirewallRule, Icmp, Protocol, RuleTarget, RuleTargetHost, ScopeConstraint, Verdict,
     },
     EnforcerConfig,
 };
@@ -257,7 +257,7 @@ pub fn convert_device_to_fw_rules(
                         AclDirection::ToDevice => (other_dev_rule_target, &this_dev_rule_target),
                     };
                     rules.push(FirewallRule::new(
-                        RuleName::new(format!("rule_{}", rule_counter)),
+                        format!("rule_{}", rule_counter),
                         src.clone(),
                         dst.clone(),
                         protocol.clone(),
@@ -271,7 +271,7 @@ pub fn convert_device_to_fw_rules(
 
         for server in &administrative_context.dns_mappings {
             rules.push(FirewallRule::new(
-                RuleName::new(format!("rule_dns_default_accept_{}", rule_counter)),
+                format!("rule_dns_default_accept_{}", rule_counter),
                 RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                 RuleTarget::new(Some(server.into()), Some("53".to_string())),
                 Protocol::Tcp,
@@ -280,7 +280,7 @@ pub fn convert_device_to_fw_rules(
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
-                RuleName::new(format!("rule_dns_default_accept_{}", rule_counter)),
+                format!("rule_dns_default_accept_{}", rule_counter),
                 RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                 RuleTarget::new(Some(server.into()), Some("53".to_string())),
                 Protocol::Udp,
@@ -291,7 +291,7 @@ pub fn convert_device_to_fw_rules(
         }
         for server in &administrative_context.ntp_mappings {
             rules.push(FirewallRule::new(
-                RuleName::new(format!("rule_ntp_default_accept_{}", rule_counter)),
+                format!("rule_ntp_default_accept_{}", rule_counter),
                 RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                 RuleTarget::new(Some(server.into()), Some("123".to_string())),
                 Protocol::Tcp,
@@ -300,7 +300,7 @@ pub fn convert_device_to_fw_rules(
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
-                RuleName::new(format!("rule_ntp_default_accept_{}", rule_counter)),
+                format!("rule_ntp_default_accept_{}", rule_counter),
                 RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                 RuleTarget::new(Some(server.into()), Some("123".to_string())),
                 Protocol::Udp,
@@ -311,7 +311,7 @@ pub fn convert_device_to_fw_rules(
         }
     }
     rules.push(FirewallRule::new(
-        RuleName::new(format!("rule_default_{}", rule_counter)),
+        format!("rule_default_{}", rule_counter),
         RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
         RuleTarget::new(None, None),
         Protocol::All,
@@ -320,7 +320,7 @@ pub fn convert_device_to_fw_rules(
     ));
     rule_counter += 1;
     rules.push(FirewallRule::new(
-        RuleName::new(format!("rule_default_{}", rule_counter)),
+        format!("rule_default_{}", rule_counter),
         RuleTarget::new(None, None),
         RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
         Protocol::All,
@@ -665,7 +665,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_0")),
+                    String::from("rule_0"),
                     RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::Udp,
@@ -673,7 +673,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_dns_default_accept_1")),
+                    String::from("rule_dns_default_accept_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(
                         Some(RuleTargetHost::Hostname(String::from(
@@ -686,7 +686,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_dns_default_accept_2")),
+                    String::from("rule_dns_default_accept_2"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(
                         Some(RuleTargetHost::Hostname(String::from(
@@ -699,7 +699,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_dns_default_accept_3")),
+                    String::from("rule_dns_default_accept_3"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
@@ -710,7 +710,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_dns_default_accept_4")),
+                    String::from("rule_dns_default_accept_4"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
@@ -721,7 +721,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_ntp_default_accept_5")),
+                    String::from("rule_ntp_default_accept_5"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
@@ -732,7 +732,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_ntp_default_accept_6")),
+                    String::from("rule_ntp_default_accept_6"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
@@ -743,7 +743,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_7")),
+                    String::from("rule_default_7"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -751,7 +751,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_8")),
+                    String::from("rule_default_8"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
@@ -853,7 +853,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_0")),
+                    String::from("rule_0"),
                     RuleTarget::new(
                         Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
                         Some("123".to_string()),
@@ -864,7 +864,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_1")),
+                    String::from("rule_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("8000:8080".to_string())),
                     RuleTarget::new(
                         Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
@@ -875,7 +875,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    String::from("rule_default_2"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -883,7 +883,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_3")),
+                    String::from("rule_default_3"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
@@ -1275,7 +1275,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_0")),
+                    String::from("rule_0"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("321".to_string())),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap().clone()))),
@@ -1286,7 +1286,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    String::from("rule_default_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1294,7 +1294,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    String::from("rule_default_2"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
@@ -1423,7 +1423,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_0")),
+                    String::from("rule_0"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("123".to_string())),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip(IpAddr::V4(device1.inner.ipv4_addr.clone().unwrap()))),
@@ -1434,7 +1434,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    String::from("rule_default_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1442,7 +1442,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    String::from("rule_default_2"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
@@ -1709,7 +1709,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_0")),
+                    String::from("rule_0"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("321".to_string())),
                     RuleTarget::new(
                         Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap().clone()))),
@@ -1720,7 +1720,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    String::from("rule_default_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1728,7 +1728,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    String::from("rule_default_2"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
@@ -1808,7 +1808,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_0")),
+                    String::from("rule_0"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
                     Protocol::Icmp(Icmp {
@@ -1819,7 +1819,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    String::from("rule_default_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1827,7 +1827,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_2")),
+                    String::from("rule_default_2"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
@@ -1907,7 +1907,7 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_0")),
+                    String::from("rule_default_0"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1915,7 +1915,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    RuleName::new(String::from("rule_default_1")),
+                    String::from("rule_default_1"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,

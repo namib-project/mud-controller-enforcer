@@ -700,7 +700,7 @@ mod tests {
 
     use super::*;
     use crate::services::dns::DnsService;
-    use namib_shared::firewall_config::{RuleName, RuleTarget, ScopeConstraint};
+    use namib_shared::firewall_config::{RuleTarget, ScopeConstraint};
 
     fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
         let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"));
@@ -760,7 +760,7 @@ mod tests {
     #[serial]
     async fn check_device_with_tcp_rule() {
         let rules: Vec<FirewallRule> = vec![FirewallRule {
-            rule_name: RuleName::new("rule_0".to_string()),
+            rule_name: "rule_0".to_string(),
             src: RuleTarget {
                 host: Some(RuleTargetHost::FirewallDevice),
                 port: None,
