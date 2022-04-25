@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Matthias Reichmann
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![allow(clippy::needless_pass_by_value)]
@@ -17,8 +17,8 @@ use crate::{
 };
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.route("/", web::get().to(get_roles));
-    cfg.route("/", web::post().to(create_role));
+    cfg.route("", web::get().to(get_roles));
+    cfg.route("", web::post().to(create_role));
     cfg.route("/available-permissions", web::get().to(available_permissions));
     cfg.route("/assign", web::post().to(assign_role));
     cfg.route("/unassign", web::post().to(unassign_role));

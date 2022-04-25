@@ -9,7 +9,7 @@ use namib_controller::{
 #[tokio::test(flavor = "multi_thread")]
 async fn test_inserting_role_mappings() -> Result<()> {
     let ctx = lib::IntegrationTestContext::new("test_inserting_role_mappings").await;
-    let user_id = user_service::insert(User::new("admin".to_string(), "pass")?, &ctx.db_conn).await?;
+    let user_id = user_service::insert(User::new("admin".to_string(), "pass", false)?, &ctx.db_conn).await?;
     let role = role_service::role_create(
         &ctx.db_conn,
         RoleUpdateDto {

@@ -155,10 +155,11 @@ async fn test_pw_update() {
     .unwrap();
 
     let pw_update_dto = UpdatePasswordDto {
+        username: String::from("admin"),
         old_password: String::from("password"),
         new_password: String::from("new_password"),
     };
-    let _result: SuccessDto = assert_post_status_deserialize(
+    let _result: TokenDto = assert_post_status_deserialize(
         &client,
         format!("http://{}/users/password", ctx.server_addr).as_str(),
         &pw_update_dto,
@@ -207,6 +208,7 @@ async fn test_pw_update_wrong_old_pw() {
     .unwrap();
 
     let pw_update_dto = UpdatePasswordDto {
+        username: String::from("admin"),
         old_password: String::from("password21"),
         new_password: String::from("new_password"),
     };
@@ -231,8 +233,8 @@ async fn test_pw_update_wrong_old_pw() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_pw_update_not_logged_in() {
-    let ctx = lib::IntegrationTestContext::new("test_pw_update_not_logged_in")
+async fn test_pw_update_wrong_password() {
+    let ctx = lib::IntegrationTestContext::new("test_pw_update_wrong_password")
         .await
         .start_test_server()
         .await;
@@ -248,7 +250,8 @@ async fn test_pw_update_not_logged_in() {
     .unwrap();
 
     let pw_update_dto = UpdatePasswordDto {
-        old_password: String::from("password"),
+        username: String::from("admin"),
+        old_password: String::from("password2"),
         new_password: String::from("new_password"),
     };
     assert_post_status(
@@ -786,11 +789,11 @@ async fn test_usermanagement_roles() {
     let (client, _auth_token) = lib::create_authorized_http_client(&ctx.server_addr).await;
 
     let roles: Vec<RoleDto> =
-        assert_get_status_deserialize(&client, &format!("http://{}/roles/", ctx.server_addr), StatusCode::OK).await;
+        assert_get_status_deserialize(&client, &format!("http://{}/roles", ctx.server_addr), StatusCode::OK).await;
 
     let new_user: Value = assert_post_status_deserialize(
         &client,
-        &format!("http://{}/management/users/", ctx.server_addr),
+        &format!("http://{}/management/users", ctx.server_addr),
         &json!({"username": "testman", "password": "iamverysecure", "roles_ids": []}),
         StatusCode::OK,
     )
@@ -808,7 +811,7 @@ async fn test_usermanagement_roles() {
         &reqwest::Client::new(),
         format!("http://{}/users/login", ctx.server_addr).as_str(),
         &json!({"username": "testman", "password": "iamverysecure"}),
-        StatusCode::OK,
+        StatusCode::PAYMENT_REQUIRED,
     )
     .await;
 
@@ -822,7 +825,7 @@ async fn test_usermanagement_roles() {
 
     let usrs: Value = assert_get_status_deserialize(
         &client,
-        &format!("http://{}/management/users/", ctx.server_addr),
+        &format!("http://{}/management/users", ctx.server_addr),
         StatusCode::OK,
     )
     .await;
@@ -858,7 +861,7 @@ async fn test_usermanagement_roles() {
 
     let usrs: Value = assert_get_status_deserialize(
         &client,
-        &format!("http://{}/management/users/", ctx.server_addr),
+        &format!("http://{}/management/users", ctx.server_addr),
         StatusCode::OK,
     )
     .await;
@@ -874,8 +877,8 @@ async fn test_usermanagement_roles() {
 
     let login: TokenDto = assert_post_status_deserialize(
         &reqwest::Client::new(),
-        format!("http://{}/users/login", ctx.server_addr).as_str(),
-        &json!({"username": "testman", "password": "iamverysecure"}),
+        format!("http://{}/users/password", ctx.server_addr).as_str(),
+        &json!({"username": "testman", "old_password": "iamverysecure", "new_password": "iamverysecure2"}),
         StatusCode::OK,
     )
     .await;
