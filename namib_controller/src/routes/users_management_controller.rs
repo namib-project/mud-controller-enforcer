@@ -81,17 +81,13 @@ pub async fn update_user_by_id(
 ) -> Result<Json<User>> {
     auth.require_permission(Permission::user__management__write)?;
 
-    update_user_dto.validate().or_else(|_| {
-        error::ResponseError {
-            status: StatusCode::BAD_REQUEST,
-            message: None,
-        }
-        .fail()
-    })?;
+    update_user_dto
+        .validate()
+        .map_err(|_| error::response_error!(StatusCode::BAD_REQUEST))?;
 
     if let Ok(same_name_user_db) = user_service::find_by_username(&update_user_dto.username, &pool).await {
         if same_name_user_db.id != user_id.0 {
-            return error::invalid_user_input!("Username already in use!", "username");
+            return Err(error::invalid_user_input!("Username already in use!", "username"));
         }
     }
 

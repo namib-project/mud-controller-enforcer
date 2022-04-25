@@ -108,7 +108,7 @@ pub async fn find_by_id(id: i64, conn: &DbConnection) -> Result<User> {
         .fetch_one(conn)
         .await?;
 
-    Ok(with_roles(usr, conn).await?)
+    with_roles(usr, conn).await
 }
 
 pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<User> {
@@ -116,7 +116,7 @@ pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<Use
         .fetch_one(conn)
         .await?;
 
-    Ok(with_roles(usr, conn).await?)
+    with_roles(usr, conn).await
 }
 
 async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
@@ -146,7 +146,7 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
-    unused_username(&user.username, conn).await.or_else(|_| {
+    unused_username(&user.username, conn).await.map_err(|_| {
         error::invalid_user_input!("Username is already in use. Please choose another one.", "username")
     })?;
 
