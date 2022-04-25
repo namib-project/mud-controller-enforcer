@@ -63,18 +63,21 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 
     let user = user_service::find_by_username(&login_dto.username, &pool)
         .await
-        .or_else(|_| error::invalid_user_input!(
-            "Your username and/or password is incorrect!",
-            "password",
-            StatusCode::UNAUTHORIZED
-        ))?;
+        .or_else(|_| {
+            error::invalid_user_input!(
+                "Your username and/or password is incorrect!",
+                "password",
+                StatusCode::UNAUTHORIZED
+            )
+        })?;
 
-    user.verify_password(&login_dto.password)
-        .or_else(|_| error::invalid_user_input!(
+    user.verify_password(&login_dto.password).or_else(|_| {
+        error::invalid_user_input!(
             "Your username and/or password is incorrect!",
             "password",
             StatusCode::UNAUTHORIZED
-        ))?;
+        )
+    })?;
 
     if user.pwd_change_required {
         return error::invalid_user_input!(
@@ -147,18 +150,21 @@ pub fn update_password(
 
     let user = user_service::find_by_username(&update_password_dto.username, &pool)
         .await
-        .or_else(|_| error::invalid_user_input!(
-            "Your username and/or password is incorrect!",
-            "password",
-            StatusCode::UNAUTHORIZED
-        ))?;
+        .or_else(|_| {
+            error::invalid_user_input!(
+                "Your username and/or password is incorrect!",
+                "password",
+                StatusCode::UNAUTHORIZED
+            )
+        })?;
 
-    user.verify_password(&update_password_dto.old_password)
-        .or_else(|_| error::invalid_user_input!(
+    user.verify_password(&update_password_dto.old_password).or_else(|_| {
+        error::invalid_user_input!(
             "Your username and/or password is incorrect!",
             "password",
             StatusCode::UNAUTHORIZED
-        ))?;
+        )
+    })?;
 
     user_service::update_password(user.id, &update_password_dto.new_password, &pool).await?;
 
