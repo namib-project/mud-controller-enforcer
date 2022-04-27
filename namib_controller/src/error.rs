@@ -123,12 +123,10 @@ pub enum Error {
 
 macro_rules! invalid_user_input {
     ($message: tt, $field: tt, $status: expr) => {
-        |_| {
-            Err(crate::error::Error::InvalidUserInput {
-                message: String::from($message),
-                field: String::from($field),
-                status: $status,
-            })
+        crate::error::Error::InvalidUserInput {
+            message: String::from($message),
+            field: String::from($field),
+            status: $status,
         }
     };
     ($message: tt, $field: tt) => {
@@ -144,12 +142,10 @@ macro_rules! response_error {
         crate::error::response_error!($status, None)
     };
     ($status: expr, $message: tt) => {
-        |_| {
-            Err(crate::error::Error::ResponseError {
-                status: $status,
-                message: $message,
-                backtrace: None,
-            })
+        crate::error::Error::ResponseError {
+            status: $status,
+            message: $message,
+            backtrace: None,
         }
     };
 }

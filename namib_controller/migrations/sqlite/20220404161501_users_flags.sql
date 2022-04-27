@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN pwd_change_required BOOLEAN NOT NULL DEFAULT FALSE;

@@ -59,6 +59,7 @@ from
                 .filter(|p| !p.is_empty())
                 .map(ToOwned::to_owned)
                 .collect(),
+            pwd_change_required: false,
         })
         .collect())
 }
@@ -107,7 +108,7 @@ pub async fn find_by_id(id: i64, conn: &DbConnection) -> Result<User> {
         .fetch_one(conn)
         .await?;
 
-    Ok(with_roles(usr, conn).await?)
+    with_roles(usr, conn).await
 }
 
 pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<User> {
@@ -115,7 +116,7 @@ pub async fn find_by_username(username: &str, conn: &DbConnection) -> Result<Use
         .fetch_one(conn)
         .await?;
 
-    Ok(with_roles(usr, conn).await?)
+    with_roles(usr, conn).await
 }
 
 async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
@@ -138,25 +139,24 @@ async fn with_roles(usr: UserDbo, conn: &DbConnection) -> Result<User> {
             .flat_map(|r| r.permissions.split(',').map(ToOwned::to_owned))
             .collect(),
         roles: roles.into_iter().map(Role::from).collect(),
+        pwd_change_required: usr.pwd_change_required,
     };
 
     Ok(user)
 }
 
 pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
-    unused_username(&user.username, conn)
-        .await
-        .or_else(error::invalid_user_input!(
-            "Username is already in use. Please choose another one.",
-            "username"
-        ))?;
+    unused_username(&user.username, conn).await.map_err(|_| {
+        error::invalid_user_input!("Username is already in use. Please choose another one.", "username")
+    })?;
 
     #[cfg(not(feature = "postgres"))]
     let result = sqlx::query!(
-        "INSERT INTO users (username, password, salt) VALUES (?, ?, ?)",
+        "INSERT INTO users (username, password, salt, pwd_change_required) VALUES (?, ?, ?, ?)",
         user.username,
         user.password,
-        user.salt
+        user.salt,
+        user.pwd_change_required
     )
     .execute(conn)
     .await?
@@ -164,10 +164,11 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
 
     #[cfg(feature = "postgres")]
     let result = sqlx::query!(
-        "INSERT INTO users (username, password, salt) VALUES ($1, $2, $3) RETURNING id",
+        "INSERT INTO users (username, password, salt, pwd_change_required) VALUES ($1, $2, $3, $4) RETURNING id",
         user.username,
         user.password,
-        user.salt
+        user.salt,
+        user.pwd_change_required
     )
     .fetch_one(conn)
     .await?
@@ -187,10 +188,11 @@ pub async fn insert(user: User, conn: &DbConnection) -> Result<i64> {
 
 pub async fn update(user: &User, conn: &DbConnection) -> Result<bool> {
     let upd_count = sqlx::query!(
-        "update users SET username = $1, password = $2, salt = $3 WHERE id = $4",
+        "update users SET username = $1, password = $2, salt = $3, pwd_change_required = $4 WHERE id = $5",
         user.username,
         user.password,
         user.salt,
+        user.pwd_change_required,
         user.id
     )
     .execute(conn)
@@ -211,7 +213,7 @@ pub async fn update_password(id: i64, password: &str, conn: &DbConnection) -> Re
     let salt = User::generate_salt();
     let password = User::hash_password(password, &salt)?;
     let upd_count = sqlx::query!(
-        "UPDATE users SET password = $1, salt = $2 where id = $3",
+        "UPDATE users SET password = $1, salt = $2, pwd_change_required = false where id = $3",
         password,
         salt,
         id

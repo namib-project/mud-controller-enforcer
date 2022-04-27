@@ -18,7 +18,7 @@ pub async fn get_config_value<T: FromStr>(key: &str, pool: &DbConnection) -> Res
         .fetch_one(pool)
         .await?;
 
-    Ok(T::from_str(&entry.value).map_err(|_| error::FromStrError {}.build())?)
+    T::from_str(&entry.value).map_err(|_| error::FromStrError {}.build())
 }
 
 /// Returns all config key-value pairs from database

@@ -44,9 +44,9 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
         }
     );
 
-    signup_dto.validate().or_else(error::response_error!())?;
+    signup_dto.validate().map_err(|_| error::response_error!())?;
 
-    let user = User::new(signup_dto.0.username, &signup_dto.0.password)?;
+    let user = User::new(signup_dto.0.username, &signup_dto.0.password, false)?;
 
     user_service::insert(user, &pool)
         .await
@@ -59,22 +59,33 @@ pub async fn signup(pool: web::Data<DbConnection>, signup_dto: Json<SignupDto>) 
 
 #[api_v2_operation(summary = "Login with username and password", tags(Users))]
 pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> Result<Json<TokenDto>> {
-    login_dto.validate().or_else(error::response_error!())?;
+    login_dto.validate().map_err(|_| error::response_error!())?;
 
     let user = user_service::find_by_username(&login_dto.username, &pool)
         .await
-        .or_else(error::invalid_user_input!(
-            "Your username and/or password is incorrect!",
-            "password",
-            StatusCode::UNAUTHORIZED
-        ))?;
+        .map_err(|_| {
+            error::invalid_user_input!(
+                "Your username and/or password is incorrect!",
+                "password",
+                StatusCode::UNAUTHORIZED
+            )
+        })?;
 
-    user.verify_password(&login_dto.password)
-        .or_else(error::invalid_user_input!(
+    user.verify_password(&login_dto.password).map_err(|_| {
+        error::invalid_user_input!(
             "Your username and/or password is incorrect!",
             "password",
             StatusCode::UNAUTHORIZED
-        ))?;
+        )
+    })?;
+
+    if user.pwd_change_required {
+        return Err(error::invalid_user_input!(
+            "Your password must be changed.",
+            "password_change",
+            StatusCode::PAYMENT_REQUIRED
+        ));
+    }
 
     user_service::update_last_interaction_stamp(user.id, &pool).await?;
 
@@ -91,7 +102,7 @@ pub async fn login(pool: web::Data<DbConnection>, login_dto: Json<LoginDto>) -> 
 pub async fn refresh_token(pool: web::Data<DbConnection>, auth: AuthToken) -> Result<Json<TokenDto>> {
     let user = user_service::find_by_id(auth.sub, &pool)
         .await
-        .or_else(error::response_error!())?;
+        .map_err(|_| error::response_error!())?;
 
     Ok(Json(TokenDto {
         token: AuthToken::encode_token(
@@ -115,7 +126,7 @@ pub fn update_me(
     auth: AuthToken,
     update_user_dto: Json<UpdateUserDto>,
 ) -> Result<Json<SuccessDto>> {
-    update_user_dto.validate().or_else(error::response_error!())?;
+    update_user_dto.validate().map_err(|_| error::response_error!())?;
 
     let mut user = user_service::find_by_id(auth.sub, &pool).await?;
 
@@ -130,23 +141,39 @@ pub fn update_me(
     }))
 }
 
-#[api_v2_operation(summary = "Update the user's password", tags(Users))]
+#[api_v2_operation(summary = "Update the user's password.", tags(Users))]
 pub fn update_password(
     pool: web::Data<DbConnection>,
-    auth: AuthToken,
     update_password_dto: Json<UpdatePasswordDto>,
-) -> Result<Json<SuccessDto>> {
-    update_password_dto.validate().or_else(error::response_error!())?;
+) -> Result<Json<TokenDto>> {
+    update_password_dto.validate().map_err(|_| error::response_error!())?;
 
-    let user = user_service::find_by_id(auth.sub, &pool).await?;
+    let user = user_service::find_by_username(&update_password_dto.username, &pool)
+        .await
+        .map_err(|_| {
+            error::invalid_user_input!(
+                "Your username and/or password is incorrect!",
+                "password",
+                StatusCode::UNAUTHORIZED
+            )
+        })?;
 
-    user.verify_password(&update_password_dto.old_password)
-        .or_else(error::response_error!(StatusCode::UNAUTHORIZED))?;
+    user.verify_password(&update_password_dto.old_password).map_err(|_| {
+        error::invalid_user_input!(
+            "Your username and/or password is incorrect!",
+            "password",
+            StatusCode::UNAUTHORIZED
+        )
+    })?;
 
-    user_service::update_password(auth.sub, &update_password_dto.new_password, &pool).await?;
+    user_service::update_password(user.id, &update_password_dto.new_password, &pool).await?;
 
-    Ok(Json(SuccessDto {
-        status: String::from("ok"),
+    Ok(Json(TokenDto {
+        token: AuthToken::encode_token(
+            &AuthToken::generate_access_token(user.id, user.username, user.permissions),
+            &pool,
+        )
+        .await,
     }))
 }
 

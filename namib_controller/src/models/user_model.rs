@@ -20,6 +20,7 @@ pub struct UserDbo {
     pub password: String,
     pub salt: Vec<u8>,
     pub last_interaction: NaiveDateTime,
+    pub pwd_change_required: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -33,6 +34,8 @@ pub struct User {
     pub last_interaction: NaiveDateTime,
     pub roles: Vec<Role>,
     pub permissions: Vec<String>,
+    #[serde(skip_serializing)]
+    pub pwd_change_required: bool,
 }
 
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone, Apiv2Schema)]
@@ -59,7 +62,7 @@ pub struct RoleDbo {
 
 // Local methods
 impl User {
-    pub fn new(username: String, password: &str) -> Result<Self> {
+    pub fn new(username: String, password: &str, pwd_change_required: bool) -> Result<Self> {
         let salt = User::generate_salt();
         let utc_now = chrono::Utc::now().naive_utc();
         Ok(Self {
@@ -70,6 +73,7 @@ impl User {
             last_interaction: utc_now,
             roles: Vec::new(),
             permissions: Vec::new(),
+            pwd_change_required,
         })
     }
 
