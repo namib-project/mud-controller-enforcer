@@ -1,8 +1,7 @@
 CREATE TABLE flow_scopes (
     id           INTEGER      NOT NULL PRIMARY KEY AUTOINCREMENT,
     name         VARCHAR(50)  NOT NULL UNIQUE,
-    --level        VARCHAR(50)  NOT NULL,
-    level        INTEGER      NOT NULL, -- CHECK (level IN (0, 1)),
+    level        INTEGER      NOT NULL CHECK (level >= 0 AND level<= 1),
     ttl          INTEGER      NOT NULL CHECK (ttl >= 0),
     starts_at    DATETIME     NOT NULL CHECK (starts_at >= 0)
 );
