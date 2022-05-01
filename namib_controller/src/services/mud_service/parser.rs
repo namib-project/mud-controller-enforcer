@@ -87,9 +87,13 @@ fn parse_device_policy(
     dir: AclDirection,
 ) -> Result<()> {
     for access_list in &policy.access_lists.access_list {
-        let mut found = false;
-        for aclitem in &mud_json.acls.acl {
-            if aclitem.name == access_list.name {
+        match &mud_json
+            .acls
+            .acl
+            .iter()
+            .find(|aclitem| aclitem.name == access_list.name)
+        {
+            Some(aclitem) => {
                 let mut ace: Vec<Ace> = Vec::new();
                 let acl_type = if aclitem.type_field == "ipv4-acl-type" {
                     AclType::IPV4
@@ -106,60 +110,83 @@ fn parse_device_policy(
                     let mut matches_augmentation = None;
                     let mut icmp_type = None;
                     let mut code = None;
-                    if let Some(udp) = &aceitem.matches.udp {
-                        protocol = Some(AceProtocol::Udp);
-                        source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                        destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                    } else if let Some(tcp) = &aceitem.matches.tcp {
-                        protocol = Some(AceProtocol::Tcp);
-                        if let Some(dir) = &tcp.direction_initiated {
-                            direction_initiated = Some(match dir.as_str() {
-                                "from-device" => AclDirection::FromDevice,
-                                "to-device" => AclDirection::ToDevice,
-                                _ => error::MudError {
-                                    message: String::from("Invalid direction"),
-                                }
-                                .fail()?,
-                            });
-                        }
 
-                        source_port = tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                        destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                    } else if let Some(icmp) = &aceitem.matches.icmp {
-                        protocol = Some(AceProtocol::Icmp);
-                        icmp_type = Some(icmp.icmp_type);
-                        code = Some(icmp.code);
+                    match (&aceitem.matches.tcp, &aceitem.matches.udp, &aceitem.matches.icmp) {
+                        (None, None, None) => {},
+                        (Some(tcp), None, None) => {
+                            protocol = Some(AceProtocol::Tcp);
+                            if let Some(dir) = &tcp.direction_initiated {
+                                direction_initiated = Some(match dir.as_str() {
+                                    "from-device" => AclDirection::FromDevice,
+                                    "to-device" => AclDirection::ToDevice,
+                                    _ => error::MudError {
+                                        message: String::from("Invalid direction"),
+                                    }
+                                    .fail()?,
+                                });
+                            }
+                            source_port = tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                            destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                        },
+                        (None, Some(udp), None) => {
+                            protocol = Some(AceProtocol::Udp);
+                            source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                            destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                        },
+                        (None, None, Some(icmp)) => {
+                            protocol = Some(AceProtocol::Icmp);
+                            icmp_type = Some(icmp.icmp_type);
+                            code = Some(icmp.code);
+                        },
+                        _ => error::MudError {
+                            message: String::from("Multiple L4 matches specified, which does not conform to RFC8519"),
+                        }
+                        .fail()?,
                     }
-                    if let Some(ipv6) = &aceitem.matches.ipv6 {
-                        if acl_type != AclType::IPV6 {
+
+                    match (&aceitem.matches.ipv4, &aceitem.matches.ipv6) {
+                        (None, None) => {},
+                        (Some(ipv4), None) => {
+                            if acl_type != AclType::IPV4 {
+                                error::MudError {
+                                    message: String::from("IPv4 ACE in IPv6 ACL"),
+                                }
+                                .fail()?;
+                            }
+                            protocol = ipv4.protocol.map(AceProtocol::Protocol);
+                            address_mask = ipv4
+                                .source_ipv4_network
+                                .as_ref()
+                                .or_else(|| ipv4.destination_ipv4_network.as_ref())
+                                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
+                            dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
+                        },
+                        (None, Some(ipv6)) => {
+                            if acl_type != AclType::IPV6 {
+                                error::MudError {
+                                    message: String::from("IPv6 ACE in IPv4 ACL"),
+                                }
+                                .fail()?;
+                            }
+                            protocol = ipv6.protocol.map(AceProtocol::Protocol);
+                            address_mask = ipv6
+                                .source_ipv6_network
+                                .as_ref()
+                                .or_else(|| ipv6.destination_ipv6_network.as_ref())
+                                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
+                            // TODO(ja_he): why are we dropping the src/dst information?
+                            dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
+                        },
+                        _ => {
                             error::MudError {
-                                message: String::from("IPv6 ACE in IPv4 ACL"),
+                                message: String::from(
+                                    "Multiple L3 matches specified, which does not conform to RFC8519",
+                                ),
                             }
                             .fail()?;
-                        }
-                        protocol = ipv6.protocol.map(AceProtocol::Protocol);
-                        address_mask = ipv6
-                            .source_ipv6_network
-                            .as_ref()
-                            .or_else(|| ipv6.destination_ipv6_network.as_ref())
-                            .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
-                        // TODO(ja_he): why are we dropping the src/dst information?
-                        dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
-                    } else if let Some(ipv4) = &aceitem.matches.ipv4 {
-                        if acl_type != AclType::IPV4 {
-                            error::MudError {
-                                message: String::from("IPv4 ACE in IPv6 ACL"),
-                            }
-                            .fail()?;
-                        }
-                        protocol = ipv4.protocol.map(AceProtocol::Protocol);
-                        address_mask = ipv4
-                            .source_ipv4_network
-                            .as_ref()
-                            .or_else(|| ipv4.destination_ipv4_network.as_ref())
-                            .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
-                        dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
+                        },
                     }
+
                     if let Some(mud) = &aceitem.matches.mud {
                         let manufacturer = mud.manufacturer.as_ref().map(std::string::ToString::to_string);
                         let same_manufacturer = mud.same_manufacturer.is_some();
@@ -184,6 +211,7 @@ fn parse_device_policy(
                             });
                         }
                     }
+
                     ace.push(Ace {
                         name: aceitem.name.clone(),
                         action: if aceitem.actions.forwarding == "accept" {
@@ -215,16 +243,14 @@ fn parse_device_policy(
                     acl_type,
                     ace,
                 });
-                found = true;
-                break;
-            }
+            },
+            None => {
+                error::MudError {
+                    message: String::from("MUD-File has dangling ACL policy"),
+                }
+                .fail()?;
+            },
         }
-        ensure!(
-            found,
-            error::MudError {
-                message: String::from("MUD-File has dangling ACL policy")
-            }
-        );
     }
 
     Ok(())
