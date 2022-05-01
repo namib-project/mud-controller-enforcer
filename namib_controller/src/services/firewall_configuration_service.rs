@@ -245,10 +245,10 @@ pub fn convert_device_to_fw_rules(
 
         for acl in &merged_acls {
             for ace in &acl.ace {
-                let icmp_type: Option<u8> = ace.matches.icmp_type;
-                let icmp_code: Option<u8> = ace.matches.icmp_code;
+                let icmp_type: Option<u8> = ace.matches.l4.icmp_type;
+                let icmp_code: Option<u8> = ace.matches.l4.icmp_code;
 
-                let protocol = match &ace.matches.protocol {
+                let protocol = match &ace.matches.l3.protocol {
                     None => Protocol::All,
                     Some(proto) => match proto {
                         AceProtocol::Tcp => Protocol::Tcp,
@@ -264,12 +264,12 @@ pub fn convert_device_to_fw_rules(
                 };
                 let mut scope = ScopeConstraint::None;
 
-                let src_ports: Option<String> = match ace.matches.source_port {
+                let src_ports: Option<String> = match ace.matches.l4.source_port {
                     None => None,
                     Some(AcePort::Single(port)) => Some(port.to_string()),
                     Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
                 };
-                let dst_ports: Option<String> = match ace.matches.destination_port {
+                let dst_ports: Option<String> = match ace.matches.l4.destination_port {
                     None => None,
                     Some(AcePort::Single(port)) => Some(port.to_string()),
                     Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
@@ -283,7 +283,7 @@ pub fn convert_device_to_fw_rules(
                 let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
 
                 let other_dev_rule_targets: Vec<RuleTarget> =
-                    match (&ace.matches.dnsname, &ace.matches.matches_augmentation) {
+                    match (&ace.matches.l3.dnsname, &ace.matches.matches_augmentation) {
                         // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
                         (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
                             Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
@@ -544,8 +544,8 @@ mod tests {
 
     use super::*;
     use crate::models::{
-        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudAclMatchesAugmentation,
-        MudData, QuarantineException,
+        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, L3Matches, L4Matches,
+        MudAclMatchesAugmentation, MudData, QuarantineException,
     };
 
     #[test]
@@ -559,14 +559,12 @@ mod tests {
                     name: "acl_to_device_0".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches::empty(),
                         matches_augmentation: None,
                     },
                 }],
@@ -579,14 +577,12 @@ mod tests {
                     name: "acl_from_device_0".to_string(),
                     action: AceAction::Deny,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches::empty(),
                         matches_augmentation: None,
                     },
                 }],
@@ -602,14 +598,12 @@ mod tests {
                     name: "acl_to_device_0".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            dnsname: None,
+                            address_mask: None,
+                        },
+                        l4: L4Matches::empty(),
                         matches_augmentation: None,
                     },
                 }],
@@ -622,14 +616,12 @@ mod tests {
                     name: "acl_around_device_or_sth_0".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Udp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Udp),
+                            dnsname: None,
+                            address_mask: None,
+                        },
+                        l4: L4Matches::empty(),
                         matches_augmentation: None,
                     },
                 }],
@@ -687,14 +679,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: Some(String::from("www.example.test")),
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            dnsname: Some(String::from("www.example.test")),
+                            address_mask: None,
+                        },
+                        l4: L4Matches::empty(),
                         matches_augmentation: None,
                     },
                 }],
@@ -707,14 +697,12 @@ mod tests {
                     name: "overriden_ace".to_string(),
                     action: AceAction::Deny,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Udp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: Some(String::from("www.example.test")),
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Udp),
+                            dnsname: Some(String::from("www.example.test")),
+                            address_mask: None,
+                        },
+                        l4: L4Matches::empty(),
                         matches_augmentation: None,
                     },
                 }],
@@ -882,14 +870,18 @@ mod tests {
                         name: "some_ace_name".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            protocol: Some(AceProtocol::Tcp),
-                            direction_initiated: None,
-                            address_mask: None,
-                            dnsname: Some(String::from("www.example.test")),
-                            source_port: Some(AcePort::Single(123)),
-                            destination_port: Some(AcePort::Range(50, 60)),
-                            icmp_type: None,
-                            icmp_code: None,
+                            l3: L3Matches {
+                                protocol: Some(AceProtocol::Tcp),
+                                dnsname: Some(String::from("www.example.test")),
+                                address_mask: None,
+                            },
+                            l4: L4Matches {
+                                direction_initiated: None,
+                                source_port: Some(AcePort::Single(123)),
+                                destination_port: Some(AcePort::Range(50, 60)),
+                                icmp_type: None,
+                                icmp_code: None,
+                            },
                             matches_augmentation: None,
                         },
                     }],
@@ -902,14 +894,18 @@ mod tests {
                         name: "other_ace_name".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            protocol: Some(AceProtocol::Udp),
-                            direction_initiated: None,
-                            address_mask: None,
-                            dnsname: Some(String::from("www.example.test")),
-                            source_port: Some(AcePort::Range(8000, 8080)),
-                            destination_port: Some(AcePort::Single(56)),
-                            icmp_type: None,
-                            icmp_code: None,
+                            l3: L3Matches {
+                                protocol: Some(AceProtocol::Udp),
+                                address_mask: None,
+                                dnsname: Some(String::from("www.example.test")),
+                            },
+                            l4: L4Matches {
+                                direction_initiated: None,
+                                source_port: Some(AcePort::Range(8000, 8080)),
+                                destination_port: Some(AcePort::Single(56)),
+                                icmp_type: None,
+                                icmp_code: None,
+                            },
                             matches_augmentation: None,
                         },
                     }],
@@ -1015,14 +1011,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1145,14 +1145,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1271,14 +1275,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: Some(AcePort::Single(321)),
-                        destination_port: Some(AcePort::Single(500)),
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: Some(AcePort::Single(321)),
+                            destination_port: Some(AcePort::Single(500)),
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: true,
@@ -1333,14 +1341,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: None,
                     },
                 }],
@@ -1434,14 +1446,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: Some(AcePort::Single(123)),
-                        destination_port: Some(AcePort::Range(50, 60)),
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: Some(AcePort::Single(123)),
+                            destination_port: Some(AcePort::Range(50, 60)),
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1581,14 +1597,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1711,14 +1731,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: Some(AcePort::Single(321)),
-                        destination_port: Some(AcePort::Single(500)),
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: Some(AcePort::Single(321)),
+                            destination_port: Some(AcePort::Single(500)),
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: Some("simple-example.com".to_string()),
                             same_manufacturer: false,
@@ -1773,14 +1797,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Tcp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: None,
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: None,
-                        icmp_code: None,
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Tcp),
+                            address_mask: None,
+                            dnsname: None,
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: None,
+                            icmp_code: None,
+                        },
                         matches_augmentation: None,
                     },
                 }],
@@ -1873,14 +1901,18 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        protocol: Some(AceProtocol::Icmp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: Some(String::from("www.example.test")),
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: Some(8),
-                        icmp_code: Some(0),
+                        l3: L3Matches {
+                            protocol: Some(AceProtocol::Icmp),
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                        },
+                        l4: L4Matches {
+                            direction_initiated: None,
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: Some(8),
+                            icmp_code: Some(0),
+                        },
                         matches_augmentation: None,
                     },
                 }],
@@ -1974,14 +2006,18 @@ mod tests {
                         name: "some_ace_name_1".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            protocol: Some(AceProtocol::Icmp),
-                            direction_initiated: None,
-                            address_mask: None,
-                            dnsname: Some(String::from("www.example.test")),
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: Some(8),
-                            icmp_code: Some(0),
+                            l3: L3Matches {
+                                protocol: Some(AceProtocol::Icmp),
+                                address_mask: None,
+                                dnsname: Some(String::from("www.example.test")),
+                            },
+                            l4: L4Matches {
+                                source_port: None,
+                                destination_port: None,
+                                direction_initiated: None,
+                                icmp_type: Some(8),
+                                icmp_code: Some(0),
+                            },
                             matches_augmentation: None,
                         },
                     },
@@ -1989,14 +2025,18 @@ mod tests {
                         name: "some_ace_name_2".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            protocol: Some(AceProtocol::Icmp),
-                            direction_initiated: None,
-                            address_mask: None,
-                            dnsname: Some(String::from("www.example.test")),
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: Some(8),
-                            icmp_code: Some(0),
+                            l3: L3Matches {
+                                protocol: Some(AceProtocol::Icmp),
+                                address_mask: None,
+                                dnsname: Some(String::from("www.example.test")),
+                            },
+                            l4: L4Matches {
+                                source_port: None,
+                                destination_port: None,
+                                direction_initiated: None,
+                                icmp_type: Some(8),
+                                icmp_code: Some(0),
+                            },
                             matches_augmentation: None,
                         },
                     },

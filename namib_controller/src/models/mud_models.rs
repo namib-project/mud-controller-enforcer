@@ -78,16 +78,57 @@ pub struct Ace {
     pub matches: AceMatches,
 }
 
+/// YANG ACL (RFC8519) matches on layer 3 protocol header information and augmented by MUD
+/// (RFC8520) with DNS names.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
-pub struct AceMatches {
+pub struct L3Matches {
     pub protocol: Option<AceProtocol>,
-    pub direction_initiated: Option<AclDirection>,
     pub address_mask: Option<String>,
     pub dnsname: Option<String>,
+    // TODO(ja_he): complete
+}
+
+impl L3Matches {
+    pub fn empty() -> Self {
+        L3Matches {
+            protocol: None,
+            address_mask: None,
+            dnsname: None,
+        }
+    }
+}
+
+/// YANG ACL (RFC8519) matches on layer 4 protocol header information and augmented by MUD
+/// (RFC8520) with matching on connection directionality for TCP.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct L4Matches {
     pub source_port: Option<AcePort>,
     pub destination_port: Option<AcePort>,
+    pub direction_initiated: Option<AclDirection>,
     pub icmp_type: Option<u8>,
     pub icmp_code: Option<u8>,
+    // TODO(ja_he): complete
+}
+
+impl L4Matches {
+    pub fn empty() -> Self {
+        L4Matches {
+            source_port: None,
+            destination_port: None,
+            direction_initiated: None,
+            icmp_type: None,
+            icmp_code: None,
+        }
+    }
+}
+
+/// Represents the "matches" configuration data node
+/// (concretely: "/acl:acls/acl:acl/acl:aces/acl:ace/acl:matches"), as defined in RFC8519 and
+/// augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct AceMatches {
+    pub l3: L3Matches,
+    pub l4: L4Matches,
     pub matches_augmentation: Option<MudAclMatchesAugmentation>,
 }
 

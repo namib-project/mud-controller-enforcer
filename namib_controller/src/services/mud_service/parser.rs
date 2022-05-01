@@ -7,7 +7,7 @@ use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use super::json_models;
-use crate::models::MudAclMatchesAugmentation;
+use crate::models::{L3Matches, L4Matches, MudAclMatchesAugmentation};
 use crate::{
     error,
     error::Result,
@@ -143,6 +143,7 @@ fn parse_device_policy(
                             .as_ref()
                             .or_else(|| ipv6.destination_ipv6_network.as_ref())
                             .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
+                        // TODO(ja_he): why are we dropping the src/dst information?
                         dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
                     } else if let Some(ipv4) = &aceitem.matches.ipv4 {
                         if acl_type != AclType::IPV4 {
@@ -191,14 +192,18 @@ fn parse_device_policy(
                             AceAction::Deny
                         },
                         matches: AceMatches {
-                            protocol,
-                            direction_initiated,
-                            address_mask: address_mask.map(|a| a.to_string()),
-                            dnsname,
-                            source_port,
-                            destination_port,
-                            icmp_type,
-                            icmp_code: code,
+                            l4: L4Matches {
+                                direction_initiated,
+                                source_port,
+                                destination_port,
+                                icmp_type,
+                                icmp_code: code,
+                            },
+                            l3: L3Matches {
+                                protocol,
+                                address_mask: address_mask.map(|a| a.to_string()),
+                                dnsname,
+                            },
                             matches_augmentation,
                         },
                     });
@@ -275,14 +280,8 @@ mod tests {
         let mud = parse_mud(URL.to_string(), mud_data.as_str())?;
 
         let matches = AceMatches {
-            protocol: None,
-            direction_initiated: None,
-            address_mask: None,
-            dnsname: None,
-            source_port: None,
-            destination_port: None,
-            icmp_type: None,
-            icmp_code: None,
+            l3: L3Matches::empty(),
+            l4: L4Matches::empty(),
             matches_augmentation: Some(MudAclMatchesAugmentation {
                 manufacturer: None,
                 same_manufacturer: true,
