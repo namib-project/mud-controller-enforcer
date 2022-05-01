@@ -16,7 +16,7 @@ use crate::{
     error::Result,
     models::{
         AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, AdministrativeContext,
-        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, Level,
+        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, L3Matches, L4Matches, Level,
     },
     services::{
         acme_service,
@@ -245,18 +245,30 @@ pub fn convert_device_to_fw_rules(
 
         for acl in &merged_acls {
             for ace in &acl.ace {
-                let icmp_type: Option<u8> = ace.matches.l4.icmp_type;
-                let icmp_code: Option<u8> = ace.matches.l4.icmp_code;
+                let (icmp_type, icmp_code) = if let Some(L4Matches::Icmp(icmp)) = &ace.matches.l4 {
+                    (icmp.icmp_type, icmp.icmp_code)
+                } else {
+                    (None, None)
+                };
 
-                let protocol = match &ace.matches.l3.protocol {
-                    None => Protocol::All,
-                    Some(proto) => match proto {
-                        AceProtocol::Tcp => Protocol::Tcp,
-                        AceProtocol::Udp => Protocol::Udp,
-                        AceProtocol::Icmp => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
-                        AceProtocol::Protocol(_proto_nr) => Protocol::All, // Default to all protocols if protocol is not supported.
-                                                                           // TODO add support for more protocols
+                let protocol = match &ace.matches.l3 {
+                    Some(L3Matches::Ipv4(matches)) => match matches.protocol {
+                        Some(AceProtocol::Tcp) => Protocol::Tcp,
+                        Some(AceProtocol::Udp) => Protocol::Udp,
+                        Some(AceProtocol::Icmp) => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
+                        Some(AceProtocol::Protocol(_proto_nr)) => Protocol::All, // Default to all protocols if protocol is not supported.
+                        // TODO add support for more protocols
+                        None => Protocol::All,
                     },
+                    Some(L3Matches::Ipv6(matches)) => match matches.protocol {
+                        Some(AceProtocol::Tcp) => Protocol::Tcp,
+                        Some(AceProtocol::Udp) => Protocol::Udp,
+                        Some(AceProtocol::Icmp) => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
+                        Some(AceProtocol::Protocol(_proto_nr)) => Protocol::All, // Default to all protocols if protocol is not supported.
+                        // TODO add support for more protocols
+                        None => Protocol::All,
+                    },
+                    None => Protocol::All,
                 };
                 let verdict = match ace.action {
                     AceAction::Accept => Verdict::Accept,
@@ -264,15 +276,31 @@ pub fn convert_device_to_fw_rules(
                 };
                 let mut scope = ScopeConstraint::None;
 
-                let src_ports: Option<String> = match ace.matches.l4.source_port {
-                    None => None,
-                    Some(AcePort::Single(port)) => Some(port.to_string()),
-                    Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                let src_ports: Option<String> = match &ace.matches.l4 {
+                    Some(L4Matches::Tcp(tcp)) => match tcp.source_port {
+                        Some(AcePort::Single(port)) => Some(port.to_string()),
+                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                        None => None,
+                    },
+                    Some(L4Matches::Udp(udp)) => match udp.source_port {
+                        Some(AcePort::Single(port)) => Some(port.to_string()),
+                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                        None => None,
+                    },
+                    _ => None,
                 };
-                let dst_ports: Option<String> = match ace.matches.l4.destination_port {
-                    None => None,
-                    Some(AcePort::Single(port)) => Some(port.to_string()),
-                    Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                let dst_ports: Option<String> = match &ace.matches.l4 {
+                    Some(L4Matches::Tcp(tcp)) => match tcp.destination_port {
+                        Some(AcePort::Single(port)) => Some(port.to_string()),
+                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                        None => None,
+                    },
+                    Some(L4Matches::Udp(udp)) => match udp.destination_port {
+                        Some(AcePort::Single(port)) => Some(port.to_string()),
+                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
+                        None => None,
+                    },
+                    _ => None,
                 };
 
                 let (this_device_ports, other_device_ports) = match acl.packet_direction {
@@ -282,67 +310,74 @@ pub fn convert_device_to_fw_rules(
 
                 let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
 
-                let other_dev_rule_targets: Vec<RuleTarget> =
-                    match (&ace.matches.l3.dnsname, &ace.matches.matches_augmentation) {
-                        // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
-                        (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                            Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
-                            Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
-                        },
-                        (None, Some(augmentation)) => {
-                            let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
-                            if let Some(host) = &augmentation.manufacturer {
-                                targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
-                            }
-                            if augmentation.same_manufacturer {
-                                targets_per_option.push(get_same_manufacturer_ruletargethosts(
-                                    device,
-                                    devices,
-                                    &acl.acl_type,
-                                ));
-                            }
-                            if let Some(uri) = &augmentation.controller {
-                                targets_per_option.push(get_controller_ruletargethosts(
-                                    device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
-                                    devices,
-                                    uri,
-                                    acl.acl_type,
-                                    &verdict,
-                                    administrative_context,
-                                ));
-                            }
-                            if augmentation.my_controller {
-                                targets_per_option.push(get_my_controller_ruletargethosts(
-                                    device,
-                                    devices,
-                                    acl.acl_type,
-                                    &verdict,
-                                    administrative_context,
-                                ));
-                            }
-                            if augmentation.local {
-                                scope = ScopeConstraint::Local;
-                            }
-                            if let Some(url) = &augmentation.model {
-                                targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
-                            }
-
-                            // return those devices matched by _all_ specified options
-                            match targets_per_option.len() {
-                                0 => vec![],
-                                1 => targets_per_option[0].clone(),
-                                _ => targets_per_option[0]
-                                    .iter()
-                                    .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
-                                    .cloned()
-                                    .collect(),
-                            }
-                        },
-                        _ => vec![],
+                let dnsname: &Option<String> = if let Some(l3) = &ace.matches.l3 {
+                    match l3 {
+                        L3Matches::Ipv4(matches) => &matches.dnsname,
+                        L3Matches::Ipv6(matches) => &matches.dnsname,
                     }
-                    .iter()
-                    .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
-                    .collect();
+                } else {
+                    &None
+                };
+                let other_dev_rule_targets: Vec<RuleTarget> = match (dnsname, &ace.matches.matches_augmentation) {
+                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
+                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
+                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
+                    },
+                    (None, Some(augmentation)) => {
+                        let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
+                        if let Some(host) = &augmentation.manufacturer {
+                            targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
+                        }
+                        if augmentation.same_manufacturer {
+                            targets_per_option.push(get_same_manufacturer_ruletargethosts(
+                                device,
+                                devices,
+                                &acl.acl_type,
+                            ));
+                        }
+                        if let Some(uri) = &augmentation.controller {
+                            targets_per_option.push(get_controller_ruletargethosts(
+                                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                                devices,
+                                uri,
+                                acl.acl_type,
+                                &verdict,
+                                administrative_context,
+                            ));
+                        }
+                        if augmentation.my_controller {
+                            targets_per_option.push(get_my_controller_ruletargethosts(
+                                device,
+                                devices,
+                                acl.acl_type,
+                                &verdict,
+                                administrative_context,
+                            ));
+                        }
+                        if augmentation.local {
+                            scope = ScopeConstraint::Local;
+                        }
+                        if let Some(url) = &augmentation.model {
+                            targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
+                        }
+
+                        // return those devices matched by _all_ specified options
+                        match targets_per_option.len() {
+                            0 => vec![],
+                            1 => targets_per_option[0].clone(),
+                            _ => targets_per_option[0]
+                                .iter()
+                                .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
+                                .cloned()
+                                .collect(),
+                        }
+                    },
+                    _ => vec![],
+                }
+                .iter()
+                .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
+                .collect();
 
                 for other_dev_rule_target in &other_dev_rule_targets {
                     let (src, dst) = match acl.packet_direction {
@@ -544,8 +579,8 @@ mod tests {
 
     use super::*;
     use crate::models::{
-        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, L3Matches, L4Matches,
-        MudAclMatchesAugmentation, MudData, QuarantineException,
+        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, IcmpMatches, Ipv4Matches,
+        L3Matches, L4Matches, MudAclMatchesAugmentation, MudData, QuarantineException, TcpMatches,
     };
 
     #[test]
@@ -559,12 +594,12 @@ mod tests {
                     name: "acl_to_device_0".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches::empty(),
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -577,12 +612,12 @@ mod tests {
                     name: "acl_from_device_0".to_string(),
                     action: AceAction::Deny,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches::empty(),
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -598,12 +633,12 @@ mod tests {
                     name: "acl_to_device_0".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             dnsname: None,
                             address_mask: None,
-                        },
-                        l4: L4Matches::empty(),
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -616,12 +651,12 @@ mod tests {
                     name: "acl_around_device_or_sth_0".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Udp),
                             dnsname: None,
                             address_mask: None,
-                        },
-                        l4: L4Matches::empty(),
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -679,12 +714,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             dnsname: Some(String::from("www.example.test")),
                             address_mask: None,
-                        },
-                        l4: L4Matches::empty(),
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -697,12 +732,12 @@ mod tests {
                     name: "overriden_ace".to_string(),
                     action: AceAction::Deny,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Udp),
                             dnsname: Some(String::from("www.example.test")),
                             address_mask: None,
-                        },
-                        l4: L4Matches::empty(),
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -870,18 +905,16 @@ mod tests {
                         name: "some_ace_name".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            l3: L3Matches {
+                            l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Tcp),
                                 dnsname: Some(String::from("www.example.test")),
                                 address_mask: None,
-                            },
-                            l4: L4Matches {
+                            })),
+                            l4: Some(L4Matches::Tcp(TcpMatches {
                                 direction_initiated: None,
                                 source_port: Some(AcePort::Single(123)),
                                 destination_port: Some(AcePort::Range(50, 60)),
-                                icmp_type: None,
-                                icmp_code: None,
-                            },
+                            })),
                             matches_augmentation: None,
                         },
                     }],
@@ -894,18 +927,16 @@ mod tests {
                         name: "other_ace_name".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            l3: L3Matches {
+                            l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Udp),
                                 address_mask: None,
                                 dnsname: Some(String::from("www.example.test")),
-                            },
-                            l4: L4Matches {
+                            })),
+                            l4: Some(L4Matches::Tcp(TcpMatches {
                                 direction_initiated: None,
                                 source_port: Some(AcePort::Range(8000, 8080)),
                                 destination_port: Some(AcePort::Single(56)),
-                                icmp_type: None,
-                                icmp_code: None,
-                            },
+                            })),
                             matches_augmentation: None,
                         },
                     }],
@@ -1011,18 +1042,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
-                            direction_initiated: None,
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
+                        l4: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1145,18 +1170,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
-                            direction_initiated: None,
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
+                        l4: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1275,18 +1294,16 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
+                        })),
+                        l4: Some(L4Matches::Tcp(TcpMatches {
                             direction_initiated: None,
                             source_port: Some(AcePort::Single(321)),
                             destination_port: Some(AcePort::Single(500)),
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: true,
@@ -1341,18 +1358,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
-                            direction_initiated: None,
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -1446,18 +1457,16 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
+                        })),
+                        l4: Some(L4Matches::Tcp(TcpMatches {
                             direction_initiated: None,
                             source_port: Some(AcePort::Single(123)),
                             destination_port: Some(AcePort::Range(50, 60)),
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1597,18 +1606,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
-                            direction_initiated: None,
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
+                        l4: None,
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
                             same_manufacturer: false,
@@ -1731,18 +1734,16 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
+                        })),
+                        l4: Some(L4Matches::Tcp(TcpMatches {
                             direction_initiated: None,
                             source_port: Some(AcePort::Single(321)),
                             destination_port: Some(AcePort::Single(500)),
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: Some("simple-example.com".to_string()),
                             same_manufacturer: false,
@@ -1797,18 +1798,12 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
                             address_mask: None,
                             dnsname: None,
-                        },
-                        l4: L4Matches {
-                            direction_initiated: None,
-                            source_port: None,
-                            destination_port: None,
-                            icmp_type: None,
-                            icmp_code: None,
-                        },
+                        })),
+                        l4: None,
                         matches_augmentation: None,
                     },
                 }],
@@ -1901,18 +1896,16 @@ mod tests {
                     name: "some_ace_name".to_string(),
                     action: AceAction::Accept,
                     matches: AceMatches {
-                        l3: L3Matches {
+                        l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Icmp),
                             address_mask: None,
                             dnsname: Some(String::from("www.example.test")),
-                        },
-                        l4: L4Matches {
-                            direction_initiated: None,
-                            source_port: None,
-                            destination_port: None,
+                        })),
+                        l4: Some(L4Matches::Icmp(IcmpMatches {
                             icmp_type: Some(8),
                             icmp_code: Some(0),
-                        },
+                            rest_of_header: None,
+                        })),
                         matches_augmentation: None,
                     },
                 }],
@@ -2006,18 +1999,16 @@ mod tests {
                         name: "some_ace_name_1".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            l3: L3Matches {
+                            l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Icmp),
                                 address_mask: None,
                                 dnsname: Some(String::from("www.example.test")),
-                            },
-                            l4: L4Matches {
-                                source_port: None,
-                                destination_port: None,
-                                direction_initiated: None,
+                            })),
+                            l4: Some(L4Matches::Icmp(IcmpMatches {
                                 icmp_type: Some(8),
                                 icmp_code: Some(0),
-                            },
+                                rest_of_header: None,
+                            })),
                             matches_augmentation: None,
                         },
                     },
@@ -2025,18 +2016,16 @@ mod tests {
                         name: "some_ace_name_2".to_string(),
                         action: AceAction::Accept,
                         matches: AceMatches {
-                            l3: L3Matches {
+                            l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Icmp),
                                 address_mask: None,
                                 dnsname: Some(String::from("www.example.test")),
-                            },
-                            l4: L4Matches {
-                                source_port: None,
-                                destination_port: None,
-                                direction_initiated: None,
+                            })),
+                            l4: Some(L4Matches::Icmp(IcmpMatches {
                                 icmp_type: Some(8),
                                 icmp_code: Some(0),
-                            },
+                                rest_of_header: None,
+                            })),
                             matches_augmentation: None,
                         },
                     },

@@ -7,7 +7,9 @@ use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use super::json_models;
-use crate::models::{L3Matches, L4Matches, MudAclMatchesAugmentation};
+use crate::models::{
+    IcmpMatches, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches, MudAclMatchesAugmentation, TcpMatches, UdpMatches,
+};
 use crate::{
     error,
     error::Result,
@@ -101,42 +103,43 @@ fn parse_device_policy(
                     AclType::IPV6
                 };
                 for aceitem in &aclitem.aces.ace {
-                    let mut protocol = None;
-                    let mut direction_initiated = None;
-                    let mut address_mask = None;
-                    let mut dnsname = None;
-                    let mut source_port = None;
-                    let mut destination_port = None;
+                    let mut l3 = None;
+                    let mut l4 = None;
                     let mut matches_augmentation = None;
-                    let mut icmp_type = None;
-                    let mut code = None;
+
+                    let mut l4_protocol_for_matching = None;
 
                     match (&aceitem.matches.tcp, &aceitem.matches.udp, &aceitem.matches.icmp) {
                         (None, None, None) => {},
                         (Some(tcp), None, None) => {
-                            protocol = Some(AceProtocol::Tcp);
-                            if let Some(dir) = &tcp.direction_initiated {
-                                direction_initiated = Some(match dir.as_str() {
-                                    "from-device" => AclDirection::FromDevice,
-                                    "to-device" => AclDirection::ToDevice,
-                                    _ => error::MudError {
+                            l4_protocol_for_matching = Some(AceProtocol::Tcp);
+                            l4 = Some(L4Matches::Tcp(TcpMatches {
+                                direction_initiated: match &tcp.direction_initiated.as_deref() {
+                                    None => None,
+                                    Some("from-device") => Some(AclDirection::FromDevice),
+                                    Some("to-device") => Some(AclDirection::ToDevice),
+                                    Some(other) => error::MudError {
                                         message: String::from("Invalid direction"),
                                     }
                                     .fail()?,
-                                });
-                            }
-                            source_port = tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                            destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                                },
+                                source_port: tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
+                                destination_port: tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
+                            }));
                         },
                         (None, Some(udp), None) => {
-                            protocol = Some(AceProtocol::Udp);
-                            source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                            destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
+                            l4_protocol_for_matching = Some(AceProtocol::Udp);
+                            l4 = Some(L4Matches::Udp(UdpMatches {
+                                source_port: udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
+                                destination_port: udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
+                            }));
                         },
                         (None, None, Some(icmp)) => {
-                            protocol = Some(AceProtocol::Icmp);
-                            icmp_type = Some(icmp.icmp_type);
-                            code = Some(icmp.code);
+                            l4_protocol_for_matching = Some(AceProtocol::Icmp);
+                            l4 = Some(L4Matches::Icmp(IcmpMatches {
+                                icmp_type: Some(icmp.icmp_type),
+                                icmp_code: Some(icmp.code),
+                            }));
                         },
                         _ => error::MudError {
                             message: String::from("Multiple L4 matches specified, which does not conform to RFC8519"),
@@ -153,13 +156,30 @@ fn parse_device_policy(
                                 }
                                 .fail()?;
                             }
-                            protocol = ipv4.protocol.map(AceProtocol::Protocol);
-                            address_mask = ipv4
-                                .source_ipv4_network
-                                .as_ref()
-                                .or_else(|| ipv4.destination_ipv4_network.as_ref())
-                                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
-                            dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
+                            let ip_header_protocol = &ipv4.protocol.map(|p| AceProtocol::from(p as u8));
+                            if let (Some(matching_proto), Some(header_proto)) =
+                                (l4_protocol_for_matching, ip_header_protocol)
+                            {
+                                if matching_proto != *header_proto {
+                                    error::MudError {
+                                        message: format!(
+                                            "IPv4 header protocol and L4 protocol used for matching differ: {} != {}",
+                                            matching_proto, header_proto
+                                        ),
+                                    }
+                                    .fail()?;
+                                }
+                            }
+                            l3 = Some(L3Matches::Ipv4(Ipv4Matches {
+                                protocol: ip_header_protocol.clone(),
+                                address_mask: ipv4
+                                    .source_ipv4_network
+                                    .as_ref()
+                                    .or_else(|| ipv4.destination_ipv4_network.as_ref())
+                                    .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
+                                    .map(|m| m.to_string()),
+                                dnsname: ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone()),
+                            }));
                         },
                         (None, Some(ipv6)) => {
                             if acl_type != AclType::IPV6 {
@@ -168,14 +188,30 @@ fn parse_device_policy(
                                 }
                                 .fail()?;
                             }
-                            protocol = ipv6.protocol.map(AceProtocol::Protocol);
-                            address_mask = ipv6
-                                .source_ipv6_network
-                                .as_ref()
-                                .or_else(|| ipv6.destination_ipv6_network.as_ref())
-                                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
-                            // TODO(ja_he): why are we dropping the src/dst information?
-                            dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
+                            let ip_header_protocol = &ipv6.protocol.map(AceProtocol::Protocol);
+                            if let (Some(matching_proto), Some(header_proto)) =
+                                (l4_protocol_for_matching, ip_header_protocol)
+                            {
+                                if matching_proto != *header_proto {
+                                    error::MudError {
+                                        message: format!(
+                                            "IPv6 header protocol and L4 protocol used for matching differ: {} != {}",
+                                            matching_proto, header_proto
+                                        ),
+                                    }
+                                    .fail()?;
+                                }
+                            }
+                            l3 = Some(L3Matches::Ipv6(Ipv6Matches {
+                                protocol: ip_header_protocol.clone(),
+                                address_mask: ipv6
+                                    .source_ipv6_network
+                                    .as_ref()
+                                    .or_else(|| ipv6.destination_ipv6_network.as_ref())
+                                    .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
+                                    .map(|m| m.to_string()),
+                                dnsname: ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone()),
+                            }));
                         },
                         _ => {
                             error::MudError {
@@ -220,18 +256,8 @@ fn parse_device_policy(
                             AceAction::Deny
                         },
                         matches: AceMatches {
-                            l4: L4Matches {
-                                direction_initiated,
-                                source_port,
-                                destination_port,
-                                icmp_type,
-                                icmp_code: code,
-                            },
-                            l3: L3Matches {
-                                protocol,
-                                address_mask: address_mask.map(|a| a.to_string()),
-                                dnsname,
-                            },
+                            l3,
+                            l4,
                             matches_augmentation,
                         },
                     });
@@ -306,8 +332,8 @@ mod tests {
         let mud = parse_mud(URL.to_string(), mud_data.as_str())?;
 
         let matches = AceMatches {
-            l3: L3Matches::empty(),
-            l4: L4Matches::empty(),
+            l3: None,
+            l4: None,
             matches_augmentation: Some(MudAclMatchesAugmentation {
                 manufacturer: None,
                 same_manufacturer: true,

@@ -81,45 +81,74 @@ pub struct Ace {
 /// YANG ACL (RFC8519) matches on layer 3 protocol header information and augmented by MUD
 /// (RFC8520) with DNS names.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
-pub struct L3Matches {
+pub enum L3Matches {
+    Ipv4(Ipv4Matches),
+    Ipv6(Ipv6Matches),
+}
+
+/// Represents the "(ipv4)" choice node (and its child "ipv4" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct Ipv4Matches {
     pub protocol: Option<AceProtocol>,
     pub address_mask: Option<String>,
     pub dnsname: Option<String>,
     // TODO(ja_he): complete
 }
 
-impl L3Matches {
-    pub fn empty() -> Self {
-        L3Matches {
-            protocol: None,
-            address_mask: None,
-            dnsname: None,
-        }
-    }
+/// Represents the "(ipv6)" choice node (and its child "ipv6" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct Ipv6Matches {
+    pub protocol: Option<AceProtocol>,
+    pub address_mask: Option<String>,
+    pub dnsname: Option<String>,
+    // TODO(ja_he): complete
 }
 
 /// YANG ACL (RFC8519) matches on layer 4 protocol header information and augmented by MUD
 /// (RFC8520) with matching on connection directionality for TCP.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
-pub struct L4Matches {
+pub enum L4Matches {
+    Tcp(TcpMatches),
+    Udp(UdpMatches),
+    Icmp(IcmpMatches),
+}
+
+/// Represents the "(tcp)" choice node (and its child "tcp" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct TcpMatches {
     pub source_port: Option<AcePort>,
     pub destination_port: Option<AcePort>,
     pub direction_initiated: Option<AclDirection>,
-    pub icmp_type: Option<u8>,
-    pub icmp_code: Option<u8>,
     // TODO(ja_he): complete
 }
 
-impl L4Matches {
-    pub fn empty() -> Self {
-        L4Matches {
-            source_port: None,
-            destination_port: None,
-            direction_initiated: None,
-            icmp_type: None,
-            icmp_code: None,
-        }
-    }
+/// Represents the "(udp)" choice node (and its child "udp" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct UdpMatches {
+    pub source_port: Option<AcePort>,
+    pub destination_port: Option<AcePort>,
+    // TODO(ja_he): complete
+}
+
+// The ICMP rest of header header field is 4 bytes long.
+pub const ICMP_REST_OF_HEADER_BYTES: usize = 4;
+
+// NOTE:
+//   The ICMP rest of header header field's format depends on type and code. I don't think there is
+//   any upside to further typing these values.
+pub type IcmpRestOfHeader = [u8; ICMP_REST_OF_HEADER_BYTES];
+
+/// Represents the "(icmp)" choice node (and its child "icmp" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct IcmpMatches {
+    pub icmp_type: Option<u8>,
+    pub icmp_code: Option<u8>,
+    pub rest_of_header: Option<IcmpRestOfHeader>,
 }
 
 /// Represents the "matches" configuration data node
@@ -127,8 +156,8 @@ impl L4Matches {
 /// augmented in RFC8520.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct AceMatches {
-    pub l3: L3Matches,
-    pub l4: L4Matches,
+    pub l3: Option<L3Matches>,
+    pub l4: Option<L4Matches>,
     pub matches_augmentation: Option<MudAclMatchesAugmentation>,
 }
 
