@@ -14,6 +14,7 @@ pub mod log_service;
 pub mod mud_service;
 pub mod neo4things_service;
 pub mod notification_service;
+pub mod quarantine_service;
 pub mod role_service;
 pub mod room_service;
 pub mod user_config_service;

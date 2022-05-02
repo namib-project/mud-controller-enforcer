@@ -130,7 +130,33 @@ pub fn convert_device_to_fw_rules(
 ) -> FirewallDevice {
     let mut rule_counter = 0;
     let mut rules: Vec<FirewallRule> = Vec::new();
-    if !device.q_bit {
+    if device.q_bit {
+        for exception in &device.quarantine_exceptions {
+            let exception_target = match exception.exception_target.parse::<IpAddr>() {
+                Ok(addr) => RuleTargetHost::Ip(addr),
+                Err(_) => RuleTargetHost::Hostname(exception.exception_target.clone()),
+            };
+            let (src, dst) = match exception.direction {
+                AclDirection::FromDevice => (
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(Some(exception_target), None),
+                ),
+                AclDirection::ToDevice => (
+                    RuleTarget::new(Some(exception_target), None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                ),
+            };
+            rules.push(FirewallRule::new(
+                format!("rule_quarantine_exception_{}", rule_counter),
+                src,
+                dst,
+                Protocol::All,
+                Verdict::Accept,
+                ScopeConstraint::None,
+            ));
+            rule_counter += 1;
+        }
+    } else {
         let mud_data = match &device.mud_data {
             Some(mud_data) => mud_data,
             None => {
@@ -451,7 +477,8 @@ mod tests {
 
     use super::*;
     use crate::models::{
-        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudAclMatchesAugmentation, MudData,
+        Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, MudAclMatchesAugmentation,
+        MudData, QuarantineException,
     };
 
     #[test]
@@ -647,6 +674,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let admin_context = AdministrativeContext {
@@ -843,6 +871,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
@@ -962,6 +991,7 @@ mod tests {
             controller_mappings: vec![ConfiguredControllerMapping::Uri(
                 "https://manufacturer.com/devices/bridge".to_string(),
             )],
+            quarantine_exceptions: vec![],
         };
 
         // create bridge
@@ -1002,6 +1032,7 @@ mod tests {
             mud_data: Some(bridge_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1088,6 +1119,7 @@ mod tests {
             mud_data: Some(bulb_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         // create bridge
@@ -1128,6 +1160,7 @@ mod tests {
             mud_data: Some(bridge_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1213,6 +1246,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1267,6 +1301,7 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1374,6 +1409,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1409,6 +1445,7 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let x = convert_device_to_fw_rules(
@@ -1518,6 +1555,7 @@ mod tests {
             mud_data: Some(bulb_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         // create bridge
@@ -1558,6 +1596,7 @@ mod tests {
             mud_data: Some(bridge_mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1647,6 +1686,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1701,6 +1741,7 @@ mod tests {
             mud_data: Some(mud_data1),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1800,6 +1841,7 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1860,21 +1902,38 @@ mod tests {
                 name: "some_acl_name".to_string(),
                 packet_direction: AclDirection::FromDevice,
                 acl_type: AclType::IPV4,
-                ace: vec![Ace {
-                    name: "some_ace_name".to_string(),
-                    action: AceAction::Accept,
-                    matches: AceMatches {
-                        protocol: Some(AceProtocol::Icmp),
-                        direction_initiated: None,
-                        address_mask: None,
-                        dnsname: Some(String::from("www.example.test")),
-                        source_port: None,
-                        destination_port: None,
-                        icmp_type: Some(8),
-                        icmp_code: Some(0),
-                        matches_augmentation: None,
+                ace: vec![
+                    Ace {
+                        name: "some_ace_name_1".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Icmp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: Some(8),
+                            icmp_code: Some(0),
+                            matches_augmentation: None,
+                        },
                     },
-                }],
+                    Ace {
+                        name: "some_ace_name_2".to_string(),
+                        action: AceAction::Accept,
+                        matches: AceMatches {
+                            protocol: Some(AceProtocol::Icmp),
+                            direction_initiated: None,
+                            address_mask: None,
+                            dnsname: Some(String::from("www.example.test")),
+                            source_port: None,
+                            destination_port: None,
+                            icmp_type: Some(8),
+                            icmp_code: Some(0),
+                            matches_augmentation: None,
+                        },
+                    },
+                ],
             }],
             acl_override: Vec::default(),
         };
@@ -1899,6 +1958,11 @@ mod tests {
             mud_data: Some(mud_data),
             room: None,
             controller_mappings: vec![],
+            quarantine_exceptions: vec![QuarantineException {
+                id: 1,
+                exception_target: "www.example.test/update-service".to_string(),
+                direction: AclDirection::FromDevice,
+            }],
         };
 
         let resulting_device = FirewallDevice {
@@ -1907,7 +1971,18 @@ mod tests {
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
-                    String::from("rule_default_0"),
+                    String::from("rule_quarantine_exception_0"),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(
+                        Some(RuleTargetHost::Hostname("www.example.test/update-service".to_string())),
+                        None,
+                    ),
+                    Protocol::All,
+                    Verdict::Accept,
+                    ScopeConstraint::None,
+                ),
+                FirewallRule::new(
+                    String::from("rule_default_1"),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     RuleTarget::new(None, None),
                     Protocol::All,
@@ -1915,7 +1990,7 @@ mod tests {
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
-                    String::from("rule_default_1"),
+                    String::from("rule_default_2"),
                     RuleTarget::new(None, None),
                     RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
                     Protocol::All,
