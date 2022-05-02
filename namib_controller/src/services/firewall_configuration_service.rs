@@ -130,7 +130,33 @@ pub fn convert_device_to_fw_rules(
 ) -> FirewallDevice {
     let mut rule_counter = 0;
     let mut rules: Vec<FirewallRule> = Vec::new();
-    if !device.q_bit {
+    if device.q_bit {
+        for exception in &device.quarantine_exceptions {
+            let exception_target = match exception.exception_target.parse::<IpAddr>() {
+                Ok(addr) => RuleTargetHost::Ip(addr),
+                Err(_) => RuleTargetHost::Hostname(exception.exception_target.clone()),
+            };
+            let (src, dst) = match exception.direction {
+                AclDirection::FromDevice => (
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                    RuleTarget::new(Some(exception_target), None),
+                ),
+                AclDirection::ToDevice => (
+                    RuleTarget::new(Some(exception_target), None),
+                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
+                ),
+            };
+            rules.push(FirewallRule::new(
+                format!("rule_quarantine_exception_{}", rule_counter),
+                src,
+                dst,
+                Protocol::All,
+                Verdict::Accept,
+                ScopeConstraint::None,
+            ));
+            rule_counter += 1;
+        }
+    } else {
         let mud_data = match &device.mud_data {
             Some(mud_data) => mud_data,
             None => {
@@ -306,32 +332,6 @@ pub fn convert_device_to_fw_rules(
                 Protocol::Udp,
                 Verdict::Accept,
                 ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
-            ));
-            rule_counter += 1;
-        }
-    } else if !device.quarantine_exceptions.is_empty() {
-        for exception in &device.quarantine_exceptions {
-            let exception_target = match exception.exception_target.parse::<IpAddr>() {
-                Ok(addr) => RuleTargetHost::Ip(addr),
-                Err(_) => RuleTargetHost::Hostname(exception.exception_target.clone()),
-            };
-            let (src, dst) = match exception.direction {
-                AclDirection::FromDevice => (
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(Some(exception_target), None),
-                ),
-                AclDirection::ToDevice => (
-                    RuleTarget::new(Some(exception_target), None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                ),
-            };
-            rules.push(FirewallRule::new(
-                format!("rule_quarantine_exception_{}", rule_counter),
-                src,
-                dst,
-                Protocol::All,
-                Verdict::Accept,
-                ScopeConstraint::None,
             ));
             rule_counter += 1;
         }

@@ -79,10 +79,9 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Device> {
         .fetch_optional(pool)
         .await?;
 
-    if let Some(device) = device {
-        Ok(Device::from(device))
-    } else {
-        Err(sqlx::error::Error::RowNotFound.into())
+    match device {
+        Some(device) => Ok(Device::from(device)),
+        None => Err(sqlx::error::Error::RowNotFound.into()),
     }
 }
 
