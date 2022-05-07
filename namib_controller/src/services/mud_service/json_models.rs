@@ -141,9 +141,25 @@ pub struct MudExtension {
     pub model: Option<serde_json::Value>,
 }
 
+pub type Dscp = u8;
+pub type Ipv6FlowLabel = u32;
+
+/// Per RFC7950 the `bits` type is represented as a string where bits are set if their name is
+/// present in the string, not set if it is absent.
+/// (also see: <https://datatracker.ietf.org/doc/html/rfc7950#section-9.7>)
+pub type Bits = String;
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4 {
-    pub protocol: Option<u32>,
+    pub dscp: Option<Dscp>,
+    pub ecn: Option<u8>,
+    pub length: Option<u16>,
+    pub ttl: Option<u8>,
+    pub protocol: Option<u8>,
+    pub ihl: Option<u8>,
+    pub flags: Option<Bits>,
+    pub offset: Option<u16>,
+    pub identification: Option<u16>,
     #[serde(rename = "source-ipv4-network")]
     pub source_ipv4_network: Option<String>,
     #[serde(rename = "destination-ipv4-network")]
@@ -156,7 +172,12 @@ pub struct Ipv4 {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6 {
+    pub dscp: Option<Dscp>,
+    pub ecn: Option<u8>,
+    pub length: Option<u16>,
+    pub ttl: Option<u8>,
     pub protocol: Option<u32>,
+    pub flow_label: Option<Ipv6FlowLabel>,
     #[serde(rename = "source-ipv6-network")]
     pub source_ipv6_network: Option<String>,
     #[serde(rename = "destination-ipv6-network")]

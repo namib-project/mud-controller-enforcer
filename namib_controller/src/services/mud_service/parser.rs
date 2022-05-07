@@ -179,6 +179,14 @@ fn parse_device_policy(
                                     .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
                                     .map(|m| m.to_string()),
                                 dnsname: ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone()),
+                                dscp: None,
+                                ecn: None,
+                                length: None,
+                                ttl: None,
+                                ihl: None,
+                                flags: None,
+                                offset: None,
+                                identification: None,
                             }));
                         },
                         (None, Some(ipv6)) => {
@@ -211,6 +219,11 @@ fn parse_device_policy(
                                     .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
                                     .map(|m| m.to_string()),
                                 dnsname: ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone()),
+                                dscp: None,
+                                ecn: None,
+                                length: None,
+                                ttl: None,
+                                flow_label: None,
                             }));
                         },
                         _ => {

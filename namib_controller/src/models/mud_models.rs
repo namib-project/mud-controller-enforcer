@@ -86,24 +86,52 @@ pub enum L3Matches {
     Ipv6(Ipv6Matches),
 }
 
+/// The Ipv4 header flags per RFC8519.
+/// RFC8519 models this as 'bits' (each definitely true or false). We take the liberty to allow for
+/// a None value with a potential semantic improvement for matches definitions in mind.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct Ipv4HeaderFlags {
+    // NOTE: it is intentional that we have Options here despite not using None;
+    //       this is motivated by an idea to add a third value (undefined, ignore for match) to
+    //       the true/false binary to make matching more powerful; currently unimplemented.
+    pub reserved: Option<bool>,
+    pub fragment: Option<bool>,
+    pub more: Option<bool>,
+}
+
 /// Represents the "(ipv4)" choice node (and its child "ipv4" configuration data node, with its
 /// contents), as defined in RFC8519 and augmented in RFC8520.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct Ipv4Matches {
+    pub dscp: Option<u8>,
+    pub ecn: Option<u8>,
+    pub length: Option<u16>,
+    pub ttl: Option<u8>,
     pub protocol: Option<AceProtocol>,
+    pub ihl: Option<u8>,
+    pub flags: Option<Ipv4HeaderFlags>,
+    pub offset: Option<u16>,
+    pub identification: Option<u16>,
+
+    // TODO(ja_he): update, probably
     pub address_mask: Option<String>,
     pub dnsname: Option<String>,
-    // TODO(ja_he): complete
 }
 
 /// Represents the "(ipv6)" choice node (and its child "ipv6" configuration data node, with its
 /// contents), as defined in RFC8519 and augmented in RFC8520.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct Ipv6Matches {
+    pub dscp: Option<u8>,
+    pub ecn: Option<u8>,
+    pub length: Option<u16>,
+    pub ttl: Option<u8>,
     pub protocol: Option<AceProtocol>,
+    pub flow_label: Option<u32>,
+
+    // TODO(ja_he): update, probably
     pub address_mask: Option<String>,
     pub dnsname: Option<String>,
-    // TODO(ja_he): complete
 }
 
 /// YANG ACL (RFC8519) matches on layer 4 protocol header information and augmented by MUD
