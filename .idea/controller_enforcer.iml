@@ -12,12 +12,16 @@
       <sourceFolder url="file://$MODULE_DIR$/namib_mud_controller/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/httpchallenge/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/namib_mud_controller/neo4jthings-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/namib_controller/neo4things-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/namib_controller/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/namib_controller/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/rust-async-dnssd/target" />
       <excludeFolder url="file://$MODULE_DIR$/libuci-sys/target" />
       <excludeFolder url="file://$MODULE_DIR$/namib_enforcer/target" />
       <excludeFolder url="file://$MODULE_DIR$/namib_shared/target" />
       <excludeFolder url="file://$MODULE_DIR$/namib_mud_controller/target" />
+      <excludeFolder url="file://$MODULE_DIR$/namib_controller/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
