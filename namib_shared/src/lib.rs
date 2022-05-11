@@ -10,7 +10,6 @@ use tokio_serde::formats::Cbor;
 use crate::firewall_config::FirewallDevice;
 
 pub mod firewall_config;
-pub mod flow_scope;
 pub mod macaddr;
 pub mod models;
 pub mod rpc;

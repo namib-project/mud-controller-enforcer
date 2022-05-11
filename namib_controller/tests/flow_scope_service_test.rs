@@ -3,9 +3,8 @@
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use namib_controller::error::Result;
-use namib_controller::models::{Device, DeviceWithRefs};
+use namib_controller::models::{Device, DeviceWithRefs, FlowScope, Level};
 use namib_controller::services::{device_service, flow_scope_service};
-use namib_shared::flow_scope::{FlowScope, Level};
 use namib_shared::macaddr::{MacAddr6, SerdeMacAddr};
 
 mod lib;

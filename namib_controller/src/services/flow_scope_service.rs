@@ -1,8 +1,8 @@
 // Copyright 2022, Jasper Wiegratz, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use crate::models::FlowScope;
 use chrono::Utc;
-use namib_shared::flow_scope::FlowScope;
 use namib_shared::macaddr::SerdeMacAddr;
 
 use crate::{
