@@ -25,6 +25,30 @@ enf:openwrt-package_bcm2711_21.02: # raspberry v4
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
 
+enf:openwrt-package_x86_64_22.03:
+  extends: .enf:openwrt_package_base
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-x86_64
+  variables:
+    RUST_TRIPLE: x86_64-unknown-linux-musl
+
+enf:openwrt-package_bcm2708_22.03: # raspberry v1
+  extends: .enf:openwrt_package_base
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-bcm27xx-bcm2708
+  variables:
+    RUST_TRIPLE: arm-unknown-linux-musleabihf
+
+enf:openwrt-package_bcm2710_22.03: # raspberry v3
+  extends: .enf:openwrt_package_base
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-bcm27xx-bcm2710
+  variables:
+    RUST_TRIPLE: aarch64-unknown-linux-musl
+
+enf:openwrt-package_bcm2711_22.03: # raspberry v4
+  extends: .enf:openwrt_package_base
+  image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-bcm27xx-bcm2711
+  variables:
+    RUST_TRIPLE: aarch64-unknown-linux-musl
+
 .enf:openwrt_package_base:
   stage: package
   needs:

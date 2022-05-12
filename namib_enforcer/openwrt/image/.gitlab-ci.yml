@@ -31,6 +31,36 @@ enf:openwrt-image_bcm2711_21.02:
   variables:
     PROFILE: rpi-4
 
+enf:openwrt-image_x86_64_22.03:
+  extends: .enf:openwrt_image_base
+  image: openwrtorg/imagebuilder:x86-64-22.03-SNAPSHOT # - unlike the sdk, "-" is used instead of "_" here...
+  needs:
+    - enf:openwrt-package_x86_64_22.03
+
+enf:openwrt-image_bcm2708_22.03:
+  extends: .enf:openwrt_image_base
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2708-22.03-SNAPSHOT # rpi 1
+  needs:
+    - enf:openwrt-package_bcm2708_22.03
+  variables:
+    PROFILE: rpi
+
+enf:openwrt-image_bcm2710_22.03:
+  extends: .enf:openwrt_image_base
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2710-22.03-SNAPSHOT # rpi 3
+  needs:
+    - enf:openwrt-package_bcm2710_22.03
+  variables:
+    PROFILE: rpi-3
+
+enf:openwrt-image_bcm2711_22.03:
+  extends: .enf:openwrt_image_base
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2711-22.03-SNAPSHOT # rpi 4
+  needs:
+    - enf:openwrt-package_bcm2711_22.03
+  variables:
+    PROFILE: rpi-4
+
 .enf:openwrt_image_base:
   stage: image
   rules:
