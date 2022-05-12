@@ -35,6 +35,8 @@ notify = "4"
 regex = "1.4"
 pnet_datalink = "0.29.0"
 ipnetwork = "0.18.0"
+nflog = { git = "https://github.com/chifflier/nflog-rs" }
+pktparse = { branch = "feat-tcp-flags", git = "https://github.com/Ti-s-ch/pktparse-rs" }
 
 [dev-dependencies]
 serial_test = "0.6.0"
@@ -42,7 +44,7 @@ serial_test = "0.6.0"
 [target.'cfg(unix)'.dependencies]
 rust-uci = { version = "0.1.5", optional = true }
 libc = { version = "0.2.95", optional = true }
-nftnl = { branch = "feature-icmp-musl", git = "https://github.com/namib-project/nftnl-rs.git", optional = true }
+nftnl = { branch = "feature-icmp-musl-log-group", git = "https://github.com/namib-project/nftnl-rs.git", optional = true }
 mnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/mnl-rs.git", optional = true}
 
 

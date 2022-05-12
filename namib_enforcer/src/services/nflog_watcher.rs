@@ -1,6 +1,9 @@
 // Copyright 2020-2021,  Till schnittka
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+// watch has an event loop, so it needs to be async
+#![allow(clippy::unused_async)]
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

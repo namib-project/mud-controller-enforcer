@@ -29,8 +29,13 @@ pub struct FlowDataTcp {
 }
 
 impl FlowDataTcp {
-    pub fn new(sport: u16, dport: u16, psh: bool, ece: bool) -> FlowDataTcp {
-        FlowDataTcp { sport, dport, psh, ece }
+    pub fn new(src_port: u16, dst_port: u16, psh: bool, ece: bool) -> FlowDataTcp {
+        FlowDataTcp {
+            sport: src_port,
+            dport: dst_port,
+            psh,
+            ece,
+        }
     }
 }
 
@@ -41,8 +46,11 @@ pub struct FlowDataUdp {
 }
 
 impl FlowDataUdp {
-    pub fn new(sport: u16, dport: u16) -> FlowDataUdp {
-        FlowDataUdp { sport, dport }
+    pub fn new(src_port: u16, dst_port: u16) -> FlowDataUdp {
+        FlowDataUdp {
+            sport: src_port,
+            dport: dst_port,
+        }
     }
 }
 

@@ -50,7 +50,7 @@ pub async fn create_configuration(
         // Flow scope rules come first, before any accept/drop
         scope_rules.extend(result.rules);
         result.rules = scope_rules;
-        rules.push(result)
+        rules.push(result);
     }
 
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
