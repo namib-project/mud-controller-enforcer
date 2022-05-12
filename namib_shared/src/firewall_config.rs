@@ -58,6 +58,7 @@ pub enum Verdict {
     Accept,
     Reject,
     Drop,
+    Log(u32),
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug, Deserialize, Serialize)]
