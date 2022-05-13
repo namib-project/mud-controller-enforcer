@@ -1,44 +1,35 @@
 Index: src/dhcp-protocol.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
 ===================================================================
---- a/src/dhcp-protocol.h	(revision c5db8f93ec20b46ad47115abf235d75e2bb11ad0)
-+++ b/src/dhcp-protocol.h	(revision 3323d59163bcb7338a9e467883f527facb8f87db)
+--- a/src/dhcp-protocol.h
++++ b/src/dhcp-protocol.h
 @@ -64,6 +64,7 @@
  #define OPTION_SIP_SERVER        120
  #define OPTION_VENDOR_IDENT      124
  #define OPTION_VENDOR_IDENT_OPT  125
 +#define OPTION_MUD_URL_V4        161
  #define OPTION_END               255
-
+ 
  #define SUBOPT_CIRCUIT_ID        1
 Index: src/helper.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
 ===================================================================
---- a/src/helper.c	(revision c5db8f93ec20b46ad47115abf235d75e2bb11ad0)
-+++ b/src/helper.c	(revision 3323d59163bcb7338a9e467883f527facb8f87db)
-@@ -605,6 +605,7 @@
+--- a/src/helper.c
++++ b/src/helper.c
+@@ -604,6 +604,7 @@ int create_helper(int event_fd, int err_
  	      buf = grab_extradata(buf, end, "DNSMASQ_CIRCUIT_ID", &err);
  	      buf = grab_extradata(buf, end, "DNSMASQ_SUBSCRIBER_ID", &err);
  	      buf = grab_extradata(buf, end, "DNSMASQ_REMOTE_ID", &err);
 +	      buf = grab_extradata(buf, end, "DNSMASQ_MUD_URL", &err);
  	      buf = grab_extradata(buf, end, "DNSMASQ_REQUESTED_OPTIONS", &err);
  	    }
-
+ 	  
 Index: src/rfc2131.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
 ===================================================================
---- a/src/rfc2131.c	(revision c5db8f93ec20b46ad47115abf235d75e2bb11ad0)
-+++ b/src/rfc2131.c	(revision 3323d59163bcb7338a9e467883f527facb8f87db)
-@@ -1370,6 +1370,15 @@
+--- a/src/rfc2131.c
++++ b/src/rfc2131.c
+@@ -1417,6 +1417,15 @@ size_t dhcp_reply(struct dhcp_context *c
  		      add_extradata_opt(lease, NULL);
  		    }
-
+ 
 +		  if ((opt = option_find(mess, sz, OPTION_MUD_URL_V4, 1)))
 +		  {
 +			add_extradata_opt(lease, opt);
