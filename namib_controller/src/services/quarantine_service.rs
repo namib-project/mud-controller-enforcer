@@ -26,6 +26,14 @@ pub async fn change_quarantine_status_device(id: i64, pool: &DbConnection, statu
     Ok(upd_count.rows_affected() == 1)
 }
 
+pub async fn get_all_quarantine_exceptions(pool: &DbConnection) -> Result<Vec<QuarantineExceptionDbo>> {
+    let exceptions = sqlx::query_as!(QuarantineExceptionDbo, "SELECT * FROM quarantine_exceptions")
+        .fetch_all(pool)
+        .await?;
+
+    Ok(exceptions)
+}
+
 pub async fn get_quarantine_exception(id: i64, pool: &DbConnection) -> Result<QuarantineExceptionDbo> {
     let exception = sqlx::query_as!(
         QuarantineExceptionDbo,
@@ -44,16 +52,18 @@ pub async fn get_quarantine_exception(id: i64, pool: &DbConnection) -> Result<Qu
 
 pub async fn insert_quarantine_exception(
     pool: &DbConnection,
-    device_id: i64,
+    device_id: Option<i64>,
+    mud_url: Option<String>,
     quarantine_exception: QuarantineException,
 ) -> Result<i64> {
     let direction = quarantine_exception.direction as i64;
 
     let result = sqlx::query!(
-        "INSERT INTO quarantine_exceptions (exception_target, direction, device_id) values ($1, $2, $3) RETURNING id",
+        "INSERT INTO quarantine_exceptions (exception_target, direction, device_id, mud_url) values ($1, $2, $3, $4) RETURNING id",
         quarantine_exception.exception_target,
         direction,
         device_id,
+        mud_url,
     )
     .fetch_one(pool)
     .await?
@@ -62,19 +72,24 @@ pub async fn insert_quarantine_exception(
     Ok(result)
 }
 
-pub async fn get_quarantine_exceptions_for_device(id: i64, pool: &DbConnection) -> Result<Vec<QuarantineException>> {
-    if device_service::find_by_id(id, pool).await.is_err() {
+pub async fn get_quarantine_exceptions_for_device(
+    id: Option<i64>,
+    mud_url: Option<String>,
+    pool: &DbConnection,
+) -> Result<Vec<QuarantineExceptionDbo>> {
+    if device_service::find_by_id(id.unwrap_or(-1), pool).await.is_err() && mud_url.is_none() {
         Err(sqlx::error::Error::RowNotFound.into())
     } else {
         let exceptions = sqlx::query_as!(
             QuarantineExceptionDbo,
-            "SELECT * FROM quarantine_exceptions WHERE device_id = $1",
+            "SELECT * FROM quarantine_exceptions WHERE device_id = $1 OR mud_url = $2",
             id,
+            mud_url,
         )
         .fetch_all(pool)
         .await?;
 
-        Ok(exceptions.into_iter().map(QuarantineException::from).collect())
+        Ok(exceptions)
     }
 }
 
@@ -87,17 +102,19 @@ pub async fn remove_quarantine_exception(id: i64, pool: &DbConnection) -> Result
 }
 
 pub async fn update_quarantine_exception(
-    device_id: i64,
+    device_id: Option<i64>,
+    mud_url: Option<String>,
     exception: QuarantineException,
     pool: &DbConnection,
 ) -> Result<bool> {
     let direction = exception.direction as i64;
 
     let result = sqlx::query!(
-        "UPDATE quarantine_exceptions SET exception_target = $1, direction = $2, device_id = $3 WHERE id = $4",
+        "UPDATE quarantine_exceptions SET exception_target = $1, direction = $2, device_id = $3, mud_url = $4 WHERE id = $5",
         exception.exception_target,
         direction,
         device_id,
+        mud_url,
         exception.id,
     )
     .execute(pool)
