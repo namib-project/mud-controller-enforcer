@@ -113,7 +113,11 @@ impl Device {
             None => vec![],
         };
         let quarantine_exceptions: Vec<QuarantineException> =
-            quarantine_service::get_quarantine_exceptions_for_device(self.id, conn).await?;
+            quarantine_service::get_quarantine_exceptions_for_device(Some(self.id), self.mud_url.clone(), conn)
+                .await?
+                .into_iter()
+                .map(QuarantineException::from)
+                .collect();
 
         Ok(DeviceWithRefs {
             inner: self,
