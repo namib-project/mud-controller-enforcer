@@ -1,20 +1,213 @@
 // Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use std::convert::TryFrom;
 use std::{clone::Clone, net::IpAddr, str::FromStr};
 
 use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use super::json_models;
+use crate::error::Error;
 use crate::models::{
-    IcmpMatches, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches, MudAclMatchesAugmentation, TcpMatches, UdpMatches,
+    IcmpMatches, IcmpRestOfHeader, Ipv4HeaderFlags, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches,
+    MudAclMatchesAugmentation, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches, ICMP_REST_OF_HEADER_BYTES,
 };
 use crate::{
     error,
     error::Result,
     models::{Ace, AceAction, AceMatches, AcePort, AceProtocol, Acl, AclDirection, AclType, MudData},
 };
+
+impl TryFrom<&json_models::Bits> for TcpHeaderFlags {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Bits) -> Result<Self> {
+        // NOTE(ja_he): technically, the YANG type mandates appearance of flags _in order_.
+        //              IMO this leniency is fine. Could think about being strict regarding unknown
+        //              flag names or flag uniqueness, but we're not trying to be a MUD linter.
+        let flag_strings: Vec<&str> = value.split(' ').collect();
+        Ok(TcpHeaderFlags {
+            cwr: Some(flag_strings.contains(&"cwr")),
+            ece: Some(flag_strings.contains(&"ece")),
+            urg: Some(flag_strings.contains(&"urg")),
+            ack: Some(flag_strings.contains(&"ack")),
+            psh: Some(flag_strings.contains(&"psh")),
+            rst: Some(flag_strings.contains(&"rst")),
+            syn: Some(flag_strings.contains(&"syn")),
+            fin: Some(flag_strings.contains(&"fin")),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Bits> for Ipv4HeaderFlags {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Bits) -> Result<Self> {
+        // NOTE(ja_he): technically, the YANG type mandates appearance of flags _in order_.
+        //              IMO this leniency is fine. Could think about being strict regarding unknown
+        //              flag names or flag uniqueness, but we're not trying to be a MUD linter.
+        let flag_strings: Vec<&str> = value.split(' ').collect();
+        Ok(Self {
+            reserved: Some(flag_strings.contains(&"reserved")),
+            fragment: Some(flag_strings.contains(&"fragment")),
+            more: Some(flag_strings.contains(&"more")),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Binary> for TcpOptions {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Binary) -> Result<Self> {
+        let bytes: Vec<u8> = base64::decode(value).map_err(|_| Error::MudError {
+            message: format!("base64-decoding error for TCP options value '{}'", value),
+            // HACK(ja_he): I don't know how to use `error::MudError` as below, there's some snafu
+            //              magic going on and I can't figure out how to wrangle the types, because
+            //              to me it seems like it should be the right type but the type checker
+            //              complains.
+            backtrace: snafu::GenerateBacktrace::generate(),
+        })?;
+
+        // TODO(ja_he): further parsing probably sensible, type would likely have to be changed
+        Ok(Self {
+            kind: bytes[0],
+            length: if bytes.len() >= 2 { Some(bytes[1]) } else { None },
+            data: bytes[2..].to_vec(),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Tcp> for TcpMatches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Tcp) -> Result<Self> {
+        Ok(Self {
+            source_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            destination_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            sequence_number: value.sequence_number,
+            acknowledgement_number: value.acknowledgement_number,
+            data_offset: value.data_offset,
+            reserved: value.reserved,
+            flags: value.flags.as_ref().map(TcpHeaderFlags::try_from).transpose()?,
+            window_size: value.window_size,
+            urgent_pointer: value.urgent_pointer,
+            options: value.options.as_ref().map(TcpOptions::try_from).transpose()?,
+            direction_initiated: match &value.direction_initiated.as_deref() {
+                None => None,
+                Some("from-device") => Some(AclDirection::FromDevice),
+                Some("to-device") => Some(AclDirection::ToDevice),
+                Some(other) => error::MudError {
+                    message: format!("Invalid direction '{}'", other),
+                }
+                .fail()?,
+            },
+        })
+    }
+}
+
+impl TryFrom<&json_models::Udp> for UdpMatches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Udp) -> Result<Self> {
+        Ok(Self {
+            length: value.length,
+            source_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            destination_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+        })
+    }
+}
+
+impl TryFrom<&json_models::Icmp> for IcmpMatches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Icmp) -> Result<Self> {
+        let rest_of_header: Option<IcmpRestOfHeader> = {
+            if let Some(binary) = &value.rest_of_header {
+                let bytes = base64::decode(binary).map_err(|_| Error::MudError {
+                    message: format!("base64-decoding error for ICMP rest-of-header '{}'", binary),
+                    backtrace: snafu::GenerateBacktrace::generate(),
+                })?;
+
+                if bytes.len() == ICMP_REST_OF_HEADER_BYTES {
+                    // STYLE(ja_he):
+                    //   I manually assign the 4 bytes because the intuitive `try_into`-attempt
+                    //   gives me trouble with multiple implementations.
+                    //   Additionally, the whole assignment of `rest_of_header` is very
+                    //   wordy due to the fact that I can't get anything less verbose past the type
+                    //   checker (surely my failing).
+                    Ok(Some([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                } else {
+                    Err(Error::MudError {
+                        message: format!(
+                            "rest of header binary gives {} bytes instead of {}",
+                            bytes.len(),
+                            ICMP_REST_OF_HEADER_BYTES
+                        ),
+                        backtrace: snafu::GenerateBacktrace::generate(),
+                    })
+                }
+            } else {
+                Ok(None)
+            }
+        }?;
+
+        Ok(Self {
+            icmp_type: value.icmp_type,
+            icmp_code: value.code,
+            rest_of_header,
+        })
+    }
+}
+
+impl TryFrom<&json_models::Ipv4> for Ipv4Matches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Ipv4) -> Result<Self> {
+        Ok(Self {
+            dscp: value.dscp,
+            ecn: value.ecn,
+            length: value.length,
+            ttl: value.ttl,
+            protocol: value.protocol.map(|p| AceProtocol::Protocol(p.into())),
+            ihl: value.ihl,
+            flags: value.flags.as_ref().map(Ipv4HeaderFlags::try_from).transpose()?,
+            offset: value.offset,
+            identification: value.identification,
+            // TODO(ja_he): does this make sense?
+            address_mask: value
+                .source_ipv4_network
+                .as_ref()
+                .or_else(|| value.destination_ipv4_network.as_ref())
+                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
+                .map(|m| m.to_string()),
+            dnsname: value.dst_dnsname.clone().or_else(|| value.src_dnsname.clone()),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Ipv6> for Ipv6Matches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Ipv6) -> Result<Self> {
+        Ok(Self {
+            dscp: value.dscp,
+            ecn: value.ecn,
+            length: value.length,
+            ttl: value.ttl,
+            protocol: value.protocol.map(AceProtocol::Protocol),
+            flow_label: value.flow_label,
+            // TODO(ja_he): does this make sense?
+            address_mask: value
+                .source_ipv6_network
+                .as_ref()
+                .or_else(|| value.destination_ipv6_network.as_ref())
+                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
+                .map(|m| m.to_string()),
+            dnsname: value.dst_dnsname.clone().or_else(|| value.src_dnsname.clone()),
+        })
+    }
+}
 
 // inspired by https://github.com/CiscoDevNet/MUD-Manager by Cisco
 pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
@@ -113,42 +306,15 @@ fn parse_device_policy(
                         (None, None, None) => {},
                         (Some(tcp), None, None) => {
                             l4_protocol_for_matching = Some(AceProtocol::Tcp);
-                            l4 = Some(L4Matches::Tcp(TcpMatches {
-                                sequence_number: None,
-                                acknowledgement_number: None,
-                                data_offset: None,
-                                reserved: None,
-                                flags: None,
-                                window_size: None,
-                                urgent_pointer: None,
-                                options: None,
-                                direction_initiated: match &tcp.direction_initiated.as_deref() {
-                                    None => None,
-                                    Some("from-device") => Some(AclDirection::FromDevice),
-                                    Some("to-device") => Some(AclDirection::ToDevice),
-                                    Some(other) => error::MudError {
-                                        message: String::from("Invalid direction"),
-                                    }
-                                    .fail()?,
-                                },
-                                source_port: tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
-                                destination_port: tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
-                            }));
+                            l4 = Some(L4Matches::Tcp(TcpMatches::try_from(tcp)?));
                         },
                         (None, Some(udp), None) => {
                             l4_protocol_for_matching = Some(AceProtocol::Udp);
-                            l4 = Some(L4Matches::Udp(UdpMatches {
-                                source_port: udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
-                                destination_port: udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
-                                length: None,
-                            }));
+                            l4 = Some(L4Matches::Udp(UdpMatches::try_from(udp)?));
                         },
                         (None, None, Some(icmp)) => {
                             l4_protocol_for_matching = Some(AceProtocol::Icmp);
-                            l4 = Some(L4Matches::Icmp(IcmpMatches {
-                                icmp_type: Some(icmp.icmp_type),
-                                icmp_code: Some(icmp.code),
-                            }));
+                            l4 = Some(L4Matches::Icmp(IcmpMatches::try_from(icmp)?));
                         },
                         _ => error::MudError {
                             message: String::from("Multiple L4 matches specified, which does not conform to RFC8519"),
@@ -179,24 +345,7 @@ fn parse_device_policy(
                                     .fail()?;
                                 }
                             }
-                            l3 = Some(L3Matches::Ipv4(Ipv4Matches {
-                                protocol: ip_header_protocol.clone(),
-                                address_mask: ipv4
-                                    .source_ipv4_network
-                                    .as_ref()
-                                    .or_else(|| ipv4.destination_ipv4_network.as_ref())
-                                    .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
-                                    .map(|m| m.to_string()),
-                                dnsname: ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone()),
-                                dscp: None,
-                                ecn: None,
-                                length: None,
-                                ttl: None,
-                                ihl: None,
-                                flags: None,
-                                offset: None,
-                                identification: None,
-                            }));
+                            l3 = Some(L3Matches::Ipv4(Ipv4Matches::try_from(ipv4)?));
                         },
                         (None, Some(ipv6)) => {
                             if acl_type != AclType::IPV6 {
@@ -219,21 +368,7 @@ fn parse_device_policy(
                                     .fail()?;
                                 }
                             }
-                            l3 = Some(L3Matches::Ipv6(Ipv6Matches {
-                                protocol: ip_header_protocol.clone(),
-                                address_mask: ipv6
-                                    .source_ipv6_network
-                                    .as_ref()
-                                    .or_else(|| ipv6.destination_ipv6_network.as_ref())
-                                    .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
-                                    .map(|m| m.to_string()),
-                                dnsname: ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone()),
-                                dscp: None,
-                                ecn: None,
-                                length: None,
-                                ttl: None,
-                                flow_label: None,
-                            }));
+                            l3 = Some(L3Matches::Ipv6(Ipv6Matches::try_from(ipv6)?));
                         },
                         _ => {
                             error::MudError {
