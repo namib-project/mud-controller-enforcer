@@ -7,6 +7,7 @@ use namib_shared::{
     firewall_config::{
         FirewallDevice, FirewallRule, Icmp, Protocol, RuleTarget, RuleTargetHost, ScopeConstraint, Verdict,
     },
+    flow_scope::LogGroup,
     EnforcerConfig,
 };
 
@@ -15,11 +16,12 @@ use crate::{
     error::Result,
     models::{
         AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, AdministrativeContext,
-        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs,
+        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, Level,
     },
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
+        flow_scope_service,
     },
 };
 
@@ -32,17 +34,82 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
         .collect()
 }
 
-pub fn create_configuration(
+pub async fn create_configuration(
+    pool: &DbConnection,
     version: String,
     devices: &[DeviceWithRefs],
     administrative_context: &AdministrativeContext,
 ) -> EnforcerConfig {
-    let rules = devices
+    let mut rules = vec![];
+    for device in devices
         .iter()
         .filter(|d| d.ipv4_addr.is_some() || d.ipv6_addr.is_some())
-        .map(|d| convert_device_to_fw_rules(d, devices, administrative_context))
-        .collect();
+    {
+        let mut result = convert_device_to_fw_rules(device, devices, administrative_context);
+        let mut scope_rules = get_flow_scope_rules(pool, device).await;
+        // Flow scope rules come first, before any accept/drop
+        scope_rules.extend(result.rules);
+        result.rules = scope_rules;
+        rules.push(result);
+    }
+
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
+}
+
+pub async fn get_flow_scope_rules(pool: &DbConnection, device_to_check: &DeviceWithRefs) -> Vec<FirewallRule> {
+    match flow_scope_service::get_active_flow_scopes_for_device(pool, device_to_check.id).await {
+        Ok(scopes) => scopes
+            .iter()
+            .flat_map(|s| {
+                let group = match s.level {
+                    Level::Full => (LogGroup::FullFromDevice, LogGroup::FullToDevice),
+                    Level::HeadersOnly => (LogGroup::HeadersOnlyFromDevice, LogGroup::HeadersOnlyToDevice),
+                };
+                let mut result = vec![];
+                if let Some(addr) = device_to_check.ipv4_addr {
+                    result.push(FirewallRule::new(
+                        format!("scope_{}_{}_fr4", device_to_check.id, s.name),
+                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                        RuleTarget::new(None, None),
+                        Protocol::All,
+                        Verdict::Log(group.0.clone().into()),
+                        ScopeConstraint::None,
+                    ));
+                    result.push(FirewallRule::new(
+                        format!("scope_{}_{}_to4", device_to_check.id, s.name),
+                        RuleTarget::new(None, None),
+                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                        Protocol::All,
+                        Verdict::Log(group.1.clone().into()),
+                        ScopeConstraint::None,
+                    ));
+                }
+                if let Some(addr) = device_to_check.ipv6_addr {
+                    result.push(FirewallRule::new(
+                        format!("scope_{}_{}_fr6", device_to_check.id, s.name),
+                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                        RuleTarget::new(None, None),
+                        Protocol::All,
+                        Verdict::Log(group.0.into()),
+                        ScopeConstraint::None,
+                    ));
+                    result.push(FirewallRule::new(
+                        format!("scope_{}_{}_to6", device_to_check.id, s.name),
+                        RuleTarget::new(None, None),
+                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                        Protocol::All,
+                        Verdict::Log(group.1.into()),
+                        ScopeConstraint::None,
+                    ));
+                }
+                result
+            })
+            .collect::<Vec<FirewallRule>>(),
+        Err(err) => {
+            debug!("Error occured while requesting active flow scopes: {:?}", err);
+            vec![]
+        },
+    }
 }
 
 pub fn get_same_manufacturer_ruletargethosts(

@@ -2278,9 +2278,11 @@ dependencies = [
  "log",
  "mnl",
  "namib_shared",
+ "nflog",
  "nftnl",
  "notify",
  "pin-project 1.0.8",
+ "pktparse",
  "pnet_datalink",
  "regex",
  "rust-uci",
@@ -2349,9 +2351,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "nflog"
+version = "0.10.0"
+source = "git+https://github.com/chifflier/nflog-rs#4092ff82aa9b96afbf5932bac9df559344adddf2"
+dependencies = [
+ "bitflags",
+ "libc",
+ "nflog-sys",
+]
+
+[[package]]
+name = "nflog-sys"
+version = "0.10.0"
+source = "git+https://github.com/chifflier/nflog-rs#4092ff82aa9b96afbf5932bac9df559344adddf2"
+dependencies = [
+ "cc",
+ "libc",
+ "nfnetlink-sys",
+ "pkg-config",
+]
+
+[[package]]
+name = "nfnetlink-sys"
+version = "0.10.0"
+source = "git+https://github.com/chifflier/nflog-rs#4092ff82aa9b96afbf5932bac9df559344adddf2"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "nftnl"
 version = "0.6.2"
-source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl#343139653de9842e6e20b8b47869297a54cfdd04"
+source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl-log-group#3c1e62298b818b3f325ea5676ae1be38e2b539c9"
 dependencies = [
  "bitflags",
  "err-derive",
@@ -2362,7 +2395,7 @@ dependencies = [
 [[package]]
 name = "nftnl-sys"
 version = "0.6.1"
-source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl#343139653de9842e6e20b8b47869297a54cfdd04"
+source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl-log-group#3c1e62298b818b3f325ea5676ae1be38e2b539c9"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -2773,6 +2806,14 @@ name = "pkg-config"
 version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12295df4f294471248581bc09bef3c38a5e46f1e36d6a37353621a0c6c357e1f"
+
+[[package]]
+name = "pktparse"
+version = "0.7.1"
+source = "git+https://github.com/Ti-s-ch/pktparse-rs?branch=feat-tcp-flags#0c32922f777e4d5293964b65dc969f35a98b784a"
+dependencies = [
+ "nom 7.1.0",
+]
 
 [[package]]
 name = "pnet_base"

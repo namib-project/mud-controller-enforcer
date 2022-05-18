@@ -9,6 +9,7 @@ use std::{
 use futures::{future, stream, StreamExt, TryStreamExt};
 use namib_shared::{
     codec,
+    flow_scope::FlowData,
     models::DhcpEvent,
     rpc::NamibRpc,
     tarpc::{
@@ -68,10 +69,12 @@ impl NamibRpc for NamibRpcServer {
                         AdministrativeContext::default()
                     });
             let new_config = firewall_configuration_service::create_configuration(
+                &self.db_connection,
                 current_config_version,
                 &init_devices,
                 &administrative_context,
-            );
+            )
+            .await;
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }
@@ -104,6 +107,10 @@ impl NamibRpc for NamibRpcServer {
             logs.len(),
         );
         log_service::add_new_logs(self.client_id, logs, &self.db_connection).await;
+    }
+
+    async fn send_scope_results(self, _: context::Context, _results: Vec<FlowData>) {
+        // Add services here
     }
 }
 

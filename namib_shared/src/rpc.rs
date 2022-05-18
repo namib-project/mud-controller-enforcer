@@ -3,7 +3,7 @@
 
 #![allow(clippy::large_enum_variant)]
 
-use crate::{models::DhcpEvent, EnforcerConfig};
+use crate::{flow_scope::FlowData, models::DhcpEvent, EnforcerConfig};
 
 /// This is the interface for communication between enforcer & controller
 ///
@@ -14,4 +14,5 @@ pub trait NamibRpc {
     async fn heartbeat(version: Option<String>) -> Option<EnforcerConfig>;
     async fn dhcp_request(event: DhcpEvent);
     async fn send_logs(logs: Vec<String>);
+    async fn send_scope_results(results: Vec<FlowData>);
 }

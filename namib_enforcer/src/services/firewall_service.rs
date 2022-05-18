@@ -596,6 +596,7 @@ async fn add_rule_to_batch(
                     current_rule.add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)));
                 },
                 Verdict::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
+                Verdict::Log(group) => current_rule.add_expr(&nft_expr!(log group group)),
             }
             device_batch.add(&current_rule, nftnl::MsgType::Add);
         }
