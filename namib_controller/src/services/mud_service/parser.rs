@@ -1,8 +1,8 @@
 // Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use std::clone::Clone;
 use std::convert::TryFrom;
-use std::{clone::Clone, net::IpAddr, str::FromStr};
 
 use chrono::{Duration, Utc};
 use snafu::ensure;
@@ -11,7 +11,8 @@ use super::json_models;
 use crate::error::Error;
 use crate::models::{
     IcmpMatches, IcmpRestOfHeader, Ipv4HeaderFlags, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches,
-    MudAclMatchesAugmentation, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches, ICMP_REST_OF_HEADER_BYTES,
+    MudAclMatchesAugmentation, SourceDest, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches,
+    ICMP_REST_OF_HEADER_BYTES,
 };
 use crate::{
     error,
@@ -174,14 +175,8 @@ impl TryFrom<&json_models::Ipv4> for Ipv4Matches {
             flags: value.flags.as_ref().map(Ipv4HeaderFlags::try_from).transpose()?,
             offset: value.offset,
             identification: value.identification,
-            // TODO(ja_he): does this make sense?
-            address_mask: value
-                .source_ipv4_network
-                .as_ref()
-                .or_else(|| value.destination_ipv4_network.as_ref())
-                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
-                .map(|m| m.to_string()),
-            dnsname: value.dst_dnsname.clone().or_else(|| value.src_dnsname.clone()),
+            networks: SourceDest::new(&value.source_ipv4_network, &value.destination_ipv4_network),
+            dnsnames: SourceDest::new(&value.src_dnsname, &value.dst_dnsname),
         })
     }
 }
@@ -197,14 +192,8 @@ impl TryFrom<&json_models::Ipv6> for Ipv6Matches {
             ttl: value.ttl,
             protocol: value.protocol.map(AceProtocol::Protocol),
             flow_label: value.flow_label,
-            // TODO(ja_he): does this make sense?
-            address_mask: value
-                .source_ipv6_network
-                .as_ref()
-                .or_else(|| value.destination_ipv6_network.as_ref())
-                .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok())
-                .map(|m| m.to_string()),
-            dnsname: value.dst_dnsname.clone().or_else(|| value.src_dnsname.clone()),
+            networks: SourceDest::new(&value.source_ipv6_network, &value.destination_ipv6_network),
+            dnsnames: SourceDest::new(&value.src_dnsname, &value.dst_dnsname),
         })
     }
 }

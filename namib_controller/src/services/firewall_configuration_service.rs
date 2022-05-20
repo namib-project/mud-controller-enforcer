@@ -312,8 +312,12 @@ pub fn convert_device_to_fw_rules(
 
                 let dnsname: &Option<String> = if let Some(l3) = &ace.matches.l3 {
                     match l3 {
-                        L3Matches::Ipv4(matches) => &matches.dnsname,
-                        L3Matches::Ipv6(matches) => &matches.dnsname,
+                        L3Matches::Ipv4(matches) => {
+                            matches.dnsnames.ordered_by_direction(acl.packet_direction).other_device
+                        },
+                        L3Matches::Ipv6(matches) => {
+                            matches.dnsnames.ordered_by_direction(acl.packet_direction).other_device
+                        },
                     }
                 } else {
                     &None
@@ -580,7 +584,7 @@ mod tests {
     use super::*;
     use crate::models::{
         Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, IcmpMatches, Ipv4Matches,
-        L3Matches, L4Matches, MudAclMatchesAugmentation, MudData, QuarantineException, TcpMatches,
+        L3Matches, L4Matches, MudAclMatchesAugmentation, MudData, QuarantineException, SourceDest, TcpMatches,
     };
 
     #[test]
@@ -596,8 +600,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -622,8 +626,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -651,8 +655,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            dnsname: None,
-                            address_mask: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -677,8 +681,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Udp),
-                            dnsname: None,
-                            address_mask: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -748,8 +752,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            dnsname: Some(String::from("www.example.test")),
-                            address_mask: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&Some(String::from("www.example.test")), &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -774,8 +778,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Udp),
-                            dnsname: Some(String::from("www.example.test")),
-                            address_mask: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&Some(String::from("www.example.test")), &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -955,8 +959,8 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Tcp),
-                                dnsname: Some(String::from("www.example.test")),
-                                address_mask: None,
+                                networks: SourceDest::new(&None, &None),
+                                dnsnames: SourceDest::new(&Some(String::from("www.example.test")), &None),
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -993,8 +997,8 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Udp),
-                                address_mask: None,
-                                dnsname: Some(String::from("www.example.test")),
+                                networks: SourceDest::new(&None, &None),
+                                dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -1124,8 +1128,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1260,8 +1264,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1392,8 +1396,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1472,8 +1476,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1579,8 +1583,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1744,8 +1748,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1880,8 +1884,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1960,8 +1964,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            address_mask: None,
-                            dnsname: None,
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &None),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -2066,8 +2070,8 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Icmp),
-                            address_mask: None,
-                            dnsname: Some(String::from("www.example.test")),
+                            networks: SourceDest::new(&None, &None),
+                            dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -2177,8 +2181,8 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Icmp),
-                                address_mask: None,
-                                dnsname: Some(String::from("www.example.test")),
+                                networks: SourceDest::new(&None, &None),
+                                dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -2202,8 +2206,8 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Icmp),
-                                address_mask: None,
-                                dnsname: Some(String::from("www.example.test")),
+                                networks: SourceDest::new(&None, &None),
+                                dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
                                 dscp: None,
                                 ecn: None,
                                 length: None,

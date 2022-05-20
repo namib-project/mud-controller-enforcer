@@ -139,10 +139,50 @@ pub struct Ipv4Matches {
     pub flags: Option<Ipv4HeaderFlags>,
     pub offset: Option<u16>,
     pub identification: Option<u16>,
+    pub networks: SourceDest<Option<String>>,
+    pub dnsnames: SourceDest<Option<String>>,
+}
 
-    // TODO(ja_he): update, probably
-    pub address_mask: Option<String>,
-    pub dnsname: Option<String>,
+impl<T: Clone> SourceDest<T> {
+    pub fn new(src: &T, dst: &T) -> Self {
+        Self {
+            src: src.clone(),
+            dst: dst.clone(),
+        }
+    }
+
+    /// Returns the source and destination ordered as "this" and the "other" device, based on the
+    /// given `AclDirection`.
+    pub fn ordered_by_direction(&self, direction: AclDirection) -> ThisOther<&T> {
+        match direction {
+            AclDirection::FromDevice => ThisOther {
+                this_device: &self.src,
+                other_device: &self.dst,
+            },
+            AclDirection::ToDevice => ThisOther {
+                this_device: &self.dst,
+                other_device: &self.src,
+            },
+        }
+    }
+}
+
+/// Represents the two ends of some directional relationship as source and destination.
+/// E.g., it could represent source and destination ports, source and destination IP addresses, ...
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct SourceDest<T> {
+    pub src: T,
+    pub dst: T,
+}
+
+/// Represents a trait on "this" and the "other" side of a relationship.
+/// E.g., it could, for a given device's communication relationship, hold the ports for "this"
+/// device and the "other" device.
+/// This type mainly exists to improve conversion semantics when working with source and
+/// destination traits in a directional relationship (i.E. by ACL direction).
+pub struct ThisOther<T> {
+    pub this_device: T,
+    pub other_device: T,
 }
 
 /// Represents the "(ipv6)" choice node (and its child "ipv6" configuration data node, with its
@@ -155,10 +195,8 @@ pub struct Ipv6Matches {
     pub ttl: Option<u8>,
     pub protocol: Option<AceProtocol>,
     pub flow_label: Option<u32>,
-
-    // TODO(ja_he): update, probably
-    pub address_mask: Option<String>,
-    pub dnsname: Option<String>,
+    pub networks: SourceDest<Option<String>>,
+    pub dnsnames: SourceDest<Option<String>>,
 }
 
 /// YANG ACL (RFC8519) matches on layer 4 protocol header information and augmented by MUD
