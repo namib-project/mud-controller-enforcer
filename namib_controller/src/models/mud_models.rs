@@ -220,8 +220,7 @@ pub struct TcpMatches {
     pub window_size: Option<u16>,
     pub urgent_pointer: Option<u16>,
     pub options: Option<TcpOptions>,
-    pub source_port: Option<AcePort>,
-    pub destination_port: Option<AcePort>,
+    pub ports: SourceDest<Option<AcePort>>,
     pub direction_initiated: Option<AclDirection>,
 }
 
@@ -230,8 +229,7 @@ pub struct TcpMatches {
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct UdpMatches {
     pub length: Option<u16>,
-    pub source_port: Option<AcePort>,
-    pub destination_port: Option<AcePort>,
+    pub ports: SourceDest<Option<AcePort>>,
 }
 
 // The ICMP rest of header header field is 4 bytes long.

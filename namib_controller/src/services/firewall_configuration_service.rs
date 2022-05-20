@@ -277,12 +277,12 @@ pub fn convert_device_to_fw_rules(
                 let mut scope = ScopeConstraint::None;
 
                 let src_ports: Option<String> = match &ace.matches.l4 {
-                    Some(L4Matches::Tcp(tcp)) => match tcp.source_port {
+                    Some(L4Matches::Tcp(tcp)) => match tcp.ports.src {
                         Some(AcePort::Single(port)) => Some(port.to_string()),
                         Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
                         None => None,
                     },
-                    Some(L4Matches::Udp(udp)) => match udp.source_port {
+                    Some(L4Matches::Udp(udp)) => match udp.ports.src {
                         Some(AcePort::Single(port)) => Some(port.to_string()),
                         Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
                         None => None,
@@ -290,12 +290,12 @@ pub fn convert_device_to_fw_rules(
                     _ => None,
                 };
                 let dst_ports: Option<String> = match &ace.matches.l4 {
-                    Some(L4Matches::Tcp(tcp)) => match tcp.destination_port {
+                    Some(L4Matches::Tcp(tcp)) => match tcp.ports.dst {
                         Some(AcePort::Single(port)) => Some(port.to_string()),
                         Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
                         None => None,
                     },
-                    Some(L4Matches::Udp(udp)) => match udp.destination_port {
+                    Some(L4Matches::Udp(udp)) => match udp.ports.dst {
                         Some(AcePort::Single(port)) => Some(port.to_string()),
                         Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
                         None => None,
@@ -972,8 +972,7 @@ mod tests {
                             })),
                             l4: Some(L4Matches::Tcp(TcpMatches {
                                 direction_initiated: None,
-                                source_port: Some(AcePort::Single(123)),
-                                destination_port: Some(AcePort::Range(50, 60)),
+                                ports: SourceDest::new(&Some(AcePort::Single(123)), &Some(AcePort::Range(50, 60))),
                                 sequence_number: None,
                                 acknowledgement_number: None,
                                 data_offset: None,
@@ -1018,8 +1017,7 @@ mod tests {
                                 urgent_pointer: None,
                                 options: None,
                                 direction_initiated: None,
-                                source_port: Some(AcePort::Range(8000, 8080)),
-                                destination_port: Some(AcePort::Single(56)),
+                                ports: SourceDest::new(&Some(AcePort::Range(8000, 8080)), &Some(AcePort::Single(56))),
                             })),
                             matches_augmentation: None,
                         },
@@ -1417,8 +1415,7 @@ mod tests {
                             urgent_pointer: None,
                             options: None,
                             direction_initiated: None,
-                            source_port: Some(AcePort::Single(321)),
-                            destination_port: Some(AcePort::Single(500)),
+                            ports: SourceDest::new(&Some(AcePort::Single(321)), &Some(AcePort::Single(500))),
                         })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
@@ -1604,8 +1601,7 @@ mod tests {
                             urgent_pointer: None,
                             options: None,
                             direction_initiated: None,
-                            source_port: Some(AcePort::Single(123)),
-                            destination_port: Some(AcePort::Range(50, 60)),
+                            ports: SourceDest::new(&Some(AcePort::Single(123)), &Some(AcePort::Range(50, 60))),
                         })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
@@ -1905,8 +1901,7 @@ mod tests {
                             urgent_pointer: None,
                             options: None,
                             direction_initiated: None,
-                            source_port: Some(AcePort::Single(321)),
-                            destination_port: Some(AcePort::Single(500)),
+                            ports: SourceDest::new(&Some(AcePort::Single(321)), &Some(AcePort::Single(500))),
                         })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: Some("simple-example.com".to_string()),

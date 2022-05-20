@@ -84,8 +84,10 @@ impl TryFrom<&json_models::Tcp> for TcpMatches {
 
     fn try_from(value: &json_models::Tcp) -> Result<Self> {
         Ok(Self {
-            source_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
-            destination_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            ports: SourceDest::new(
+                &value.source_port.as_ref().map(parse_mud_port).transpose()?,
+                &value.destination_port.as_ref().map(parse_mud_port).transpose()?,
+            ),
             sequence_number: value.sequence_number,
             acknowledgement_number: value.acknowledgement_number,
             data_offset: value.data_offset,
@@ -113,8 +115,10 @@ impl TryFrom<&json_models::Udp> for UdpMatches {
     fn try_from(value: &json_models::Udp) -> Result<Self> {
         Ok(Self {
             length: value.length,
-            source_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
-            destination_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            ports: SourceDest::new(
+                &value.source_port.as_ref().map(parse_mud_port).transpose()?,
+                &value.destination_port.as_ref().map(parse_mud_port).transpose()?,
+            ),
         })
     }
 }
