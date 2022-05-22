@@ -150,14 +150,14 @@ async fn test_update_outdated_profiles() -> Result<()> {
     let ctx = lib::IntegrationTestContext::new("test_update_outdated_profiles").await;
     //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
     let url: String = String::from("https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json");
-    let mut file = File::open(PATH).unwrap_or_else(|_| panic!("Could not open {}", PATH));
+    let mut file = File::open(PATH).unwrap_or_else(|e| panic!("Could not open {}: {}", PATH, e));
     let mut str_data = String::new();
     file.read_to_string(&mut str_data)
-        .unwrap_or_else(|_| panic!("Could not read {}", PATH));
+        .unwrap_or_else(|e| panic!("Could not read {}: {}", PATH, e));
     let mud_json: json_models::MudJson = serde_json::from_str(&str_data)?;
     let duration = mud_json.mud.cache_validity.unwrap_or(48);
     let mud_data: MudData =
-        parse_mud(url.clone(), str_data.as_str()).unwrap_or_else(|_| panic!("Could not parse {}", PATH));
+        parse_mud(url.clone(), str_data.as_str()).unwrap_or_else(|e| panic!("Could not parse {}: {}", PATH, e));
 
     let present = Utc::now();
     let mud_dbo = MudDbo {
@@ -223,13 +223,13 @@ async fn test_update_valid_profiles() -> Result<()> {
     //external URL containing the same contents as in the test file. Makes the test dependent on an external Service
     let url: String = String::from("https://gitlab.freedesktop.org/sw0rd/MUD-Files/-/raw/master/amazonEchoMud.json");
     let duration: i64 = 50;
-    let mut file = File::open(PATH).unwrap_or_else(|_| panic!("Could not open {}", PATH));
+    let mut file = File::open(PATH).unwrap_or_else(|e| panic!("Could not open {}: {}", PATH, e));
     let mut str_data = String::new();
     file.read_to_string(&mut str_data)
-        .unwrap_or_else(|_| panic!("Could not read {}", PATH));
+        .unwrap_or_else(|e| panic!("Could not read {}: {}", PATH, e));
 
     let mud_data: MudData =
-        parse_mud(url.clone(), str_data.as_str()).unwrap_or_else(|_| panic!("Could not parse {}", PATH));
+        parse_mud(url.clone(), str_data.as_str()).unwrap_or_else(|e| panic!("Could not parse {}: {}", PATH, e));
 
     let mut mud_dbo = MudDbo {
         url: url.to_owned(),
