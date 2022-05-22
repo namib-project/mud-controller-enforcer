@@ -467,9 +467,6 @@ fn parse_mud_port(port: &json_models::Port) -> Result<AcePort> {
 mod tests {
     use std::{fs::File, io::Read};
 
-    use chrono::{offset::TimeZone, NaiveDateTime, Utc};
-    use serde_json::Value;
-
     use super::*;
 
     #[test]
@@ -550,94 +547,6 @@ mod tests {
         };
 
         assert_eq!(mud, example);
-        Ok(())
-    }
-
-    #[test]
-    fn test_example_amazon_echo() -> Result<()> {
-        compare_mud_accept(
-            "tests/mud_tests/Amazon-Echo.json",
-            "https://amazonecho.com/amazonecho",
-            "tests/mud_tests/Amazon-Echo-Test.json",
-        )
-    }
-
-    #[test]
-    fn test_example_amazon_echo_wrong_expired() -> Result<()> {
-        compare_mud_fail(
-            "tests/mud_tests/Amazon-Echo.json",
-            "https://amazonecho.com/amazonecho",
-            "tests/mud_tests/Amazon-Echo-Test.json",
-        )
-    }
-
-    #[test]
-    fn test_example_ring_doorbell() -> Result<()> {
-        compare_mud_accept(
-            "tests/mud_tests/Ring-Doorbell.json",
-            "https://ringdoorbell.com/ringdoorbell",
-            "tests/mud_tests/Ring-Doorbell-Test.json",
-        )
-    }
-
-    #[test]
-    fn test_example_ring_doorbell_wrong_expired() -> Result<()> {
-        compare_mud_fail(
-            "tests/mud_tests/Ring-Doorbell.json",
-            "https://ringdoorbell.com/ringdoorbell",
-            "tests/mud_tests/Ring-Doorbell-Test.json",
-        )
-    }
-
-    #[test]
-    fn test_example_august_doorbell() -> Result<()> {
-        compare_mud_accept(
-            "tests/mud_tests/August-Doorbell.json",
-            "https://augustdoorbellcam.com/augustdoorbellcam",
-            "tests/mud_tests/August-Doorbell-Test.json",
-        )
-    }
-
-    #[test]
-    fn test_example_august_doorbell_wrong_expired() -> Result<()> {
-        compare_mud_fail(
-            "tests/mud_tests/August-Doorbell.json",
-            "https://augustdoorbellcam.com/augustdoorbellcam",
-            "tests/mud_tests/August-Doorbell-Test.json",
-        )
-    }
-
-    fn compare_mud(
-        mud_profile_path: &str,
-        mud_profile_url: &str,
-        mud_profile_example_path: &str,
-    ) -> Result<(MudData, String)> {
-        let mut mud_data = String::new();
-        let mut mud_data_test = String::new();
-
-        let mut mud_profile = File::open(mud_profile_path)?;
-        let mut mud_profile_test = File::open(mud_profile_example_path)?;
-
-        mud_profile.read_to_string(&mut mud_data)?;
-        mud_profile_test.read_to_string(&mut mud_data_test)?;
-
-        let mud = parse_mud(mud_profile_url.to_string(), mud_data.as_str())?;
-        Ok((mud, mud_data_test))
-    }
-    fn compare_mud_fail(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
-        let mud_data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        assert_ne!(
-            serde_json::to_value(&mud_data.0)?,
-            serde_json::from_str::<Value>(&mud_data.1)?
-        );
-        Ok(())
-    }
-
-    fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
-        let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S")?;
-        data.0.expiration = Utc.from_utc_datetime(&naive);
-        assert_eq!(serde_json::to_value(&data.0)?, serde_json::from_str::<Value>(&data.1)?);
         Ok(())
     }
 }
