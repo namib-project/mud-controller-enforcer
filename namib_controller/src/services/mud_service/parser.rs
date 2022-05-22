@@ -549,4 +549,114 @@ mod tests {
         assert_eq!(mud, example);
         Ok(())
     }
+
+    #[test]
+    fn test_dangling_detected() {
+        // no dangling policy
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "systeminfo" : "amazonEcho",
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a" } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x" } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            if let Err(e) = parse_mud("https://manufacturer.com/thing".to_string(), data) {
+                panic!("parsing mostly empty but valid MUD JSON returned an error: {}", e);
+            }
+        }
+
+        // dangling from-device-policy "b"
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "systeminfo" : "amazonEcho",
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a", "b" } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x"      } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            assert!(
+                !parse_mud("https://manufacturer.com/thing".to_string(), data).is_ok(),
+                "parsing MUD JSON with dangling policy 'b' SHOULD return an error, BUT does not"
+            );
+        }
+
+        // dangling to-device-policy "y"
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "systeminfo" : "amazonEcho",
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a"      } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x", "y" } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            assert!(
+                !parse_mud("https://manufacturer.com/thing".to_string(), data).is_ok(),
+                "parsing MUD JSON with dangling policy 'y' SHOULD return an error, BUT does not"
+            );
+        }
+    }
 }
