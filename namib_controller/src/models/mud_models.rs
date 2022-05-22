@@ -174,6 +174,17 @@ pub enum AceProtocol {
     Protocol(u32),
 }
 
+impl fmt::Display for AceProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tcp => write!(f, "tcp"),
+            Self::Udp => write!(f, "udp"),
+            Self::Icmp => write!(f, "icmp"),
+            Self::Protocol(number) => write!(f, "other({})", number),
+        }
+    }
+}
+
 impl Apiv2Schema for AceProtocol {
     const NAME: Option<&'static str> = Some("AceProtocol");
 
