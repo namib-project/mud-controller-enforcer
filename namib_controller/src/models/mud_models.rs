@@ -185,6 +185,17 @@ impl fmt::Display for AceProtocol {
     }
 }
 
+impl From<u8> for AceProtocol {
+    fn from(p: u8) -> Self {
+        match p {
+            1 => Self::Icmp,
+            6 => Self::Tcp,
+            17 => Self::Udp,
+            n => Self::Protocol(n.into()),
+        }
+    }
+}
+
 impl Apiv2Schema for AceProtocol {
     const NAME: Option<&'static str> = Some("AceProtocol");
 
