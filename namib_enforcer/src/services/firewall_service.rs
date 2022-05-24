@@ -422,6 +422,8 @@ async fn convert_config_to_nftnl_commands(
     dns_watcher: &DnsWatcher,
     device_batches: &mut Vec<FinalizedBatch>,
 ) -> Result<()> {
+    use namib_shared::flow_scope::LogGroup;
+
     // Create new firewall table.
     let table = create_table(scope);
     batch.add(&table, nftnl::MsgType::Add);
@@ -473,10 +475,28 @@ async fn convert_config_to_nftnl_commands(
         for rule_spec in &device.rules {
             add_rule_to_batch(&device_chain, &mut device_batch, device, scope, rule_spec, dns_watcher).await?;
         }
+        if log_rule_in_scope(scope) {
+            log_rule(&device_chain, &mut device_batch, LogGroup::FirewallDenials as u32);
+        }
         device_batches.push(device_batch.finalize());
     }
 
     Ok(())
+}
+
+/// Adds a rule to log packets to a specified log groups
+#[cfg(feature = "nftables")]
+fn log_rule(device_chain: &Chain, device_batch: &mut Batch, log_group: u32) {
+    let mut rule = Rule::new(device_chain);
+    rule.add_expr(&nft_expr!(log group log_group));
+    device_batch.add(&rule, nftnl::MsgType::Add);
+}
+
+/// Returns whether log rules should be added in the given scope
+fn log_rule_in_scope(scope: &FirewallRuleScope) -> bool {
+    match scope {
+        FirewallRuleScope::Inet | FirewallRuleScope::Bridge => true,
+    }
 }
 
 // Adds a rule based on the given `rule_spec` to the given `device_batch` as part of the given `device_chain`
