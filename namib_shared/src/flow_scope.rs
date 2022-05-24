@@ -6,7 +6,8 @@ pub enum LogGroup {
     FullToDevice,
     HeadersOnlyFromDevice,
     HeadersOnlyToDevice,
-    FirewallDenials,
+    DenialsFromDevice,
+    DenialsToDevice,
 }
 
 impl From<LogGroup> for u32 {

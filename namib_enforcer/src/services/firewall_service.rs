@@ -422,8 +422,6 @@ async fn convert_config_to_nftnl_commands(
     dns_watcher: &DnsWatcher,
     device_batches: &mut Vec<FinalizedBatch>,
 ) -> Result<()> {
-    use namib_shared::flow_scope::LogGroup;
-
     // Create new firewall table.
     let table = create_table(scope);
     batch.add(&table, nftnl::MsgType::Add);
@@ -475,9 +473,15 @@ async fn convert_config_to_nftnl_commands(
         for rule_spec in &device.rules {
             add_rule_to_batch(&device_chain, &mut device_batch, device, scope, rule_spec, dns_watcher).await?;
         }
-        if log_rule_in_scope(scope) {
-            log_rule(&device_chain, &mut device_batch, LogGroup::FirewallDenials as u32);
+
+        // Add log rules for denials
+        if let Some(v4addr) = device.ipv4_addr {
+            add_log_rules(&device_chain, &mut device_batch, scope, v4addr.into());
         }
+        if let Some(v6addr) = device.ipv6_addr {
+            add_log_rules(&device_chain, &mut device_batch, scope, v6addr.into());
+        }
+
         device_batches.push(device_batch.finalize());
     }
 
@@ -486,16 +490,25 @@ async fn convert_config_to_nftnl_commands(
 
 /// Adds a rule to log packets to a specified log groups
 #[cfg(feature = "nftables")]
-fn log_rule(device_chain: &Chain, device_batch: &mut Batch, log_group: u32) {
-    let mut rule = Rule::new(device_chain);
-    rule.add_expr(&nft_expr!(log group log_group));
-    device_batch.add(&rule, nftnl::MsgType::Add);
-}
+fn add_log_rules(device_chain: &Chain, device_batch: &mut Batch, scope: &FirewallRuleScope, device_addr: IpAddr) {
+    use namib_shared::flow_scope::LogGroup;
+    if !(scope == &FirewallRuleScope::Inet || scope == &FirewallRuleScope::Bridge) {
+        return;
+    }
+    let l3proto = match device_addr {
+        IpAddr::V4(_) => FirewallRuleProto::IPv4,
+        IpAddr::V6(_) => FirewallRuleProto::IPv6,
+    };
 
-/// Returns whether log rules should be added in the given scope
-fn log_rule_in_scope(scope: &FirewallRuleScope) -> bool {
-    match scope {
-        FirewallRuleScope::Inet | FirewallRuleScope::Bridge => true,
+    for direction in [
+        (&AddressMatchOn::Src, LogGroup::DenialsFromDevice),
+        (&AddressMatchOn::Dest, LogGroup::DenialsToDevice),
+    ] {
+        let mut rule = Rule::new(device_chain);
+        nf_match_l3proto(&mut rule, scope, &l3proto);
+        nf_match_addresses(&mut rule, &device_addr, direction.0);
+        rule.add_expr(&nft_expr!(log group (direction.1 as u32)));
+        device_batch.add(&rule, nftnl::MsgType::Add);
     }
 }
 
