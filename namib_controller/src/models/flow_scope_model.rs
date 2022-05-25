@@ -19,8 +19,8 @@ impl From<FlowScopeDbo> for FlowScope {
         FlowScope {
             name: flowscope.name,
             level: match flowscope.level {
-                0 => Level::Full,
-                _ => Level::HeadersOnly,
+                0 => FlowScopeLevel::Full,
+                _ => FlowScopeLevel::HeadersOnly,
             },
             ttl: flowscope.ttl,
             starts_at: flowscope.starts_at,
@@ -44,14 +44,14 @@ impl EndsAt for FlowScopeDbo {
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct FlowScope {
     pub name: String,
-    pub level: Level,
+    pub level: FlowScopeLevel,
     pub ttl: i64,
     pub starts_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[repr(i64)]
-pub enum Level {
+pub enum FlowScopeLevel {
     Full = 0,
     HeadersOnly = 1,
 }

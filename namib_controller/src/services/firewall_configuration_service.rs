@@ -16,7 +16,7 @@ use crate::{
     error::Result,
     models::{
         AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, AdministrativeContext,
-        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, L3Matches, L4Matches, Level,
+        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, FlowScopeLevel, L3Matches, L4Matches,
     },
     services::{
         acme_service,
@@ -62,8 +62,8 @@ pub async fn get_flow_scope_rules(pool: &DbConnection, device_to_check: &DeviceW
             .iter()
             .flat_map(|s| {
                 let group = match s.level {
-                    Level::Full => (LogGroup::FullFromDevice, LogGroup::FullToDevice),
-                    Level::HeadersOnly => (LogGroup::HeadersOnlyFromDevice, LogGroup::HeadersOnlyToDevice),
+                    FlowScopeLevel::Full => (LogGroup::FullFromDevice, LogGroup::FullToDevice),
+                    FlowScopeLevel::HeadersOnly => (LogGroup::HeadersOnlyFromDevice, LogGroup::HeadersOnlyToDevice),
                 };
                 let mut result = vec![];
                 if let Some(addr) = device_to_check.ipv4_addr {
