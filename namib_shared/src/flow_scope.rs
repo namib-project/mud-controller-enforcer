@@ -63,13 +63,13 @@ pub enum FlowDataTransport {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FlowData {
-    timestamp: Option<std::time::SystemTime>,
-    src_ip: std::net::IpAddr,
-    dest_ip: std::net::IpAddr,
-    direction: FlowDataDirection,
-    length: u16,
-    transport: FlowDataTransport,
-    packet: Option<Vec<u8>>,
+    pub timestamp: Option<std::time::SystemTime>,
+    pub src_ip: std::net::IpAddr,
+    pub dest_ip: std::net::IpAddr,
+    pub direction: FlowDataDirection,
+    pub length: u16,
+    pub transport: FlowDataTransport,
+    pub packet: Option<Vec<u8>>,
 }
 
 impl FlowData {

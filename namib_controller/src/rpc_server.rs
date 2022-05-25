@@ -34,7 +34,7 @@ use crate::{
     models::{AdministrativeContext, ConfiguredServerDbo, DefinedServer},
     services::{
         acme_service::CertId, device_service, enforcer_service, firewall_configuration_service, flow_scope_service,
-        log_service,
+        flow_service, log_service,
     },
     util::open_file_with,
 };
@@ -133,8 +133,13 @@ impl NamibRpc for NamibRpcServer {
         log_service::add_new_logs(self.client_id, logs, &self.db_connection).await;
     }
 
-    async fn send_scope_results(self, _: context::Context, _results: Vec<FlowData>) {
+    async fn send_scope_results(self, _: context::Context, results: Vec<FlowData>) {
         // Add services here
+        for result in results {
+            if let Err(e) = flow_service::on_flow(&result, &self.db_connection).await {
+                error!("error occured while handling flow data: {:?}", e);
+            }
+        }
     }
 }
 
