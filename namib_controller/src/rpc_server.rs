@@ -77,12 +77,10 @@ impl NamibRpc for NamibRpcServer {
                         AdministrativeContext::default()
                     });
             let new_config = firewall_configuration_service::create_configuration(
-                &self.db_connection,
                 current_config_version,
                 &init_devices,
                 &administrative_context,
-            )
-            .await;
+            );
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }

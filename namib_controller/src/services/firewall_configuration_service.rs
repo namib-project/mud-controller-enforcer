@@ -34,8 +34,7 @@ pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a 
         .collect()
 }
 
-pub async fn create_configuration(
-    pool: &DbConnection,
+pub fn create_configuration(
     version: String,
     devices: &[DeviceWithRefs],
     administrative_context: &AdministrativeContext,
@@ -46,7 +45,7 @@ pub async fn create_configuration(
         .filter(|d| d.ipv4_addr.is_some() || d.ipv6_addr.is_some())
     {
         let mut result = convert_device_to_fw_rules(device, devices, administrative_context);
-        let mut scope_rules = get_flow_scope_rules(pool, device).await;
+        let mut scope_rules = get_flow_scope_rules(device);
         // Flow scope rules come first, before any accept/drop
         scope_rules.extend(result.rules);
         result.rules = scope_rules;
@@ -56,60 +55,55 @@ pub async fn create_configuration(
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
 }
 
-pub async fn get_flow_scope_rules(pool: &DbConnection, device_to_check: &DeviceWithRefs) -> Vec<FirewallRule> {
-    match flow_scope_service::get_active_flow_scopes_for_device(pool, device_to_check.id).await {
-        Ok(scopes) => scopes
-            .iter()
-            .flat_map(|s| {
-                let group = match s.level {
-                    FlowScopeLevel::Full => (LogGroup::FullFromDevice, LogGroup::FullToDevice),
-                    FlowScopeLevel::HeadersOnly => (LogGroup::HeadersOnlyFromDevice, LogGroup::HeadersOnlyToDevice),
-                };
-                let mut result = vec![];
-                if let Some(addr) = device_to_check.ipv4_addr {
-                    result.push(FirewallRule::new(
-                        format!("scope_{}_{}_fr4", device_to_check.id, s.name),
-                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                        RuleTarget::new(None, None),
-                        Protocol::All,
-                        Verdict::Log(group.0.clone().into()),
-                        ScopeConstraint::None,
-                    ));
-                    result.push(FirewallRule::new(
-                        format!("scope_{}_{}_to4", device_to_check.id, s.name),
-                        RuleTarget::new(None, None),
-                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                        Protocol::All,
-                        Verdict::Log(group.1.clone().into()),
-                        ScopeConstraint::None,
-                    ));
-                }
-                if let Some(addr) = device_to_check.ipv6_addr {
-                    result.push(FirewallRule::new(
-                        format!("scope_{}_{}_fr6", device_to_check.id, s.name),
-                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                        RuleTarget::new(None, None),
-                        Protocol::All,
-                        Verdict::Log(group.0.into()),
-                        ScopeConstraint::None,
-                    ));
-                    result.push(FirewallRule::new(
-                        format!("scope_{}_{}_to6", device_to_check.id, s.name),
-                        RuleTarget::new(None, None),
-                        RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                        Protocol::All,
-                        Verdict::Log(group.1.into()),
-                        ScopeConstraint::None,
-                    ));
-                }
-                result
-            })
-            .collect::<Vec<FirewallRule>>(),
-        Err(err) => {
-            debug!("Error occured while requesting active flow scopes: {:?}", err);
-            vec![]
-        },
-    }
+pub fn get_flow_scope_rules(device_to_check: &DeviceWithRefs) -> Vec<FirewallRule> {
+    device_to_check
+        .flow_scopes
+        .iter()
+        .flat_map(|s| {
+            let group = match s.level {
+                FlowScopeLevel::Full => (LogGroup::FullFromDevice, LogGroup::FullToDevice),
+                FlowScopeLevel::HeadersOnly => (LogGroup::HeadersOnlyFromDevice, LogGroup::HeadersOnlyToDevice),
+            };
+            let mut result = vec![];
+            if let Some(addr) = device_to_check.ipv4_addr {
+                result.push(FirewallRule::new(
+                    format!("scope_{}_{}_fr4", device_to_check.id, s.name),
+                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                    RuleTarget::new(None, None),
+                    Protocol::All,
+                    Verdict::Log(group.0.clone().into()),
+                    ScopeConstraint::None,
+                ));
+                result.push(FirewallRule::new(
+                    format!("scope_{}_{}_to4", device_to_check.id, s.name),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                    Protocol::All,
+                    Verdict::Log(group.1.clone().into()),
+                    ScopeConstraint::None,
+                ));
+            }
+            if let Some(addr) = device_to_check.ipv6_addr {
+                result.push(FirewallRule::new(
+                    format!("scope_{}_{}_fr6", device_to_check.id, s.name),
+                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                    RuleTarget::new(None, None),
+                    Protocol::All,
+                    Verdict::Log(group.0.into()),
+                    ScopeConstraint::None,
+                ));
+                result.push(FirewallRule::new(
+                    format!("scope_{}_{}_to6", device_to_check.id, s.name),
+                    RuleTarget::new(None, None),
+                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
+                    Protocol::All,
+                    Verdict::Log(group.1.into()),
+                    ScopeConstraint::None,
+                ));
+            }
+            result
+        })
+        .collect::<Vec<FirewallRule>>()
 }
 
 pub fn get_same_manufacturer_ruletargethosts(
@@ -817,6 +811,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let admin_context = AdministrativeContext {
@@ -1048,6 +1043,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
@@ -1174,6 +1170,7 @@ mod tests {
                 "https://manufacturer.com/devices/bridge".to_string(),
             )],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         // create bridge
@@ -1215,6 +1212,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1308,6 +1306,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         // create bridge
@@ -1349,6 +1348,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1452,6 +1452,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1513,6 +1514,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -1638,6 +1640,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1674,6 +1677,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let x = convert_device_to_fw_rules(
@@ -1790,6 +1794,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         // create bridge
@@ -1831,6 +1836,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let bulb_firewall_rules_result = convert_device_to_fw_rules(
@@ -1938,6 +1944,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let mud_data1 = MudData {
@@ -1999,6 +2006,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -2109,6 +2117,7 @@ mod tests {
             room: None,
             controller_mappings: vec![],
             quarantine_exceptions: vec![],
+            flow_scopes: vec![],
         };
 
         let resulting_device = FirewallDevice {
@@ -2250,6 +2259,7 @@ mod tests {
                 exception_target: "www.example.test/update-service".to_string(),
                 direction: AclDirection::FromDevice,
             }],
+            flow_scopes: vec![],
         };
 
         let resulting_device = FirewallDevice {
