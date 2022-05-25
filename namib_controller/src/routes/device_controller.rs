@@ -4,6 +4,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::http::StatusCode;
+use chrono::Utc;
 use futures::{stream, StreamExt, TryStreamExt};
 use paperclip::actix::{
     api_v2_operation, web,
@@ -16,10 +17,14 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    models::Device,
+    models::{Device, FlowScope, Level},
     routes::dtos::{AnomalyDto, DeviceCreationUpdateDto, DeviceDto, GuessDto},
-    services::{anomaly_service, device_service, neo4things_service, role_service::Permission},
+    services::{
+        anomaly_service, device_service, flow_scope_service, flow_service, neo4things_service, role_service::Permission,
+    },
 };
+
+use super::dtos::DeviceConnectionsDto;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(get_all_devices));
@@ -30,6 +35,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{id}", web::delete().to(delete_device));
     cfg.route("/{id}/guesses", web::get().to(guess_thing));
     cfg.route("/{id}/anomalies", web::get().to(get_anomalies_of_device));
+    cfg.route("/{id}/connections", web::get().to(get_connections_of_device));
 }
 
 #[api_v2_operation(summary = "List all devices", tags(Devices))]
@@ -135,6 +141,21 @@ async fn update_device(
             device_with_refs.id,
             device_with_refs.inner.clone(),
         ));
+
+        // add flow scope for device
+        if let Some(mac) = device_with_refs.inner.mac_addr {
+            flow_scope_service::insert_flow_scope(
+                vec![mac],
+                &FlowScope {
+                    name: "device_connections".into(),
+                    level: Level::HeadersOnly,
+                    ttl: i64::MAX,
+                    starts_at: Utc::now().naive_utc(),
+                },
+                &pool,
+            )
+            .await?;
+        }
     }
 
     Ok(Json(DeviceDto::from(device_with_refs)))
@@ -188,6 +209,26 @@ async fn get_anomalies_of_device(
                 .map(AnomalyDto::from)
                 .collect(),
         ))
+    }
+}
+
+#[api_v2_operation(summary = "List all connections of a device by id", tags(Devices))]
+async fn get_connections_of_device(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<Json<DeviceConnectionsDto>> {
+    auth.require_permission(Permission::connections__list)?;
+
+    if device_service::find_by_id(*id, &pool).await.is_err() {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Device with Id {} can not be found.", *id)),
+        }
+        .fail()
+    } else {
+        let connections = flow_service::get_device_connections(*id, &pool).await?;
+        Ok(Json((&connections).into()))
     }
 }
 

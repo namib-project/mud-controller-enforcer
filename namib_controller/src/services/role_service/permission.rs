@@ -139,4 +139,7 @@ pub enum Permission {
     /// anomaly/create
     #[strum(serialize = "anomaly/create")]
     anomaly__create,
+    /// connections/list
+    #[strum(serialize = "connections/list")]
+    connections__list,
 }

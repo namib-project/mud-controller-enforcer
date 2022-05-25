@@ -40,7 +40,7 @@ pub async fn add_device_connection(device: &Device, flow: &FlowData, pool: &DbCo
     let dest_ip = flow.dest_ip.to_string();
 
     let _ = sqlx::query!(
-        "INSERT OR IGNORE INTO device_connections (device_id, direction, target, amount) VALUES (?, ?, ?, 1);
+        "INSERT OR IGNORE INTO device_connections (device_id, direction, target, amount) VALUES (?, ?, ?, 0);
          UPDATE device_connections SET amount = amount + 1 WHERE device_id = ? AND direction = ? AND target = ?",
         device.id,
         direction,
