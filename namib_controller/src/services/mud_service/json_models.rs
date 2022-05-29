@@ -94,6 +94,19 @@ pub struct Matches {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Tcp {
+    #[serde(rename = "sequence-number")]
+    pub sequence_number: Option<u32>,
+    #[serde(rename = "acknowledgement-number")]
+    pub acknowledgement_number: Option<u32>,
+    #[serde(rename = "data-offset")]
+    pub data_offset: Option<u8>,
+    pub reserved: Option<u8>,
+    pub flags: Option<Bits>,
+    #[serde(rename = "window-size")]
+    pub window_size: Option<u16>,
+    #[serde(rename = "urgent-pointer")]
+    pub urgent_pointer: Option<u16>,
+    pub options: Option<Binary>,
     #[serde(rename = "source-port")]
     pub source_port: Option<Port>,
     #[serde(rename = "destination-port")]
@@ -104,17 +117,20 @@ pub struct Tcp {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Udp {
+    pub length: Option<u16>,
     #[serde(rename = "source-port")]
     pub source_port: Option<Port>,
     #[serde(rename = "destination-port")]
     pub destination_port: Option<Port>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Icmp {
     #[serde(rename = "type")]
-    pub icmp_type: u8,
-    pub code: u8,
+    pub icmp_type: Option<u8>,
+    pub code: Option<u8>,
+    #[serde(rename = "rest-of-header")]
+    pub rest_of_header: Option<Binary>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -148,6 +164,10 @@ pub type Ipv6FlowLabel = u32;
 /// present in the string, not set if it is absent.
 /// (also see: <https://datatracker.ietf.org/doc/html/rfc7950#section-9.7>)
 pub type Bits = String;
+
+/// According to RFC7950 the `binary` type's information is base64-encoded.
+/// (also see: <https://datatracker.ietf.org/doc/html/rfc7950#section-9.8>)
+pub type Binary = String;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4 {

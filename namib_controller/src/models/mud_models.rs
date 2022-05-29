@@ -99,6 +99,33 @@ pub struct Ipv4HeaderFlags {
     pub more: Option<bool>,
 }
 
+/// The TCP header flags per RFC8519.
+/// RFC8519 models this as 'bits' (each definitely true or false). We take the liberty to allow for
+/// a None value with a potential semantic improvement for matches definitions in mind.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct TcpHeaderFlags {
+    // NOTE: it is intentional that we have Options here despite not using None;
+    //       this is motivated by an idea to add a third value (undefined, ignore for match) to
+    //       the true/false binary to make matching more powerful; currently unimplemented.
+    pub cwr: Option<bool>,
+    pub ece: Option<bool>,
+    pub urg: Option<bool>,
+    pub ack: Option<bool>,
+    pub psh: Option<bool>,
+    pub rst: Option<bool>,
+    pub syn: Option<bool>,
+    pub fin: Option<bool>,
+}
+
+/// The type of the TCP header "options" field. In MUD (per RFC8519) this value is given as
+/// "binary" (meaning a base64 string), which we parse into this specific type.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct TcpOptions {
+    pub kind: u8,
+    pub length: Option<u8>,
+    pub data: Vec<u8>,
+}
+
 /// Represents the "(ipv4)" choice node (and its child "ipv4" configuration data node, with its
 /// contents), as defined in RFC8519 and augmented in RFC8520.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
@@ -147,19 +174,26 @@ pub enum L4Matches {
 /// contents), as defined in RFC8519 and augmented in RFC8520.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct TcpMatches {
+    pub sequence_number: Option<u32>,
+    pub acknowledgement_number: Option<u32>,
+    pub data_offset: Option<u8>,
+    pub reserved: Option<u8>,
+    pub flags: Option<TcpHeaderFlags>,
+    pub window_size: Option<u16>,
+    pub urgent_pointer: Option<u16>,
+    pub options: Option<TcpOptions>,
     pub source_port: Option<AcePort>,
     pub destination_port: Option<AcePort>,
     pub direction_initiated: Option<AclDirection>,
-    // TODO(ja_he): complete
 }
 
 /// Represents the "(udp)" choice node (and its child "udp" configuration data node, with its
 /// contents), as defined in RFC8519 and augmented in RFC8520.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct UdpMatches {
+    pub length: Option<u16>,
     pub source_port: Option<AcePort>,
     pub destination_port: Option<AcePort>,
-    // TODO(ja_he): complete
 }
 
 // The ICMP rest of header header field is 4 bytes long.

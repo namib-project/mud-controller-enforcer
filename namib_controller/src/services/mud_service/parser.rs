@@ -114,6 +114,14 @@ fn parse_device_policy(
                         (Some(tcp), None, None) => {
                             l4_protocol_for_matching = Some(AceProtocol::Tcp);
                             l4 = Some(L4Matches::Tcp(TcpMatches {
+                                sequence_number: None,
+                                acknowledgement_number: None,
+                                data_offset: None,
+                                reserved: None,
+                                flags: None,
+                                window_size: None,
+                                urgent_pointer: None,
+                                options: None,
                                 direction_initiated: match &tcp.direction_initiated.as_deref() {
                                     None => None,
                                     Some("from-device") => Some(AclDirection::FromDevice),
@@ -132,6 +140,7 @@ fn parse_device_policy(
                             l4 = Some(L4Matches::Udp(UdpMatches {
                                 source_port: udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
                                 destination_port: udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok()),
+                                length: None,
                             }));
                         },
                         (None, None, Some(icmp)) => {
