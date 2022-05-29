@@ -659,4 +659,176 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_tcp_header_flags() -> Result<()> {
+        {
+            let bits: json_models::Bits = String::from("");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(false),
+                    ece: Some(false),
+                    urg: Some(false),
+                    ack: Some(false),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(false)
+                }
+            );
+        }
+
+        {
+            let bits: json_models::Bits = String::from("ece");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(false),
+                    ece: Some(true),
+                    urg: Some(false),
+                    ack: Some(false),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(false)
+                }
+            );
+        }
+
+        {
+            let bits: json_models::Bits = String::from("cwr ack fin");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(true),
+                    ece: Some(false),
+                    urg: Some(false),
+                    ack: Some(true),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(true)
+                }
+            );
+        }
+
+        {
+            // NOTE(ja_he): I claim we want to be permissive in this case and simply ignore
+            //              extraneous flags.
+            let bits: json_models::Bits = String::from("this test is fun");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(false),
+                    ece: Some(false),
+                    urg: Some(false),
+                    ack: Some(false),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(false)
+                }
+            );
+        }
+
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a" } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x" } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [ {
+                                    "name": "cool-ace",
+                                    "matches": {
+                                      "tcp": { "flags": "syn" }
+                                    },
+                                    "actions": { "forwarding": "accept" }
+                                  } ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            let mud: MudData = parse_mud("https://manufacturer.com/thing".to_string(), data)?;
+            assert_eq!(
+                mud,
+                MudData {
+                    url: "https://manufacturer.com/thing".to_string(),
+                    masa_url: None,
+                    last_update: "2018-09-16T13:53:04.908+10:00".to_string(),
+                    systeminfo: None,
+                    mfg_name: None,
+                    model_name: None,
+                    documentation: None,
+                    expiration: mud.expiration, // :^)
+                    acllist: vec![
+                        Acl {
+                            name: "a".to_string(),
+                            packet_direction: AclDirection::FromDevice,
+                            acl_type: AclType::IPV4,
+                            ace: vec![Ace {
+                                name: "cool-ace".to_string(),
+                                action: AceAction::Accept,
+                                matches: AceMatches {
+                                    l3: None,
+                                    l4: Some(L4Matches::Tcp(TcpMatches {
+                                        sequence_number: None,
+                                        acknowledgement_number: None,
+                                        data_offset: None,
+                                        reserved: None,
+                                        flags: Some(TcpHeaderFlags {
+                                            cwr: Some(false),
+                                            ece: Some(false),
+                                            urg: Some(false),
+                                            ack: Some(false),
+                                            psh: Some(false),
+                                            rst: Some(false),
+                                            syn: Some(true),
+                                            fin: Some(false),
+                                        }),
+                                        window_size: None,
+                                        urgent_pointer: None,
+                                        options: None,
+                                        ports: SourceDest { src: None, dst: None },
+                                        direction_initiated: None,
+                                    })),
+                                    matches_augmentation: None,
+                                }
+                            },],
+                        },
+                        Acl {
+                            name: "x".to_string(),
+                            packet_direction: AclDirection::ToDevice,
+                            acl_type: AclType::IPV4,
+                            ace: vec![],
+                        }
+                    ],
+                    acl_override: vec![],
+                },
+            );
+        }
+
+        Ok(())
+    }
 }
