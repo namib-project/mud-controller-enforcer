@@ -11,14 +11,16 @@ pub struct QuarantineExceptionDto {
     pub id: i64,
     pub exception_target: String,
     pub direction: String,
-    pub device_id: i64,
+    pub device_id: Option<i64>,
+    pub mud_url: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone)]
 pub struct QuarantineExceptionCreationUpdateDto {
     pub exception_target: Option<String>,
     pub direction: Option<String>,
     pub device_id: Option<i64>,
+    pub mud_url: Option<String>,
 }
 
 impl From<QuarantineExceptionCreationUpdateDto> for QuarantineException {
