@@ -723,31 +723,41 @@ mod tests {
             .expect("Could not apply config.");
 
         for family_info in [
-            ("inet", super::TABLE_NAME, super::BASE_CHAIN_NAME),
-            ("bridge", super::TABLE_NAME_BRIDGE, super::BASE_CHAIN_NAME_BRIDGE),
+            (FirewallRuleScope::Inet, super::TABLE_NAME, super::BASE_CHAIN_NAME),
+            (
+                FirewallRuleScope::Bridge,
+                super::TABLE_NAME_BRIDGE,
+                super::BASE_CHAIN_NAME_BRIDGE,
+            ),
         ] {
             let family = family_info.0;
             let table_name = family_info.1;
             let chain_name = family_info.2;
+            let family_nfname = match family {
+                FirewallRuleScope::Inet => "inet",
+                FirewallRuleScope::Bridge => "bridge",
+            };
 
             let output = Command::new("nft")
-                .args(["-j", "list", "chain", family, table_name, chain_name])
+                .args(["-j", "list", "chain", family_nfname, table_name, chain_name])
                 .output()
                 .expect("failed to execute process");
             let parsed: Value = serde_json::from_slice(&output.stdout).expect("failed to parse command output as JSON");
             let expected = json!({
             "chain": {
-                "family": family,
+                "family": family_nfname,
                 "table": table_name,
                 "name": chain_name,
                 "handle": 1,
                 "type": "filter",
                 "hook": match family {
-                    "inet" => "forward",
-                    "bridge" => "input",
-                    _ => panic!("unsupported family")
+                    FirewallRuleScope::Inet => "forward",
+                    FirewallRuleScope::Bridge => "input",
                 },
-                "prio": 0,
+                "prio": match family {
+                    FirewallRuleScope::Inet => 0,
+                    FirewallRuleScope::Bridge => -200,
+                },
                 "policy": "accept"
             }
             });
@@ -790,13 +800,21 @@ mod tests {
             .expect("Could not apply config.");
 
         for family_info in [
-            ("inet", super::TABLE_NAME, super::BASE_CHAIN_NAME),
-            ("bridge", super::TABLE_NAME_BRIDGE, super::BASE_CHAIN_NAME_BRIDGE),
+            (FirewallRuleScope::Inet, super::TABLE_NAME, super::BASE_CHAIN_NAME),
+            (
+                FirewallRuleScope::Bridge,
+                super::TABLE_NAME_BRIDGE,
+                super::BASE_CHAIN_NAME_BRIDGE,
+            ),
         ] {
             let family = family_info.0;
             let table_name = family_info.1;
             let base_chain = family_info.2;
             let device_id = device_id.to_string();
+            let family_nfname = match family {
+                FirewallRuleScope::Inet => "inet",
+                FirewallRuleScope::Bridge => "bridge",
+            };
 
             for chain in [base_chain, &device_id] {
                 let device_chain = &format!("device_{}", &chain).to_owned();
@@ -804,7 +822,7 @@ mod tests {
                     x if x == base_chain => base_chain,
                     _ => device_chain,
                 };
-                let cmd_args = ["-j", "list", "chain", family, table_name, chain_name];
+                let cmd_args = ["-j", "list", "chain", family_nfname, table_name, chain_name];
                 let output = Command::new("nft")
                     .args(cmd_args)
                     .output()
@@ -821,37 +839,27 @@ mod tests {
                 let expected_chain = match chain {
                     x if x == base_chain => json!({
                     "chain": {
-                        "family": family,
+                        "family": family_nfname,
                         "table": table_name,
                         "name": chain_name,
                         "handle": 1,
                         "type": "filter",
                         "hook": match family {
-                            "inet" => "forward",
-                            "bridge" => "input",
-                            _ => panic!("unsupported family")
+                            FirewallRuleScope::Inet => "forward",
+                            FirewallRuleScope::Bridge => "input",
                         },
-                        "prio": 0,
+                        "prio": match family {
+                            FirewallRuleScope::Inet => 0,
+                            FirewallRuleScope::Bridge => -200,
+                        },
                         "policy": "accept"
                     }}),
                     x if x == device_id => {
-                        json!({"chain": {"family": family, "handle": 2, "name": chain_name, "table": table_name}})
+                        json!({"chain": {"family": family_nfname, "handle": 2, "name": chain_name, "table": table_name}})
                     },
                     _ => panic!("unsupported chain"),
                 };
                 assert_eq!(parsed["nftables"][1], expected_chain);
-
-                if chain == device_id {
-                    match family {
-                        "inet" => {
-                            assert!(!parsed["nftables"][2]["rule"]["expr"][0].is_null());
-                            // rule added to inet chain
-                            // TODO: check content of rule spec
-                        },
-                        "bridge" => assert!(parsed["nftables"][2].is_null()), // rule not added to bridge chain
-                        _ => panic!("unsupported chain"),
-                    }
-                }
             }
         }
     }
