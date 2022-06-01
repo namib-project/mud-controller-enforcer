@@ -55,3 +55,12 @@ pub enum FlowScopeLevel {
     Full = 0,
     HeadersOnly = 1,
 }
+
+impl EndsAt for FlowScope {
+    fn ends_at(&self) -> NaiveDateTime {
+        match self.starts_at.checked_add_signed(Duration::seconds(self.ttl)) {
+            Some(ends_at) => ends_at,
+            None => panic!("Overflow when adding TTL to flow start"),
+        }
+    }
+}

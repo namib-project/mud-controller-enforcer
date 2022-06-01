@@ -1,6 +1,7 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jan Hensel
+// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jan Hensel, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use chrono::NaiveDateTime;
 use std::net::IpAddr;
 
 use namib_shared::{
@@ -21,7 +22,6 @@ use crate::{
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
-        flow_scope_service,
     },
 };
 
@@ -38,6 +38,7 @@ pub fn create_configuration(
     version: String,
     devices: &[DeviceWithRefs],
     administrative_context: &AdministrativeContext,
+    next_expiration: &Option<NaiveDateTime>,
 ) -> EnforcerConfig {
     let mut rules = vec![];
     for device in devices
@@ -52,7 +53,7 @@ pub fn create_configuration(
         rules.push(result);
     }
 
-    EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone())
+    EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone(), *next_expiration)
 }
 
 pub fn get_flow_scope_rules(device_to_check: &DeviceWithRefs) -> Vec<FirewallRule> {
