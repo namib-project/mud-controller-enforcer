@@ -69,7 +69,10 @@ pub async fn heartbeat(enforcer: Arc<RwLock<Enforcer>>, fw_service: Arc<Firewall
         {
             let enf = enforcer.read().await;
             let version = Some(enf.config.version().into());
-            let heartbeat: io::Result<Option<EnforcerConfig>> = enf.client.heartbeat(context::current(), version).await;
+            let heartbeat: io::Result<Option<EnforcerConfig>> = enf
+                .client
+                .heartbeat(context::current(), version, enf.config.expiration_date_time())
+                .await;
             match heartbeat {
                 Err(error) => match error.kind() {
                     ErrorKind::ConnectionReset => {
