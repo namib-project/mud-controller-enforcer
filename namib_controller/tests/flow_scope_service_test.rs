@@ -4,8 +4,10 @@
 use chrono::{Duration, NaiveDateTime, Utc};
 use namib_controller::error::Result;
 use namib_controller::models::{Device, DeviceWithRefs, FlowScope, FlowScopeLevel};
-use namib_controller::services::{device_service, flow_scope_service};
+use namib_controller::services::{device_service, firewall_configuration_service, flow_scope_service};
 use namib_shared::macaddr::{MacAddr6, SerdeMacAddr};
+use std::thread::sleep;
+use std::time;
 
 mod lib;
 
@@ -14,28 +16,23 @@ async fn test_get_flow_scopes() -> Result<()> {
     let ctx = lib::IntegrationTestContext::new("test_get_flow_scopes").await;
 
     let device_mac = SerdeMacAddr::V6(MacAddr6::new(0x01, 0x23, 0x45, 0x67, 0x89, 0xAB));
-    let device = DeviceWithRefs {
-        controller_mappings: vec![],
-        inner: Device {
-            id: 1,
-            name: Some(String::from("test_device")),
-            ipv4_addr: None,
-            ipv6_addr: None,
-            mac_addr: Some(device_mac),
-            duid: None,
-            hostname: String::from("test_device"),
-            vendor_class: String::from(""),
-            mud_url: None,
-            collect_info: false,
-            last_interaction: NaiveDateTime::from_timestamp(42_000_000, 0),
-            room_id: None,
-            fa_icon: None,
-            q_bit: false,
-        },
-        mud_data: None,
-        room: None,
-        quarantine_exceptions: vec![],
+    let device = Device {
+        id: 1,
+        name: Some(String::from("test_device")),
+        ipv4_addr: None,
+        ipv6_addr: None,
+        mac_addr: Some(device_mac),
+        duid: None,
+        hostname: String::from("test_device"),
+        vendor_class: String::from(""),
+        mud_url: None,
+        collect_info: false,
+        last_interaction: NaiveDateTime::from_timestamp(42_000_000, 0),
+        room_id: None,
+        fa_icon: None,
+        q_bit: false,
     };
+
     device_service::insert_device(&device, &ctx.db_conn).await?;
 
     let scope_data = [
@@ -154,6 +151,59 @@ async fn test_get_flow_scope_by_name() -> Result<()> {
     let scope_by_name = flow_scope_service::find_by_name(&ctx.db_conn, &String::from("test_scope")).await?;
     assert_eq!(scope_by_name.ttl, 3600);
     assert_eq!(scope_by_name.name, String::from("test_scope"));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flow_scope_ttl_validation() -> Result<()> {
+    let ctx = lib::IntegrationTestContext::new("test_flow_scope_ttl_validation").await;
+
+    let device_mac = SerdeMacAddr::V6(MacAddr6::new(0x01, 0x23, 0x45, 0x67, 0x89, 0xAB));
+    let device = Device {
+        id: 1,
+        name: Some(String::from("test_device")),
+        ipv4_addr: None,
+        ipv6_addr: None,
+        mac_addr: Some(device_mac),
+        duid: None,
+        hostname: String::from("test_device"),
+        vendor_class: String::from(""),
+        mud_url: None,
+        collect_info: false,
+        last_interaction: NaiveDateTime::from_timestamp(42_000_000, 0),
+        room_id: None,
+        fa_icon: None,
+        q_bit: false,
+    };
+
+    device_service::insert_device(&device, &ctx.db_conn).await?;
+
+    assert_eq!(
+        firewall_configuration_service::get_config_version(&ctx.db_conn).await,
+        "1"
+    );
+    assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 0);
+
+    flow_scope_service::insert_flow_scope(
+        vec![device.mac_addr.unwrap()],
+        &FlowScope {
+            name: String::from("test_scope"),
+            level: FlowScopeLevel::Full,
+            ttl: 5,
+            starts_at: Utc::now().naive_local(),
+        },
+        &ctx.db_conn,
+    )
+    .await?;
+    assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 1);
+    assert_eq!(
+        firewall_configuration_service::get_config_version(&ctx.db_conn).await,
+        "2"
+    );
+
+    sleep(time::Duration::from_secs(5));
+    assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 0);
 
     Ok(())
 }
