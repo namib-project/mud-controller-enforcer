@@ -61,7 +61,9 @@ shd:coverage:
     - mv cobertura.xml target/shared-coverage.xml
   artifacts:
     reports:
-      cobertura: target/shared-coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: target/shared-coverage.xml
   allow_failure: true
 
 shd:warnings:

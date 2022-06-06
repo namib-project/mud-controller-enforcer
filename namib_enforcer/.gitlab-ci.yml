@@ -71,7 +71,9 @@ enf:coverage:
     - mv cobertura.xml target/enf-coverage.xml
   artifacts:
     reports:
-      cobertura: target/enf-coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: target/enf-coverage.xml
   allow_failure: true
 
 enf:warnings:
