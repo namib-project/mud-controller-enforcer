@@ -102,7 +102,9 @@ ctl:coverage:
     - mv cobertura.xml target/ctl-coverage.xml
   artifacts:
     reports:
-      cobertura: target/ctl-coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: target/ctl-coverage.xml
   allow_failure: true
 
 ctl:test_postgres:
@@ -127,7 +129,9 @@ ctl:coverage_postgres:
     - mv cobertura.xml target/ctl-coverage_postgres.xml
   artifacts:
     reports:
-      cobertura: target/ctl-coverage_postgres.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: target/ctl-coverage_postgres.xml
   allow_failure: true
 
 ctl:warnings:
