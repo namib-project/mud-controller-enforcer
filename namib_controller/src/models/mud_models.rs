@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jan Hensel
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![allow(clippy::field_reassign_with_default)]
@@ -78,16 +78,184 @@ pub struct Ace {
     pub matches: AceMatches,
 }
 
+/// YANG ACL (RFC8519) matches on layer 3 protocol header information and augmented by MUD
+/// (RFC8520) with DNS names.
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
-pub struct AceMatches {
+pub enum L3Matches {
+    Ipv4(Ipv4Matches),
+    Ipv6(Ipv6Matches),
+}
+
+/// The Ipv4 header flags per RFC8519.
+/// RFC8519 models this as 'bits' (each definitely true or false). We take the liberty to allow for
+/// a None value with a potential semantic improvement for matches definitions in mind.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct Ipv4HeaderFlags {
+    // NOTE: it is intentional that we have Options here despite not using None;
+    //       this is motivated by an idea to add a third value (undefined, ignore for match) to
+    //       the true/false binary to make matching more powerful; currently unimplemented.
+    pub reserved: Option<bool>,
+    pub fragment: Option<bool>,
+    pub more: Option<bool>,
+}
+
+/// The TCP header flags per RFC8519.
+/// RFC8519 models this as 'bits' (each definitely true or false). We take the liberty to allow for
+/// a None value with a potential semantic improvement for matches definitions in mind.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct TcpHeaderFlags {
+    // NOTE: it is intentional that we have Options here despite not using None;
+    //       this is motivated by an idea to add a third value (undefined, ignore for match) to
+    //       the true/false binary to make matching more powerful; currently unimplemented.
+    pub cwr: Option<bool>,
+    pub ece: Option<bool>,
+    pub urg: Option<bool>,
+    pub ack: Option<bool>,
+    pub psh: Option<bool>,
+    pub rst: Option<bool>,
+    pub syn: Option<bool>,
+    pub fin: Option<bool>,
+}
+
+/// The type of the TCP header "options" field. In MUD (per RFC8519) this value is given as
+/// "binary" (meaning a base64 string), which we parse into this specific type.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct TcpOptions {
+    pub kind: u8,
+    pub length: Option<u8>,
+    pub data: Vec<u8>,
+}
+
+/// Represents the "(ipv4)" choice node (and its child "ipv4" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct Ipv4Matches {
+    pub dscp: Option<u8>,
+    pub ecn: Option<u8>,
+    pub length: Option<u16>,
+    pub ttl: Option<u8>,
     pub protocol: Option<AceProtocol>,
+    pub ihl: Option<u8>,
+    pub flags: Option<Ipv4HeaderFlags>,
+    pub offset: Option<u16>,
+    pub identification: Option<u16>,
+    pub networks: SourceDest<Option<String>>,
+    pub dnsnames: SourceDest<Option<String>>,
+}
+
+impl<T: Clone> SourceDest<T> {
+    pub fn new(src: &T, dst: &T) -> Self {
+        Self {
+            src: src.clone(),
+            dst: dst.clone(),
+        }
+    }
+
+    /// Returns the source and destination ordered as "this" and the "other" device, based on the
+    /// given `AclDirection`.
+    pub fn ordered_by_direction(&self, direction: AclDirection) -> ThisOther<&T> {
+        match direction {
+            AclDirection::FromDevice => ThisOther {
+                this_device: &self.src,
+                other_device: &self.dst,
+            },
+            AclDirection::ToDevice => ThisOther {
+                this_device: &self.dst,
+                other_device: &self.src,
+            },
+        }
+    }
+}
+
+/// Represents the two ends of some directional relationship as source and destination.
+/// E.g., it could represent source and destination ports, source and destination IP addresses, ...
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct SourceDest<T> {
+    pub src: T,
+    pub dst: T,
+}
+
+/// Represents a trait on "this" and the "other" side of a relationship.
+/// E.g., it could, for a given device's communication relationship, hold the ports for "this"
+/// device and the "other" device.
+/// This type mainly exists to improve conversion semantics when working with source and
+/// destination traits in a directional relationship (i.E. by ACL direction).
+pub struct ThisOther<T> {
+    pub this_device: T,
+    pub other_device: T,
+}
+
+/// Represents the "(ipv6)" choice node (and its child "ipv6" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct Ipv6Matches {
+    pub dscp: Option<u8>,
+    pub ecn: Option<u8>,
+    pub length: Option<u16>,
+    pub ttl: Option<u8>,
+    pub protocol: Option<AceProtocol>,
+    pub flow_label: Option<u32>,
+    pub networks: SourceDest<Option<String>>,
+    pub dnsnames: SourceDest<Option<String>>,
+}
+
+/// YANG ACL (RFC8519) matches on layer 4 protocol header information and augmented by MUD
+/// (RFC8520) with matching on connection directionality for TCP.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub enum L4Matches {
+    Tcp(TcpMatches),
+    Udp(UdpMatches),
+    Icmp(IcmpMatches),
+}
+
+/// Represents the "(tcp)" choice node (and its child "tcp" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct TcpMatches {
+    pub sequence_number: Option<u32>,
+    pub acknowledgement_number: Option<u32>,
+    pub data_offset: Option<u8>,
+    pub reserved: Option<u8>,
+    pub flags: Option<TcpHeaderFlags>,
+    pub window_size: Option<u16>,
+    pub urgent_pointer: Option<u16>,
+    pub options: Option<TcpOptions>,
+    pub ports: SourceDest<Option<AcePort>>,
     pub direction_initiated: Option<AclDirection>,
-    pub address_mask: Option<String>,
-    pub dnsname: Option<String>,
-    pub source_port: Option<AcePort>,
-    pub destination_port: Option<AcePort>,
+}
+
+/// Represents the "(udp)" choice node (and its child "udp" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct UdpMatches {
+    pub length: Option<u16>,
+    pub ports: SourceDest<Option<AcePort>>,
+}
+
+// The ICMP rest of header header field is 4 bytes long.
+pub const ICMP_REST_OF_HEADER_BYTES: usize = 4;
+
+// NOTE:
+//   The ICMP rest of header header field's format depends on type and code. I don't think there is
+//   any upside to further typing these values.
+pub type IcmpRestOfHeader = [u8; ICMP_REST_OF_HEADER_BYTES];
+
+/// Represents the "(icmp)" choice node (and its child "icmp" configuration data node, with its
+/// contents), as defined in RFC8519 and augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct IcmpMatches {
     pub icmp_type: Option<u8>,
     pub icmp_code: Option<u8>,
+    pub rest_of_header: Option<IcmpRestOfHeader>,
+}
+
+/// Represents the "matches" configuration data node
+/// (concretely: "/acl:acls/acl:acl/acl:aces/acl:ace/acl:matches"), as defined in RFC8519 and
+/// augmented in RFC8520.
+#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
+pub struct AceMatches {
+    pub l3: Option<L3Matches>,
+    pub l4: Option<L4Matches>,
     pub matches_augmentation: Option<MudAclMatchesAugmentation>,
 }
 
@@ -131,6 +299,28 @@ pub enum AceProtocol {
     Udp,
     Icmp,
     Protocol(u32),
+}
+
+impl fmt::Display for AceProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tcp => write!(f, "tcp"),
+            Self::Udp => write!(f, "udp"),
+            Self::Icmp => write!(f, "icmp"),
+            Self::Protocol(number) => write!(f, "other({})", number),
+        }
+    }
+}
+
+impl From<u8> for AceProtocol {
+    fn from(p: u8) -> Self {
+        match p {
+            1 => Self::Icmp,
+            6 => Self::Tcp,
+            17 => Self::Udp,
+            n => Self::Protocol(n.into()),
+        }
+    }
 }
 
 impl Apiv2Schema for AceProtocol {

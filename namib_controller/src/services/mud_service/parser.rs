@@ -1,18 +1,206 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jan Hensel
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use std::{clone::Clone, net::IpAddr, str::FromStr};
+use std::clone::Clone;
+use std::convert::TryFrom;
 
 use chrono::{Duration, Utc};
 use snafu::ensure;
 
 use super::json_models;
-use crate::models::MudAclMatchesAugmentation;
+use crate::error::Error;
+use crate::models::{
+    IcmpMatches, IcmpRestOfHeader, Ipv4HeaderFlags, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches,
+    MudAclMatchesAugmentation, SourceDest, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches,
+    ICMP_REST_OF_HEADER_BYTES,
+};
 use crate::{
     error,
     error::Result,
     models::{Ace, AceAction, AceMatches, AcePort, AceProtocol, Acl, AclDirection, AclType, MudData},
 };
+
+impl TryFrom<&json_models::Bits> for TcpHeaderFlags {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Bits) -> Result<Self> {
+        // NOTE(ja_he): technically, the YANG type mandates appearance of flags _in order_.
+        //              IMO this leniency is fine. Could think about being strict regarding unknown
+        //              flag names or flag uniqueness, but we're not trying to be a MUD linter.
+        let flag_strings: Vec<&str> = value.split(' ').collect();
+        Ok(TcpHeaderFlags {
+            cwr: Some(flag_strings.contains(&"cwr")),
+            ece: Some(flag_strings.contains(&"ece")),
+            urg: Some(flag_strings.contains(&"urg")),
+            ack: Some(flag_strings.contains(&"ack")),
+            psh: Some(flag_strings.contains(&"psh")),
+            rst: Some(flag_strings.contains(&"rst")),
+            syn: Some(flag_strings.contains(&"syn")),
+            fin: Some(flag_strings.contains(&"fin")),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Bits> for Ipv4HeaderFlags {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Bits) -> Result<Self> {
+        // NOTE(ja_he): technically, the YANG type mandates appearance of flags _in order_.
+        //              IMO this leniency is fine. Could think about being strict regarding unknown
+        //              flag names or flag uniqueness, but we're not trying to be a MUD linter.
+        let flag_strings: Vec<&str> = value.split(' ').collect();
+        Ok(Self {
+            reserved: Some(flag_strings.contains(&"reserved")),
+            fragment: Some(flag_strings.contains(&"fragment")),
+            more: Some(flag_strings.contains(&"more")),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Binary> for TcpOptions {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Binary) -> Result<Self> {
+        let bytes: Vec<u8> = base64::decode(value).map_err(|_| Error::MudError {
+            message: format!("base64-decoding error for TCP options value '{}'", value),
+            // HACK(ja_he): I don't know how to use `error::MudError` as below, there's some snafu
+            //              magic going on and I can't figure out how to wrangle the types, because
+            //              to me it seems like it should be the right type but the type checker
+            //              complains.
+            backtrace: snafu::GenerateBacktrace::generate(),
+        })?;
+
+        // TODO(ja_he): further parsing probably sensible, type would likely have to be changed
+        Ok(Self {
+            kind: bytes[0],
+            length: if bytes.len() >= 2 { Some(bytes[1]) } else { None },
+            data: bytes[2..].to_vec(),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Tcp> for TcpMatches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Tcp) -> Result<Self> {
+        Ok(Self {
+            ports: SourceDest::new(
+                &value.source_port.as_ref().map(parse_mud_port).transpose()?,
+                &value.destination_port.as_ref().map(parse_mud_port).transpose()?,
+            ),
+            sequence_number: value.sequence_number,
+            acknowledgement_number: value.acknowledgement_number,
+            data_offset: value.data_offset,
+            reserved: value.reserved,
+            flags: value.flags.as_ref().map(TcpHeaderFlags::try_from).transpose()?,
+            window_size: value.window_size,
+            urgent_pointer: value.urgent_pointer,
+            options: value.options.as_ref().map(TcpOptions::try_from).transpose()?,
+            direction_initiated: match &value.direction_initiated.as_deref() {
+                None => None,
+                Some("from-device") => Some(AclDirection::FromDevice),
+                Some("to-device") => Some(AclDirection::ToDevice),
+                Some(other) => error::MudError {
+                    message: format!("Invalid direction '{}'", other),
+                }
+                .fail()?,
+            },
+        })
+    }
+}
+
+impl TryFrom<&json_models::Udp> for UdpMatches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Udp) -> Result<Self> {
+        Ok(Self {
+            length: value.length,
+            ports: SourceDest::new(
+                &value.source_port.as_ref().map(parse_mud_port).transpose()?,
+                &value.destination_port.as_ref().map(parse_mud_port).transpose()?,
+            ),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Icmp> for IcmpMatches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Icmp) -> Result<Self> {
+        let rest_of_header: Option<IcmpRestOfHeader> = {
+            if let Some(binary) = &value.rest_of_header {
+                let bytes = base64::decode(binary).map_err(|_| Error::MudError {
+                    message: format!("base64-decoding error for ICMP rest-of-header '{}'", binary),
+                    backtrace: snafu::GenerateBacktrace::generate(),
+                })?;
+
+                if bytes.len() == ICMP_REST_OF_HEADER_BYTES {
+                    // STYLE(ja_he):
+                    //   I manually assign the 4 bytes because the intuitive `try_into`-attempt
+                    //   gives me trouble with multiple implementations.
+                    //   Additionally, the whole assignment of `rest_of_header` is very
+                    //   wordy due to the fact that I can't get anything less verbose past the type
+                    //   checker (surely my failing).
+                    Ok(Some([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                } else {
+                    Err(Error::MudError {
+                        message: format!(
+                            "rest of header binary gives {} bytes instead of {}",
+                            bytes.len(),
+                            ICMP_REST_OF_HEADER_BYTES
+                        ),
+                        backtrace: snafu::GenerateBacktrace::generate(),
+                    })
+                }
+            } else {
+                Ok(None)
+            }
+        }?;
+
+        Ok(Self {
+            icmp_type: value.icmp_type,
+            icmp_code: value.code,
+            rest_of_header,
+        })
+    }
+}
+
+impl TryFrom<&json_models::Ipv4> for Ipv4Matches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Ipv4) -> Result<Self> {
+        Ok(Self {
+            dscp: value.dscp,
+            ecn: value.ecn,
+            length: value.length,
+            ttl: value.ttl,
+            protocol: value.protocol.map(|p| AceProtocol::Protocol(p.into())),
+            ihl: value.ihl,
+            flags: value.flags.as_ref().map(Ipv4HeaderFlags::try_from).transpose()?,
+            offset: value.offset,
+            identification: value.identification,
+            networks: SourceDest::new(&value.source_ipv4_network, &value.destination_ipv4_network),
+            dnsnames: SourceDest::new(&value.src_dnsname, &value.dst_dnsname),
+        })
+    }
+}
+
+impl TryFrom<&json_models::Ipv6> for Ipv6Matches {
+    type Error = Error;
+
+    fn try_from(value: &json_models::Ipv6) -> Result<Self> {
+        Ok(Self {
+            dscp: value.dscp,
+            ecn: value.ecn,
+            length: value.length,
+            ttl: value.ttl,
+            protocol: value.protocol.map(AceProtocol::Protocol),
+            flow_label: value.flow_label,
+            networks: SourceDest::new(&value.source_ipv6_network, &value.destination_ipv6_network),
+            dnsnames: SourceDest::new(&value.src_dnsname, &value.dst_dnsname),
+        })
+    }
+}
 
 // inspired by https://github.com/CiscoDevNet/MUD-Manager by Cisco
 pub fn parse_mud(url: String, json: &str) -> Result<MudData> {
@@ -87,9 +275,13 @@ fn parse_device_policy(
     dir: AclDirection,
 ) -> Result<()> {
     for access_list in &policy.access_lists.access_list {
-        let mut found = false;
-        for aclitem in &mud_json.acls.acl {
-            if aclitem.name == access_list.name {
+        match &mud_json
+            .acls
+            .acl
+            .iter()
+            .find(|aclitem| aclitem.name == access_list.name)
+        {
+            Some(aclitem) => {
                 let mut ace: Vec<Ace> = Vec::new();
                 let acl_type = if aclitem.type_field == "ipv4-acl-type" {
                     AclType::IPV4
@@ -97,68 +289,90 @@ fn parse_device_policy(
                     AclType::IPV6
                 };
                 for aceitem in &aclitem.aces.ace {
-                    let mut protocol = None;
-                    let mut direction_initiated = None;
-                    let mut address_mask = None;
-                    let mut dnsname = None;
-                    let mut source_port = None;
-                    let mut destination_port = None;
+                    let mut l3 = None;
+                    let mut l4 = None;
                     let mut matches_augmentation = None;
-                    let mut icmp_type = None;
-                    let mut code = None;
-                    if let Some(udp) = &aceitem.matches.udp {
-                        protocol = Some(AceProtocol::Udp);
-                        source_port = udp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                        destination_port = udp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                    } else if let Some(tcp) = &aceitem.matches.tcp {
-                        protocol = Some(AceProtocol::Tcp);
-                        if let Some(dir) = &tcp.direction_initiated {
-                            direction_initiated = Some(match dir.as_str() {
-                                "from-device" => AclDirection::FromDevice,
-                                "to-device" => AclDirection::ToDevice,
-                                _ => error::MudError {
-                                    message: String::from("Invalid direction"),
-                                }
-                                .fail()?,
-                            });
-                        }
 
-                        source_port = tcp.source_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                        destination_port = tcp.destination_port.as_ref().and_then(|p| parse_mud_port(p).ok());
-                    } else if let Some(icmp) = &aceitem.matches.icmp {
-                        protocol = Some(AceProtocol::Icmp);
-                        icmp_type = Some(icmp.icmp_type);
-                        code = Some(icmp.code);
+                    let mut l4_protocol_for_matching = None;
+
+                    match (&aceitem.matches.tcp, &aceitem.matches.udp, &aceitem.matches.icmp) {
+                        (None, None, None) => {},
+                        (Some(tcp), None, None) => {
+                            l4_protocol_for_matching = Some(AceProtocol::Tcp);
+                            l4 = Some(L4Matches::Tcp(TcpMatches::try_from(tcp)?));
+                        },
+                        (None, Some(udp), None) => {
+                            l4_protocol_for_matching = Some(AceProtocol::Udp);
+                            l4 = Some(L4Matches::Udp(UdpMatches::try_from(udp)?));
+                        },
+                        (None, None, Some(icmp)) => {
+                            l4_protocol_for_matching = Some(AceProtocol::Icmp);
+                            l4 = Some(L4Matches::Icmp(IcmpMatches::try_from(icmp)?));
+                        },
+                        _ => error::MudError {
+                            message: String::from("Multiple L4 matches specified, which does not conform to RFC8519"),
+                        }
+                        .fail()?,
                     }
-                    if let Some(ipv6) = &aceitem.matches.ipv6 {
-                        if acl_type != AclType::IPV6 {
+
+                    match (&aceitem.matches.ipv4, &aceitem.matches.ipv6) {
+                        (None, None) => {},
+                        (Some(ipv4), None) => {
+                            if acl_type != AclType::IPV4 {
+                                error::MudError {
+                                    message: String::from("IPv4 ACE in IPv6 ACL"),
+                                }
+                                .fail()?;
+                            }
+                            let ip_header_protocol = &ipv4.protocol.map(|p| AceProtocol::from(p as u8));
+                            if let (Some(matching_proto), Some(header_proto)) =
+                                (l4_protocol_for_matching, ip_header_protocol)
+                            {
+                                if matching_proto != *header_proto {
+                                    error::MudError {
+                                        message: format!(
+                                            "IPv4 header protocol and L4 protocol used for matching differ: {} != {}",
+                                            matching_proto, header_proto
+                                        ),
+                                    }
+                                    .fail()?;
+                                }
+                            }
+                            l3 = Some(L3Matches::Ipv4(Ipv4Matches::try_from(ipv4)?));
+                        },
+                        (None, Some(ipv6)) => {
+                            if acl_type != AclType::IPV6 {
+                                error::MudError {
+                                    message: String::from("IPv6 ACE in IPv4 ACL"),
+                                }
+                                .fail()?;
+                            }
+                            let ip_header_protocol = &ipv6.protocol.map(AceProtocol::Protocol);
+                            if let (Some(matching_proto), Some(header_proto)) =
+                                (l4_protocol_for_matching, ip_header_protocol)
+                            {
+                                if matching_proto != *header_proto {
+                                    error::MudError {
+                                        message: format!(
+                                            "IPv6 header protocol and L4 protocol used for matching differ: {} != {}",
+                                            matching_proto, header_proto
+                                        ),
+                                    }
+                                    .fail()?;
+                                }
+                            }
+                            l3 = Some(L3Matches::Ipv6(Ipv6Matches::try_from(ipv6)?));
+                        },
+                        _ => {
                             error::MudError {
-                                message: String::from("IPv6 ACE in IPv4 ACL"),
+                                message: String::from(
+                                    "Multiple L3 matches specified, which does not conform to RFC8519",
+                                ),
                             }
                             .fail()?;
-                        }
-                        protocol = ipv6.protocol.map(AceProtocol::Protocol);
-                        address_mask = ipv6
-                            .source_ipv6_network
-                            .as_ref()
-                            .or_else(|| ipv6.destination_ipv6_network.as_ref())
-                            .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
-                        dnsname = ipv6.dst_dnsname.clone().or_else(|| ipv6.src_dnsname.clone());
-                    } else if let Some(ipv4) = &aceitem.matches.ipv4 {
-                        if acl_type != AclType::IPV4 {
-                            error::MudError {
-                                message: String::from("IPv4 ACE in IPv6 ACL"),
-                            }
-                            .fail()?;
-                        }
-                        protocol = ipv4.protocol.map(AceProtocol::Protocol);
-                        address_mask = ipv4
-                            .source_ipv4_network
-                            .as_ref()
-                            .or_else(|| ipv4.destination_ipv4_network.as_ref())
-                            .and_then(|srcip| IpAddr::from_str(srcip.as_str()).ok());
-                        dnsname = ipv4.dst_dnsname.clone().or_else(|| ipv4.src_dnsname.clone());
+                        },
                     }
+
                     if let Some(mud) = &aceitem.matches.mud {
                         let manufacturer = mud.manufacturer.as_ref().map(std::string::ToString::to_string);
                         let same_manufacturer = mud.same_manufacturer.is_some();
@@ -183,6 +397,7 @@ fn parse_device_policy(
                             });
                         }
                     }
+
                     ace.push(Ace {
                         name: aceitem.name.clone(),
                         action: if aceitem.actions.forwarding == "accept" {
@@ -191,14 +406,8 @@ fn parse_device_policy(
                             AceAction::Deny
                         },
                         matches: AceMatches {
-                            protocol,
-                            direction_initiated,
-                            address_mask: address_mask.map(|a| a.to_string()),
-                            dnsname,
-                            source_port,
-                            destination_port,
-                            icmp_type,
-                            icmp_code: code,
+                            l3,
+                            l4,
                             matches_augmentation,
                         },
                     });
@@ -210,16 +419,14 @@ fn parse_device_policy(
                     acl_type,
                     ace,
                 });
-                found = true;
-                break;
-            }
+            },
+            None => {
+                error::MudError {
+                    message: String::from("MUD-File has dangling ACL policy"),
+                }
+                .fail()?;
+            },
         }
-        ensure!(
-            found,
-            error::MudError {
-                message: String::from("MUD-File has dangling ACL policy")
-            }
-        );
     }
 
     Ok(())
@@ -260,9 +467,6 @@ fn parse_mud_port(port: &json_models::Port) -> Result<AcePort> {
 mod tests {
     use std::{fs::File, io::Read};
 
-    use chrono::{offset::TimeZone, NaiveDateTime, Utc};
-    use serde_json::Value;
-
     use super::*;
 
     #[test]
@@ -275,14 +479,8 @@ mod tests {
         let mud = parse_mud(URL.to_string(), mud_data.as_str())?;
 
         let matches = AceMatches {
-            protocol: None,
-            direction_initiated: None,
-            address_mask: None,
-            dnsname: None,
-            source_port: None,
-            destination_port: None,
-            icmp_type: None,
-            icmp_code: None,
+            l3: None,
+            l4: None,
             matches_augmentation: Some(MudAclMatchesAugmentation {
                 manufacturer: None,
                 same_manufacturer: true,
@@ -353,90 +551,284 @@ mod tests {
     }
 
     #[test]
-    fn test_example_amazon_echo() -> Result<()> {
-        compare_mud_accept(
-            "tests/mud_tests/Amazon-Echo.json",
-            "https://amazonecho.com/amazonecho",
-            "tests/mud_tests/Amazon-Echo-Test.json",
-        )
+    fn test_dangling_detected() {
+        // no dangling policy
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "systeminfo" : "amazonEcho",
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a" } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x" } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            if let Err(e) = parse_mud("https://manufacturer.com/thing".to_string(), data) {
+                panic!("parsing mostly empty but valid MUD JSON returned an error: {}", e);
+            }
+        }
+
+        // dangling from-device-policy "b"
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "systeminfo" : "amazonEcho",
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a", "b" } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x"      } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            assert!(
+                !parse_mud("https://manufacturer.com/thing".to_string(), data).is_ok(),
+                "parsing MUD JSON with dangling policy 'b' SHOULD return an error, BUT does not"
+            );
+        }
+
+        // dangling to-device-policy "y"
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "systeminfo" : "amazonEcho",
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a"      } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x", "y" } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
+
+            assert!(
+                !parse_mud("https://manufacturer.com/thing".to_string(), data).is_ok(),
+                "parsing MUD JSON with dangling policy 'y' SHOULD return an error, BUT does not"
+            );
+        }
     }
 
     #[test]
-    fn test_example_amazon_echo_wrong_expired() -> Result<()> {
-        compare_mud_fail(
-            "tests/mud_tests/Amazon-Echo.json",
-            "https://amazonecho.com/amazonecho",
-            "tests/mud_tests/Amazon-Echo-Test.json",
-        )
-    }
+    fn test_tcp_header_flags() -> Result<()> {
+        {
+            let bits: json_models::Bits = String::from("");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(false),
+                    ece: Some(false),
+                    urg: Some(false),
+                    ack: Some(false),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(false)
+                }
+            );
+        }
 
-    #[test]
-    fn test_example_ring_doorbell() -> Result<()> {
-        compare_mud_accept(
-            "tests/mud_tests/Ring-Doorbell.json",
-            "https://ringdoorbell.com/ringdoorbell",
-            "tests/mud_tests/Ring-Doorbell-Test.json",
-        )
-    }
+        {
+            let bits: json_models::Bits = String::from("ece");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(false),
+                    ece: Some(true),
+                    urg: Some(false),
+                    ack: Some(false),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(false)
+                }
+            );
+        }
 
-    #[test]
-    fn test_example_ring_doorbell_wrong_expired() -> Result<()> {
-        compare_mud_fail(
-            "tests/mud_tests/Ring-Doorbell.json",
-            "https://ringdoorbell.com/ringdoorbell",
-            "tests/mud_tests/Ring-Doorbell-Test.json",
-        )
-    }
+        {
+            let bits: json_models::Bits = String::from("cwr ack fin");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(true),
+                    ece: Some(false),
+                    urg: Some(false),
+                    ack: Some(true),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(true)
+                }
+            );
+        }
 
-    #[test]
-    fn test_example_august_doorbell() -> Result<()> {
-        compare_mud_accept(
-            "tests/mud_tests/August-Doorbell.json",
-            "https://augustdoorbellcam.com/augustdoorbellcam",
-            "tests/mud_tests/August-Doorbell-Test.json",
-        )
-    }
+        {
+            // NOTE(ja_he): I claim we want to be permissive in this case and simply ignore
+            //              extraneous flags.
+            let bits: json_models::Bits = String::from("this test is fun");
+            let header_flags: TcpHeaderFlags = TcpHeaderFlags::try_from(&bits)?;
+            assert_eq!(
+                header_flags,
+                TcpHeaderFlags {
+                    cwr: Some(false),
+                    ece: Some(false),
+                    urg: Some(false),
+                    ack: Some(false),
+                    psh: Some(false),
+                    rst: Some(false),
+                    syn: Some(false),
+                    fin: Some(false)
+                }
+            );
+        }
 
-    #[test]
-    fn test_example_august_doorbell_wrong_expired() -> Result<()> {
-        compare_mud_fail(
-            "tests/mud_tests/August-Doorbell.json",
-            "https://augustdoorbellcam.com/augustdoorbellcam",
-            "tests/mud_tests/August-Doorbell-Test.json",
-        )
-    }
+        {
+            let data = r#"{
+                            "ietf-mud:mud" : {
+                              "mud-version" : 1,
+                              "mud-url" : "https://manufacturer.com/thing",
+                              "last-update" : "2018-09-16T13:53:04.908+10:00",
+                              "cache-validity" : 100,
+                              "is-supported" : true,
+                              "from-device-policy" : { "access-lists" : { "access-list" : [ { "name" : "a" } ] } },
+                              "to-device-policy" :   { "access-lists" : { "access-list" : [ { "name" : "x" } ] } }
+                            },
+                            "ietf-access-control-list:access-lists" : {
+                              "acl" : [ {
+                                "name" : "a",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [ {
+                                    "name": "cool-ace",
+                                    "matches": {
+                                      "tcp": { "flags": "syn" }
+                                    },
+                                    "actions": { "forwarding": "accept" }
+                                  } ]
+                                }
+                              }, {
+                                "name" : "x",
+                                "type" : "ipv4-acl-type",
+                                "aces" : {
+                                  "ace" : [  ]
+                                }
+                              } ]
+                            }
+                          }"#;
 
-    fn compare_mud(
-        mud_profile_path: &str,
-        mud_profile_url: &str,
-        mud_profile_example_path: &str,
-    ) -> Result<(MudData, String)> {
-        let mut mud_data = String::new();
-        let mut mud_data_test = String::new();
+            let mud: MudData = parse_mud("https://manufacturer.com/thing".to_string(), data)?;
+            assert_eq!(
+                mud,
+                MudData {
+                    url: "https://manufacturer.com/thing".to_string(),
+                    masa_url: None,
+                    last_update: "2018-09-16T13:53:04.908+10:00".to_string(),
+                    systeminfo: None,
+                    mfg_name: None,
+                    model_name: None,
+                    documentation: None,
+                    expiration: mud.expiration, // :^)
+                    acllist: vec![
+                        Acl {
+                            name: "a".to_string(),
+                            packet_direction: AclDirection::FromDevice,
+                            acl_type: AclType::IPV4,
+                            ace: vec![Ace {
+                                name: "cool-ace".to_string(),
+                                action: AceAction::Accept,
+                                matches: AceMatches {
+                                    l3: None,
+                                    l4: Some(L4Matches::Tcp(TcpMatches {
+                                        sequence_number: None,
+                                        acknowledgement_number: None,
+                                        data_offset: None,
+                                        reserved: None,
+                                        flags: Some(TcpHeaderFlags {
+                                            cwr: Some(false),
+                                            ece: Some(false),
+                                            urg: Some(false),
+                                            ack: Some(false),
+                                            psh: Some(false),
+                                            rst: Some(false),
+                                            syn: Some(true),
+                                            fin: Some(false),
+                                        }),
+                                        window_size: None,
+                                        urgent_pointer: None,
+                                        options: None,
+                                        ports: SourceDest { src: None, dst: None },
+                                        direction_initiated: None,
+                                    })),
+                                    matches_augmentation: None,
+                                }
+                            },],
+                        },
+                        Acl {
+                            name: "x".to_string(),
+                            packet_direction: AclDirection::ToDevice,
+                            acl_type: AclType::IPV4,
+                            ace: vec![],
+                        }
+                    ],
+                    acl_override: vec![],
+                },
+            );
+        }
 
-        let mut mud_profile = File::open(mud_profile_path)?;
-        let mut mud_profile_test = File::open(mud_profile_example_path)?;
-
-        mud_profile.read_to_string(&mut mud_data)?;
-        mud_profile_test.read_to_string(&mut mud_data_test)?;
-
-        let mud = parse_mud(mud_profile_url.to_string(), mud_data.as_str())?;
-        Ok((mud, mud_data_test))
-    }
-    fn compare_mud_fail(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
-        let mud_data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        assert_ne!(
-            serde_json::to_value(&mud_data.0)?,
-            serde_json::from_str::<Value>(&mud_data.1)?
-        );
-        Ok(())
-    }
-
-    fn compare_mud_accept(mud_profile_path: &str, mud_profile_url: &str, mud_profile_example_path: &str) -> Result<()> {
-        let mut data = compare_mud(mud_profile_path, mud_profile_url, mud_profile_example_path)?;
-        let naive = NaiveDateTime::parse_from_str("2020-11-12T5:52:46", "%Y-%m-%dT%H:%M:%S")?;
-        data.0.expiration = Utc.from_utc_datetime(&naive);
-        assert_eq!(serde_json::to_value(&data.0)?, serde_json::from_str::<Value>(&data.1)?);
         Ok(())
     }
 }
