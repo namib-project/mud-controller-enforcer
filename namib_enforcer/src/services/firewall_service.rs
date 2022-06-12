@@ -13,7 +13,7 @@ use ipnetwork::IpNetwork;
 use namib_shared::firewall_config::{FirewallDevice, FirewallRule, ScopeConstraint};
 #[cfg(feature = "nftables")]
 use namib_shared::{
-    firewall_config::{Protocol, RuleTargetHost, Verdict},
+    firewall_config::{L4Matches, RuleTargetHost, Verdict},
     EnforcerConfig,
 };
 #[cfg(feature = "nftables")]
@@ -213,17 +213,14 @@ trait ProtocolCode {
     fn proto_code(&self, l3proto: &FirewallRuleProto) -> u32;
 }
 
-impl ProtocolCode for Protocol {
+impl ProtocolCode for L4Matches {
     fn proto_code(&self, l3proto: &FirewallRuleProto) -> u32 {
         match self {
-            Protocol::Tcp => libc::IPPROTO_TCP as u32,
-            Protocol::Udp => libc::IPPROTO_UDP as u32,
-            Protocol::Icmp(_) => match l3proto {
+            L4Matches::Tcp(_) => libc::IPPROTO_TCP as u32,
+            L4Matches::Udp(_) => libc::IPPROTO_UDP as u32,
+            L4Matches::Icmp(_) => match l3proto {
                 FirewallRuleProto::IPv4 => libc::IPPROTO_ICMP as u32,
                 FirewallRuleProto::IPv6 => libc::IPPROTO_ICMPV6 as u32,
-            },
-            Protocol::All => {
-                panic!("Unknown protocol {:?}", self)
             },
         }
     }
@@ -294,42 +291,60 @@ fn nf_match_l3proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &Firewall
 
 /// Adds netfilter instructions to match the given layer 4 protocol in rule.
 #[cfg(feature = "nftables")]
-fn nf_match_l4proto(rule: &mut Rule, l3proto: &FirewallRuleProto, l4proto: &Protocol) {
-    match l4proto {
-        Protocol::Tcp | Protocol::Udp | Protocol::Icmp(_) => {
-            match l3proto {
-                FirewallRuleProto::IPv4 => rule.add_expr(&nft_expr!(payload ipv4 protocol)),
-                FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
-            }
-            rule.add_expr(&nft_expr!(cmp == l4proto.proto_code(l3proto)));
-        },
-        Protocol::All => {},
+fn nf_match_l4proto(rule: &mut Rule, l3proto: &FirewallRuleProto, maybe_l4proto: &Option<L4Matches>) {
+    if let Some(l4proto) = maybe_l4proto {
+        match l3proto {
+            FirewallRuleProto::IPv4 => rule.add_expr(&nft_expr!(payload ipv4 protocol)),
+            FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
+        }
+        rule.add_expr(&nft_expr!(cmp == l4proto.proto_code(l3proto)));
     }
 }
 
 /// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
 #[cfg(feature = "nftables")]
 fn nf_match_l4payload(rule: &mut Rule, rule_spec: &FirewallRule, l3proto: &Option<FirewallRuleProto>) {
-    match &rule_spec.protocol {
-        Protocol::Tcp | Protocol::Udp => {
-            if let Some(port) = &rule_spec.dst.port {
-                if rule_spec.protocol == Protocol::Tcp {
+    use namib_shared::firewall_config::PortOrRange;
+
+    match &rule_spec.l4_matches {
+        // TODO(ja_he): do we not handle port ranges?
+        Some(L4Matches::Tcp(tcp_matchable_data)) => {
+            match tcp_matchable_data.dst_port {
+                Some(PortOrRange::Single(port)) => {
                     rule.add_expr(&nft_expr!(payload tcp dport));
-                } else {
-                    rule.add_expr(&nft_expr!(payload udp dport));
-                }
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
+                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
+                },
+                Some(PortOrRange::Range(_, _)) => todo!(),
+                None => {},
             }
-            if let Some(port) = &rule_spec.src.port {
-                if rule_spec.protocol == Protocol::Tcp {
+            match tcp_matchable_data.src_port {
+                Some(PortOrRange::Single(port)) => {
                     rule.add_expr(&nft_expr!(payload tcp sport));
-                } else {
-                    rule.add_expr(&nft_expr!(payload udp sport));
-                }
-                rule.add_expr(&nft_expr!(cmp == port.parse::<u16>().unwrap().to_be()));
+                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
+                },
+                Some(PortOrRange::Range(_, _)) => todo!(),
+                None => {},
             }
         },
-        Protocol::Icmp(icmp_spec) => {
+        Some(L4Matches::Udp(udp_matchable_data)) => {
+            match udp_matchable_data.dst_port {
+                Some(PortOrRange::Single(port)) => {
+                    rule.add_expr(&nft_expr!(payload tcp dport));
+                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
+                },
+                Some(PortOrRange::Range(_, _)) => todo!(),
+                None => {},
+            }
+            match udp_matchable_data.src_port {
+                Some(PortOrRange::Single(port)) => {
+                    rule.add_expr(&nft_expr!(payload tcp sport));
+                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
+                },
+                Some(PortOrRange::Range(_, _)) => todo!(),
+                None => {},
+            }
+        },
+        Some(L4Matches::Icmp(icmp_spec)) => {
             /// TODO: this produces the following `nft list ruleset` output for code==123 and type==234: `@th,0,8 234 @th,8,8 123`
             use nftnl::expr::IcmpHeaderField;
             for icmp_data in [
@@ -357,7 +372,7 @@ fn nf_match_l4payload(rule: &mut Rule, rule_spec: &FirewallRule, l3proto: &Optio
                 }
             }
         },
-        Protocol::All => {},
+        None => {},
     }
 }
 
@@ -529,7 +544,7 @@ async fn add_rule_to_batch(
 
     // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
     // for the packet source or destination, create a vector of ip addresses for this identifier.
-    let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src.host {
+    let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src {
         Some(RuleTargetHost::Ip(ipaddr)) => {
             vec![RuleAddrEntry::AddrEntry(*ipaddr)]
         },
@@ -548,7 +563,7 @@ async fn add_rule_to_batch(
             .collect(),
         _ => vec![RuleAddrEntry::AnyAddr],
     };
-    let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst.host {
+    let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst {
         Some(RuleTargetHost::Ip(ipaddr)) => {
             vec![RuleAddrEntry::AddrEntry(*ipaddr)]
         },
@@ -599,7 +614,7 @@ async fn add_rule_to_batch(
             // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
             if let Some(ipaddr) = protocol_reference_ip {
                 nf_match_l3proto(&mut current_rule, scope, &ipaddr.into());
-                nf_match_l4proto(&mut current_rule, &ipaddr.into(), &rule_spec.protocol);
+                nf_match_l4proto(&mut current_rule, &ipaddr.into(), &rule_spec.l4_matches);
             }
             // Create expressions to match source IP.
             match source_ip {
@@ -734,7 +749,7 @@ mod tests {
 
     use super::*;
     use crate::services::dns::DnsService;
-    use namib_shared::firewall_config::{RuleTarget, ScopeConstraint};
+    use namib_shared::firewall_config::{ScopeConstraint, TcpMatches};
 
     fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
         let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"), None);
@@ -805,15 +820,10 @@ mod tests {
     async fn check_device_with_tcp_rule() {
         let rules: Vec<FirewallRule> = vec![FirewallRule {
             rule_name: "rule_0".to_string(),
-            src: RuleTarget {
-                host: Some(RuleTargetHost::FirewallDevice),
-                port: None,
-            },
-            dst: RuleTarget {
-                host: Some(RuleTargetHost::Ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))),
-                port: Some("53".to_string()),
-            },
-            protocol: Protocol::Tcp,
+            src: Some(RuleTargetHost::FirewallDevice),
+            dst: Some(RuleTargetHost::Ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))),
+            l3_matches: None,
+            l4_matches: Some(L4Matches::Tcp(TcpMatches::default())),
             verdict: Verdict::Accept,
             scope: ScopeConstraint::None,
         }];

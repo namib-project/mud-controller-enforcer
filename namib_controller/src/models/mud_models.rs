@@ -139,50 +139,28 @@ pub struct Ipv4Matches {
     pub flags: Option<Ipv4HeaderFlags>,
     pub offset: Option<u16>,
     pub identification: Option<u16>,
-    pub networks: SourceDest<Option<String>>,
-    pub dnsnames: SourceDest<Option<String>>,
+    pub src_network: Option<String>,
+    pub dst_network: Option<String>,
+    pub src_dnsname: Option<String>,
+    pub dst_dnsname: Option<String>,
 }
 
-impl<T: Clone> SourceDest<T> {
-    pub fn new(src: &T, dst: &T) -> Self {
-        Self {
-            src: src.clone(),
-            dst: dst.clone(),
-        }
-    }
-
-    /// Returns the source and destination ordered as "this" and the "other" device, based on the
-    /// given `AclDirection`.
-    pub fn ordered_by_direction(&self, direction: AclDirection) -> ThisOther<&T> {
-        match direction {
-            AclDirection::FromDevice => ThisOther {
-                this_device: &self.src,
-                other_device: &self.dst,
-            },
-            AclDirection::ToDevice => ThisOther {
-                this_device: &self.dst,
-                other_device: &self.src,
-            },
-        }
+/// Returns (in a 2-device directional communication relationship) the "other" device; the device
+/// on the "other" end of the connection.
+pub fn other_device_by_direction<'a, T>(src: &'a T, dst: &'a T, direction: AclDirection) -> &'a T {
+    match direction {
+        AclDirection::FromDevice => dst,
+        AclDirection::ToDevice => src,
     }
 }
 
-/// Represents the two ends of some directional relationship as source and destination.
-/// E.g., it could represent source and destination ports, source and destination IP addresses, ...
-#[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
-pub struct SourceDest<T> {
-    pub src: T,
-    pub dst: T,
-}
-
-/// Represents a trait on "this" and the "other" side of a relationship.
-/// E.g., it could, for a given device's communication relationship, hold the ports for "this"
-/// device and the "other" device.
-/// This type mainly exists to improve conversion semantics when working with source and
-/// destination traits in a directional relationship (i.E. by ACL direction).
-pub struct ThisOther<T> {
-    pub this_device: T,
-    pub other_device: T,
+/// Returns (in a 2-device directional communication relationship) "this" device; the device
+/// relative to which the directionality is defined.
+pub fn this_device_by_direction<'a, T>(src: &'a T, dst: &'a T, direction: AclDirection) -> &'a T {
+    match direction {
+        AclDirection::FromDevice => dst,
+        AclDirection::ToDevice => src,
+    }
 }
 
 /// Represents the "(ipv6)" choice node (and its child "ipv6" configuration data node, with its
@@ -195,8 +173,10 @@ pub struct Ipv6Matches {
     pub ttl: Option<u8>,
     pub protocol: Option<AceProtocol>,
     pub flow_label: Option<u32>,
-    pub networks: SourceDest<Option<String>>,
-    pub dnsnames: SourceDest<Option<String>>,
+    pub src_network: Option<String>,
+    pub dst_network: Option<String>,
+    pub src_dnsname: Option<String>,
+    pub dst_dnsname: Option<String>,
 }
 
 /// YANG ACL (RFC8519) matches on layer 4 protocol header information and augmented by MUD
@@ -220,7 +200,8 @@ pub struct TcpMatches {
     pub window_size: Option<u16>,
     pub urgent_pointer: Option<u16>,
     pub options: Option<TcpOptions>,
-    pub ports: SourceDest<Option<AcePort>>,
+    pub src_port: Option<AcePort>,
+    pub dst_port: Option<AcePort>,
     pub direction_initiated: Option<AclDirection>,
 }
 
@@ -229,7 +210,8 @@ pub struct TcpMatches {
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 pub struct UdpMatches {
     pub length: Option<u16>,
-    pub ports: SourceDest<Option<AcePort>>,
+    pub src_port: Option<AcePort>,
+    pub dst_port: Option<AcePort>,
 }
 
 // The ICMP rest of header header field is 4 bytes long.
@@ -257,6 +239,16 @@ pub struct AceMatches {
     pub l3: Option<L3Matches>,
     pub l4: Option<L4Matches>,
     pub matches_augmentation: Option<MudAclMatchesAugmentation>,
+}
+
+impl AceMatches {
+    pub fn l3_specified_l4_protocol(&self) -> Option<AceProtocol> {
+        match &self.l3 {
+            Some(L3Matches::Ipv4(matches)) => matches.protocol.clone(),
+            Some(L3Matches::Ipv6(matches)) => matches.protocol.clone(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
@@ -367,6 +359,7 @@ pub struct AdministrativeContext {
     pub ntp_mappings: Vec<DefinedServer>,
 }
 
+// TODO(ja_he): shouldn't this go in ...config...rs?
 #[derive(Debug, Clone, PartialEq)]
 pub enum DefinedServer {
     Ip(IpAddr),

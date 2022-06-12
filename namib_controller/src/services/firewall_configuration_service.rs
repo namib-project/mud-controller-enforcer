@@ -5,9 +5,7 @@ use chrono::NaiveDateTime;
 use std::net::IpAddr;
 
 use namib_shared::{
-    firewall_config::{
-        FirewallDevice, FirewallRule, Icmp, Protocol, RuleTarget, RuleTargetHost, ScopeConstraint, Verdict,
-    },
+    firewall_config::{FirewallDevice, FirewallRule, PortOrRange, RuleTargetHost, ScopeConstraint, Verdict},
     flow_scope::LogGroup,
     EnforcerConfig,
 };
@@ -16,14 +14,181 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{
-        AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, AdministrativeContext,
-        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, FlowScopeLevel, L3Matches, L4Matches,
+        other_device_by_direction, AceAction, AcePort, AceProtocol, Acl, AclDirection, AclType, AdministrativeContext,
+        ConfiguredControllerMapping, DefinedServer, DeviceWithRefs, FlowScopeLevel, IcmpMatches, Ipv4HeaderFlags,
+        L3Matches, L4Matches, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches,
     },
     services::{
         acme_service,
         config_service::{get_config_value, set_config_value, ConfigKeys},
     },
 };
+
+impl From<AclDirection> for namib_shared::firewall_config::Direction {
+    fn from(from: AclDirection) -> Self {
+        match from {
+            AclDirection::ToDevice => namib_shared::firewall_config::Direction::ToDevice,
+            AclDirection::FromDevice => namib_shared::firewall_config::Direction::FromDevice,
+        }
+    }
+}
+
+impl From<AcePort> for PortOrRange {
+    fn from(from: AcePort) -> Self {
+        match from {
+            AcePort::Single(port) => Self::Single(port as u16),
+            AcePort::Range(lower, upper) => Self::Range(lower as u16, upper as u16),
+        }
+    }
+}
+
+impl From<TcpMatches> for namib_shared::firewall_config::TcpMatches {
+    fn from(from: TcpMatches) -> Self {
+        Self {
+            src_port: from.src_port.map(std::convert::Into::into),
+            dst_port: from.dst_port.map(std::convert::Into::into),
+            sequence_number: from.sequence_number,
+            acknowledgement_number: from.acknowledgement_number,
+            data_offset: from.data_offset,
+            reserved: from.reserved,
+            flags: from.flags.map(std::convert::Into::into),
+            window_size: from.window_size,
+            urgent_pointer: from.urgent_pointer,
+            options: from.options.map(std::convert::Into::into),
+            direction_initiated: from.direction_initiated.map(std::convert::Into::into),
+        }
+    }
+}
+
+impl From<UdpMatches> for namib_shared::firewall_config::UdpMatches {
+    fn from(from: UdpMatches) -> Self {
+        Self {
+            src_port: from.src_port.map(std::convert::Into::into),
+            dst_port: from.dst_port.map(std::convert::Into::into),
+            length: from.length,
+        }
+    }
+}
+
+impl From<IcmpMatches> for namib_shared::firewall_config::IcmpMatches {
+    fn from(from: IcmpMatches) -> Self {
+        Self {
+            icmp_type: from.icmp_type,
+            icmp_code: from.icmp_code,
+            rest_of_header: from.rest_of_header,
+        }
+    }
+}
+
+impl From<TcpOptions> for namib_shared::firewall_config::TcpOptions {
+    fn from(from: TcpOptions) -> Self {
+        Self {
+            kind: from.kind,
+            length: from.length,
+            data: from.data,
+        }
+    }
+}
+
+impl From<TcpHeaderFlags> for namib_shared::firewall_config::TcpHeaderFlags {
+    fn from(val: TcpHeaderFlags) -> Self {
+        namib_shared::firewall_config::TcpHeaderFlags {
+            cwr: val.cwr,
+            ece: val.ece,
+            urg: val.urg,
+            ack: val.ack,
+            psh: val.psh,
+            rst: val.rst,
+            syn: val.syn,
+            fin: val.fin,
+        }
+    }
+}
+
+impl From<L4Matches> for namib_shared::firewall_config::L4Matches {
+    fn from(from: L4Matches) -> Self {
+        match from {
+            L4Matches::Tcp(matches) => Self::Tcp(matches.into()),
+            L4Matches::Udp(matches) => Self::Udp(matches.into()),
+            L4Matches::Icmp(matches) => Self::Icmp(matches.into()),
+        }
+    }
+}
+
+/// Convert the L3 matches info from MUD data into the additional L3 matching data for the
+/// firewall, IFF at least one of the addional fields is specified.
+fn convert_l3_matches_info(from: &Option<L3Matches>) -> Option<namib_shared::firewall_config::L3MatchesExtra> {
+    match from {
+        None => None,
+        Some(l3_matches) => match l3_matches {
+            L3Matches::Ipv4(ipv4_matches) => {
+                if ipv4_matches.dscp.is_none()
+                    && ipv4_matches.ecn.is_none()
+                    && ipv4_matches.length.is_none()
+                    && ipv4_matches.ttl.is_none()
+                    && ipv4_matches.ihl.is_none()
+                    && ipv4_matches.flags.is_none()
+                    && ipv4_matches.offset.is_none()
+                    && ipv4_matches.identification.is_none()
+                {
+                    None
+                } else {
+                    Some(namib_shared::firewall_config::L3MatchesExtra::Ipv4(
+                        namib_shared::firewall_config::Ipv4MatchesExtra {
+                            dscp: ipv4_matches.dscp,
+                            ecn: ipv4_matches.ecn,
+                            length: ipv4_matches.length,
+                            ttl: ipv4_matches.ttl,
+                            ihl: ipv4_matches.ihl,
+                            flags: ipv4_matches.flags.clone().map(std::convert::Into::into),
+                            offset: ipv4_matches.offset,
+                            identification: ipv4_matches.identification,
+                        },
+                    ))
+                }
+            },
+            L3Matches::Ipv6(ipv6_matches) => {
+                if ipv6_matches.dscp.is_none()
+                    && ipv6_matches.ecn.is_none()
+                    && ipv6_matches.length.is_none()
+                    && ipv6_matches.ttl.is_none()
+                    && ipv6_matches.flow_label.is_none()
+                {
+                    None
+                } else {
+                    Some(namib_shared::firewall_config::L3MatchesExtra::Ipv6(
+                        namib_shared::firewall_config::Ipv6MatchesExtra {
+                            dscp: ipv6_matches.dscp,
+                            ecn: ipv6_matches.ecn,
+                            length: ipv6_matches.length,
+                            ttl: ipv6_matches.ttl,
+                            flow_label: ipv6_matches.flow_label,
+                        },
+                    ))
+                }
+            },
+        },
+    }
+}
+
+impl From<Ipv4HeaderFlags> for namib_shared::firewall_config::Ipv4HeaderFlags {
+    fn from(from: Ipv4HeaderFlags) -> Self {
+        Self {
+            reserved: from.reserved,
+            fragment: from.fragment,
+            more: from.more,
+        }
+    }
+}
+
+/// Returns the source and destination ordered as "this" and the "other" device, based on the
+/// given `AclDirection`.
+fn ordered_by_direction<T>(src: T, dst: T, direction: AclDirection) -> (T, T) {
+    match direction {
+        AclDirection::FromDevice => (src, dst),
+        AclDirection::ToDevice => (dst, src),
+    }
+}
 
 pub fn merge_acls<'a>(original: &'a [Acl], override_with: &'a [Acl]) -> Vec<&'a Acl> {
     let override_keys: Vec<&str> = override_with.iter().map(|x| x.name.as_ref()).collect();
@@ -69,17 +234,19 @@ pub fn get_flow_scope_rules(device_to_check: &DeviceWithRefs) -> Vec<FirewallRul
             if let Some(addr) = device_to_check.ipv4_addr {
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_fr4", device_to_check.id, s.name),
-                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::Ip(addr.into())),
+                    None,
+                    None,
+                    None,
                     Verdict::Log(group.0.clone().into()),
                     ScopeConstraint::None,
                 ));
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_to4", device_to_check.id, s.name),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::Ip(addr.into())),
+                    None,
+                    None,
                     Verdict::Log(group.1.clone().into()),
                     ScopeConstraint::None,
                 ));
@@ -87,17 +254,19 @@ pub fn get_flow_scope_rules(device_to_check: &DeviceWithRefs) -> Vec<FirewallRul
             if let Some(addr) = device_to_check.ipv6_addr {
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_fr6", device_to_check.id, s.name),
-                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::Ip(addr.into())),
+                    None,
+                    None,
+                    None,
                     Verdict::Log(group.0.into()),
                     ScopeConstraint::None,
                 ));
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_to6", device_to_check.id, s.name),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::Ip(addr.into())), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::Ip(addr.into())),
+                    None,
+                    None,
                     Verdict::Log(group.1.into()),
                     ScopeConstraint::None,
                 ));
@@ -199,39 +368,21 @@ pub fn convert_device_to_fw_rules(
                 Err(_) => RuleTargetHost::Hostname(exception.exception_target.clone()),
             };
             let (src, dst) = match exception.direction {
-                AclDirection::FromDevice => (
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(Some(exception_target), None),
-                ),
-                AclDirection::ToDevice => (
-                    RuleTarget::new(Some(exception_target), None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                ),
+                AclDirection::FromDevice => (Some(RuleTargetHost::FirewallDevice), Some(exception_target)),
+                AclDirection::ToDevice => (Some(exception_target), Some(RuleTargetHost::FirewallDevice)),
             };
             rules.push(FirewallRule::new(
                 format!("rule_quarantine_exception_{}", rule_counter),
                 src,
                 dst,
-                Protocol::All,
+                None,
+                None,
                 Verdict::Accept,
                 ScopeConstraint::None,
             ));
             rule_counter += 1;
         }
-    } else {
-        let mud_data = match &device.mud_data {
-            Some(mud_data) => mud_data,
-            None => {
-                return FirewallDevice {
-                    id: device.id,
-                    ipv4_addr: device.ipv4_addr,
-                    ipv6_addr: device.ipv6_addr,
-                    rules,
-                    collect_data: device.collect_info,
-                }
-            },
-        };
-
+    } else if let Some(mud_data) = &device.mud_data {
         let merged_acls = if mud_data.acl_override.is_empty() {
             mud_data.acllist.iter().collect()
         } else {
@@ -240,143 +391,124 @@ pub fn convert_device_to_fw_rules(
 
         for acl in &merged_acls {
             for ace in &acl.ace {
-                let (icmp_type, icmp_code) = if let Some(L4Matches::Icmp(icmp)) = &ace.matches.l4 {
-                    (icmp.icmp_type, icmp.icmp_code)
-                } else {
-                    (None, None)
-                };
-
-                let protocol = match &ace.matches.l3 {
-                    Some(L3Matches::Ipv4(matches)) => match matches.protocol {
-                        Some(AceProtocol::Tcp) => Protocol::Tcp,
-                        Some(AceProtocol::Udp) => Protocol::Udp,
-                        Some(AceProtocol::Icmp) => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
-                        Some(AceProtocol::Protocol(_proto_nr)) => Protocol::All, // Default to all protocols if protocol is not supported.
-                        // TODO add support for more protocols
-                        None => Protocol::All,
-                    },
-                    Some(L3Matches::Ipv6(matches)) => match matches.protocol {
-                        Some(AceProtocol::Tcp) => Protocol::Tcp,
-                        Some(AceProtocol::Udp) => Protocol::Udp,
-                        Some(AceProtocol::Icmp) => Protocol::Icmp(Icmp { icmp_type, icmp_code }),
-                        Some(AceProtocol::Protocol(_proto_nr)) => Protocol::All, // Default to all protocols if protocol is not supported.
-                        // TODO add support for more protocols
-                        None => Protocol::All,
-                    },
-                    None => Protocol::All,
-                };
                 let verdict = match ace.action {
                     AceAction::Accept => Verdict::Accept,
                     AceAction::Deny => Verdict::Reject,
                 };
                 let mut scope = ScopeConstraint::None;
 
-                let src_ports: Option<String> = match &ace.matches.l4 {
-                    Some(L4Matches::Tcp(tcp)) => match tcp.ports.src {
-                        Some(AcePort::Single(port)) => Some(port.to_string()),
-                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-                        None => None,
-                    },
-                    Some(L4Matches::Udp(udp)) => match udp.ports.src {
-                        Some(AcePort::Single(port)) => Some(port.to_string()),
-                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-                        None => None,
-                    },
-                    _ => None,
-                };
-                let dst_ports: Option<String> = match &ace.matches.l4 {
-                    Some(L4Matches::Tcp(tcp)) => match tcp.ports.dst {
-                        Some(AcePort::Single(port)) => Some(port.to_string()),
-                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-                        None => None,
-                    },
-                    Some(L4Matches::Udp(udp)) => match udp.ports.dst {
-                        Some(AcePort::Single(port)) => Some(port.to_string()),
-                        Some(AcePort::Range(from, to)) => Some(format!("{}:{}", from, to)),
-                        None => None,
-                    },
-                    _ => None,
-                };
+                let mut l4_matchable: Option<namib_shared::firewall_config::L4Matches> =
+                    ace.matches.l4.clone().map(std::convert::Into::into);
+                let l3_matchable: Option<namib_shared::firewall_config::L3MatchesExtra> =
+                    convert_l3_matches_info(&ace.matches.l3);
 
-                let (this_device_ports, other_device_ports) = match acl.packet_direction {
-                    AclDirection::FromDevice => (src_ports, dst_ports),
-                    AclDirection::ToDevice => (dst_ports, src_ports),
-                };
+                // NOTE:
+                //   We check for a mismatch between:
+                //   - the L4 protocol that is specified in the MUD L3 (IP) matches data
+                //   - the L4 protocol for which matches data is specified
+                //   This should never come up, as we consider this case in parsing the MUD data,
+                //   and as an edge case it would produce a rule that would match nothing and thus
+                //   have no effect.
+                match (&ace.matches.l3_specified_l4_protocol(), &l4_matchable) {
+                    // MUD L3 data specifies protocol but no L4 matches data
+                    (Some(l4_proto), None) => { l4_matchable = match l4_proto {
+                        AceProtocol::Tcp  => Some(namib_shared::firewall_config::L4Matches::empty_tcp()),
+                        AceProtocol::Udp  => Some(namib_shared::firewall_config::L4Matches::empty_udp()),
+                        AceProtocol::Icmp => Some(namib_shared::firewall_config::L4Matches::empty_icmp()),
+                        AceProtocol::Protocol(_) => None,
+                    }},
+                    // no L4 protocol specified per L3 matches data
+                    (None, _)
+                        // L3-header-specified L4 protocol and L4 matches data protocol are the same
+                        | (Some(AceProtocol::Tcp), Some(namib_shared::firewall_config::L4Matches::Tcp(_)))
+                        | (Some(AceProtocol::Udp), Some(namib_shared::firewall_config::L4Matches::Udp(_)))
+                        | (Some(AceProtocol::Icmp), Some(namib_shared::firewall_config::L4Matches::Icmp(_))) => {},
+                    // L3-header-specified L4 protocol and L4 matches data are NOT the same
+                    (Some(a), Some(b)) => {
+                        warn!(
+                            "MUD L3 matches data specifies L4 protocol {} but L4 matches data is for {} (DEV: (name: {:?}, url: {:?}), MUD: {:?})",
+                            a.to_string(),
+                            b.to_protocol_string(),
+                            device.name,
+                            device.mud_url,
+                            mud_data,
+                        );
+                    },
+                }
 
-                let this_dev_rule_target = RuleTarget::new(Some(RuleTargetHost::FirewallDevice), this_device_ports);
+                let this_dev_rule_target = Some(RuleTargetHost::FirewallDevice);
 
                 let dnsname: &Option<String> = if let Some(l3) = &ace.matches.l3 {
                     match l3 {
                         L3Matches::Ipv4(matches) => {
-                            matches.dnsnames.ordered_by_direction(acl.packet_direction).other_device
+                            other_device_by_direction(&matches.src_dnsname, &matches.dst_dnsname, acl.packet_direction)
                         },
                         L3Matches::Ipv6(matches) => {
-                            matches.dnsnames.ordered_by_direction(acl.packet_direction).other_device
+                            other_device_by_direction(&matches.src_dnsname, &matches.dst_dnsname, acl.packet_direction)
                         },
                     }
                 } else {
                     &None
                 };
-                let other_dev_rule_targets: Vec<RuleTarget> = match (dnsname, &ace.matches.matches_augmentation) {
-                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
-                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
-                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
-                    },
-                    (None, Some(augmentation)) => {
-                        let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
-                        if let Some(host) = &augmentation.manufacturer {
-                            targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
-                        }
-                        if augmentation.same_manufacturer {
-                            targets_per_option.push(get_same_manufacturer_ruletargethosts(
-                                device,
-                                devices,
-                                &acl.acl_type,
-                            ));
-                        }
-                        if let Some(uri) = &augmentation.controller {
-                            targets_per_option.push(get_controller_ruletargethosts(
-                                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
-                                devices,
-                                uri,
-                                acl.acl_type,
-                                &verdict,
-                                administrative_context,
-                            ));
-                        }
-                        if augmentation.my_controller {
-                            targets_per_option.push(get_my_controller_ruletargethosts(
-                                device,
-                                devices,
-                                acl.acl_type,
-                                &verdict,
-                                administrative_context,
-                            ));
-                        }
-                        if augmentation.local {
-                            scope = ScopeConstraint::Local;
-                        }
-                        if let Some(url) = &augmentation.model {
-                            targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
-                        }
+                let other_dev_rule_targets: Vec<Option<RuleTargetHost>> =
+                    match (dnsname, &ace.matches.matches_augmentation) {
+                        // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
+                        (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
+                            Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                            Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
+                        },
+                        (None, Some(augmentation)) => {
+                            let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
+                            if let Some(host) = &augmentation.manufacturer {
+                                targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
+                            }
+                            if augmentation.same_manufacturer {
+                                targets_per_option.push(get_same_manufacturer_ruletargethosts(
+                                    device,
+                                    devices,
+                                    &acl.acl_type,
+                                ));
+                            }
+                            if let Some(uri) = &augmentation.controller {
+                                targets_per_option.push(get_controller_ruletargethosts(
+                                    device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                                    devices,
+                                    uri,
+                                    acl.acl_type,
+                                    &verdict,
+                                    administrative_context,
+                                ));
+                            }
+                            if augmentation.my_controller {
+                                targets_per_option.push(get_my_controller_ruletargethosts(
+                                    device,
+                                    devices,
+                                    acl.acl_type,
+                                    &verdict,
+                                    administrative_context,
+                                ));
+                            }
+                            if augmentation.local {
+                                scope = ScopeConstraint::Local;
+                            }
+                            if let Some(url) = &augmentation.model {
+                                targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
+                            }
 
-                        // return those devices matched by _all_ specified options
-                        match targets_per_option.len() {
-                            0 => vec![],
-                            1 => targets_per_option[0].clone(),
-                            _ => targets_per_option[0]
-                                .iter()
-                                .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
-                                .cloned()
-                                .collect(),
-                        }
-                    },
-                    _ => vec![],
-                }
-                .iter()
-                .map(|host| RuleTarget::new(host.clone(), other_device_ports.clone()))
-                .collect();
+                            // return those devices matched by _all_ specified options
+                            match targets_per_option.len() {
+                                0 => vec![],
+                                1 => targets_per_option[0].clone(),
+                                _ => targets_per_option[0]
+                                    .iter()
+                                    .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
+                                    .cloned()
+                                    .collect(),
+                            }
+                        },
+                        _ => vec![],
+                    }
+                    .clone();
 
                 for other_dev_rule_target in &other_dev_rule_targets {
                     let (src, dst) = match acl.packet_direction {
@@ -387,7 +519,8 @@ pub fn convert_device_to_fw_rules(
                         format!("rule_{}", rule_counter),
                         src.clone(),
                         dst.clone(),
-                        protocol.clone(),
+                        l3_matchable.clone(),
+                        l4_matchable.clone(), // includes ports
                         verdict.clone(),
                         scope,
                     ));
@@ -399,18 +532,24 @@ pub fn convert_device_to_fw_rules(
         for server in &administrative_context.dns_mappings {
             rules.push(FirewallRule::new(
                 format!("rule_dns_default_accept_{}", rule_counter),
-                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                RuleTarget::new(Some(server.into()), Some("53".to_string())),
-                Protocol::Tcp,
+                Some(RuleTargetHost::FirewallDevice),
+                Some(server.into()),
+                None,
+                Some(namib_shared::firewall_config::L4Matches::Tcp(
+                    namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(53))),
+                )),
                 Verdict::Accept,
                 ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
                 format!("rule_dns_default_accept_{}", rule_counter),
-                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                RuleTarget::new(Some(server.into()), Some("53".to_string())),
-                Protocol::Udp,
+                Some(RuleTargetHost::FirewallDevice),
+                Some(server.into()),
+                None,
+                Some(namib_shared::firewall_config::L4Matches::Udp(
+                    namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(53))),
+                )),
                 Verdict::Accept,
                 ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
@@ -419,38 +558,54 @@ pub fn convert_device_to_fw_rules(
         for server in &administrative_context.ntp_mappings {
             rules.push(FirewallRule::new(
                 format!("rule_ntp_default_accept_{}", rule_counter),
-                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                RuleTarget::new(Some(server.into()), Some("123".to_string())),
-                Protocol::Tcp,
+                Some(RuleTargetHost::FirewallDevice),
+                Some(server.into()),
+                None,
+                Some(namib_shared::firewall_config::L4Matches::Tcp(
+                    namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(123))),
+                )),
                 Verdict::Accept,
                 ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
                 format!("rule_ntp_default_accept_{}", rule_counter),
-                RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                RuleTarget::new(Some(server.into()), Some("123".to_string())),
-                Protocol::Udp,
+                Some(RuleTargetHost::FirewallDevice),
+                Some(server.into()),
+                None,
+                Some(namib_shared::firewall_config::L4Matches::Udp(
+                    namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(123))),
+                )),
                 Verdict::Accept,
                 ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
         }
+    } else {
+        return FirewallDevice {
+            id: device.id,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
+            rules,
+            collect_data: device.collect_info,
+        };
     }
     rules.push(FirewallRule::new(
         format!("rule_default_{}", rule_counter),
-        RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-        RuleTarget::new(None, None),
-        Protocol::All,
+        Some(RuleTargetHost::FirewallDevice),
+        None,
+        None,
+        None,
         Verdict::Reject,
         ScopeConstraint::None,
     ));
     rule_counter += 1;
     rules.push(FirewallRule::new(
         format!("rule_default_{}", rule_counter),
-        RuleTarget::new(None, None),
-        RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-        Protocol::All,
+        None,
+        Some(RuleTargetHost::FirewallDevice),
+        None,
+        None,
         Verdict::Reject,
         ScopeConstraint::None,
     ));
@@ -579,11 +734,11 @@ mod tests {
     use super::*;
     use crate::models::{
         Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, IcmpMatches, Ipv4Matches,
-        L3Matches, L4Matches, MudAclMatchesAugmentation, MudData, QuarantineException, SourceDest, TcpMatches,
+        L3Matches, L4Matches, MudAclMatchesAugmentation, MudData, QuarantineException, TcpMatches,
     };
 
     #[test]
-    fn test_acl_merging() -> Result<()> {
+    fn test_acl_merging() {
         let original_acls = vec![
             Acl {
                 name: "acl_to_device".to_string(),
@@ -595,8 +750,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -621,8 +778,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -650,8 +809,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -676,8 +837,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Udp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -722,12 +885,10 @@ mod tests {
             around_device_or_sth_acl.packet_direction,
             override_acls[1].packet_direction
         );
-
-        Ok(())
     }
 
     #[test]
-    fn test_overridden_acls_to_firewall_rules() -> Result<()> {
+    fn test_overridden_acls_to_firewall_rules() {
         let mud_data = MudData {
             url: "https://example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -747,8 +908,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&Some(String::from("www.example.test")), &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: Some(String::from("www.example.test")),
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -773,8 +936,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Udp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&Some(String::from("www.example.test")), &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: Some(String::from("www.example.test")),
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -832,95 +997,100 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_0"),
-                    RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::Udp,
+                    Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Udp(
+                        namib_shared::firewall_config::UdpMatches::default(),
+                    )),
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Hostname(String::from(
-                            "https://me.org/mud-devices/my-dns-server.json",
-                        ))),
-                        Some(String::from("53")),
-                    ),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Hostname(String::from(
+                        "https://me.org/mud-devices/my-dns-server.json",
+                    ))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(53))),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_2"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Hostname(String::from(
-                            "https://me.org/mud-devices/my-dns-server.json",
-                        ))),
-                        Some(String::from("53")),
-                    ),
-                    Protocol::Udp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Hostname(String::from(
+                        "https://me.org/mud-devices/my-dns-server.json",
+                    ))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Udp(
+                        namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(53))),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_3"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
-                        Some(String::from("53")),
-                    ),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(53))),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_4"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
-                        Some(String::from("53")),
-                    ),
-                    Protocol::Udp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Udp(
+                        namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(53))),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_ntp_default_accept_5"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
-                        Some(String::from("123")),
-                    ),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(123))),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_ntp_default_accept_6"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
-                        Some(String::from("123")),
-                    ),
-                    Protocol::Udp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Udp(
+                        namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(123))),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_7"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_8"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
@@ -928,13 +1098,11 @@ mod tests {
             collect_data: false,
         };
 
-        assert!(x.eq(&resulting_device));
-
-        Ok(())
+        assert_eq!(x, resulting_device);
     }
 
     #[test]
-    fn test_converting() -> Result<()> {
+    fn test_converting() {
         let mud_data = MudData {
             url: "https://example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -955,8 +1123,10 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Tcp),
-                                networks: SourceDest::new(&None, &None),
-                                dnsnames: SourceDest::new(&Some(String::from("www.example.test")), &None),
+                                src_network: None,
+                                dst_network: None,
+                                src_dnsname: Some(String::from("www.example.test")),
+                                dst_dnsname: None,
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -968,7 +1138,8 @@ mod tests {
                             })),
                             l4: Some(L4Matches::Tcp(TcpMatches {
                                 direction_initiated: None,
-                                ports: SourceDest::new(&Some(AcePort::Single(123)), &Some(AcePort::Range(50, 60))),
+                                src_port: Some(AcePort::Single(123)),
+                                dst_port: Some(AcePort::Range(50, 60)),
                                 sequence_number: None,
                                 acknowledgement_number: None,
                                 data_offset: None,
@@ -992,8 +1163,10 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Udp),
-                                networks: SourceDest::new(&None, &None),
-                                dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
+                                src_network: None,
+                                dst_network: None,
+                                src_dnsname: None,
+                                dst_dnsname: Some(String::from("www.example.test")),
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -1003,17 +1176,10 @@ mod tests {
                                 offset: None,
                                 identification: None,
                             })),
-                            l4: Some(L4Matches::Tcp(TcpMatches {
-                                sequence_number: None,
-                                acknowledgement_number: None,
-                                data_offset: None,
-                                reserved: None,
-                                flags: None,
-                                window_size: None,
-                                urgent_pointer: None,
-                                options: None,
-                                direction_initiated: None,
-                                ports: SourceDest::new(&Some(AcePort::Range(8000, 8080)), &Some(AcePort::Single(56))),
+                            l4: Some(L4Matches::Udp(UdpMatches {
+                                src_port: Some(AcePort::Range(8000, 8080)),
+                                dst_port: Some(AcePort::Single(56)),
+                                length: None,
                             })),
                             matches_augmentation: None,
                         },
@@ -1047,48 +1213,56 @@ mod tests {
             flow_scopes: vec![],
         };
 
-        let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
+        let actual = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
-        let resulting_device = FirewallDevice {
+        let expected = FirewallDevice {
             id: device.id,
             ipv4_addr: device.ipv4_addr,
             ipv6_addr: device.ipv6_addr,
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_0"),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
-                        Some("123".to_string()),
-                    ),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("50:60".to_string())),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(
+                            Some(PortOrRange::Single(123)),
+                            Some(PortOrRange::Range(50, 60)),
+                        ),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("8000:8080".to_string())),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
-                        Some("56".to_string()),
-                    ),
-                    Protocol::Udp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Udp(
+                        namib_shared::firewall_config::UdpMatches::only_ports(
+                            Some(PortOrRange::Range(8000, 8080)),
+                            Some(PortOrRange::Single(56)),
+                        ),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_3"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
@@ -1096,13 +1270,11 @@ mod tests {
             collect_data: true,
         };
 
-        assert!(x.eq(&resulting_device));
-
-        Ok(())
+        assert_eq!(actual, expected);
     }
 
     #[test]
-    fn test_my_controller() -> Result<()> {
+    fn test_my_controller() {
         // create bulb
         let bulb_mud_data = MudData {
             url: "https://manufacturer.com/devices/bulb".to_string(),
@@ -1123,8 +1295,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1226,8 +1400,8 @@ mod tests {
             .rules
             .iter()
             .filter(|&r| {
-                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
-                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+                r.src.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
             })
             .collect();
 
@@ -1235,12 +1409,10 @@ mod tests {
 
         let rule = rule_result[0];
         assert_eq!(rule.verdict, Verdict::Accept);
-
-        Ok(())
     }
 
     #[test]
-    fn test_controller() -> Result<()> {
+    fn test_controller() {
         // create bulb
         let bulb_mud_data = MudData {
             url: "https://manufacturer.com/devices/bulb".to_string(),
@@ -1261,8 +1433,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1362,8 +1536,8 @@ mod tests {
             .rules
             .iter()
             .filter(|&r| {
-                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
-                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+                r.src.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
             })
             .collect();
 
@@ -1371,11 +1545,10 @@ mod tests {
 
         let rule = rule_result[0];
         assert_eq!(rule.verdict, Verdict::Accept);
-
-        return Ok(());
     }
+
     #[test]
-    fn test_same_manufacturer() -> Result<()> {
+    fn test_same_manufacturer() {
         let mud_data = MudData {
             url: "https://example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -1395,8 +1568,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1416,7 +1591,8 @@ mod tests {
                             urgent_pointer: None,
                             options: None,
                             direction_initiated: None,
-                            ports: SourceDest::new(&Some(AcePort::Single(321)), &Some(AcePort::Single(500))),
+                            src_port: Some(AcePort::Single(321)),
+                            dst_port: Some(AcePort::Single(500)),
                         })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
@@ -1475,8 +1651,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1525,28 +1703,33 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_0"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("321".to_string())),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap().clone()))),
-                        Some("500".to_string()),
-                    ),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap()))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(
+                            Some(PortOrRange::Single(321)),
+                            Some(PortOrRange::Single(500)),
+                        ),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
@@ -1556,13 +1739,11 @@ mod tests {
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1], &AdministrativeContext::default());
 
-        assert!(x.eq(&resulting_device));
-
-        Ok(())
+        assert_eq!(x, resulting_device);
     }
 
     #[test]
-    fn test_model_matching() -> Result<()> {
+    fn test_model_matching() {
         let mud_data = MudData {
             url: "https://simple-example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -1583,8 +1764,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1604,7 +1787,8 @@ mod tests {
                             urgent_pointer: None,
                             options: None,
                             direction_initiated: None,
-                            ports: SourceDest::new(&Some(AcePort::Single(123)), &Some(AcePort::Range(50, 60))),
+                            src_port: Some(AcePort::Single(123)),
+                            dst_port: Some(AcePort::Range(50, 60)),
                         })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: None,
@@ -1694,37 +1878,40 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_0"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("123".to_string())),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip(IpAddr::V4(device1.inner.ipv4_addr.clone().unwrap()))),
-                        Some("50:60".to_string()),
-                    ),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip(IpAddr::V4(device1.inner.ipv4_addr.unwrap()))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(
+                            Some(PortOrRange::Single(123)),
+                            Some(PortOrRange::Range(50, 60)),
+                        ),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
         };
-        assert!(x.eq(&resulting_device));
-
-        Ok(())
+        assert_eq!(x, resulting_device);
     }
 
     #[test]
@@ -1749,8 +1936,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1850,8 +2039,8 @@ mod tests {
             .rules
             .iter()
             .find(|&r| {
-                r.src.host.as_ref() == Some(&RuleTargetHost::FirewallDevice)
-                    && r.dst.host.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+                r.src.as_ref() == Some(&RuleTargetHost::FirewallDevice)
+                    && r.dst.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
             })
             .expect("could not find firewall rule filtered for bridge target");
         assert_eq!(controller_rule.scope, ScopeConstraint::Local);
@@ -1867,7 +2056,7 @@ mod tests {
     }
 
     #[test]
-    fn test_manufacturer() -> Result<()> {
+    fn test_manufacturer() {
         let mud_data = MudData {
             url: "https://example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -1887,8 +2076,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -1908,7 +2099,8 @@ mod tests {
                             urgent_pointer: None,
                             options: None,
                             direction_initiated: None,
-                            ports: SourceDest::new(&Some(AcePort::Single(321)), &Some(AcePort::Single(500))),
+                            src_port: Some(AcePort::Single(321)),
+                            dst_port: Some(AcePort::Single(500)),
                         })),
                         matches_augmentation: Some(MudAclMatchesAugmentation {
                             manufacturer: Some("simple-example.com".to_string()),
@@ -1967,8 +2159,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Tcp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &None),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: None,
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -2017,28 +2211,33 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_0"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), Some("321".to_string())),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap().clone()))),
-                        Some("500".to_string()),
-                    ),
-                    Protocol::Tcp,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap()))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Tcp(
+                        namib_shared::firewall_config::TcpMatches::only_ports(
+                            Some(PortOrRange::Single(321)),
+                            Some(PortOrRange::Single(500)),
+                        ),
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
@@ -2048,13 +2247,11 @@ mod tests {
 
         let x = convert_device_to_fw_rules(&device, &[device.clone(), device1], &AdministrativeContext::default());
 
-        assert!(x.eq(&resulting_device));
-
-        Ok(())
+        assert_eq!(x, resulting_device);
     }
 
     #[test]
-    fn test_icmp_matching() -> Result<()> {
+    fn test_icmp_matching() {
         let mud_data = MudData {
             url: "https://example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -2074,8 +2271,10 @@ mod tests {
                     matches: AceMatches {
                         l3: Some(L3Matches::Ipv4(Ipv4Matches {
                             protocol: Some(AceProtocol::Icmp),
-                            networks: SourceDest::new(&None, &None),
-                            dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
+                            src_network: None,
+                            dst_network: None,
+                            src_dnsname: None,
+                            dst_dnsname: Some(String::from("www.example.test")),
                             dscp: None,
                             ecn: None,
                             length: None,
@@ -2128,28 +2327,34 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_0"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(Some(RuleTargetHost::Hostname(String::from("www.example.test"))), None),
-                    Protocol::Icmp(Icmp {
-                        icmp_type: Some(8),
-                        icmp_code: Some(0),
-                    }),
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                    None,
+                    Some(namib_shared::firewall_config::L4Matches::Icmp(
+                        namib_shared::firewall_config::IcmpMatches {
+                            icmp_type: Some(8),
+                            icmp_code: Some(0),
+                            rest_of_header: None,
+                        },
+                    )),
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
@@ -2159,13 +2364,11 @@ mod tests {
 
         let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
-        assert!(x.eq(&resulting_device));
-
-        Ok(())
+        assert_eq!(x, resulting_device);
     }
 
     #[test]
-    fn test_q_bit() -> Result<()> {
+    fn test_q_bit() {
         let mud_data = MudData {
             url: "https://example.com/.well-known/mud".to_string(),
             masa_url: None,
@@ -2186,8 +2389,10 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Icmp),
-                                networks: SourceDest::new(&None, &None),
-                                dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
+                                src_network: None,
+                                dst_network: None,
+                                src_dnsname: None,
+                                dst_dnsname: Some(String::from("www.example.test")),
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -2211,8 +2416,10 @@ mod tests {
                         matches: AceMatches {
                             l3: Some(L3Matches::Ipv4(Ipv4Matches {
                                 protocol: Some(AceProtocol::Icmp),
-                                networks: SourceDest::new(&None, &None),
-                                dnsnames: SourceDest::new(&None, &Some(String::from("www.example.test"))),
+                                src_network: None,
+                                dst_network: None,
+                                src_dnsname: None,
+                                dst_dnsname: Some(String::from("www.example.test")),
                                 dscp: None,
                                 ecn: None,
                                 length: None,
@@ -2270,28 +2477,28 @@ mod tests {
             rules: vec![
                 FirewallRule::new(
                     String::from("rule_quarantine_exception_0"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(
-                        Some(RuleTargetHost::Hostname("www.example.test/update-service".to_string())),
-                        None,
-                    ),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    Some(RuleTargetHost::Hostname("www.example.test/update-service".to_string())),
+                    None,
+                    None,
                     Verdict::Accept,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    RuleTarget::new(None, None),
-                    Protocol::All,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
-                    RuleTarget::new(None, None),
-                    RuleTarget::new(Some(RuleTargetHost::FirewallDevice), None),
-                    Protocol::All,
+                    None,
+                    Some(RuleTargetHost::FirewallDevice),
+                    None,
+                    None,
                     Verdict::Reject,
                     ScopeConstraint::None,
                 ),
@@ -2302,7 +2509,5 @@ mod tests {
         let x = convert_device_to_fw_rules(&device, &[device.clone()], &AdministrativeContext::default());
 
         assert_eq!(x, resulting_device);
-
-        Ok(())
     }
 }

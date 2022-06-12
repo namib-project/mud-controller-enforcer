@@ -11,8 +11,7 @@ use super::json_models;
 use crate::error::Error;
 use crate::models::{
     IcmpMatches, IcmpRestOfHeader, Ipv4HeaderFlags, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches,
-    MudAclMatchesAugmentation, SourceDest, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches,
-    ICMP_REST_OF_HEADER_BYTES,
+    MudAclMatchesAugmentation, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches, ICMP_REST_OF_HEADER_BYTES,
 };
 use crate::{
     error,
@@ -84,10 +83,8 @@ impl TryFrom<&json_models::Tcp> for TcpMatches {
 
     fn try_from(value: &json_models::Tcp) -> Result<Self> {
         Ok(Self {
-            ports: SourceDest::new(
-                &value.source_port.as_ref().map(parse_mud_port).transpose()?,
-                &value.destination_port.as_ref().map(parse_mud_port).transpose()?,
-            ),
+            src_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            dst_port: value.destination_port.as_ref().map(parse_mud_port).transpose()?,
             sequence_number: value.sequence_number,
             acknowledgement_number: value.acknowledgement_number,
             data_offset: value.data_offset,
@@ -115,10 +112,8 @@ impl TryFrom<&json_models::Udp> for UdpMatches {
     fn try_from(value: &json_models::Udp) -> Result<Self> {
         Ok(Self {
             length: value.length,
-            ports: SourceDest::new(
-                &value.source_port.as_ref().map(parse_mud_port).transpose()?,
-                &value.destination_port.as_ref().map(parse_mud_port).transpose()?,
-            ),
+            src_port: value.source_port.as_ref().map(parse_mud_port).transpose()?,
+            dst_port: value.destination_port.as_ref().map(parse_mud_port).transpose()?,
         })
     }
 }
@@ -179,8 +174,10 @@ impl TryFrom<&json_models::Ipv4> for Ipv4Matches {
             flags: value.flags.as_ref().map(Ipv4HeaderFlags::try_from).transpose()?,
             offset: value.offset,
             identification: value.identification,
-            networks: SourceDest::new(&value.source_ipv4_network, &value.destination_ipv4_network),
-            dnsnames: SourceDest::new(&value.src_dnsname, &value.dst_dnsname),
+            src_network: value.source_ipv4_network.clone(),
+            dst_network: value.destination_ipv4_network.clone(),
+            src_dnsname: value.src_dnsname.clone(),
+            dst_dnsname: value.dst_dnsname.clone(),
         })
     }
 }
@@ -196,8 +193,10 @@ impl TryFrom<&json_models::Ipv6> for Ipv6Matches {
             ttl: value.ttl,
             protocol: value.protocol.map(AceProtocol::Protocol),
             flow_label: value.flow_label,
-            networks: SourceDest::new(&value.source_ipv6_network, &value.destination_ipv6_network),
-            dnsnames: SourceDest::new(&value.src_dnsname, &value.dst_dnsname),
+            src_network: value.source_ipv6_network.clone(),
+            dst_network: value.destination_ipv6_network.clone(),
+            src_dnsname: value.src_dnsname.clone(),
+            dst_dnsname: value.dst_dnsname.clone(),
         })
     }
 }
@@ -810,7 +809,8 @@ mod tests {
                                         window_size: None,
                                         urgent_pointer: None,
                                         options: None,
-                                        ports: SourceDest { src: None, dst: None },
+                                        src_port: None,
+                                        dst_port: None,
                                         direction_initiated: None,
                                     })),
                                     matches_augmentation: None,
