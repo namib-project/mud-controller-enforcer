@@ -22,10 +22,10 @@ pub enum FlowDataDirection {
     ToDevice,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlowDataTcp {
-    sport: u16,
-    dport: u16,
+    pub sport: u16,
+    pub dport: u16,
     psh: bool,
     ece: bool,
 }
@@ -41,10 +41,10 @@ impl FlowDataTcp {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlowDataUdp {
-    sport: u16,
-    dport: u16,
+    pub sport: u16,
+    pub dport: u16,
 }
 
 impl FlowDataUdp {
@@ -56,14 +56,14 @@ impl FlowDataUdp {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FlowDataTransport {
     None,
     Tcp(FlowDataTcp),
     Udp(FlowDataUdp),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FlowData {
     pub timestamp: Option<std::time::SystemTime>,
     pub src_ip: std::net::IpAddr,
@@ -72,6 +72,8 @@ pub struct FlowData {
     pub length: u16,
     pub transport: FlowDataTransport,
     pub packet: Option<Vec<u8>>,
+    pub denied: bool,
+
 }
 
 impl FlowData {
@@ -83,6 +85,7 @@ impl FlowData {
         length: u16,
         transport: FlowDataTransport,
         packet: Option<Vec<u8>>,
+        denied: bool,
     ) -> FlowData {
         FlowData {
             timestamp,
@@ -92,6 +95,7 @@ impl FlowData {
             length,
             transport,
             packet,
+            denied,
         }
     }
 }
