@@ -8,7 +8,6 @@ use crate::{
     routes::dtos::AnomalyCreationDto,
     services::device_service,
 };
-use actix_web::web::Json;
 
 pub async fn get_all_anomalies(pool: &DbConnection) -> Result<Vec<Anomaly>> {
     let anomalies = sqlx::query_as!(AnomalyDbo, "SELECT * FROM anomalies")
@@ -38,7 +37,7 @@ pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Anomaly> {
     Ok(Anomaly::from(anomaly))
 }
 
-pub async fn insert_anomaly(mut anomaly_data: Json<AnomalyCreationDto>, pool: &DbConnection) -> Result<Anomaly> {
+pub async fn insert_anomaly(mut anomaly_data: AnomalyCreationDto, pool: &DbConnection) -> Result<Anomaly> {
     if let Ok(source) = device_service::find_by_ip(anomaly_data.source_ip.as_str(), pool).await {
         anomaly_data.source_id = Some(source.id);
     } else {

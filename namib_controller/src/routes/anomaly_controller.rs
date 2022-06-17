@@ -60,7 +60,7 @@ async fn create_anomaly(
     auth.require_permission(Permission::anomaly__write)?;
 
     Ok(Json(AnomalyDto::from(
-        &anomaly_service::insert_anomaly(anomaly_creation_dto, &pool).await?,
+        &anomaly_service::insert_anomaly(anomaly_creation_dto.into_inner(), &pool).await?,
     )))
 }
 

@@ -3,6 +3,7 @@
 
 use crate::{error::Result, models::Anomaly};
 use chrono::NaiveDateTime;
+use namib_shared::flow_scope::{FlowData, FlowDataTransport};
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
@@ -58,5 +59,31 @@ impl AnomalyCreationDto {
             l4protocol: self.l4protocol,
             date_time_created,
         })
+    }
+}
+
+impl From<&FlowData> for AnomalyCreationDto {
+    fn from(flow_data: &FlowData) -> Self {
+        Self {
+            source_ip: flow_data.src_ip.to_string(),
+            source_port: match flow_data.clone().transport {
+                FlowDataTransport::Tcp(transport_data) => Some(transport_data.sport),
+                FlowDataTransport::Udp(transport_data) => Some(transport_data.sport),
+                FlowDataTransport::None => None,
+            },
+            source_id: None,
+            destination_ip: flow_data.dest_ip.to_string(),
+            destination_port: match flow_data.clone().transport {
+                FlowDataTransport::Tcp(transport_data) => Some(transport_data.dport),
+                FlowDataTransport::Udp(transport_data) => Some(transport_data.dport),
+                FlowDataTransport::None => None,
+            },
+            destination_id: None,
+            l4protocol: match flow_data.clone().transport {
+                FlowDataTransport::Tcp(_) => Some(6),
+                FlowDataTransport::Udp(_) => Some(17),
+                FlowDataTransport::None => None,
+            },
+        }
     }
 }

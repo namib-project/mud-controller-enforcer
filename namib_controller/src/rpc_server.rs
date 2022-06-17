@@ -32,9 +32,10 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{AdministrativeContext, ConfiguredServerDbo, DefinedServer},
+    routes::dtos::AnomalyCreationDto,
     services::{
-        acme_service::CertId, device_service, enforcer_service, firewall_configuration_service, flow_scope_service,
-        flow_service, log_service,
+        acme_service::CertId, anomaly_service, device_service, enforcer_service, firewall_configuration_service,
+        flow_scope_service, flow_service, log_service,
     },
     util::open_file_with,
 };
@@ -136,8 +137,13 @@ impl NamibRpc for NamibRpcServer {
     async fn send_scope_results(self, _: context::Context, results: Vec<FlowData>) {
         // Add services here
         for result in results {
-            if let Err(e) = flow_service::on_flow(&result, &self.db_connection).await {
+            if let Err(e) = flow_service::on_flow(&result.clone(), &self.db_connection).await {
                 error!("error occured while handling flow data: {:?}", e);
+            }
+            if flow_data.denied {
+                anomaly_service::insert_anomaly(AnomalyCreationDto::from(&result), &self.db_connection)
+                    .await
+                    .expect("Anomaly could not be created");
             }
         }
     }
