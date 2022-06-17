@@ -1,4 +1,4 @@
-// Copyright 2020-2021,  Till schnittka
+// Copyright 2020-2021,  Till Schnittka, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 // watch has an event loop, so it needs to be async
@@ -27,19 +27,29 @@ pub async fn watch(enforcer: Arc<RwLock<Enforcer>>) {
         enforcer.clone(),
         FlowDataDirection::FromDevice,
         false,
+        false,
     ));
 
     let mut headers_to = queue.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
     headers_to.set_mode(CopyMode::Packet, 0);
-    headers_to.set_callback(generate_callback(enforcer.clone(), FlowDataDirection::ToDevice, false));
+    headers_to.set_callback(generate_callback(enforcer.clone(), FlowDataDirection::ToDevice, false, false));
 
     let mut full_from = queue.bind_group(LogGroup::FullFromDevice as u16).unwrap();
     full_from.set_mode(CopyMode::Packet, 0);
-    full_from.set_callback(generate_callback(enforcer.clone(), FlowDataDirection::FromDevice, true));
+    full_from.set_callback(generate_callback(enforcer.clone(), FlowDataDirection::FromDevice, true, false));
 
     let mut full_to = queue.bind_group(LogGroup::FullToDevice as u16).unwrap();
     full_to.set_mode(CopyMode::Packet, 0);
-    full_to.set_callback(generate_callback(enforcer, FlowDataDirection::ToDevice, true));
+    full_to.set_callback(generate_callback(enforcer.clone(), FlowDataDirection::ToDevice, true, false));
+
+    let mut deny_to = queue.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
+    deny_to.set_mode(CopyMode::Packet, 0);
+    deny_to.set_callback(generate_callback(enforcer.clone(), FlowDataDirection::ToDevice, true, true));
+
+    let mut deny_from = queue.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
+    deny_from.set_mode(CopyMode::Packet, 0);
+    deny_from.set_callback(generate_callback(enforcer, FlowDataDirection::FromDevice, true, true));
+
 
     queue.run_loop();
 }
@@ -48,6 +58,7 @@ fn generate_callback(
     enforcer: Arc<RwLock<Enforcer>>,
     direction: FlowDataDirection,
     include_packet: bool,
+    denied: bool,
 ) -> std::boxed::Box<dyn Fn(nflog::Message)> {
     std::boxed::Box::new(move |msg: nflog::Message| {
         {
@@ -125,6 +136,7 @@ fn generate_callback(
                     } else {
                         None
                     },
+                    denied,
                 );
                 let _send = futures::executor::block_on(
                     futures::executor::block_on(enforcer.read())
