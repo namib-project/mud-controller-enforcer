@@ -16,7 +16,7 @@ actix-web = { version = "^3.3.2", features = ["rustls"] }
 actix-files = "^0.5.0"
 actix-cors = "^0.5.4"
 actix-ratelimit = { version = "^0.3.1", default-features = false, features = ["memory"] }
-sqlx = { git = "https://github.com/launchbadge/sqlx", branch = "master", features = ["runtime-tokio-rustls", "chrono", "offline"] }
+sqlx = { version = "^0.5.13", features = ["runtime-tokio-rustls", "chrono", "offline"] }
 log = "^0.4.14"
 env_logger = "^0.8.3"
 tokio = { version = "^1.5.0", features = ["rt-multi-thread", "fs", "macros"] }
@@ -31,7 +31,7 @@ tokio-rustls = "^0.22.0"
 tokio-util = "^0.6.6"
 tokio-serde = "^0.8.0"
 tokio-stream = { version = "^0.1.5", features = ["net"] }
-pin-project = "^1.0.7"
+pin-project = "^1.0.10"
 rand = "^0.8.3"
 rust-argon2 = "^0.8.3"
 serde = { version = "^1.0.125", features = ["derive"] }
