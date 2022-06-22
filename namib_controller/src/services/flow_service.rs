@@ -40,8 +40,8 @@ pub async fn add_device_connection(device: &Device, flow: &FlowData, pool: &DbCo
     let dest_ip = flow.dest_ip.to_string();
 
     let _ = sqlx::query!(
-        "INSERT OR IGNORE INTO device_connections (device_id, direction, target, amount) VALUES (?, ?, ?, 0);
-         UPDATE device_connections SET amount = amount + 1 WHERE device_id = ? AND direction = ? AND target = ?",
+        "INSERT OR IGNORE INTO device_connections (device_id, date, direction, target, amount) VALUES (?, DATE('now'), ?, ?, 0);
+         UPDATE device_connections SET amount = amount + 1 WHERE device_id = ? AND direction = ? AND target = ? AND date = DATE('now')",
         device.id,
         direction,
         dest_ip,
@@ -62,7 +62,7 @@ pub async fn get_device_connections(device: i64, pool: &DbConnection) -> Result<
     Ok(DeviceConnections {
         device_id: device,
         from: sqlx::query!(
-            "SELECT target, amount FROM device_connections WHERE device_id = ? AND direction = ?",
+            "SELECT date, target, amount FROM device_connections WHERE device_id = ? AND direction = ?",
             device,
             from_device
         )
@@ -70,12 +70,13 @@ pub async fn get_device_connections(device: i64, pool: &DbConnection) -> Result<
         .await?
         .iter()
         .map(|dbo| DeviceConnection {
+            date: dbo.date.date(),
             target: std::net::IpAddr::from_str(dbo.target.as_str()).unwrap(),
             amount: dbo.amount,
         })
         .collect(),
         to: sqlx::query!(
-            "SELECT target, amount FROM device_connections WHERE device_id = ? AND direction = ?",
+            "SELECT date, target, amount FROM device_connections WHERE device_id = ? AND direction = ?",
             device,
             to_device
         )
@@ -83,6 +84,7 @@ pub async fn get_device_connections(device: i64, pool: &DbConnection) -> Result<
         .await?
         .iter()
         .map(|dbo| DeviceConnection {
+            date: dbo.date.date(),
             target: std::net::IpAddr::from_str(dbo.target.as_str()).unwrap(),
             amount: dbo.amount,
         })

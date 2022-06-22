@@ -1,4 +1,5 @@
 use crate::models::{DeviceConnection, DeviceConnections};
+use chrono::NaiveDate;
 use paperclip::actix::Apiv2Schema;
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
@@ -20,6 +21,7 @@ impl From<&DeviceConnections> for DeviceConnectionsDto {
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema)]
 pub struct DeviceConnectionDto {
+    pub date: NaiveDate,
     pub target: String,
     pub amount: i64,
 }
@@ -27,6 +29,7 @@ pub struct DeviceConnectionDto {
 impl From<&DeviceConnection> for DeviceConnectionDto {
     fn from(conn: &DeviceConnection) -> Self {
         Self {
+            date: conn.date,
             target: conn.target.to_string(),
             amount: conn.amount,
         }
