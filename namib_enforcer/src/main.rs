@@ -152,7 +152,8 @@ async fn main() -> Result<()> {
     let dns_task = tokio::spawn(async move { dns_service.auto_refresher_task().await });
     let firewall_task = tokio::spawn(async move { fw_service.firewall_change_watcher().await });
     let np0f_log_task = tokio::spawn(services::log_watcher::watch_np0f(enforcer.clone()));
-    let nflog_task = tokio::spawn(services::nflog_watcher::watch(enforcer.clone()));
+    let nflog_task_ipv4 = tokio::spawn(services::nflog_watcher::watch_ipv4(enforcer.clone()));
+    let nflog_task_ipv6 = tokio::spawn(services::nflog_watcher::watch_ipv6(enforcer.clone()));
 
     let _log_watcher = thread::spawn(move || services::log_watcher::watch(&enforcer));
 
@@ -162,7 +163,8 @@ async fn main() -> Result<()> {
         dns_task,
         firewall_task,
         np0f_log_task,
-        nflog_task
+        nflog_task_ipv4,
+        nflog_task_ipv6
     )?;
     Ok(())
 }
