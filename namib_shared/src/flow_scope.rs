@@ -1,3 +1,5 @@
+use crate::macaddr::SerdeMacAddr;
+use macaddr::MacAddr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -67,7 +69,9 @@ pub enum FlowDataTransport {
 pub struct FlowData {
     pub timestamp: Option<std::time::SystemTime>,
     pub src_ip: std::net::IpAddr,
+    pub src_mac: Option<SerdeMacAddr>,
     pub dest_ip: std::net::IpAddr,
+    pub dest_mac: Option<SerdeMacAddr>,
     pub direction: FlowDataDirection,
     pub length: u16,
     pub transport: FlowDataTransport,
@@ -77,10 +81,13 @@ pub struct FlowData {
 }
 
 impl FlowData {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         timestamp: Option<std::time::SystemTime>,
         src_ip: std::net::IpAddr,
+        src_mac: Option<MacAddr>,
         dest_ip: std::net::IpAddr,
+        dest_mac: Option<MacAddr>,
         direction: FlowDataDirection,
         length: u16,
         transport: FlowDataTransport,
@@ -90,7 +97,9 @@ impl FlowData {
         FlowData {
             timestamp,
             src_ip,
+            src_mac: src_mac.map(SerdeMacAddr::from),
             dest_ip,
+            dest_mac: dest_mac.map(SerdeMacAddr::from),
             direction,
             length,
             transport,
