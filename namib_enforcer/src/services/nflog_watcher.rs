@@ -9,8 +9,9 @@ use tokio::sync::RwLock;
 
 use namib_shared::flow_scope::{FlowData, FlowDataDirection, FlowDataTcp, FlowDataTransport, FlowDataUdp, LogGroup};
 
-use pktparse::{ip, ipv4, ipv6, tcp, udp};
+use pktparse::{ethernet, ip, ipv4, ipv6, tcp, udp};
 
+use namib_shared::macaddr::{MacAddr, MacAddr6};
 use nflog::{CopyMode, Queue};
 
 use crate::{rpc::rpc_client, Enforcer};
@@ -138,89 +139,99 @@ fn generate_callback(
     denied: bool,
 ) -> std::boxed::Box<dyn Fn(nflog::Message)> {
     std::boxed::Box::new(move |msg: nflog::Message| {
-        {
-            let payload_data = msg.get_payload();
+        let payload_data = msg.get_payload();
 
-            println!("packet ({})", payload_data.len());
+        println!("packet ({})", payload_data.len());
 
-            // if let Ok((remaining, eth_frame)) = ethernet::parse_ethernet_frame(payload_data) {
-            let parsed = if let Ok((remaining, ipv4_packet)) = ipv4::parse_ipv4_header(payload_data) {
-                Some((
-                    std::net::IpAddr::V4(ipv4_packet.source_addr),
-                    std::net::IpAddr::V4(ipv4_packet.dest_addr),
-                    ipv4_packet.protocol,
-                    ipv4_packet.length,
-                    remaining,
-                ))
-            } else if let Ok((remaining, ipv6_packet)) = ipv6::parse_ipv6_header(payload_data) {
-                Some((
-                    std::net::IpAddr::V6(ipv6_packet.source_addr),
-                    std::net::IpAddr::V6(ipv6_packet.dest_addr),
-                    ipv6_packet.next_header,
-                    ipv6_packet.length,
-                    remaining,
-                ))
-            } else {
-                None
-            };
+        let link_layer_header = msg.get_packet_hwhdr();
+        let mac_addresses = if let Ok((_, eth_frame)) = ethernet::parse_ethernet_frame(link_layer_header) {
+            (
+                Some(MacAddr::from(MacAddr6::from(eth_frame.source_mac.0))),
+                Some(MacAddr::from(MacAddr6::from(eth_frame.dest_mac.0))),
+                Some(eth_frame.ethertype),
+            )
+        } else {
+            (None, None, None)
+        };
 
-            if let Some((src_addr, dst_addr, protocol, length, remaining)) = parsed {
-                let result = FlowData::new(
-                    msg.get_timestamp().ok(),
-                    src_addr,
-                    dst_addr,
-                    direction,
-                    length,
-                    match protocol {
-                        ip::IPProtocol::TCP => {
-                            if let Ok((_, tcp_header)) = tcp::parse_tcp_header(remaining) {
-                                FlowDataTransport::Tcp(FlowDataTcp::new(
-                                    match direction {
-                                        FlowDataDirection::FromDevice => tcp_header.dest_port,
-                                        FlowDataDirection::ToDevice => tcp_header.source_port,
-                                    },
-                                    match direction {
-                                        FlowDataDirection::ToDevice => tcp_header.dest_port,
-                                        FlowDataDirection::FromDevice => tcp_header.source_port,
-                                    },
-                                    tcp_header.flag_psh,
-                                    tcp_header.flag_ece,
-                                ))
-                            } else {
-                                FlowDataTransport::None
-                            }
-                        },
-                        ip::IPProtocol::UDP => {
-                            if let Ok((_, udp_header)) = udp::parse_udp_header(remaining) {
-                                FlowDataTransport::Udp(FlowDataUdp::new(
-                                    match direction {
-                                        FlowDataDirection::FromDevice => udp_header.dest_port,
-                                        FlowDataDirection::ToDevice => udp_header.source_port,
-                                    },
-                                    match direction {
-                                        FlowDataDirection::ToDevice => udp_header.dest_port,
-                                        FlowDataDirection::FromDevice => udp_header.source_port,
-                                    },
-                                ))
-                            } else {
-                                FlowDataTransport::None
-                            }
-                        },
-                        _ => FlowDataTransport::None,
+        let parsed = if let Ok((remaining, ipv4_packet)) = ipv4::parse_ipv4_header(payload_data) {
+            Some((
+                std::net::IpAddr::V4(ipv4_packet.source_addr),
+                std::net::IpAddr::V4(ipv4_packet.dest_addr),
+                ipv4_packet.protocol,
+                ipv4_packet.length,
+                remaining,
+            ))
+        } else if let Ok((remaining, ipv6_packet)) = ipv6::parse_ipv6_header(payload_data) {
+            Some((
+                std::net::IpAddr::V6(ipv6_packet.source_addr),
+                std::net::IpAddr::V6(ipv6_packet.dest_addr),
+                ipv6_packet.next_header,
+                ipv6_packet.length,
+                remaining,
+            ))
+        } else {
+            None
+        };
+
+        if let Some((src_addr, dst_addr, protocol, length, remaining)) = parsed {
+            let result = FlowData::new(
+                msg.get_timestamp().ok(),
+                src_addr,
+                mac_addresses.0,
+                dst_addr,
+                mac_addresses.1,
+                direction,
+                length,
+                match protocol {
+                    ip::IPProtocol::TCP => {
+                        if let Ok((_, tcp_header)) = tcp::parse_tcp_header(remaining) {
+                            FlowDataTransport::Tcp(FlowDataTcp::new(
+                                match direction {
+                                    FlowDataDirection::FromDevice => tcp_header.dest_port,
+                                    FlowDataDirection::ToDevice => tcp_header.source_port,
+                                },
+                                match direction {
+                                    FlowDataDirection::ToDevice => tcp_header.dest_port,
+                                    FlowDataDirection::FromDevice => tcp_header.source_port,
+                                },
+                                tcp_header.flag_psh,
+                                tcp_header.flag_ece,
+                            ))
+                        } else {
+                            FlowDataTransport::None
+                        }
                     },
-                    if include_packet {
-                        Some(payload_data.into())
-                    } else {
-                        None
+                    ip::IPProtocol::UDP => {
+                        if let Ok((_, udp_header)) = udp::parse_udp_header(remaining) {
+                            FlowDataTransport::Udp(FlowDataUdp::new(
+                                match direction {
+                                    FlowDataDirection::FromDevice => udp_header.dest_port,
+                                    FlowDataDirection::ToDevice => udp_header.source_port,
+                                },
+                                match direction {
+                                    FlowDataDirection::ToDevice => udp_header.dest_port,
+                                    FlowDataDirection::FromDevice => udp_header.source_port,
+                                },
+                            ))
+                        } else {
+                            FlowDataTransport::None
+                        }
                     },
-                    denied,
-                );
-                let _send = futures::executor::block_on(
-                    futures::executor::block_on(enforcer.read())
-                        .client
-                        .send_scope_results(rpc_client::current_rpc_context(), vec![result]),
-                );
-            }
+                    _ => FlowDataTransport::None,
+                },
+                if include_packet {
+                    Some(payload_data.into())
+                } else {
+                    None
+                },
+                denied,
+            );
+            let _send = futures::executor::block_on(
+                futures::executor::block_on(enforcer.read())
+                    .client
+                    .send_scope_results(rpc_client::current_rpc_context(), vec![result]),
+            );
         }
     })
 }
