@@ -450,65 +450,64 @@ pub fn convert_device_to_fw_rules(
                 } else {
                     &None
                 };
-                let other_dev_rule_targets: Vec<Option<RuleTargetHost>> =
-                    match (dnsname, &ace.matches.matches_augmentation) {
-                        // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
-                        (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                            Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
-                            Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
-                        },
-                        (None, Some(augmentation)) => {
-                            let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
-                            if let Some(host) = &augmentation.manufacturer {
-                                targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
-                            }
-                            if augmentation.same_manufacturer {
-                                targets_per_option.push(get_same_manufacturer_ruletargethosts(
-                                    device,
-                                    devices,
-                                    &acl.acl_type,
-                                ));
-                            }
-                            if let Some(uri) = &augmentation.controller {
-                                targets_per_option.push(get_controller_ruletargethosts(
-                                    device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
-                                    devices,
-                                    uri,
-                                    acl.acl_type,
-                                    &verdict,
-                                    administrative_context,
-                                ));
-                            }
-                            if augmentation.my_controller {
-                                targets_per_option.push(get_my_controller_ruletargethosts(
-                                    device,
-                                    devices,
-                                    acl.acl_type,
-                                    &verdict,
-                                    administrative_context,
-                                ));
-                            }
-                            if augmentation.local {
-                                scope = ScopeConstraint::Local;
-                            }
-                            if let Some(url) = &augmentation.model {
-                                targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
-                            }
+                let other_dev_rule_targets: Vec<Option<RuleTargetHost>> = match (dnsname, &ace.matches.mud) {
+                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
+                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
+                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
+                    },
+                    (None, Some(augmentation)) => {
+                        let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
+                        if let Some(host) = &augmentation.manufacturer {
+                            targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
+                        }
+                        if augmentation.same_manufacturer {
+                            targets_per_option.push(get_same_manufacturer_ruletargethosts(
+                                device,
+                                devices,
+                                &acl.acl_type,
+                            ));
+                        }
+                        if let Some(uri) = &augmentation.controller {
+                            targets_per_option.push(get_controller_ruletargethosts(
+                                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                                devices,
+                                uri,
+                                acl.acl_type,
+                                &verdict,
+                                administrative_context,
+                            ));
+                        }
+                        if augmentation.my_controller {
+                            targets_per_option.push(get_my_controller_ruletargethosts(
+                                device,
+                                devices,
+                                acl.acl_type,
+                                &verdict,
+                                administrative_context,
+                            ));
+                        }
+                        if augmentation.local {
+                            scope = ScopeConstraint::Local;
+                        }
+                        if let Some(url) = &augmentation.model {
+                            targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
+                        }
 
-                            // return those devices matched by _all_ specified options
-                            match targets_per_option.len() {
-                                0 => vec![],
-                                1 => targets_per_option[0].clone(),
-                                _ => targets_per_option[0]
-                                    .iter()
-                                    .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
-                                    .cloned()
-                                    .collect(),
-                            }
-                        },
-                        _ => vec![],
-                    }
-                    .clone();
+                        // return those devices matched by _all_ specified options
+                        match targets_per_option.len() {
+                            0 => vec![],
+                            1 => targets_per_option[0].clone(),
+                            _ => targets_per_option[0]
+                                .iter()
+                                .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
+                                .cloned()
+                                .collect(),
+                        }
+                    },
+                    _ => vec![],
+                }
+                .clone();
 
                 for other_dev_rule_target in &other_dev_rule_targets {
                     let (src, dst) = match acl.packet_direction {
@@ -734,7 +733,7 @@ mod tests {
     use super::*;
     use crate::models::{
         Ace, AceAction, AceMatches, AceProtocol, Acl, AclDirection, AclType, Device, IcmpMatches, Ipv4Matches,
-        L3Matches, L4Matches, MudAclMatchesAugmentation, MudData, QuarantineException, TcpMatches,
+        L3Matches, L4Matches, MudData, MudMatches, QuarantineException, TcpMatches,
     };
 
     #[test]
@@ -764,7 +763,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             },
@@ -792,7 +791,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             },
@@ -823,7 +822,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             },
@@ -851,7 +850,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             },
@@ -922,7 +921,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             }],
@@ -950,7 +949,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             }],
@@ -1149,7 +1148,7 @@ mod tests {
                                 urgent_pointer: None,
                                 options: None,
                             })),
-                            matches_augmentation: None,
+                            mud: None,
                         },
                     }],
                 },
@@ -1181,7 +1180,7 @@ mod tests {
                                 dst_port: Some(AcePort::Single(56)),
                                 length: None,
                             })),
-                            matches_augmentation: None,
+                            mud: None,
                         },
                     }],
                 },
@@ -1309,7 +1308,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                        mud: Some(MudMatches {
                             manufacturer: None,
                             same_manufacturer: false,
                             controller: None,
@@ -1447,7 +1446,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                        mud: Some(MudMatches {
                             manufacturer: None,
                             same_manufacturer: false,
                             controller: Some("https://manufacturer.com/devices/bridge".to_string()),
@@ -1594,7 +1593,7 @@ mod tests {
                             src_port: Some(AcePort::Single(321)),
                             dst_port: Some(AcePort::Single(500)),
                         })),
-                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                        mud: Some(MudMatches {
                             manufacturer: None,
                             same_manufacturer: true,
                             controller: None,
@@ -1665,7 +1664,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             }],
@@ -1790,7 +1789,7 @@ mod tests {
                             src_port: Some(AcePort::Single(123)),
                             dst_port: Some(AcePort::Range(50, 60)),
                         })),
-                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                        mud: Some(MudMatches {
                             manufacturer: None,
                             same_manufacturer: false,
                             controller: None,
@@ -1950,7 +1949,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                        mud: Some(MudMatches {
                             manufacturer: None,
                             same_manufacturer: false,
                             controller: Some("https://manufacturer.com/devices/bridge".to_string()),
@@ -2102,7 +2101,7 @@ mod tests {
                             src_port: Some(AcePort::Single(321)),
                             dst_port: Some(AcePort::Single(500)),
                         })),
-                        matches_augmentation: Some(MudAclMatchesAugmentation {
+                        mud: Some(MudMatches {
                             manufacturer: Some("simple-example.com".to_string()),
                             same_manufacturer: false,
                             controller: None,
@@ -2173,7 +2172,7 @@ mod tests {
                             identification: None,
                         })),
                         l4: None,
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             }],
@@ -2289,7 +2288,7 @@ mod tests {
                             icmp_code: Some(0),
                             rest_of_header: None,
                         })),
-                        matches_augmentation: None,
+                        mud: None,
                     },
                 }],
             }],
@@ -2407,7 +2406,7 @@ mod tests {
                                 icmp_code: Some(0),
                                 rest_of_header: None,
                             })),
-                            matches_augmentation: None,
+                            mud: None,
                         },
                     },
                     Ace {
@@ -2434,7 +2433,7 @@ mod tests {
                                 icmp_code: Some(0),
                                 rest_of_header: None,
                             })),
-                            matches_augmentation: None,
+                            mud: None,
                         },
                     },
                 ],

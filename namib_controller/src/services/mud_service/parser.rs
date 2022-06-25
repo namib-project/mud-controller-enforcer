@@ -10,8 +10,8 @@ use snafu::ensure;
 use super::json_models;
 use crate::error::Error;
 use crate::models::{
-    IcmpMatches, IcmpRestOfHeader, Ipv4HeaderFlags, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches,
-    MudAclMatchesAugmentation, TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches, ICMP_REST_OF_HEADER_BYTES,
+    IcmpMatches, IcmpRestOfHeader, Ipv4HeaderFlags, Ipv4Matches, Ipv6Matches, L3Matches, L4Matches, MudMatches,
+    TcpHeaderFlags, TcpMatches, TcpOptions, UdpMatches, ICMP_REST_OF_HEADER_BYTES,
 };
 use crate::{
     error,
@@ -386,7 +386,7 @@ fn parse_device_policy(
                             || local
                             || model.is_some()
                         {
-                            matches_augmentation = Some(MudAclMatchesAugmentation {
+                            matches_augmentation = Some(MudMatches {
                                 manufacturer,
                                 same_manufacturer,
                                 controller,
@@ -407,7 +407,7 @@ fn parse_device_policy(
                         matches: AceMatches {
                             l3,
                             l4,
-                            matches_augmentation,
+                            mud: matches_augmentation,
                         },
                     });
                 }
@@ -480,7 +480,7 @@ mod tests {
         let matches = AceMatches {
             l3: None,
             l4: None,
-            matches_augmentation: Some(MudAclMatchesAugmentation {
+            mud: Some(MudMatches {
                 manufacturer: None,
                 same_manufacturer: true,
                 controller: None,
@@ -813,7 +813,7 @@ mod tests {
                                         dst_port: None,
                                         direction_initiated: None,
                                     })),
-                                    matches_augmentation: None,
+                                    mud: None,
                                 }
                             },],
                         },

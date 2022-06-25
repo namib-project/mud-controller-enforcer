@@ -238,7 +238,7 @@ pub struct IcmpMatches {
 pub struct AceMatches {
     pub l3: Option<L3Matches>,
     pub l4: Option<L4Matches>,
-    pub matches_augmentation: Option<MudAclMatchesAugmentation>,
+    pub mud: Option<MudMatches>,
 }
 
 impl AceMatches {
@@ -253,7 +253,7 @@ impl AceMatches {
 
 #[derive(Debug, Serialize, Deserialize, Apiv2Schema, Clone, Eq, PartialEq)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct MudAclMatchesAugmentation {
+pub struct MudMatches {
     pub manufacturer: Option<String>,
     pub same_manufacturer: bool,
     pub controller: Option<String>,
