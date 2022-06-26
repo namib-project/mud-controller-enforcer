@@ -46,6 +46,14 @@ pub fn create_configuration(
     EnforcerConfig::new(version, rules, acme_service::DOMAIN.clone(), *next_expiration)
 }
 
+/// Generate the firewall rules for the given device (within the context of the other given devices
+/// and the 'administrative context' (i.E. for services like DNS/NTP configured providing servers),
+/// taking quarantining status into account.
+///
+/// Depending on the type/status of device, one of three cases can apply
+/// 1. A quarantined device is disallowed from any communication (excepting quarantine exceptions).
+/// 2. A (non-quarantined) MUD device will have rules generated corresponding to it's MUD.
+/// 3. A (non-quarantined) general purpose device will have no rules generated.
 pub fn convert_device_to_fw_rules(
     device: &DeviceWithRefs,
     devices: &[DeviceWithRefs],
@@ -74,6 +82,34 @@ pub fn convert_device_to_fw_rules(
             ));
             rule_counter += 1;
         }
+
+        rules.push(FirewallRule::new(
+            format!("rule_default_{}", rule_counter),
+            Some(RuleTargetHost::FirewallDevice),
+            None,
+            None,
+            None,
+            Verdict::Reject,
+            ScopeConstraint::None,
+        ));
+        rule_counter += 1;
+        rules.push(FirewallRule::new(
+            format!("rule_default_{}", rule_counter),
+            None,
+            Some(RuleTargetHost::FirewallDevice),
+            None,
+            None,
+            Verdict::Reject,
+            ScopeConstraint::None,
+        ));
+
+        FirewallDevice {
+            id: device.id,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
+            rules,
+            collect_data: device.collect_info,
+        }
     } else if let Some(mud_data) = &device.mud_data {
         let merged_acls = if mud_data.acl_override.is_empty() {
             mud_data.acllist.iter().collect()
@@ -87,7 +123,7 @@ pub fn convert_device_to_fw_rules(
                     AceAction::Accept => Verdict::Accept,
                     AceAction::Deny => Verdict::Reject,
                 };
-                let mut scope = ScopeConstraint::None;
+                let mut local_networks: bool = false;
 
                 let mut l4_matchable: Option<namib_shared::firewall_config::L4Matches> =
                     ace.matches.l4.clone().map(std::convert::Into::into);
@@ -180,7 +216,7 @@ pub fn convert_device_to_fw_rules(
                             ));
                         }
                         if augmentation.local {
-                            scope = ScopeConstraint::Local;
+                            local_networks = true;
                         }
                         if let Some(url) = &augmentation.model {
                             targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
@@ -213,7 +249,11 @@ pub fn convert_device_to_fw_rules(
                         l3_matchable.clone(),
                         l4_matchable.clone(), // includes ports
                         verdict.clone(),
-                        scope,
+                        if local_networks {
+                            ScopeConstraint::Local
+                        } else {
+                            ScopeConstraint::None
+                        },
                     ));
                     rule_counter += 1;
                 }
@@ -272,41 +312,43 @@ pub fn convert_device_to_fw_rules(
             ));
             rule_counter += 1;
         }
-    } else {
-        return FirewallDevice {
+
+        rules.push(FirewallRule::new(
+            format!("rule_default_{}", rule_counter),
+            Some(RuleTargetHost::FirewallDevice),
+            None,
+            None,
+            None,
+            Verdict::Reject,
+            ScopeConstraint::None,
+        ));
+        rule_counter += 1;
+        rules.push(FirewallRule::new(
+            format!("rule_default_{}", rule_counter),
+            None,
+            Some(RuleTargetHost::FirewallDevice),
+            None,
+            None,
+            Verdict::Reject,
+            ScopeConstraint::None,
+        ));
+
+        FirewallDevice {
             id: device.id,
             ipv4_addr: device.ipv4_addr,
             ipv6_addr: device.ipv6_addr,
             rules,
             collect_data: device.collect_info,
-        };
-    }
-    rules.push(FirewallRule::new(
-        format!("rule_default_{}", rule_counter),
-        Some(RuleTargetHost::FirewallDevice),
-        None,
-        None,
-        None,
-        Verdict::Reject,
-        ScopeConstraint::None,
-    ));
-    rule_counter += 1;
-    rules.push(FirewallRule::new(
-        format!("rule_default_{}", rule_counter),
-        None,
-        Some(RuleTargetHost::FirewallDevice),
-        None,
-        None,
-        Verdict::Reject,
-        ScopeConstraint::None,
-    ));
-
-    FirewallDevice {
-        id: device.id,
-        ipv4_addr: device.ipv4_addr,
-        ipv6_addr: device.ipv6_addr,
-        rules,
-        collect_data: device.collect_info,
+        }
+    } else {
+        // device is neither quarantined nor has MUD data
+        FirewallDevice {
+            id: device.id,
+            ipv4_addr: device.ipv4_addr,
+            ipv6_addr: device.ipv6_addr,
+            rules,
+            collect_data: device.collect_info,
+        }
     }
 }
 
