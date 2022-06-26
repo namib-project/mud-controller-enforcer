@@ -346,7 +346,7 @@ pub fn convert_device_to_fw_rules(
             id: device.id,
             ipv4_addr: device.ipv4_addr,
             ipv6_addr: device.ipv6_addr,
-            rules,
+            rules: vec![],
             collect_data: device.collect_info,
         }
     }
