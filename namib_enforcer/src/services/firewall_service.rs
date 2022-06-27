@@ -538,14 +538,14 @@ async fn add_rule_to_batch(
     dns_watcher: &DnsWatcher,
 ) -> Result<()> {
     // if the rule is constrained to local scope, only add it to the bridge chain.
-    if rule_spec.scope == ScopeConstraint::Local && *scope != FirewallRuleScope::Bridge {
+    if rule_spec.network_constraint == Some(ScopeConstraint::JustLocal) && *scope != FirewallRuleScope::Bridge {
         return Ok(());
     }
 
     // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
     // for the packet source or destination, create a vector of ip addresses for this identifier.
     let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src {
-        Some(RuleTargetHost::Ip(ipaddr)) => {
+        Some(RuleTargetHost::IpAddr(ipaddr)) => {
             vec![RuleAddrEntry::AddrEntry(*ipaddr)]
         },
         // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
@@ -564,7 +564,7 @@ async fn add_rule_to_batch(
         _ => vec![RuleAddrEntry::AnyAddr],
     };
     let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst {
-        Some(RuleTargetHost::Ip(ipaddr)) => {
+        Some(RuleTargetHost::IpAddr(ipaddr)) => {
             vec![RuleAddrEntry::AddrEntry(*ipaddr)]
         },
         // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
@@ -821,11 +821,11 @@ mod tests {
         let rules: Vec<FirewallRule> = vec![FirewallRule {
             rule_name: "rule_0".to_string(),
             src: Some(RuleTargetHost::FirewallDevice),
-            dst: Some(RuleTargetHost::Ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))),
+            dst: Some(RuleTargetHost::IpAddr(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))),
             l3_matches: None,
             l4_matches: Some(L4Matches::Tcp(TcpMatches::default())),
             verdict: Verdict::Accept,
-            scope: ScopeConstraint::None,
+            network_constraint: None,
         }];
         let device_id = 1234;
         let device = FirewallDevice {

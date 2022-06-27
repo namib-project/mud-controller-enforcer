@@ -7,6 +7,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
+use ipnetwork::IpNetwork;
 use serde::{Deserialize, Serialize};
 
 /// This file represent the config for firewall on openwrt.
@@ -17,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum RuleTargetHost {
     /// An IP address.
-    Ip(IpAddr),
+    IpAddr(IpAddr),
     /// A hostname.
     Hostname(String),
     /// The `FirewallDevice` to which the rule in which this indicates the host belongs.
@@ -221,10 +222,14 @@ pub enum Verdict {
     Log(u32),
 }
 
-#[derive(Eq, PartialEq, Clone, Copy, Debug, Deserialize, Serialize)]
+/// A constraint on the scope to which a rule applies.
+#[derive(Eq, PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub enum ScopeConstraint {
-    Local,
-    None,
+    /// A union of networks. The constraint is "must be within (at least) one of the listed
+    /// networks".
+    IpNetworks(Vec<IpNetwork>),
+    /// Just the local network. Whatever the enforcer device (router/switch) might make of that.
+    JustLocal,
 }
 
 /// A single firewall rule entry.
@@ -240,10 +245,10 @@ pub struct FirewallRule {
     pub rule_name: String,
     pub src: Option<RuleTargetHost>,
     pub dst: Option<RuleTargetHost>,
+    pub network_constraint: Option<ScopeConstraint>,
     pub l3_matches: Option<L3MatchesExtra>,
     pub l4_matches: Option<L4Matches>,
     pub verdict: Verdict,
-    pub scope: ScopeConstraint,
 }
 
 impl FirewallRule {
@@ -252,19 +257,19 @@ impl FirewallRule {
         rule_name: String,
         src: Option<RuleTargetHost>,
         dst: Option<RuleTargetHost>,
+        network_constraint: Option<ScopeConstraint>,
         l3_matches: Option<L3MatchesExtra>,
         l4_matches: Option<L4Matches>,
         verdict: Verdict,
-        scope: ScopeConstraint,
     ) -> FirewallRule {
         FirewallRule {
             rule_name,
             src,
             dst,
+            network_constraint,
             l3_matches,
             l4_matches,
             verdict,
-            scope,
         }
     }
 

@@ -369,7 +369,7 @@ pub enum DefinedServer {
 impl From<&DefinedServer> for RuleTargetHost {
     fn from(s: &DefinedServer) -> Self {
         match s {
-            DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
+            DefinedServer::Ip(addr) => RuleTargetHost::IpAddr(*addr),
             DefinedServer::Url(mud_url) => RuleTargetHost::Hostname(mud_url.clone()),
         }
     }

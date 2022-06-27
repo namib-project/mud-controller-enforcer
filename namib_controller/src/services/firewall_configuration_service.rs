@@ -64,7 +64,7 @@ pub fn convert_device_to_fw_rules(
     if device.q_bit {
         for exception in &device.quarantine_exceptions {
             let exception_target = match exception.exception_target.parse::<IpAddr>() {
-                Ok(addr) => RuleTargetHost::Ip(addr),
+                Ok(addr) => RuleTargetHost::IpAddr(addr),
                 Err(_) => RuleTargetHost::Hostname(exception.exception_target.clone()),
             };
             let (src, dst) = match exception.direction {
@@ -77,8 +77,8 @@ pub fn convert_device_to_fw_rules(
                 dst,
                 None,
                 None,
+                None,
                 Verdict::Accept,
-                ScopeConstraint::None,
             ));
             rule_counter += 1;
         }
@@ -89,8 +89,8 @@ pub fn convert_device_to_fw_rules(
             None,
             None,
             None,
+            None,
             Verdict::Reject,
-            ScopeConstraint::None,
         ));
         rule_counter += 1;
         rules.push(FirewallRule::new(
@@ -99,8 +99,8 @@ pub fn convert_device_to_fw_rules(
             Some(RuleTargetHost::FirewallDevice),
             None,
             None,
+            None,
             Verdict::Reject,
-            ScopeConstraint::None,
         ));
 
         FirewallDevice {
@@ -181,7 +181,7 @@ pub fn convert_device_to_fw_rules(
                 let other_dev_rule_targets: Vec<Option<RuleTargetHost>> = match (dnsname, &ace.matches.mud) {
                     // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
                     (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                        Ok(addr) => vec![Some(RuleTargetHost::Ip(addr))],
+                        Ok(addr) => vec![Some(RuleTargetHost::IpAddr(addr))],
                         Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
                     },
                     (None, Some(augmentation)) => {
@@ -246,14 +246,14 @@ pub fn convert_device_to_fw_rules(
                         format!("rule_{}", rule_counter),
                         src.clone(),
                         dst.clone(),
+                        if local_networks {
+                            Some(ScopeConstraint::JustLocal)
+                        } else {
+                            None
+                        },
                         l3_matchable.clone(),
                         l4_matchable.clone(), // includes ports
                         verdict.clone(),
-                        if local_networks {
-                            ScopeConstraint::Local
-                        } else {
-                            ScopeConstraint::None
-                        },
                     ));
                     rule_counter += 1;
                 }
@@ -265,24 +265,24 @@ pub fn convert_device_to_fw_rules(
                 format!("rule_dns_default_accept_{}", rule_counter),
                 Some(RuleTargetHost::FirewallDevice),
                 Some(server.into()),
+                None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
                 None,
                 Some(namib_shared::firewall_config::L4Matches::Tcp(
                     namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(53))),
                 )),
                 Verdict::Accept,
-                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
                 format!("rule_dns_default_accept_{}", rule_counter),
                 Some(RuleTargetHost::FirewallDevice),
                 Some(server.into()),
+                None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
                 None,
                 Some(namib_shared::firewall_config::L4Matches::Udp(
                     namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(53))),
                 )),
                 Verdict::Accept,
-                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
         }
@@ -291,24 +291,24 @@ pub fn convert_device_to_fw_rules(
                 format!("rule_ntp_default_accept_{}", rule_counter),
                 Some(RuleTargetHost::FirewallDevice),
                 Some(server.into()),
+                None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
                 None,
                 Some(namib_shared::firewall_config::L4Matches::Tcp(
                     namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(123))),
                 )),
                 Verdict::Accept,
-                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
             rules.push(FirewallRule::new(
                 format!("rule_ntp_default_accept_{}", rule_counter),
                 Some(RuleTargetHost::FirewallDevice),
                 Some(server.into()),
+                None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
                 None,
                 Some(namib_shared::firewall_config::L4Matches::Udp(
                     namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(123))),
                 )),
                 Verdict::Accept,
-                ScopeConstraint::None, // NOTE(ja_he): could be `Local`; we choose to allow any user-named device
             ));
             rule_counter += 1;
         }
@@ -319,8 +319,8 @@ pub fn convert_device_to_fw_rules(
             None,
             None,
             None,
+            None,
             Verdict::Reject,
-            ScopeConstraint::None,
         ));
         rule_counter += 1;
         rules.push(FirewallRule::new(
@@ -329,8 +329,8 @@ pub fn convert_device_to_fw_rules(
             Some(RuleTargetHost::FirewallDevice),
             None,
             None,
+            None,
             Verdict::Reject,
-            ScopeConstraint::None,
         ));
 
         FirewallDevice {
@@ -365,41 +365,41 @@ pub fn get_flow_scope_rules(device_to_check: &DeviceWithRefs) -> Vec<FirewallRul
             if let Some(addr) = device_to_check.ipv4_addr {
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_fr4", device_to_check.id, s.name),
-                    Some(RuleTargetHost::Ip(addr.into())),
+                    Some(RuleTargetHost::IpAddr(addr.into())),
+                    None,
                     None,
                     None,
                     None,
                     Verdict::Log(group.0.clone().into()),
-                    ScopeConstraint::None,
                 ));
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_to4", device_to_check.id, s.name),
                     None,
-                    Some(RuleTargetHost::Ip(addr.into())),
+                    Some(RuleTargetHost::IpAddr(addr.into())),
+                    None,
                     None,
                     None,
                     Verdict::Log(group.1.clone().into()),
-                    ScopeConstraint::None,
                 ));
             }
             if let Some(addr) = device_to_check.ipv6_addr {
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_fr6", device_to_check.id, s.name),
-                    Some(RuleTargetHost::Ip(addr.into())),
+                    Some(RuleTargetHost::IpAddr(addr.into())),
+                    None,
                     None,
                     None,
                     None,
                     Verdict::Log(group.0.into()),
-                    ScopeConstraint::None,
                 ));
                 result.push(FirewallRule::new(
                     format!("scope_{}_{}_to6", device_to_check.id, s.name),
                     None,
-                    Some(RuleTargetHost::Ip(addr.into())),
+                    Some(RuleTargetHost::IpAddr(addr.into())),
+                    None,
                     None,
                     None,
                     Verdict::Log(group.1.into()),
-                    ScopeConstraint::None,
                 ));
             }
             result
@@ -431,10 +431,10 @@ pub fn get_same_manufacturer_ruletargethosts(
             if device_to_check_manu == device_with_refs.mud_url.as_ref().unwrap().split('/').nth(2) {
                 match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
                     (AclType::IPV4, Some(ipv4_addr), _) => {
-                        manu_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
+                        manu_match.push(Some(RuleTargetHost::IpAddr((*ipv4_addr).into())));
                     },
                     (AclType::IPV6, _, Some(ipv6_addr)) => {
-                        manu_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
+                        manu_match.push(Some(RuleTargetHost::IpAddr((*ipv6_addr).into())));
                     },
                     _ => {
                         manu_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
@@ -456,10 +456,10 @@ pub fn get_manufacturer_ruletargethosts(
         if device_with_refs.mud_url.as_ref().unwrap().split('/').nth(2) == Some(string_to_check) {
             match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
                 (AclType::IPV4, Some(ipv4_addr), _) => {
-                    manu_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
+                    manu_match.push(Some(RuleTargetHost::IpAddr((*ipv4_addr).into())));
                 },
                 (AclType::IPV6, _, Some(ipv6_addr)) => {
-                    manu_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
+                    manu_match.push(Some(RuleTargetHost::IpAddr((*ipv6_addr).into())));
                 },
                 _ => {
                     manu_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
@@ -480,10 +480,10 @@ pub fn get_model_ruletargethosts(
         if device_with_refs.inner.mud_url.is_some() && url.eq(device_with_refs.mud_url.as_ref().unwrap()) {
             match (acl_type, &device_with_refs.ipv4_addr, &device_with_refs.ipv6_addr) {
                 (AclType::IPV4, Some(ipv4_addr), _) => {
-                    model_match.push(Some(RuleTargetHost::Ip((*ipv4_addr).into())));
+                    model_match.push(Some(RuleTargetHost::IpAddr((*ipv4_addr).into())));
                 },
                 (AclType::IPV6, _, Some(ipv6_addr)) => {
-                    model_match.push(Some(RuleTargetHost::Ip((*ipv6_addr).into())));
+                    model_match.push(Some(RuleTargetHost::IpAddr((*ipv6_addr).into())));
                 },
                 _ => {
                     model_match.push(Some(RuleTargetHost::Hostname(device_with_refs.hostname.clone())));
@@ -505,7 +505,7 @@ fn get_my_controller_ruletargethosts(
         .controller_mappings
         .iter()
         .flat_map(|configured_controller_mapping| match configured_controller_mapping {
-            ConfiguredControllerMapping::Ip(addr) => vec![Some(RuleTargetHost::Ip(*addr))],
+            ConfiguredControllerMapping::Ip(addr) => vec![Some(RuleTargetHost::IpAddr(*addr))],
             ConfiguredControllerMapping::Uri(uri) => get_controller_ruletargethosts(
                 device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
                 devices,
@@ -539,7 +539,7 @@ fn get_controller_ruletargethosts(
                 .iter()
                 .map(|server| {
                     Some(match server {
-                        DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
+                        DefinedServer::Ip(addr) => RuleTargetHost::IpAddr(*addr),
                         DefinedServer::Url(url) => RuleTargetHost::Hostname(url.clone()),
                     })
                 })
@@ -549,7 +549,7 @@ fn get_controller_ruletargethosts(
                 .iter()
                 .map(|server| {
                     Some(match server {
-                        DefinedServer::Ip(addr) => RuleTargetHost::Ip(*addr),
+                        DefinedServer::Ip(addr) => RuleTargetHost::IpAddr(*addr),
                         DefinedServer::Url(url) => RuleTargetHost::Hostname(url.clone()),
                     })
                 })
@@ -572,8 +572,8 @@ fn get_controller_ruletargethosts(
             })
             .map(
                 |controller_dev| match (controller_dev.ipv4_addr, controller_dev.ipv6_addr, acl_type) {
-                    (Some(addr), _, AclType::IPV4) => Some(RuleTargetHost::Ip(addr.into())),
-                    (_, Some(addr), AclType::IPV6) => Some(RuleTargetHost::Ip(addr.into())),
+                    (Some(addr), _, AclType::IPV4) => Some(RuleTargetHost::IpAddr(addr.into())),
+                    (_, Some(addr), AclType::IPV6) => Some(RuleTargetHost::IpAddr(addr.into())),
                     _ => Some(RuleTargetHost::Hostname(controller_uri.to_string())),
                 },
             )
@@ -1041,11 +1041,11 @@ mod tests {
                     Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
                     Some(RuleTargetHost::FirewallDevice),
                     None,
+                    None,
                     Some(namib_shared::firewall_config::L4Matches::Udp(
                         namib_shared::firewall_config::UdpMatches::default(),
                     )),
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_1"),
@@ -1054,11 +1054,11 @@ mod tests {
                         "https://me.org/mud-devices/my-dns-server.json",
                     ))),
                     None,
+                    None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(53))),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_2"),
@@ -1067,55 +1067,55 @@ mod tests {
                         "https://me.org/mud-devices/my-dns-server.json",
                     ))),
                     None,
+                    None,
                     Some(namib_shared::firewall_config::L4Matches::Udp(
                         namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(53))),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_3"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
+                    Some(RuleTargetHost::IpAddr("192.168.0.1".parse().unwrap())),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(53))),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_dns_default_accept_4"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip("192.168.0.1".parse().unwrap())),
+                    Some(RuleTargetHost::IpAddr("192.168.0.1".parse().unwrap())),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Udp(
                         namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(53))),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_ntp_default_accept_5"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
+                    Some(RuleTargetHost::IpAddr("123.45.67.89".parse().unwrap())),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(None, Some(PortOrRange::Single(123))),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_ntp_default_accept_6"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip("123.45.67.89".parse().unwrap())),
+                    Some(RuleTargetHost::IpAddr("123.45.67.89".parse().unwrap())),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Udp(
                         namib_shared::firewall_config::UdpMatches::only_ports(None, Some(PortOrRange::Single(123))),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_7"),
@@ -1123,8 +1123,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_8"),
@@ -1132,8 +1132,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: false,
@@ -1266,6 +1266,7 @@ mod tests {
                     Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
                     Some(RuleTargetHost::FirewallDevice),
                     None,
+                    None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(
                             Some(PortOrRange::Single(123)),
@@ -1273,12 +1274,12 @@ mod tests {
                         ),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_1"),
                     Some(RuleTargetHost::FirewallDevice),
                     Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Udp(
                         namib_shared::firewall_config::UdpMatches::only_ports(
@@ -1287,7 +1288,6 @@ mod tests {
                         ),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
@@ -1295,8 +1295,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_3"),
@@ -1304,8 +1304,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1442,7 +1442,7 @@ mod tests {
             .iter()
             .filter(|&r| {
                 r.src.as_ref() == Some(&RuleTargetHost::FirewallDevice)
-                    && r.dst.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+                    && r.dst.as_ref() == Some(&RuleTargetHost::IpAddr(bridge.ipv4_addr.unwrap().into()))
             })
             .collect();
 
@@ -1578,7 +1578,7 @@ mod tests {
             .iter()
             .filter(|&r| {
                 r.src.as_ref() == Some(&RuleTargetHost::FirewallDevice)
-                    && r.dst.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+                    && r.dst.as_ref() == Some(&RuleTargetHost::IpAddr(bridge.ipv4_addr.unwrap().into()))
             })
             .collect();
 
@@ -1745,7 +1745,8 @@ mod tests {
                 FirewallRule::new(
                     String::from("rule_0"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap()))),
+                    Some(RuleTargetHost::IpAddr(IpAddr::V4(device1.ipv4_addr.unwrap()))),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(
@@ -1754,7 +1755,6 @@ mod tests {
                         ),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
@@ -1762,8 +1762,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
@@ -1771,8 +1771,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -1920,7 +1920,8 @@ mod tests {
                 FirewallRule::new(
                     String::from("rule_0"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip(IpAddr::V4(device1.inner.ipv4_addr.unwrap()))),
+                    Some(RuleTargetHost::IpAddr(IpAddr::V4(device1.inner.ipv4_addr.unwrap()))),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(
@@ -1929,7 +1930,6 @@ mod tests {
                         ),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
@@ -1937,8 +1937,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
@@ -1946,8 +1946,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -2081,10 +2081,10 @@ mod tests {
             .iter()
             .find(|&r| {
                 r.src.as_ref() == Some(&RuleTargetHost::FirewallDevice)
-                    && r.dst.as_ref() == Some(&RuleTargetHost::Ip(bridge.ipv4_addr.unwrap().into()))
+                    && r.dst.as_ref() == Some(&RuleTargetHost::IpAddr(bridge.ipv4_addr.unwrap().into()))
             })
             .expect("could not find firewall rule filtered for bridge target");
-        assert_eq!(controller_rule.scope, ScopeConstraint::Local);
+        assert_eq!(controller_rule.network_constraint, Some(ScopeConstraint::JustLocal));
 
         let default_rule_regex = Regex::new(r"rule_default_\d+").unwrap();
         for default_rule in bulb_firewall_rules_result
@@ -2092,7 +2092,7 @@ mod tests {
             .iter()
             .filter(|&r| default_rule_regex.is_match(&r.rule_name.to_string()))
         {
-            assert_eq!(default_rule.scope, ScopeConstraint::None);
+            assert_eq!(default_rule.network_constraint, None);
         }
     }
 
@@ -2253,7 +2253,8 @@ mod tests {
                 FirewallRule::new(
                     String::from("rule_0"),
                     Some(RuleTargetHost::FirewallDevice),
-                    Some(RuleTargetHost::Ip(IpAddr::V4(device1.ipv4_addr.unwrap()))),
+                    Some(RuleTargetHost::IpAddr(IpAddr::V4(device1.ipv4_addr.unwrap()))),
+                    None,
                     None,
                     Some(namib_shared::firewall_config::L4Matches::Tcp(
                         namib_shared::firewall_config::TcpMatches::only_ports(
@@ -2262,7 +2263,6 @@ mod tests {
                         ),
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
@@ -2270,8 +2270,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
@@ -2279,8 +2279,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -2371,6 +2371,7 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     Some(RuleTargetHost::Hostname(String::from("www.example.test"))),
                     None,
+                    None,
                     Some(namib_shared::firewall_config::L4Matches::Icmp(
                         namib_shared::firewall_config::IcmpMatches {
                             icmp_type: Some(8),
@@ -2379,7 +2380,6 @@ mod tests {
                         },
                     )),
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
@@ -2387,8 +2387,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
@@ -2396,8 +2396,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
@@ -2522,8 +2522,8 @@ mod tests {
                     Some(RuleTargetHost::Hostname("www.example.test/update-service".to_string())),
                     None,
                     None,
+                    None,
                     Verdict::Accept,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_1"),
@@ -2531,8 +2531,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
                 FirewallRule::new(
                     String::from("rule_default_2"),
@@ -2540,8 +2540,8 @@ mod tests {
                     Some(RuleTargetHost::FirewallDevice),
                     None,
                     None,
+                    None,
                     Verdict::Reject,
-                    ScopeConstraint::None,
                 ),
             ],
             collect_data: true,
