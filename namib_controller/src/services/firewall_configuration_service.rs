@@ -813,15 +813,6 @@ impl From<Ipv4HeaderFlags> for namib_shared::firewall_config::Ipv4HeaderFlags {
     }
 }
 
-/// Returns the source and destination ordered as "this" and the "other" device, based on the
-/// given `AclDirection`.
-fn ordered_by_direction<T>(src: T, dst: T, direction: AclDirection) -> (T, T) {
-    match direction {
-        AclDirection::FromDevice => (src, dst),
-        AclDirection::ToDevice => (dst, src),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
