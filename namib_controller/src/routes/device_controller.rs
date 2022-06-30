@@ -89,7 +89,7 @@ async fn create_device(
 
     let collect_info = device_creation_update_dto.mud_url.is_none();
     let device = device_creation_update_dto.into_inner().into_device(collect_info)?;
-    let id = device_service::insert_device(&device.load_refs(&pool).await?, &pool).await?;
+    let id = device_service::insert_device(&device, &pool).await?;
 
     let created_device = find_device(id, &pool).await?;
     Ok(Json(DeviceDto::from(created_device.load_refs(&pool).await?)))
