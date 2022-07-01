@@ -347,7 +347,7 @@ fn parse_device_policy(
                                 }
                                 .fail()?;
                             }
-                            let ip_header_protocol = &ipv6.protocol.map(AceProtocol::Protocol);
+                            let ip_header_protocol = &ipv6.protocol.map(|p| AceProtocol::from(p as u8));
                             if let (Some(matching_proto), Some(header_proto)) =
                                 (l4_protocol_for_matching, ip_header_protocol)
                             {
