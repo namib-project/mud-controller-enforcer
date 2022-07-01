@@ -58,9 +58,17 @@ impl NamibRpc for NamibRpcServer {
                 .unwrap_or_default();
             let init_devices: Vec<_> = stream::iter(devices)
                 .then(|d| d.load_refs(&self.db_connection))
-                .try_collect()
-                .await
-                .unwrap_or_default();
+                .filter_map(|parse_result| async move {
+                    match parse_result {
+                        Ok(device) => Some(device),
+                        Err(err) => {
+                            error!("error parsing device's MUD data: {err}");
+                            None
+                        },
+                    }
+                })
+                .collect()
+                .await;
             let administrative_context =
                 create_administrative_context(&self.db_connection)
                     .await
