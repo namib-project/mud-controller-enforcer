@@ -35,7 +35,7 @@ pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, poo
 
         remove_existing_ips(device.ipv4_addr, device.ipv6_addr, pool).await?;
 
-        insert_device(&device.load_refs(pool).await?, pool).await?;
+        insert_device(&device, pool).await?;
     }
 
     Ok(())
@@ -126,7 +126,7 @@ pub async fn find_by_mac_or_duid(
     }
 }
 
-pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) -> Result<i64> {
+pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<i64> {
     let ipv4_addr = device_data.ipv4_addr.map(|ip| ip.to_string());
     let ipv6_addr = device_data.ipv6_addr.map(|ip| ip.to_string());
     let mac_addr = device_data.mac_addr.map(|m| m.to_string());
@@ -174,7 +174,7 @@ pub async fn insert_device(device_data: &DeviceWithRefs, pool: &DbConnection) ->
 
     if device_data.collect_info {
         // add the device in the background as it may take some time
-        tokio::spawn(neo4things_service::add_device(result, device_data.inner.clone()));
+        tokio::spawn(neo4things_service::add_device(result, device_data.clone()));
     }
 
     firewall_configuration_service::update_config_version(pool).await?;
