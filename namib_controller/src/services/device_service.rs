@@ -11,7 +11,9 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{Device, DeviceDbo, DeviceWithRefs},
-    services::{config_service, config_service::ConfigKeys, firewall_configuration_service, neo4things_service},
+    services::{
+        config_service, config_service::ConfigKeys, firewall_configuration_service, flow_service, neo4things_service,
+    },
 };
 
 pub async fn upsert_device_from_dhcp_lease(lease_info: DhcpLeaseInformation, pool: &DbConnection) -> Result<()> {
@@ -176,6 +178,8 @@ pub async fn insert_device(device_data: &Device, pool: &DbConnection) -> Result<
         // add the device in the background as it may take some time
         tokio::spawn(neo4things_service::add_device(result, device_data.clone()));
     }
+
+    flow_service::on_device(pool, device_data.clone()).await;
 
     firewall_configuration_service::update_config_version(pool).await?;
 

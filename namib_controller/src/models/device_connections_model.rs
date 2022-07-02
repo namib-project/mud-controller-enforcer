@@ -1,5 +1,4 @@
-use chrono::NaiveDate;
-use std::net::IpAddr;
+use chrono::NaiveDateTime;
 
 #[derive(Debug, Clone)]
 pub struct DeviceConnections {
@@ -10,7 +9,7 @@ pub struct DeviceConnections {
 
 #[derive(Debug, Clone)]
 pub struct DeviceConnection {
-    pub date: NaiveDate,
-    pub target: IpAddr,
+    pub date: NaiveDateTime,
+    pub target: String,
     pub amount: i64,
 }

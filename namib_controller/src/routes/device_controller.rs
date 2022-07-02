@@ -4,7 +4,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use actix_web::http::StatusCode;
-use chrono::Utc;
 use futures::{stream, StreamExt, TryStreamExt};
 use paperclip::actix::{
     api_v2_operation, web,
@@ -17,11 +16,9 @@ use crate::{
     db::DbConnection,
     error,
     error::Result,
-    models::{Device, FlowScope, Level},
+    models::Device,
     routes::dtos::{AnomalyDto, DeviceCreationUpdateDto, DeviceDto, GuessDto},
-    services::{
-        anomaly_service, device_service, flow_scope_service, flow_service, neo4things_service, role_service::Permission,
-    },
+    services::{anomaly_service, device_service, flow_service, neo4things_service, role_service::Permission},
 };
 
 use super::dtos::DeviceConnectionsDto;
@@ -141,21 +138,6 @@ async fn update_device(
             device_with_refs.id,
             device_with_refs.inner.clone(),
         ));
-
-        // add flow scope for device
-        if let Some(mac) = device_with_refs.inner.mac_addr {
-            flow_scope_service::insert_flow_scope(
-                vec![mac],
-                &FlowScope {
-                    name: "device_connections".into(),
-                    level: Level::HeadersOnly,
-                    ttl: i64::MAX,
-                    starts_at: Utc::now().naive_utc(),
-                },
-                &pool,
-            )
-            .await?;
-        }
     }
 
     Ok(Json(DeviceDto::from(device_with_refs)))

@@ -29,7 +29,7 @@ pub struct DeviceConnectionDto {
 impl From<&DeviceConnection> for DeviceConnectionDto {
     fn from(conn: &DeviceConnection) -> Self {
         Self {
-            date: conn.date,
+            date: conn.date.date(),
             target: conn.target.to_string(),
             amount: conn.amount,
         }

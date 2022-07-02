@@ -5,5 +5,5 @@ CREATE TABLE device_connections (
   direction INTEGER NOT NULL,
   target    TEXT NOT NULL,
   amount    INTEGER NOT NULL,
-  PRIMARY KEY (device_id, direction, target)
+  PRIMARY KEY (device_id, direction, target, date)
 );
