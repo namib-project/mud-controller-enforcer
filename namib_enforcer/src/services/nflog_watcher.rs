@@ -1,4 +1,4 @@
-// Copyright 2020-2021,  Till Schnittka, Hannes Masuch
+// Copyright 2020-2022, Till Schnittka, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 // watch has an event loop, so it needs to be async
@@ -16,8 +16,46 @@ use nflog::{CopyMode, Queue};
 
 use crate::{rpc::rpc_client, Enforcer};
 
+const CAPTURE_DURATION: std::time::Duration = std::time::Duration::from_secs(1);
+
+struct State {
+    enforcer: Arc<RwLock<Enforcer>>,
+    result: Vec<FlowData>,
+}
+
+impl State {
+    fn on_data(&mut self, data: FlowData) {
+        self.result.push(data);
+    }
+
+    fn send_results(&mut self) {
+        if !self.result.is_empty() {
+            let result_copy = self.result.clone();
+            self.result.clear();
+            let enforcer_copy = self.enforcer.clone();
+            let _ = std::thread::spawn(move || {
+                let builder = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
+                let enforcer = builder.block_on(enforcer_copy.read());
+                let _send = builder.block_on(
+                    enforcer
+                        .client
+                        .send_scope_results(rpc_client::current_rpc_context(), result_copy),
+                );
+            });
+        }
+    }
+}
+
 pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
     debug!("Starting nflog watcher");
+
+    let state = Arc::new(std::sync::Mutex::new(State {
+        enforcer,
+        result: vec![],
+    }));
 
     let queue_ipv4 = Queue::open().unwrap();
     queue_ipv4.bind(libc::AF_INET).unwrap();
@@ -25,7 +63,7 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
     let mut headers_from = queue_ipv4.bind_group(LogGroup::HeadersOnlyFromDevice as u16).unwrap();
     headers_from.set_mode(CopyMode::Packet, 0);
     headers_from.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::FromDevice,
         false,
         false,
@@ -34,7 +72,7 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
     let mut headers_to = queue_ipv4.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
     headers_to.set_mode(CopyMode::Packet, 0);
     headers_to.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::ToDevice,
         false,
         false,
@@ -43,7 +81,7 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
     let mut full_from = queue_ipv4.bind_group(LogGroup::FullFromDevice as u16).unwrap();
     full_from.set_mode(CopyMode::Packet, 0);
     full_from.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::FromDevice,
         true,
         false,
@@ -52,7 +90,7 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
     let mut full_to = queue_ipv4.bind_group(LogGroup::FullToDevice as u16).unwrap();
     full_to.set_mode(CopyMode::Packet, 0);
     full_to.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::ToDevice,
         true,
         false,
@@ -61,7 +99,7 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
     let mut deny_to = queue_ipv4.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
     deny_to.set_mode(CopyMode::Packet, 0);
     deny_to.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::ToDevice,
         true,
         true,
@@ -69,7 +107,17 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
 
     let mut deny_from = queue_ipv4.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
     deny_from.set_mode(CopyMode::Packet, 0);
-    deny_from.set_callback(generate_callback(enforcer, FlowDataDirection::FromDevice, true, true));
+    deny_from.set_callback(generate_callback(
+        state.clone(),
+        FlowDataDirection::FromDevice,
+        true,
+        true,
+    ));
+
+    let _send_results = std::thread::spawn(move || loop {
+        std::thread::sleep(CAPTURE_DURATION);
+        state.lock().unwrap().send_results();
+    });
 
     queue_ipv4.run_loop();
 }
@@ -77,13 +125,18 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
 pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
     debug!("Starting nflog watcher");
 
+    let state = Arc::new(std::sync::Mutex::new(State {
+        enforcer,
+        result: vec![],
+    }));
+
     let queue_ipv6 = Queue::open().unwrap();
     queue_ipv6.bind(libc::AF_INET6).unwrap();
 
     let mut headers_from = queue_ipv6.bind_group(LogGroup::HeadersOnlyFromDevice as u16).unwrap();
     headers_from.set_mode(CopyMode::Packet, 0);
     headers_from.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::FromDevice,
         false,
         false,
@@ -92,7 +145,7 @@ pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
     let mut headers_to = queue_ipv6.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
     headers_to.set_mode(CopyMode::Packet, 0);
     headers_to.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::ToDevice,
         false,
         false,
@@ -101,7 +154,7 @@ pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
     let mut full_from = queue_ipv6.bind_group(LogGroup::FullFromDevice as u16).unwrap();
     full_from.set_mode(CopyMode::Packet, 0);
     full_from.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::FromDevice,
         true,
         false,
@@ -110,7 +163,7 @@ pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
     let mut full_to = queue_ipv6.bind_group(LogGroup::FullToDevice as u16).unwrap();
     full_to.set_mode(CopyMode::Packet, 0);
     full_to.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::ToDevice,
         true,
         false,
@@ -119,7 +172,7 @@ pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
     let mut deny_to = queue_ipv6.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
     deny_to.set_mode(CopyMode::Packet, 0);
     deny_to.set_callback(generate_callback(
-        enforcer.clone(),
+        state.clone(),
         FlowDataDirection::ToDevice,
         true,
         true,
@@ -127,13 +180,23 @@ pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
 
     let mut deny_from = queue_ipv6.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
     deny_from.set_mode(CopyMode::Packet, 0);
-    deny_from.set_callback(generate_callback(enforcer, FlowDataDirection::FromDevice, true, true));
+    deny_from.set_callback(generate_callback(
+        state.clone(),
+        FlowDataDirection::FromDevice,
+        true,
+        true,
+    ));
+
+    let _send_results = std::thread::spawn(move || loop {
+        std::thread::sleep(CAPTURE_DURATION);
+        state.lock().unwrap().send_results();
+    });
 
     queue_ipv6.run_loop();
 }
 
 fn generate_callback(
-    enforcer: Arc<RwLock<Enforcer>>,
+    state: Arc<std::sync::Mutex<State>>,
     direction: FlowDataDirection,
     include_packet: bool,
     denied: bool,
@@ -227,21 +290,8 @@ fn generate_callback(
                 },
                 denied,
             );
-            let enforcer_copy = enforcer.clone();
-            let _ = std::thread::spawn(move || {
-                println!("sending data");
-                let builder = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                let enforcer = builder.block_on(enforcer_copy.read());
-                let _send = builder.block_on(
-                    enforcer
-                        .client
-                        .send_scope_results(rpc_client::current_rpc_context(), vec![result]),
-                );
-                println!("DONE sending data");
-            });
+
+            state.lock().unwrap().on_data(result);
         }
     })
 }
