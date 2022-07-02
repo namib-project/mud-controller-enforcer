@@ -227,11 +227,21 @@ fn generate_callback(
                 },
                 denied,
             );
-            let _send = futures::executor::block_on(
-                futures::executor::block_on(enforcer.read())
-                    .client
-                    .send_scope_results(rpc_client::current_rpc_context(), vec![result]),
-            );
+            let enforcer_copy = enforcer.clone();
+            let _ = std::thread::spawn(move || {
+                println!("sending data");
+                let builder = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
+                let enforcer = builder.block_on(enforcer_copy.read());
+                let _send = builder.block_on(
+                    enforcer
+                        .client
+                        .send_scope_results(rpc_client::current_rpc_context(), vec![result]),
+                );
+                println!("DONE sending data");
+            });
         }
     })
 }
