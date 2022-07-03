@@ -541,6 +541,26 @@ async fn add_rule_to_batch(
     if rule_spec.network_constraint == Some(ScopeConstraint::JustLocal) && *scope != FirewallRuleScope::Bridge {
         return Ok(());
     }
+    // TODO(ja_he):
+    //   Consider `ScopeConstraint::IpNetworks`, which lists a number of networks to which (as a
+    //   union) the match should be constrained.
+    //   We could check whether any IP addresses we use for rules are within one of those networks
+    //   and filter this way.
+    //   I would think, the appropriate implementation would be roughly:
+    //
+    //      IF have a target IP
+    //      {
+    //          only generate the rule if it falls within one of the listed networks
+    //          (e.g. for a v4 address we can skip checking any v6 networks and for the v4 networks
+    //           we use the type implementation contains or something)
+    //      }
+    //      ELSE (IF don't have a target IP (i.E. it's a rule that matches ports or sth))
+    //      {
+    //          FOR each network listed
+    //          {
+    //              generate a rule matching the network
+    //          }
+    //      }
 
     // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
     // for the packet source or destination, create a vector of ip addresses for this identifier.
