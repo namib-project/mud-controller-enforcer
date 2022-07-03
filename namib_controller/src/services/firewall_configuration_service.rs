@@ -123,8 +123,97 @@ pub fn convert_device_to_fw_rules(
                     AceAction::Accept => Verdict::Accept,
                     AceAction::Deny => Verdict::Reject,
                 };
-                let mut local_networks: bool = false;
 
+                let mud_matches_hosts: Option<Vec<Option<RuleTargetHost>>> = ace.matches.mud.as_ref().map(|mud| {
+                    let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
+                    if let Some(host) = &mud.manufacturer {
+                        targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
+                    }
+                    if mud.same_manufacturer {
+                        targets_per_option.push(get_same_manufacturer_ruletargethosts(device, devices, &acl.acl_type));
+                    }
+                    if let Some(uri) = &mud.controller {
+                        targets_per_option.push(get_controller_ruletargethosts(
+                            device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
+                            devices,
+                            uri,
+                            acl.acl_type,
+                            &verdict,
+                            administrative_context,
+                        ));
+                    }
+                    if mud.my_controller {
+                        targets_per_option.push(get_my_controller_ruletargethosts(
+                            device,
+                            devices,
+                            acl.acl_type,
+                            &verdict,
+                            administrative_context,
+                        ));
+                    }
+                    if let Some(url) = &mud.model {
+                        targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
+                    }
+
+                    // return those devices matched by _all_ specified options
+                    match targets_per_option.len() {
+                        0 => vec![],
+                        1 => targets_per_option[0].clone(),
+                        _ => targets_per_option[0]
+                            .iter()
+                            .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
+                            .cloned()
+                            .collect(),
+                    }
+                });
+
+                let dnsname_host: Option<RuleTargetHost> = if let Some(l3) = &ace.matches.l3 {
+                    let dnsname: &Option<String> = match l3 {
+                        L3Matches::Ipv4(matches) => {
+                            other_device_by_direction(&matches.src_dnsname, &matches.dst_dnsname, acl.packet_direction)
+                        },
+                        L3Matches::Ipv6(matches) => {
+                            other_device_by_direction(&matches.src_dnsname, &matches.dst_dnsname, acl.packet_direction)
+                        },
+                    };
+                    match dnsname {
+                        // NOTE: `dnsname` has YANG type 'inet:host' which _can_ be an IP address
+                        Some(dnsname) => match dnsname.parse::<IpAddr>() {
+                            Ok(addr) => Some(RuleTargetHost::IpAddr(addr)),
+                            Err(_) => Some(RuleTargetHost::Hostname(dnsname.clone())),
+                        },
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+
+                let other_dev_rule_targets: Vec<Option<RuleTargetHost>> = match (dnsname_host, mud_matches_hosts) {
+                    (Some(_), Some(_)) => {
+                        // NOTE(ja_he):
+                        //   Here we do _not_ support the specification of both MUD device classes
+                        //   and DNS names. I claim it does not make sense to construct such ACEs.
+                        //   I can think of a case like the NTP protocol being defined in a MUD
+                        //   'controller' match and then a DNS name like 'provider.com' being
+                        //   given, which makes sense _semantically_ as "NTP from provider".
+                        //   However, we can't (and can't be expected to) actually match on NTP as
+                        //   a protocol -- instead translating to hosts -- and in this case the
+                        //   combination does not make sense either.
+                        warn!(
+                            "specifying hosts via MUD via MUD abstraction AND a DNS name is considered invalid (for dev:{},acl/ace:{}/{})",
+                            device.mud_url.clone().unwrap_or_else(|| "(unknown)".to_string()),
+                            acl.name,
+                            ace.name,
+                        );
+                        vec![] // no hosts, i.E. nothing matches; no rules will get generated
+                    },
+                    (Some(host), None) => vec![Some(host)], // the host by DNS name
+                    (None, Some(hosts)) =>  hosts, // the hosts for the MUD device classes
+                    (None, None) => vec![None], // the non-specific host, not constrained
+                }
+                .clone();
+
+                // convert additional matching data
                 let mut l4_matchable: Option<namib_shared::firewall_config::L4Matches> =
                     ace.matches.l4.clone().map(std::convert::Into::into);
                 let l3_matchable: Option<namib_shared::firewall_config::L3MatchesExtra> =
@@ -166,76 +255,47 @@ pub fn convert_device_to_fw_rules(
 
                 let this_dev_rule_target = Some(RuleTargetHost::FirewallDevice);
 
-                let dnsname: &Option<String> = if let Some(l3) = &ace.matches.l3 {
+                // Constrain the rules' hosts, if necessary.
+                let local_networks: bool = ace.matches.mud.is_some() && ace.matches.mud.as_ref().unwrap().local;
+                let network: &Option<String> = if let Some(l3) = &ace.matches.l3 {
                     match l3 {
                         L3Matches::Ipv4(matches) => {
-                            other_device_by_direction(&matches.src_dnsname, &matches.dst_dnsname, acl.packet_direction)
+                            other_device_by_direction(&matches.src_network, &matches.dst_network, acl.packet_direction)
                         },
                         L3Matches::Ipv6(matches) => {
-                            other_device_by_direction(&matches.src_dnsname, &matches.dst_dnsname, acl.packet_direction)
+                            other_device_by_direction(&matches.src_network, &matches.dst_network, acl.packet_direction)
                         },
                     }
                 } else {
                     &None
                 };
-                let other_dev_rule_targets: Vec<Option<RuleTargetHost>> = match (dnsname, &ace.matches.mud) {
-                    // NOTE: `dns_name` has YANG type 'inet:host' which _can_ be an IP address
-                    (Some(dns_name), None) => match dns_name.parse::<IpAddr>() {
-                        Ok(addr) => vec![Some(RuleTargetHost::IpAddr(addr))],
-                        Err(_) => vec![Some(RuleTargetHost::Hostname(dns_name.clone()))],
-                    },
-                    (None, Some(augmentation)) => {
-                        let mut targets_per_option: Vec<Vec<Option<RuleTargetHost>>> = Vec::new();
-                        if let Some(host) = &augmentation.manufacturer {
-                            targets_per_option.push(get_manufacturer_ruletargethosts(host, devices, &acl.acl_type));
-                        }
-                        if augmentation.same_manufacturer {
-                            targets_per_option.push(get_same_manufacturer_ruletargethosts(
-                                device,
-                                devices,
-                                &acl.acl_type,
-                            ));
-                        }
-                        if let Some(uri) = &augmentation.controller {
-                            targets_per_option.push(get_controller_ruletargethosts(
-                                device.mud_url.as_ref().unwrap_or(&String::from("(unknown)")).as_str(),
-                                devices,
-                                uri,
-                                acl.acl_type,
-                                &verdict,
-                                administrative_context,
-                            ));
-                        }
-                        if augmentation.my_controller {
-                            targets_per_option.push(get_my_controller_ruletargethosts(
-                                device,
-                                devices,
-                                acl.acl_type,
-                                &verdict,
-                                administrative_context,
-                            ));
-                        }
-                        if augmentation.local {
-                            local_networks = true;
-                        }
-                        if let Some(url) = &augmentation.model {
-                            targets_per_option.push(get_model_ruletargethosts(url, devices, &acl.acl_type));
-                        }
-
-                        // return those devices matched by _all_ specified options
-                        match targets_per_option.len() {
-                            0 => vec![],
-                            1 => targets_per_option[0].clone(),
-                            _ => targets_per_option[0]
-                                .iter()
-                                .filter(|host| targets_per_option[1..].iter().all(|v| v.contains(host)))
-                                .cloned()
-                                .collect(),
+                let constraint = match (local_networks, network) {
+                    (true, Some(network_str)) => {
+                        warn!("both 'local-networks' and 'source-'/'destination-network' specified; invalid combination, only using local");
+                        if let Ok(network) = network_str.parse() {
+                            Some(ScopeConstraint::IpNetworks(vec![network]))
+                        } else {
+                            warn!("unable to parse network string '{network_str}'");
+                            Some(ScopeConstraint::IpNetworks(vec![]))
                         }
                     },
-                    _ => vec![],
-                }
-                .clone();
+                    (false, Some(network_str)) => {
+                        if let Ok(network) = network_str.parse() {
+                            Some(ScopeConstraint::IpNetworks(vec![network]))
+                        } else {
+                            warn!("unable to parse network string '{network_str}'");
+                            Some(ScopeConstraint::IpNetworks(vec![]))
+                        }
+                    },
+                    (true, None) => {
+                        // TODO(ja_he):
+                        //   Once we allow 'local-networks' configuration for administrators, here we
+                        //   would process whether such a configuration has been provided and add the
+                        //   specified networks accordingly.
+                        Some(ScopeConstraint::JustLocal)
+                    },
+                    (false, None) => None,
+                };
 
                 for other_dev_rule_target in &other_dev_rule_targets {
                     let (src, dst) = match acl.packet_direction {
@@ -246,11 +306,7 @@ pub fn convert_device_to_fw_rules(
                         format!("rule_{}", rule_counter),
                         src.clone(),
                         dst.clone(),
-                        if local_networks {
-                            Some(ScopeConstraint::JustLocal)
-                        } else {
-                            None
-                        },
+                        constraint.clone(),
                         l3_matchable.clone(),
                         l4_matchable.clone(), // includes ports
                         verdict.clone(),
