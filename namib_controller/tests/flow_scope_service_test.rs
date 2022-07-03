@@ -35,6 +35,11 @@ async fn test_get_flow_scopes() -> Result<()> {
 
     device_service::insert_device(&device, &ctx.db_conn).await?;
 
+    // insert_device will add flow scopes for capturing device traffic
+    for scope in &flow_scope_service::get_all_flow_scopes(&ctx.db_conn).await? {
+        flow_scope_service::remove_flow_scope(scope.id, &ctx.db_conn).await?;
+    }
+
     let scope_data = [
         (
             "fullscope",
@@ -119,7 +124,12 @@ async fn test_get_flow_scopes() -> Result<()> {
     assert_eq!(flow_scope_service::get_all_flow_scopes(&ctx.db_conn).await?.len(), 3);
 
     assert_eq!(
-        flow_scope_service::remove_targets_from_scope(vec![device_mac], 3, &ctx.db_conn).await?,
+        flow_scope_service::remove_targets_from_scope(
+            vec![device_mac],
+            flow_scope_service::find_id_by_name(&ctx.db_conn, "active_and_full").await?,
+            &ctx.db_conn
+        )
+        .await?,
         1
     );
     assert_eq!(
