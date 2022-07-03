@@ -1,9 +1,9 @@
 
 CREATE TABLE device_connections (
-  device_id INTEGER NOT NULL,
+  device_id BIGSERIAL NOT NULL,
   date TIMESTAMP NOT NULL,
-  direction INTEGER NOT NULL,
+  direction BIGSERIAL NOT NULL,
   target    TEXT NOT NULL,
-  amount    INTEGER NOT NULL,
+  amount    BIGSERIAL NOT NULL,
   PRIMARY KEY (device_id, direction, target, date)
 );

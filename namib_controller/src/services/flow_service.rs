@@ -67,12 +67,17 @@ pub async fn add_device_connection(device: &Device, flow: &FlowData, pool: &DbCo
     let date: chrono::NaiveDateTime = chrono::Utc::now().naive_utc().date().and_hms(0, 0, 0);
 
     let _ = sqlx::query!(
-        "INSERT OR IGNORE INTO device_connections (device_id, date, direction, target, amount) VALUES (?, ?, ?, ?, 0);
-         UPDATE device_connections SET amount = amount + 1 WHERE device_id = ? AND direction = ? AND target = ? AND date = ?",
+        "INSERT INTO device_connections (device_id, date, direction, target, amount) VALUES ($1, $2, $3, $4, 0) ON CONFLICT DO NOTHING",
         device.id,
         date,
         direction,
         dest_ip,
+    )
+    .execute(pool)
+    .await?;
+
+    let _ = sqlx::query!(
+         "UPDATE device_connections SET amount = amount + 1 WHERE device_id = $1 AND direction = $2 AND target = $3 AND date = $4",
         device.id,
         direction,
         dest_ip,
@@ -92,7 +97,7 @@ pub async fn get_device_connections(device: i64, pool: &DbConnection) -> Result<
         device_id: device,
         from: sqlx::query_as!(
             DeviceConnection,
-            "SELECT date, target, amount FROM device_connections WHERE device_id = ? AND direction = ?",
+            "SELECT date, target, amount FROM device_connections WHERE device_id = $1 AND direction = $2",
             device,
             from_device
         )
@@ -100,7 +105,7 @@ pub async fn get_device_connections(device: i64, pool: &DbConnection) -> Result<
         .await?,
         to: sqlx::query_as!(
             DeviceConnection,
-            "SELECT date, target, amount FROM device_connections WHERE device_id = ? AND direction = ?",
+            "SELECT date, target, amount FROM device_connections WHERE device_id = $1 AND direction = $2",
             device,
             to_device
         )
