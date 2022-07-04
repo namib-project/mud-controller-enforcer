@@ -23,7 +23,7 @@ pub async fn on_device(pool: &DbConnection, device: Device) {
                     name: "device_connections".into(),
                     level: Level::HeadersOnly,
                     ttl: 315_360_000, // 10 years, this should be changed to infinite.
-                    starts_at: chrono::Utc::now().naive_utc(),
+                    starts_at: chrono::Utc::now().naive_local(),
                 },
                 pool,
             )
