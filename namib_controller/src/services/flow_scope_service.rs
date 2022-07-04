@@ -1,15 +1,14 @@
 // Copyright 2022, Jasper Wiegratz, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use crate::models::FlowScope;
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use namib_shared::macaddr::SerdeMacAddr;
 
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{EndsAt, FlowScopeDbo},
-    services::device_service,
+    models::{EndsAt, FlowScope, FlowScopeDbo},
+    services::{device_service, firewall_configuration_service},
 };
 
 ///returns all flow scopes from the database
@@ -72,7 +71,9 @@ pub async fn insert_flow_scope(devices: Vec<SerdeMacAddr>, scope: &FlowScope, po
     .await?
     .id;
 
-    insert_targets(devices, flowscope_id, pool).await?;
+    if !devices.is_empty() {
+        insert_targets(devices, flowscope_id, pool).await?;
+    }
 
     Ok(flowscope_id)
 }
@@ -82,6 +83,7 @@ pub async fn remove_flow_scope(scope_id: i64, pool: &DbConnection) -> Result<boo
         .execute(pool)
         .await?;
 
+    firewall_configuration_service::update_config_version(pool).await?;
     Ok(result.rows_affected() == 1)
 }
 
@@ -103,6 +105,7 @@ async fn insert_targets(targets: Vec<SerdeMacAddr>, scope_id: i64, pool: &DbConn
             },
         }
     }
+    firewall_configuration_service::update_config_version(pool).await?;
     Ok(affected)
 }
 
@@ -124,12 +127,34 @@ pub async fn remove_targets_from_scope(targets: Vec<SerdeMacAddr>, scope_id: i64
             },
         }
     }
-
+    firewall_configuration_service::update_config_version(pool).await?;
     Ok(affected)
 }
 
+pub async fn get_next_expiration_date_time(pool: &DbConnection) -> Option<NaiveDateTime> {
+    let active_flow_scopes = get_active_flow_scopes(pool).await.unwrap();
+
+    if active_flow_scopes.is_empty() {
+        None
+    } else {
+        let mut next_expiration_date_time = None;
+        let now = Utc::now().naive_local();
+        for flow_scope in active_flow_scopes {
+            let flow_scope_end = flow_scope.ends_at();
+            if next_expiration_date_time.is_none() {
+                if flow_scope_end > now {
+                    next_expiration_date_time = Some(flow_scope_end);
+                }
+            } else if flow_scope_end < next_expiration_date_time.unwrap() {
+                next_expiration_date_time = Some(flow_scope_end);
+            }
+        }
+        next_expiration_date_time
+    }
+}
+
 fn check_ttl(flowscopes: Vec<FlowScopeDbo>) -> Vec<FlowScope> {
-    let now = Utc::now().naive_utc();
+    let now = Utc::now().naive_local();
     flowscopes
         .into_iter()
         .filter(|fs| (fs.starts_at < now && now < fs.ends_at()))

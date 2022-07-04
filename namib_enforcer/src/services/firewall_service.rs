@@ -1,4 +1,4 @@
-// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jasper Wiegratz
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jasper Wiegratz, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #[cfg(feature = "nftables")]
@@ -704,7 +704,7 @@ mod tests {
     use namib_shared::firewall_config::{RuleTarget, ScopeConstraint};
 
     fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
-        let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"));
+        let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"), None);
         let watcher = DnsService::new().unwrap().create_watcher();
         (config, watcher)
     }

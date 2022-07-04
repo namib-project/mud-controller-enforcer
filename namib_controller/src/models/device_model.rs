@@ -16,8 +16,8 @@ use paperclip::actix::Apiv2Schema;
 use crate::{
     db::DbConnection,
     error::Result,
-    models::{mud_models::MudData, quarantine_exception_model::QuarantineException, Room},
-    services::{device_config_service, mud_service, quarantine_service, room_service},
+    models::{flow_scope_model::FlowScope, mud_models::MudData, quarantine_exception_model::QuarantineException, Room},
+    services::{device_config_service, flow_scope_service, mud_service, quarantine_service, room_service},
 };
 
 #[derive(Debug, Clone)]
@@ -63,6 +63,7 @@ pub struct DeviceWithRefs {
     pub mud_data: Option<MudData>,
     pub controller_mappings: Vec<ConfiguredControllerMapping>,
     pub quarantine_exceptions: Vec<QuarantineException>,
+    pub flow_scopes: Vec<FlowScope>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -118,6 +119,7 @@ impl Device {
                 .into_iter()
                 .map(QuarantineException::from)
                 .collect();
+        let flow_scopes = flow_scope_service::get_active_flow_scopes_for_device(conn, self.id).await?;
 
         Ok(DeviceWithRefs {
             inner: self,
@@ -125,6 +127,7 @@ impl Device {
             mud_data,
             controller_mappings,
             quarantine_exceptions,
+            flow_scopes,
         })
     }
 }

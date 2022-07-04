@@ -1,6 +1,7 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use chrono::{NaiveDateTime, Utc};
 use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
@@ -31,7 +32,10 @@ use crate::{
     db::DbConnection,
     error::Result,
     models::{AdministrativeContext, ConfiguredServerDbo, DefinedServer},
-    services::{acme_service::CertId, device_service, enforcer_service, firewall_configuration_service, log_service},
+    services::{
+        acme_service::CertId, device_service, enforcer_service, firewall_configuration_service, flow_scope_service,
+        log_service,
+    },
     util::open_file_with,
 };
 
@@ -45,13 +49,25 @@ pub struct NamibRpcServer {
 #[server]
 impl NamibRpc for NamibRpcServer {
     /// Called regularly by the enforcer to refresh its state.
-    async fn heartbeat(self, _: context::Context, version: Option<String>) -> Option<EnforcerConfig> {
+    async fn heartbeat(
+        self,
+        _: context::Context,
+        version: Option<String>,
+        expiration_date_time: Option<NaiveDateTime>,
+    ) -> Option<EnforcerConfig> {
         let current_config_version = firewall_configuration_service::get_config_version(&self.db_connection).await;
         debug!(
-            "heartbeat from {:?} ({}): version {:?}, current version {:?}",
-            self.client_ip, self.client_id, version, current_config_version
+            "heartbeat from {:?} ({}): enforcer version {:?}, current controller version {:?}, expiration date {:?}",
+            self.client_ip,
+            self.client_id,
+            version.clone().unwrap(),
+            current_config_version,
+            expiration_date_time
         );
-        if Some(&current_config_version) != version.as_ref() {
+
+        if Some(&current_config_version) != version.as_ref()
+            || (expiration_date_time.is_some() && expiration_date_time.unwrap() < Utc::now().naive_local())
+        {
             debug!("Client has outdated version. Starting update...");
             let devices = device_service::get_all_devices(&self.db_connection)
                 .await
@@ -76,13 +92,13 @@ impl NamibRpc for NamibRpcServer {
                         error!("there was an error creating the administrative context: '{}'", err);
                         AdministrativeContext::default()
                     });
+            let next_expiration = flow_scope_service::get_next_expiration_date_time(&self.db_connection).await;
             let new_config = firewall_configuration_service::create_configuration(
-                &self.db_connection,
                 current_config_version,
                 &init_devices,
                 &administrative_context,
-            )
-            .await;
+                &next_expiration,
+            );
             debug!("Returning Heartbeat to client with config: {:?}", new_config.version());
             return Some(new_config);
         }

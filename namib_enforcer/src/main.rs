@@ -7,6 +7,7 @@
 #[macro_use]
 extern crate log;
 
+use chrono::Utc;
 use std::{env, fs::File, net::SocketAddr, path::Path, sync::Arc, thread};
 
 use dotenv::dotenv;
@@ -107,7 +108,7 @@ async fn main() -> Result<()> {
         info!("Retrieving initial config from NAMIB Controller");
         let (client, addr) = rpc::rpc_client::run().await?;
         let config = client
-            .heartbeat(current_rpc_context(), None)
+            .heartbeat(current_rpc_context(), None, Some(Utc::now().naive_local()))
             .await?
             .expect("no initial config sent from controller");
         persist_config(&config).await;
