@@ -7,7 +7,7 @@ use crate::models::Device;
 use crate::models::DeviceConnection;
 use crate::models::DeviceConnections;
 use crate::models::FlowScope;
-use crate::models::Level;
+use crate::models::FlowScopeLevel;
 
 use super::device_service;
 use super::flow_scope_service;
@@ -21,7 +21,7 @@ pub async fn on_device(pool: &DbConnection, device: Device) {
                 vec![],
                 &FlowScope {
                     name: "device_connections".into(),
-                    level: Level::HeadersOnly,
+                    level: FlowScopeLevel::HeadersOnly,
                     ttl: 315_360_000, // 10 years, this should be changed to infinite.
                     starts_at: chrono::Utc::now().naive_local(),
                 },
@@ -37,10 +37,10 @@ pub async fn on_device(pool: &DbConnection, device: Device) {
     }
 }
 
-pub fn match_scope_level(level: &Level, data: &FlowData) -> bool {
+pub fn match_scope_level(level: &FlowScopeLevel, data: &FlowData) -> bool {
     match level {
-        Level::Full => data.packet != None,
-        Level::HeadersOnly => data.packet == None,
+        FlowScopeLevel::Full => data.packet != None,
+        FlowScopeLevel::HeadersOnly => data.packet == None,
     }
 }
 
