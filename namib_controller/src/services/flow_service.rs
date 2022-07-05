@@ -64,7 +64,7 @@ pub async fn add_device_connection(device: &Device, flow: &FlowData, pool: &DbCo
     let dest_ip = flow.dest_ip.to_string();
 
     // sqlx's sqlite backend does not support datetime, so we have to do some ugly conversion
-    let date: chrono::NaiveDateTime = chrono::Utc::now().naive_utc().date().and_hms(0, 0, 0);
+    let date: chrono::NaiveDateTime = chrono::Utc::now().naive_local().date().and_hms(0, 0, 0);
 
     let _ = sqlx::query!(
         "INSERT INTO device_connections (device_id, date, direction, target, amount) VALUES ($1, $2, $3, $4, 0) ON CONFLICT DO NOTHING",

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use chrono::{Duration, NaiveDateTime, Utc};
+use namib_controller::db::DbConnection;
 use namib_controller::error::Result;
 use namib_controller::models::{Device, DeviceWithRefs, FlowScope, FlowScopeLevel};
 use namib_controller::services::{device_service, firewall_configuration_service, flow_scope_service};
@@ -10,6 +11,25 @@ use std::thread::sleep;
 use std::time;
 
 mod lib;
+
+/// Insert devices without handlers to these devices modifying the flow scope state
+async fn insert_device_without_scopes(device: &Device, pool: &DbConnection) -> Result<()> {
+    let previous_scopes = flow_scope_service::get_all_flow_scopes(pool)
+        .await?
+        .into_iter()
+        .map(|f| f.id)
+        .collect::<Vec<_>>();
+
+    device_service::insert_device(device, pool).await?;
+
+    for scope in &flow_scope_service::get_all_flow_scopes(pool).await? {
+        if !previous_scopes.contains(&scope.id) {
+            flow_scope_service::remove_flow_scope(scope.id, pool).await?;
+        }
+    }
+
+    Ok(())
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_get_flow_scopes() -> Result<()> {
@@ -33,12 +53,7 @@ async fn test_get_flow_scopes() -> Result<()> {
         q_bit: false,
     };
 
-    device_service::insert_device(&device, &ctx.db_conn).await?;
-
-    // insert_device will add flow scopes for capturing device traffic
-    for scope in &flow_scope_service::get_all_flow_scopes(&ctx.db_conn).await? {
-        flow_scope_service::remove_flow_scope(scope.id, &ctx.db_conn).await?;
-    }
+    insert_device_without_scopes(&device, &ctx.db_conn).await?;
 
     let scope_data = [
         (
@@ -187,12 +202,8 @@ async fn test_flow_scope_ttl_validation() -> Result<()> {
         q_bit: false,
     };
 
-    device_service::insert_device(&device, &ctx.db_conn).await?;
+    insert_device_without_scopes(&device, &ctx.db_conn).await?;
 
-    assert_eq!(
-        firewall_configuration_service::get_config_version(&ctx.db_conn).await,
-        "1"
-    );
     assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 0);
 
     flow_scope_service::insert_flow_scope(
@@ -207,10 +218,6 @@ async fn test_flow_scope_ttl_validation() -> Result<()> {
     )
     .await?;
     assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 1);
-    assert_eq!(
-        firewall_configuration_service::get_config_version(&ctx.db_conn).await,
-        "2"
-    );
 
     sleep(time::Duration::from_secs(5));
     assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 0);
