@@ -22,7 +22,7 @@ define Package/namib
   TITLE:=NAMIB Enforcer
   URL:=https://gitlab.informatik.uni-bremen.de/namib/mud-controller-enforcer/namib_enforcer
   MAINTAINER:=Benjamin Ludewig <ludewigb@uni-bremen.de>, Hugo Damer <hdamer@uni-bremen.de>
-  DEPENDS:=@IPV6 +libavahi-compat-libdnssd +libuci +nftables +libnftnl +libmnl
+  DEPENDS:=@IPV6 +libavahi-compat-libdnssd +libuci +nftables +libnftnl +libmnl +libnetfilter-log
   PKG_BUILD_DEPENDS:=openssl
 endef
 
