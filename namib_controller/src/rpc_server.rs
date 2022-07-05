@@ -140,7 +140,7 @@ impl NamibRpc for NamibRpcServer {
             if let Err(e) = flow_service::on_flow(&result.clone(), &self.db_connection).await {
                 error!("error occured while handling flow data: {:?}", e);
             }
-            if flow_data.denied {
+            if result.denied {
                 anomaly_service::insert_anomaly(AnomalyCreationDto::from(&result), &self.db_connection)
                     .await
                     .expect("Anomaly could not be created");

@@ -1,6 +1,8 @@
 // Copyright 2022, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use crate::models::Notification;
+use crate::services::notification_service;
 use crate::{
     db::DbConnection,
     error::Result,
@@ -73,6 +75,8 @@ pub async fn insert_anomaly(mut anomaly_data: AnomalyCreationDto, pool: &DbConne
     )
     .fetch_one(pool)
     .await?;
+
+    notification_service::insert_notification(&Notification::from(anomaly.clone()), pool).await?;
 
     anomaly_data.into_anomaly(anomaly.id, anomaly.date_time_created)
 }

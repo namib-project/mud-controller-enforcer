@@ -77,7 +77,6 @@ pub struct FlowData {
     pub transport: FlowDataTransport,
     pub packet: Option<Vec<u8>>,
     pub denied: bool,
-
 }
 
 impl FlowData {
