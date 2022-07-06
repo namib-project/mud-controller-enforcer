@@ -56,6 +56,14 @@ pub async fn find_by_name(pool: &DbConnection, name: &str) -> Result<FlowScope> 
     Ok(FlowScope::from(flowscope))
 }
 
+///returns flow scope by name from the database
+pub async fn find_id_by_name(pool: &DbConnection, name: &str) -> Result<i64> {
+    Ok(sqlx::query!("SELECT id FROM flow_scopes WHERE name = $1", name)
+        .fetch_one(pool)
+        .await?
+        .id)
+}
+
 ///inserts flow scope into the database, returning the id
 pub async fn insert_flow_scope(devices: Vec<SerdeMacAddr>, scope: &FlowScope, pool: &DbConnection) -> Result<i64> {
     let level = scope.level.clone() as i64;
@@ -87,7 +95,7 @@ pub async fn remove_flow_scope(scope_id: i64, pool: &DbConnection) -> Result<boo
     Ok(result.rows_affected() == 1)
 }
 
-async fn insert_targets(targets: Vec<SerdeMacAddr>, scope_id: i64, pool: &DbConnection) -> Result<u64> {
+pub async fn insert_targets(targets: Vec<SerdeMacAddr>, scope_id: i64, pool: &DbConnection) -> Result<u64> {
     let mut affected = 0;
     for mac in targets {
         match device_service::find_by_mac_or_duid(Some(mac), None, pool).await {

@@ -3,6 +3,7 @@
 
 mod anomaly_dto;
 mod config_dto;
+mod device_connection_dto;
 mod device_dto;
 mod enforcer_dto;
 mod floor_dto;
@@ -19,6 +20,7 @@ mod users_management_dto;
 
 pub use anomaly_dto::*;
 pub use config_dto::*;
+pub use device_connection_dto::*;
 pub use device_dto::*;
 pub use enforcer_dto::*;
 pub use floor_dto::*;
