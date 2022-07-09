@@ -1,9 +1,9 @@
-// Copyright 2022, Matthias Reichmann
+// Copyright 2022, Matthias Reichmann, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use crate::models::DeviceWithRefs;
+use crate::models::{AnomalyDbo, DeviceWithRefs};
 use crate::{db::DbConnection, error::Result, services::device_service};
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
@@ -39,5 +39,21 @@ impl Notification {
             inner: self,
             device: device_with_refs,
         })
+    }
+}
+
+impl From<AnomalyDbo> for Notification {
+    fn from(anomaly: AnomalyDbo) -> Self {
+        Self {
+            id: 0,
+            device_id: match (anomaly.source_id, anomaly.destination_id) {
+                (None, Some(dest_id)) => dest_id,
+                (Some(src_id), _) => src_id,
+                (None, None) => 0,
+            },
+            source: "MUD file violation detection".to_string(),
+            timestamp: Utc::now().naive_local(),
+            read: false,
+        }
     }
 }

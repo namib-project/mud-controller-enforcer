@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use chrono::NaiveDateTime;
+use namib_shared::macaddr::{MacAddr, SerdeMacAddr};
 use std::convert::TryFrom;
 use std::net::IpAddr;
 
@@ -10,9 +11,11 @@ pub struct AnomalyDbo {
     pub id: i64,
     pub source_ip: String,
     pub source_port: Option<i64>,
+    pub source_mac: Option<String>,
     pub source_id: Option<i64>,
     pub destination_ip: String,
     pub destination_port: Option<i64>,
+    pub destination_mac: Option<String>,
     pub destination_id: Option<i64>,
     pub l4protocol: Option<i64>,
     pub date_time_created: NaiveDateTime,
@@ -23,9 +26,11 @@ pub struct Anomaly {
     pub id: i64,
     pub source_ip: IpAddr,
     pub source_port: Option<u16>,
+    pub source_mac: Option<SerdeMacAddr>,
     pub source_id: Option<i64>,
     pub destination_ip: IpAddr,
     pub destination_port: Option<u16>,
+    pub destination_mac: Option<SerdeMacAddr>,
     pub destination_id: Option<i64>,
     pub l4protocol: Option<i32>,
     pub date_time_created: NaiveDateTime,
@@ -40,11 +45,19 @@ impl From<AnomalyDbo> for Anomaly {
                 Some(source_port) => u16::try_from(source_port).ok(),
                 None => None,
             },
+            source_mac: match anomaly.source_mac.map(|m| m.parse::<MacAddr>()).unwrap() {
+                Ok(mac) => Some(SerdeMacAddr::from(mac)),
+                _ => None,
+            },
             source_id: anomaly.source_id,
             destination_ip: anomaly.destination_ip.parse().unwrap(),
             destination_port: match anomaly.destination_port {
                 Some(destination_port) => u16::try_from(destination_port).ok(),
                 None => None,
+            },
+            destination_mac: match anomaly.destination_mac.map(|m| m.parse::<MacAddr>()).unwrap() {
+                Ok(mac) => Some(SerdeMacAddr::from(mac)),
+                _ => None,
             },
             destination_id: anomaly.destination_id,
             l4protocol: match anomaly.l4protocol {
