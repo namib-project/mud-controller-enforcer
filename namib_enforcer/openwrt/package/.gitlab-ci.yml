@@ -51,8 +51,7 @@ enf:openwrt-package_bcm2711_22.03: # raspberry v4
 
 .enf:openwrt_package_base:
   stage: package
-  needs:
-    - enf:build
+  needs: []
   rules:
     - !reference [.on_tags]
     - !reference [.on_default_branch]
