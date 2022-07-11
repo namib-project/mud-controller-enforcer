@@ -74,9 +74,10 @@ enf:openwrt-package_bcm2711_22.03: # raspberry v4
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/patches/"* package/feeds/base/dnsmasq/patches/
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package" ./package/namib
     - ln -s "${CI_PROJECT_DIR}" package/namib/src
+    - mkdir output
     - make defconfig
-    - make package/namib/compile -j8 -j1 V=sc | tee output/namib_compile.txt
-    - make package/feeds/base/dnsmasq/compile -j8 -j1 V=sc | tee output/dnsmasq_compile.txt
+    - make package/namib/compile -j8 | tee output/namib_compile.txt
+    - make package/feeds/base/dnsmasq/compile -j8 | tee output/dnsmasq_compile.txt
   after_script:
     - mkdir ${CI_PROJECT_DIR}/output
     - cp -r /home/build/openwrt/logs/package/namib ${CI_PROJECT_DIR}/output/logs || true
