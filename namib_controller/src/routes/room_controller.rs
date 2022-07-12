@@ -5,10 +5,7 @@
 
 use actix_web::http::StatusCode;
 use futures::{stream, StreamExt, TryStreamExt};
-use paperclip::actix::{
-    api_v2_operation, web,
-    web::{HttpResponse, Json},
-};
+use paperclip::actix::{api_v2_operation, web, web::Json};
 use snafu::ensure;
 use validator::Validate;
 
@@ -157,11 +154,11 @@ async fn update_room(
         .map_or(id.0, |room| room.room_id)
         != id.0
     {
-        error::ResponseError {
-            status: StatusCode::CONFLICT,
-            message: Some("Room already exists.".to_string()),
-        }
-        .fail()?;
+        return Err(error::invalid_user_input!(
+            "A room with this name already exists. Please chose another one or delete the other room first.",
+            "name",
+            StatusCode::CONFLICT
+        ));
     }
 
     let updated = room_service::update(&room, &pool).await.or_else(|_| {
@@ -184,7 +181,7 @@ async fn update_room(
 }
 
 #[api_v2_operation(summary = "Deletes a room.", tags(Rooms))]
-async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<HttpResponse> {
+async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Path<i64>) -> Result<Json<RoomDto>> {
     auth.require_permission(Permission::room__delete)?;
 
     let find_room = room_service::find_by_id(id.0, &pool).await.or_else(|_| {
@@ -196,7 +193,7 @@ async fn delete_room(pool: web::Data<DbConnection>, auth: AuthToken, id: web::Pa
     })?;
     debug!("{:?}", find_room);
     room_service::delete_room(&find_room.name, &pool).await?;
-    Ok(HttpResponse::NoContent().finish())
+    Ok(Json(RoomDto::from(find_room)))
 }
 
 #[api_v2_operation(summary = "Changes the guest in a room.", tags(Rooms))]
