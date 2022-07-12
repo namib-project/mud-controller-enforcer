@@ -154,7 +154,7 @@ async fn main() -> Result<()> {
     let np0f_log_task = tokio::spawn(services::log_watcher::watch_np0f(enforcer.clone()));
     let nflog_task_ipv4 = tokio::spawn(services::nflog_watcher::watch_ipv4(enforcer.clone()));
     let nflog_task_ipv6 = tokio::spawn(services::nflog_watcher::watch_ipv6(enforcer.clone()));
-    let nflog_task_bridge = tokio::spawn(services::nflog_watcher::watch_ipv6(enforcer.clone()));
+    let nflog_task_bridge = tokio::spawn(services::nflog_watcher::watch_bridge(enforcer.clone()));
 
     let _log_watcher = thread::spawn(move || services::log_watcher::watch(&enforcer));
 

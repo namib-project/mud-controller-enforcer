@@ -34,12 +34,12 @@ impl State {
             self.result.clear();
             let enforcer_copy = self.enforcer.clone();
             let _ = std::thread::spawn(move || {
-                let builder = tokio::runtime::Builder::new_current_thread()
+                let runtime = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
                     .unwrap();
-                let enforcer = builder.block_on(enforcer_copy.read());
-                let _send = builder.block_on(
+                let enforcer = runtime.block_on(enforcer_copy.read());
+                let _send = runtime.block_on(
                     enforcer
                         .client
                         .send_scope_results(rpc_client::current_rpc_context(), result_copy),
@@ -50,7 +50,7 @@ impl State {
 }
 
 pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
-    debug!("Starting nflog watcher");
+    debug!("Starting nflog ipv4 watcher");
 
     let state = Arc::new(std::sync::Mutex::new(State {
         enforcer,
@@ -123,7 +123,7 @@ pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
 }
 
 pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
-    debug!("Starting nflog watcher");
+    debug!("Starting nflog ipv6 watcher");
 
     let state = Arc::new(std::sync::Mutex::new(State {
         enforcer,
@@ -196,7 +196,7 @@ pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
 }
 
 pub async fn watch_bridge(enforcer: Arc<RwLock<Enforcer>>) {
-    debug!("Starting nflog watcher");
+    debug!("Starting nflog bridge watcher");
 
     let state = Arc::new(std::sync::Mutex::new(State {
         enforcer,
