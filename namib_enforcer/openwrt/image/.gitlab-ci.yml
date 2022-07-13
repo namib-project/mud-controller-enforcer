@@ -3,13 +3,13 @@ include:
 
 enf:openwrt-image_x86_64_21.02:
   extends: .enf:openwrt_image_base
-  image: openwrtorg/imagebuilder:x86-64-21.02.0 # - unlike the sdk, "-" is used instead of "_" here...
+  image: openwrtorg/imagebuilder:x86-64-21.02.3 # - unlike the sdk, "-" is used instead of "_" here...
   needs:
     - enf:openwrt-package_x86_64_21.02
 
 enf:openwrt-image_bcm2708_21.02:
   extends: .enf:openwrt_image_base
-  image: openwrtorg/imagebuilder:bcm27xx-bcm2708-21.02.0 # rpi 1
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2708-21.02.3 # rpi 1
   needs:
     - enf:openwrt-package_bcm2708_21.02
   variables:
@@ -17,7 +17,7 @@ enf:openwrt-image_bcm2708_21.02:
 
 enf:openwrt-image_bcm2710_21.02:
   extends: .enf:openwrt_image_base
-  image: openwrtorg/imagebuilder:bcm27xx-bcm2710-21.02.0 # rpi 3
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2710-21.02.3 # rpi 3
   needs:
     - enf:openwrt-package_bcm2710_21.02
   variables:
@@ -25,7 +25,7 @@ enf:openwrt-image_bcm2710_21.02:
 
 enf:openwrt-image_bcm2711_21.02:
   extends: .enf:openwrt_image_base
-  image: openwrtorg/imagebuilder:bcm27xx-bcm2711-21.02.0 # rpi 4
+  image: openwrtorg/imagebuilder:bcm27xx-bcm2711-21.02.3 # rpi 4
   needs:
     - enf:openwrt-package_bcm2711_21.02
   variables:
