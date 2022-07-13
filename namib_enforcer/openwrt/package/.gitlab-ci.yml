@@ -6,48 +6,56 @@ enf:openwrt-package_x86_64_21.02:
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.3-x86_64
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
+    CI_OPENWRT_RELEASE: "21.02"
 
 enf:openwrt-package_bcm2708_21.02: # raspberry v1
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.3-bcm27xx-bcm2708
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
+    CI_OPENWRT_RELEASE: "21.02"
 
 enf:openwrt-package_bcm2710_21.02: # raspberry v3
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.3-bcm27xx-bcm2710
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
+    CI_OPENWRT_RELEASE: "21.02"
 
 enf:openwrt-package_bcm2711_21.02: # raspberry v4
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:21.02.3-bcm27xx-bcm2711
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
+    CI_OPENWRT_RELEASE: "21.02"
 
 enf:openwrt-package_x86_64_22.03:
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-x86_64
   variables:
     RUST_TRIPLE: x86_64-unknown-linux-musl
+    CI_OPENWRT_RELEASE: "22.03"
 
 enf:openwrt-package_bcm2708_22.03: # raspberry v1
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-bcm27xx-bcm2708
   variables:
     RUST_TRIPLE: arm-unknown-linux-musleabihf
+    CI_OPENWRT_RELEASE: "22.03"
 
 enf:openwrt-package_bcm2710_22.03: # raspberry v3
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-bcm27xx-bcm2710
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
+    CI_OPENWRT_RELEASE: "22.03"
 
 enf:openwrt-package_bcm2711_22.03: # raspberry v4
   extends: .enf:openwrt_package_base
   image: gitlab.informatik.uni-bremen.de:5005/namib-master/ci-docker-images/controller/openwrt_sdk:22.03-SNAPSHOT-bcm27xx-bcm2711
   variables:
     RUST_TRIPLE: aarch64-unknown-linux-musl
+    CI_OPENWRT_RELEASE: "22.03"
 
 .enf:openwrt_package_base:
   stage: package
@@ -70,7 +78,7 @@ enf:openwrt-package_bcm2711_22.03: # raspberry v4
     - ./scripts/feeds update base packages
     - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl nftables dnsmasq-full libnetfilter-log
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/config.diff" .config
-    - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/patches/"* package/feeds/base/dnsmasq/patches/
+    - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/dnsmasq_patches_${CI_OPENWRT_RELEASE}/"* package/feeds/base/dnsmasq/patches/
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package" ./package/namib
     - ln -s "${CI_PROJECT_DIR}" package/namib/src
     - mkdir output
