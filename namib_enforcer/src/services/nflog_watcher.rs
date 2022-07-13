@@ -49,223 +49,83 @@ impl State {
     }
 }
 
-pub async fn watch_ipv4(enforcer: Arc<RwLock<Enforcer>>) {
-    debug!("Starting nflog ipv4 watcher");
+pub async fn watch(enforcer: Arc<RwLock<Enforcer>>) {
+    debug!("Starting nflog watcher");
 
     let state = Arc::new(std::sync::Mutex::new(State {
         enforcer,
         result: vec![],
     }));
 
-    let queue_ipv4 = Queue::open().unwrap();
-    queue_ipv4.bind(libc::AF_INET).unwrap();
+    if let Ok(queue) = Queue::open() {
+        queue.bind(libc::AF_INET).unwrap();
+        queue.bind(libc::AF_INET6).unwrap();
+        queue.bind(libc::AF_BRIDGE).unwrap();
 
-    let mut headers_from = queue_ipv4.bind_group(LogGroup::HeadersOnlyFromDevice as u16).unwrap();
-    headers_from.set_mode(CopyMode::Packet, 0);
-    headers_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        false,
-        false,
-    ));
+        let mut headers_from = queue.bind_group(LogGroup::HeadersOnlyFromDevice as u16).unwrap();
+        headers_from.set_mode(CopyMode::Packet, 0);
+        headers_from.set_callback(generate_callback(
+            state.clone(),
+            FlowDataDirection::FromDevice,
+            false,
+            false,
+        ));
 
-    let mut headers_to = queue_ipv4.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
-    headers_to.set_mode(CopyMode::Packet, 0);
-    headers_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        false,
-        false,
-    ));
+        let mut headers_to = queue.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
+        headers_to.set_mode(CopyMode::Packet, 0);
+        headers_to.set_callback(generate_callback(
+            state.clone(),
+            FlowDataDirection::ToDevice,
+            false,
+            false,
+        ));
 
-    let mut full_from = queue_ipv4.bind_group(LogGroup::FullFromDevice as u16).unwrap();
-    full_from.set_mode(CopyMode::Packet, 0);
-    full_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        true,
-        false,
-    ));
+        let mut full_from = queue.bind_group(LogGroup::FullFromDevice as u16).unwrap();
+        full_from.set_mode(CopyMode::Packet, 0);
+        full_from.set_callback(generate_callback(
+            state.clone(),
+            FlowDataDirection::FromDevice,
+            true,
+            false,
+        ));
 
-    let mut full_to = queue_ipv4.bind_group(LogGroup::FullToDevice as u16).unwrap();
-    full_to.set_mode(CopyMode::Packet, 0);
-    full_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        true,
-        false,
-    ));
+        let mut full_to = queue.bind_group(LogGroup::FullToDevice as u16).unwrap();
+        full_to.set_mode(CopyMode::Packet, 0);
+        full_to.set_callback(generate_callback(
+            state.clone(),
+            FlowDataDirection::ToDevice,
+            true,
+            false,
+        ));
 
-    let mut deny_to = queue_ipv4.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
-    deny_to.set_mode(CopyMode::Packet, 0);
-    deny_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        true,
-        true,
-    ));
+        let mut deny_to = queue.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
+        deny_to.set_mode(CopyMode::Packet, 0);
+        deny_to.set_callback(generate_callback(
+            state.clone(),
+            FlowDataDirection::ToDevice,
+            true,
+            true,
+        ));
 
-    let mut deny_from = queue_ipv4.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
-    deny_from.set_mode(CopyMode::Packet, 0);
-    deny_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        true,
-        true,
-    ));
+        let mut deny_from = queue.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
+        deny_from.set_mode(CopyMode::Packet, 0);
+        deny_from.set_callback(generate_callback(
+            state.clone(),
+            FlowDataDirection::FromDevice,
+            true,
+            true,
+        ));
 
-    let _send_results = std::thread::spawn(move || loop {
-        std::thread::sleep(CAPTURE_DURATION);
-        state.lock().unwrap().send_results();
-    });
+        let _send_results = std::thread::spawn(move || loop {
+            std::thread::sleep(CAPTURE_DURATION);
+            state.lock().unwrap().send_results();
+        });
 
-    queue_ipv4.run_loop();
-}
-
-pub async fn watch_ipv6(enforcer: Arc<RwLock<Enforcer>>) {
-    debug!("Starting nflog ipv6 watcher");
-
-    let state = Arc::new(std::sync::Mutex::new(State {
-        enforcer,
-        result: vec![],
-    }));
-
-    let queue_ipv6 = Queue::open().unwrap();
-    queue_ipv6.bind(libc::AF_INET6).unwrap();
-
-    let mut headers_from = queue_ipv6.bind_group(LogGroup::HeadersOnlyFromDevice as u16).unwrap();
-    headers_from.set_mode(CopyMode::Packet, 0);
-    headers_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        false,
-        false,
-    ));
-
-    let mut headers_to = queue_ipv6.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
-    headers_to.set_mode(CopyMode::Packet, 0);
-    headers_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        false,
-        false,
-    ));
-
-    let mut full_from = queue_ipv6.bind_group(LogGroup::FullFromDevice as u16).unwrap();
-    full_from.set_mode(CopyMode::Packet, 0);
-    full_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        true,
-        false,
-    ));
-
-    let mut full_to = queue_ipv6.bind_group(LogGroup::FullToDevice as u16).unwrap();
-    full_to.set_mode(CopyMode::Packet, 0);
-    full_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        true,
-        false,
-    ));
-
-    let mut deny_to = queue_ipv6.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
-    deny_to.set_mode(CopyMode::Packet, 0);
-    deny_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        true,
-        true,
-    ));
-
-    let mut deny_from = queue_ipv6.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
-    deny_from.set_mode(CopyMode::Packet, 0);
-    deny_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        true,
-        true,
-    ));
-
-    let _send_results = std::thread::spawn(move || loop {
-        std::thread::sleep(CAPTURE_DURATION);
-        state.lock().unwrap().send_results();
-    });
-
-    queue_ipv6.run_loop();
-}
-
-pub async fn watch_bridge(enforcer: Arc<RwLock<Enforcer>>) {
-    debug!("Starting nflog bridge watcher");
-
-    let state = Arc::new(std::sync::Mutex::new(State {
-        enforcer,
-        result: vec![],
-    }));
-
-    let queue_bridge = Queue::open().unwrap();
-    queue_bridge.bind(libc::AF_BRIDGE).unwrap();
-
-    let mut headers_from = queue_bridge.bind_group(LogGroup::HeadersOnlyFromDevice as u16).unwrap();
-    headers_from.set_mode(CopyMode::Packet, 0);
-    headers_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        false,
-        false,
-    ));
-
-    let mut headers_to = queue_bridge.bind_group(LogGroup::HeadersOnlyToDevice as u16).unwrap();
-    headers_to.set_mode(CopyMode::Packet, 0);
-    headers_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        false,
-        false,
-    ));
-
-    let mut full_from = queue_bridge.bind_group(LogGroup::FullFromDevice as u16).unwrap();
-    full_from.set_mode(CopyMode::Packet, 0);
-    full_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        true,
-        false,
-    ));
-
-    let mut full_to = queue_bridge.bind_group(LogGroup::FullToDevice as u16).unwrap();
-    full_to.set_mode(CopyMode::Packet, 0);
-    full_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        true,
-        false,
-    ));
-
-    let mut deny_to = queue_bridge.bind_group(LogGroup::DenialsToDevice as u16).unwrap();
-    deny_to.set_mode(CopyMode::Packet, 0);
-    deny_to.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::ToDevice,
-        true,
-        true,
-    ));
-
-    let mut deny_from = queue_bridge.bind_group(LogGroup::DenialsFromDevice as u16).unwrap();
-    deny_from.set_mode(CopyMode::Packet, 0);
-    deny_from.set_callback(generate_callback(
-        state.clone(),
-        FlowDataDirection::FromDevice,
-        true,
-        true,
-    ));
-
-    let _send_results = std::thread::spawn(move || loop {
-        std::thread::sleep(CAPTURE_DURATION);
-        state.lock().unwrap().send_results();
-    });
-
-    queue_bridge.run_loop();
+        debug!("nflog watcher started successfully");
+        queue.run_loop();
+    } else {
+        debug!("nflog watcher failed to start");
+    }
 }
 
 fn generate_callback(
