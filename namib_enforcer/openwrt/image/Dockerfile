@@ -1,4 +1,4 @@
-FROM openwrtorg/rootfs:x86_64-22.03-SNAPSHOT
+FROM openwrtorg/rootfs:x86_64-21.02.3
 
 ADD output/ /tmp/
 
