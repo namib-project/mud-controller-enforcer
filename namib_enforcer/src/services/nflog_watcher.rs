@@ -123,7 +123,7 @@ pub async fn watch(enforcer: Arc<RwLock<Enforcer>>) {
 
         debug!("nflog watcher started successfully");
         queue.run_loop();
-    }else {
+    } else {
         debug!("nflog watcher failed to start");
     }
 }
