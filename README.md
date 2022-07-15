@@ -12,6 +12,11 @@ The Enforcer then applies these rules via Netfilter to the OpenWRT router on
 which it runs as a service.
 Together they function as a MUD-Manager per RFC8520.
 
+## Binaries
+
+Currently we publish no binaries, packages or images.
+We plan on adding these in the near future.
+
 ## Build dependencies (Debian/Ubuntu)
 
 ```bash
