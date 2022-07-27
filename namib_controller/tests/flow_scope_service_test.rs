@@ -4,8 +4,8 @@
 use chrono::{Duration, NaiveDateTime, Utc};
 use namib_controller::db::DbConnection;
 use namib_controller::error::Result;
-use namib_controller::models::{Device, DeviceWithRefs, FlowScope, FlowScopeLevel};
-use namib_controller::services::{device_service, firewall_configuration_service, flow_scope_service};
+use namib_controller::models::{Device, EndsAt, FlowScope, FlowScopeLevel};
+use namib_controller::services::{device_service, flow_scope_service};
 use namib_shared::macaddr::{MacAddr6, SerdeMacAddr};
 use std::thread::sleep;
 use std::time;
@@ -153,6 +153,33 @@ async fn test_get_flow_scopes() -> Result<()> {
             .len(),
         0
     );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_unlimited_flow_scope() -> Result<()> {
+    let ctx = lib::IntegrationTestContext::new("test_unlimited_flow_scope").await;
+
+    flow_scope_service::insert_flow_scope(
+        Vec::new(),
+        &FlowScope {
+            name: String::from("test_scope"),
+            level: FlowScopeLevel::Full,
+            ttl: 0,
+            starts_at: NaiveDateTime::from_timestamp(42_000_000, 0),
+        },
+        &ctx.db_conn,
+    )
+    .await?;
+
+    let fs = flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?;
+
+    for fs in fs {
+        assert_eq!(fs.ends_at(), fs.starts_at);
+    }
+
+    assert_eq!(flow_scope_service::get_active_flow_scopes(&ctx.db_conn).await?.len(), 1);
 
     Ok(())
 }
