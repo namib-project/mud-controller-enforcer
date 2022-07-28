@@ -1,4 +1,21 @@
-# Metaproject
+# NAMIB MUD Controller and Enforcer (Monorepo)
+
+This repository holds the NAMIB MUD Controller and Enforcer.
+
+A Manufacturer Usage Description (MUD) is a definition format to describe the
+necessary communication permissions of an IoT device by a manufacturer.
+It is defined in [RFC8520](https://datatracker.ietf.org/doc/html/rfc8520).
+
+The NAMIB MUD Controller implements a conversion of MUD to abstracted firewall
+rules.
+The Enforcer then applies these rules via Netfilter to the OpenWRT router on
+which it runs as a service.
+Together they function as a MUD-Manager per RFC8520.
+
+## Binaries
+
+Currently we publish no binaries, packages or images.
+We plan on adding these in the near future.
 
 ## Build dependencies (Debian/Ubuntu)
 
