@@ -243,12 +243,12 @@ pub fn convert_device_to_fw_rules(
                     // L3-header-specified L4 protocol and L4 matches data are NOT the same
                     (Some(a), Some(b)) => {
                         warn!(
-                            "MUD L3 matches data specifies L4 protocol {} but L4 matches data is for {} (DEV: (name: {:?}, url: {:?}), MUD: {:?})",
+                            "MUD L3 matches data specifies L4 protocol {} but L4 matches data is for {} (DEV: (name: {:?}, url: {:?}), ACE: {:?})",
                             a.to_string(),
                             b.to_protocol_string(),
                             device.name,
                             device.mud_url,
-                            mud_data,
+                            &ace.name,
                         );
                     },
                 }
