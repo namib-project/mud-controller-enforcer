@@ -4,10 +4,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use std::fmt;
-use std::net::IpAddr;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use namib_shared::firewall_config::RuleTargetHost;
 use paperclip::{
     actix::Apiv2Schema,
     v2::{
@@ -22,11 +20,6 @@ use crate::error::Result;
 pub struct MudDboRefresh {
     pub url: String,
     pub expiration: NaiveDateTime,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ConfiguredServerDbo {
-    pub server: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -351,28 +344,6 @@ pub enum AclType {
 pub enum AclDirection {
     FromDevice = 0,
     ToDevice = 1,
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct AdministrativeContext {
-    pub dns_mappings: Vec<DefinedServer>,
-    pub ntp_mappings: Vec<DefinedServer>,
-}
-
-// TODO(ja_he): shouldn't this go in ...config...rs?
-#[derive(Debug, Clone, PartialEq)]
-pub enum DefinedServer {
-    Ip(IpAddr),
-    Url(String),
-}
-
-impl From<&DefinedServer> for RuleTargetHost {
-    fn from(s: &DefinedServer) -> Self {
-        match s {
-            DefinedServer::Ip(addr) => RuleTargetHost::IpAddr(*addr),
-            DefinedServer::Url(mud_url) => RuleTargetHost::Hostname(mud_url.clone()),
-        }
-    }
 }
 
 impl fmt::Display for AclDirection {

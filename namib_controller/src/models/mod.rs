@@ -3,6 +3,7 @@
 
 mod anomaly_model;
 mod config_model;
+mod device_config_model;
 mod device_connections_model;
 mod device_model;
 mod floor_model;
@@ -16,6 +17,7 @@ mod user_model;
 
 pub use anomaly_model::*;
 pub use config_model::*;
+pub use device_config_model::*;
 pub use device_connections_model::*;
 pub use device_model::*;
 pub use floor_model::*;
