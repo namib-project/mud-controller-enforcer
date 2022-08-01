@@ -33,13 +33,13 @@ serde_json = "1.0"
 trust-dns-resolver = "0.21.1"
 notify = "4"
 regex = "1.4"
-pnet_datalink = "0.29.0"
-ipnetwork = "0.18.0"
+pnet_datalink = "0.31.0"
+ipnetwork = "0.19.0"
 nflog = { git = "https://github.com/chifflier/nflog-rs" }
 pktparse = { branch = "feat-tcp-flags", git = "https://github.com/Ti-s-ch/pktparse-rs" }
 
 [dev-dependencies]
-serial_test = "0.6.0"
+serial_test = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
 rust-uci = { version = "0.1.5", optional = true }
