@@ -148,13 +148,15 @@ pub async fn get_next_expiration_date_time(pool: &DbConnection) -> Option<NaiveD
         let mut next_expiration_date_time = None;
         let now = Utc::now().naive_local();
         for flow_scope in active_flow_scopes {
-            let flow_scope_end = flow_scope.ends_at();
-            if next_expiration_date_time.is_none() {
-                if flow_scope_end > now {
+            if flow_scope.ttl != 0 {
+                let flow_scope_end = flow_scope.ends_at();
+                if next_expiration_date_time.is_none() {
+                    if flow_scope_end > now {
+                        next_expiration_date_time = Some(flow_scope_end);
+                    }
+                } else if flow_scope_end < next_expiration_date_time.unwrap() {
                     next_expiration_date_time = Some(flow_scope_end);
                 }
-            } else if flow_scope_end < next_expiration_date_time.unwrap() {
-                next_expiration_date_time = Some(flow_scope_end);
             }
         }
         next_expiration_date_time
@@ -165,7 +167,7 @@ fn check_ttl(flowscopes: Vec<FlowScopeDbo>) -> Vec<FlowScope> {
     let now = Utc::now().naive_local();
     flowscopes
         .into_iter()
-        .filter(|fs| (fs.starts_at < now && now < fs.ends_at()))
+        .filter(|fs| (fs.ttl == 0 || now < fs.ends_at()) && fs.starts_at < now)
         .map(FlowScope::from)
         .collect()
 }
