@@ -127,7 +127,6 @@ async fn add_quarantine_exception(
             exception.id =
                 quarantine_service::insert_quarantine_exception(&pool, device_id, mud_url.clone(), exception.clone())
                     .await?;
-
             Ok(Json(exception.into_dto(device_id, mud_url)))
         }
     }

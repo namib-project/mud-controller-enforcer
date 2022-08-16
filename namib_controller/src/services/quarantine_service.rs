@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::db::DbConnection;
-use crate::error::Result;
+use crate::error::{Error::InvalidUserInput, Result, StatusCode};
 use crate::models::{Device, DeviceDbo, QuarantineException, QuarantineExceptionDbo};
 use crate::services::{device_service, firewall_configuration_service};
 
@@ -57,19 +57,36 @@ pub async fn insert_quarantine_exception(
     quarantine_exception: QuarantineException,
 ) -> Result<i64> {
     let direction = quarantine_exception.direction as i64;
-
-    let result = sqlx::query!(
-        "INSERT INTO quarantine_exceptions (exception_target, direction, device_id, mud_url) values ($1, $2, $3, $4) RETURNING id",
-        quarantine_exception.exception_target,
-        direction,
+    let duplicate = sqlx::query_as!(QuarantineExceptionDbo,
+        "SELECT * FROM quarantine_exceptions WHERE (device_id = $1 OR mud_url = $2) AND direction = $3 AND exception_target = $4",
         device_id,
         mud_url,
+        direction,
+        quarantine_exception.exception_target,
     )
-    .fetch_one(pool)
-    .await?
-    .id;
+    .fetch_optional(pool)
+    .await?;
 
-    Ok(result)
+    if duplicate.is_some() {
+        Err(InvalidUserInput {
+            message: "Quarantine Exception already exists with id:".to_string(),
+            field: duplicate.unwrap().id.to_string(),
+            status: StatusCode::BAD_REQUEST,
+        })
+    } else {
+        let result = sqlx::query!(
+            "INSERT INTO quarantine_exceptions (exception_target, direction, device_id, mud_url) values ($1, $2, $3, $4) RETURNING id",
+            quarantine_exception.exception_target,
+            direction,
+            device_id,
+            mud_url,
+        )
+        .fetch_one(pool)
+        .await?
+        .id;
+
+        Ok(result)
+    }
 }
 
 pub async fn get_quarantine_exceptions_for_device(
