@@ -45,7 +45,7 @@ pub fn match_scope_level(level: &FlowScopeLevel, data: &FlowData) -> bool {
 }
 
 pub async fn on_flow(flow: &FlowData, pool: &DbConnection) -> Result<()> {
-    if let Ok(device) = device_service::find_by_ip(flow.src_ip.to_string().as_str(), pool).await {
+    if let Ok(device) = device_service::find_by_ip(flow.device_ip().to_string().as_str(), pool).await {
         for flow_scope in flow_scope_service::get_active_flow_scopes_for_device(pool, device.id)
             .await?
             .iter()
@@ -61,7 +61,7 @@ pub async fn on_flow(flow: &FlowData, pool: &DbConnection) -> Result<()> {
 
 pub async fn add_device_connection(device: &Device, flow: &FlowData, pool: &DbConnection) -> Result<()> {
     let direction = flow.direction as i64;
-    let dest_ip = flow.dest_ip.to_string();
+    let dest_ip = flow.target_ip().to_string();
 
     // sqlx's sqlite backend does not support datetime, so we have to do some ugly conversion
     let date: chrono::NaiveDateTime = chrono::Utc::now().naive_local().date().and_hms(0, 0, 0);

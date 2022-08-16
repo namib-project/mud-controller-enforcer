@@ -106,4 +106,18 @@ impl FlowData {
             denied,
         }
     }
+
+    pub fn device_ip(&self) -> std::net::IpAddr {
+        match self.direction {
+            FlowDataDirection::FromDevice => self.src_ip,
+            FlowDataDirection::ToDevice => self.dest_ip,
+        }
+    }
+
+    pub fn target_ip(&self) -> std::net::IpAddr {
+        match self.direction {
+            FlowDataDirection::FromDevice => self.dest_ip,
+            FlowDataDirection::ToDevice => self.src_ip,
+        }
+    }
 }
