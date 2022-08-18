@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![allow(clippy::field_reassign_with_default)]
@@ -30,6 +30,7 @@ pub struct DeviceDto {
     pub q_bit: bool,
     #[serde(rename = "type")]
     pub type_: DeviceType,
+    pub log_anomalies: bool,
 }
 
 impl From<DeviceWithRefs> for DeviceDto {
@@ -51,6 +52,7 @@ impl From<DeviceWithRefs> for DeviceDto {
             room: d.room,
             q_bit: d.inner.q_bit,
             type_,
+            log_anomalies: d.inner.log_anomalies,
         }
     }
 }
@@ -71,6 +73,7 @@ pub struct DeviceCreationUpdateDto {
     pub room_id: Option<i64>,
     pub collect_info: Option<bool>,
     pub q_bit: Option<bool>,
+    pub log_anomalies: Option<bool>,
 }
 
 impl DeviceCreationUpdateDto {
@@ -95,6 +98,7 @@ impl DeviceCreationUpdateDto {
             fa_icon: self.fa_icon.clone(),
             room_id: self.room_id,
             q_bit: self.q_bit.unwrap_or(false),
+            log_anomalies: self.log_anomalies.unwrap_or(true),
         })
     }
 
@@ -134,6 +138,9 @@ impl DeviceCreationUpdateDto {
         }
         if let Some(q_bit) = self.q_bit {
             device.q_bit = q_bit;
+        }
+        if let Some(log_anomalies) = self.log_anomalies {
+            device.log_anomalies = log_anomalies;
         }
     }
 }
