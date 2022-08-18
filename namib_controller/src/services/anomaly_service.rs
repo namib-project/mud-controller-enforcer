@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::models::Notification;
-use crate::services::notification_service;
+use crate::services::{firewall_configuration_service, notification_service};
 use crate::{
     db::DbConnection,
     error::Result,
@@ -29,6 +29,16 @@ pub async fn get_all_device_anomalies(pool: &DbConnection, id: i64) -> Result<Ve
     .await?;
 
     Ok(anomalies.into_iter().map(Anomaly::from).collect())
+}
+
+pub async fn change_anomaly_collection_status_for_device(pool: &DbConnection, status: bool, id: i64) -> Result<bool> {
+    let upd_count = sqlx::query!("UPDATE devices SET log_anomalies = $1 WHERE id = $2", status, id)
+        .execute(pool)
+        .await?;
+
+    firewall_configuration_service::update_config_version(pool).await?;
+
+    Ok(upd_count.rows_affected() == 1)
 }
 
 pub async fn find_by_id(id: i64, pool: &DbConnection) -> Result<Anomaly> {
