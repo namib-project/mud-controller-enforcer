@@ -109,7 +109,6 @@ impl FirewallService {
     pub async fn apply_current_config(&self) -> Result<()> {
         debug!("Configuration has changed, applying new rules to nftables");
         let config = &self.enforcer_state.read().await.config;
-        debug!("{:?}", config);
         self.dns_watcher.clear_watched_names().await;
         apply_firewall_config_inner(config, &self.dns_watcher).await
     }
