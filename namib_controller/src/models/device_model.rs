@@ -1,4 +1,4 @@
-// Copyright 2020-2021, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach
+// Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use std::{
@@ -36,6 +36,7 @@ pub struct DeviceDbo {
     pub room_id: Option<i64>,
     pub fa_icon: Option<String>,
     pub q_bit: bool,
+    pub log_anomalies: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -54,6 +55,7 @@ pub struct Device {
     pub room_id: Option<i64>,
     pub fa_icon: Option<String>,
     pub q_bit: bool,
+    pub log_anomalies: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -151,6 +153,7 @@ impl From<DeviceDbo> for Device {
             room_id: device.room_id,
             fa_icon: device.fa_icon,
             q_bit: device.q_bit,
+            log_anomalies: device.log_anomalies,
         }
     }
 }
@@ -184,6 +187,7 @@ impl Device {
             room_id: None,
             fa_icon: Some(String::from("fas fa-house-signal")),
             q_bit: false,
+            log_anomalies: true,
         }
     }
 

@@ -51,6 +51,7 @@ async fn test_get_flow_scopes() -> Result<()> {
         room_id: None,
         fa_icon: None,
         q_bit: false,
+        log_anomalies: true,
     };
 
     insert_device_without_scopes(&device, &ctx.db_conn).await?;
@@ -227,6 +228,7 @@ async fn test_flow_scope_ttl_validation() -> Result<()> {
         room_id: None,
         fa_icon: None,
         q_bit: false,
+        log_anomalies: true,
     };
 
     insert_device_without_scopes(&device, &ctx.db_conn).await?;

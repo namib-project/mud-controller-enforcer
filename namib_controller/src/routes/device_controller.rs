@@ -32,6 +32,11 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.route("/{id}", web::delete().to(delete_device));
     cfg.route("/{id}/guesses", web::get().to(guess_thing));
     cfg.route("/{id}/anomalies", web::get().to(get_anomalies_of_device));
+    cfg.route("/{id}/anomalies", web::put().to(start_collecting_anomalies_for_device));
+    cfg.route(
+        "/{id}/anomalies",
+        web::delete().to(stop_collecting_anomalies_for_device),
+    );
     cfg.route("/{id}/connections", web::get().to(get_connections_of_device));
 }
 
@@ -168,7 +173,7 @@ async fn guess_thing(
     Ok(Json(guesses))
 }
 
-#[api_v2_operation(summary = "List all anomalies of a device by id", tags(Devices))]
+#[api_v2_operation(summary = "List all anomalies of a device by id", tags(Devices, Anomalies))]
 async fn get_anomalies_of_device(
     pool: web::Data<DbConnection>,
     auth: AuthToken,
@@ -191,6 +196,56 @@ async fn get_anomalies_of_device(
                 .map(AnomalyDto::from)
                 .collect(),
         ))
+    }
+}
+
+#[api_v2_operation(summary = "Collect anomalies for device", tags(Device, Anomalies))]
+async fn start_collecting_anomalies_for_device(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<HttpResponse> {
+    auth.require_permission(Permission::device__write)?;
+
+    if device_service::find_by_id(*id, &pool).await.is_err() {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Device with Id {} can not be found.", id.into_inner())),
+        }
+        .fail()
+    } else if anomaly_service::change_anomaly_collection_status_for_device(&pool, true, *id).await? {
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Device with Id {} can not be found.", id.into_inner())),
+        }
+        .fail()
+    }
+}
+
+#[api_v2_operation(summary = "Collect anomalies for device", tags(Device, Anomalies))]
+async fn stop_collecting_anomalies_for_device(
+    pool: web::Data<DbConnection>,
+    auth: AuthToken,
+    id: web::Path<i64>,
+) -> Result<HttpResponse> {
+    auth.require_permission(Permission::device__write)?;
+
+    if device_service::find_by_id(*id, &pool).await.is_err() {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Device with Id {} can not be found.", id.into_inner())),
+        }
+        .fail()
+    } else if anomaly_service::change_anomaly_collection_status_for_device(&pool, false, *id).await? {
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        error::ResponseError {
+            status: StatusCode::NOT_FOUND,
+            message: Some(format!("Device with Id {} can not be found.", id.into_inner())),
+        }
+        .fail()
     }
 }
 
