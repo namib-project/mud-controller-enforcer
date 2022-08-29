@@ -22,8 +22,7 @@ We plan on adding these in the near future.
 ```bash
 sudo apt-get update && sudo apt-get install -y \
       git-secret cmake clang \
-      libavahi-compat-libdnssd-dev \
-      libnftnl-dev libmnl-dev libssl-dev \
+      libavahi-compat-libdnssd-dev libssl-dev \
       nftables jq sqlite3 unzip \
 && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh \
 && rustup component add clippy rustfmt rust-src

@@ -1,4 +1,4 @@
-namib_enforcer contains code from althea-packages, libnftnl, libmnl and libuci, under the following licenses:
+namib_enforcer contains code from althea-packages, and libuci, under the following licenses:
 
 althea-packages:
   ---------------

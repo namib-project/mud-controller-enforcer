@@ -76,7 +76,7 @@ enf:openwrt-package_bcm2711_22.03: # raspberry v4
   script:
     - cd /home/build/openwrt
     - ./scripts/feeds update base packages
-    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl libnftnl libmnl nftables dnsmasq-full libnetfilter-log
+    - ./scripts/feeds install libavahi-compat-libdnssd libuci openssl nftables dnsmasq-full libnetfilter-log
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/config.diff" .config
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package/dnsmasq_patches_${CI_OPENWRT_RELEASE}/"* package/feeds/base/dnsmasq/patches/
     - mv "${CI_PROJECT_DIR}/namib_enforcer/openwrt/package" ./package/namib
