@@ -655,12 +655,15 @@ async fn add_rule_to_batch(
                 }))),
             }
 
-            let current_rule = schema::Rule::new(
-                family_for_scope(scope),
-                table.to_string(),
-                device_chain.to_string(),
+            let current_rule = schema::Rule {
+                family: family_for_scope(scope),
+                table: table.to_string(),
+                chain: device_chain.to_string(),
                 expr,
-            );
+                handle: None,
+                index: None,
+                comment: Some(rule_spec.rule_name.clone()),
+            };
             rules.push(current_rule);
         }
     }
