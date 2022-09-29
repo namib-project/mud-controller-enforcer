@@ -474,52 +474,10 @@ async fn convert_config_to_nft_commands(
                 .for_each(|rule| device_batch.add(schema::NfListObject::Rule(rule.clone())));
         }
 
-        // Add log rules for denials to device chain.
-        for ip_addr in [device.ipv4_addr.map(IpAddr::V4), device.ipv6_addr.map(IpAddr::V6)]
-            .iter()
-            .flatten()
-        {
-            add_log_rules(&table, &chain, scope, *ip_addr)
-                .into_iter()
-                .flatten()
-                .for_each(|rule| device_batch.add(schema::NfListObject::Rule(rule)));
-        }
-
         device_batches.push(device_batch);
     }
 
     Ok(())
-}
-
-/// Adds a rule to log packets to a specified log groups
-#[cfg(feature = "nftables")]
-fn add_log_rules(
-    table: &str,
-    device_chain: &str,
-    scope: &FirewallRuleScope,
-    device_addr: IpAddr,
-) -> Option<Vec<schema::Rule>> {
-    use namib_shared::flow_scope::LogGroup;
-    if !(scope == &FirewallRuleScope::Inet || scope == &FirewallRuleScope::Bridge) {
-        return None;
-    }
-    let mut rules: Vec<schema::Rule> = Vec::new();
-    for (direction, group) in [
-        (&AddressMatchOn::Src, LogGroup::DenialsFromDevice),
-        (&AddressMatchOn::Dest, LogGroup::DenialsToDevice),
-    ] {
-        let expr = vec![
-            nf_match_addresses(&device_addr, direction),
-            stmt::Statement::Log(Some(stmt::Log::new(Some(group as u32)))),
-        ];
-        rules.push(schema::Rule::new(
-            family_for_scope(scope),
-            table.to_string(),
-            device_chain.to_string(),
-            expr,
-        ));
-    }
-    Some(rules)
 }
 
 // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
