@@ -410,12 +410,12 @@ impl NftablesMatcher {
     /// `field` is either `sport` or `dport`.
     /// The port range is defined by start `port1` and end `port2`.
     fn match_portrange(proto: &str, field: &str, port1: u16, port2: u16) -> stmt::Statement {
-        let range_expr = expr::Expression::Named(expr::NamedExpression::Range(expr::Range {
+        let range_expr = expr::Expression::Range(expr::Range {
             range: vec![
                 expr::Expression::Number(u32::from(port1)),
                 expr::Expression::Number(u32::from(port2)),
             ],
-        }));
+        });
         NftablesMatcher::match_payload(proto, field, range_expr)
     }
 
@@ -576,11 +576,9 @@ impl NftablesMatcher {
         expr
     }
 
-    /// Adds netfilter instructions to a rule to match on the given IPv4/IPv6 address as source or destination address
+    /// Generates nftables statement to match on the given IPv4/IPv6 address as source or destination address
     #[cfg(feature = "nftables")]
     fn match_addresses(device_addr: &IpAddr, match_on: &AddressMatchOn) -> stmt::Statement {
-        // Match rule if source or target address is configured device.
-
         let protocol = match device_addr {
             IpAddr::V4(_) => "ip".to_string(),
             IpAddr::V6(_) => "ip6".to_string(),
@@ -594,6 +592,65 @@ impl NftablesMatcher {
             right: expr::Expression::String(device_addr.to_string()),
             op: stmt::Operator::EQ,
         })
+    }
+
+    /// Generates nftables statement to match on the given IPv4/IPv6 networks as source or destination address.
+    /// `reference_ip` is used to identify the protocol (IPv4 or IPv6).
+    #[cfg(feature = "nftables")]
+    fn match_networks(
+        networks: &[IpNetwork],
+        match_on: &AddressMatchOn,
+        reference_ip: &IpAddr,
+    ) -> Option<stmt::Statement> {
+        let protocol = match reference_ip {
+            IpAddr::V4(_) => "ip".to_string(),
+            IpAddr::V6(_) => "ip6".to_string(),
+        };
+        let field = match match_on {
+            AddressMatchOn::Src => "saddr".to_string(),
+            AddressMatchOn::Dest => "daddr".to_string(),
+        };
+
+        let mut set_elem: Vec<expr::Expression> = Vec::new();
+        for network in networks {
+            match (network, reference_ip) {
+                (IpNetwork::V4(v4network), IpAddr::V4(_)) => {
+                    let elem = match v4network.size() {
+                        // network size of 1 is an edge case, it is a single address
+                        1 => expr::Expression::String(v4network.network().to_string()),
+                        // IPv4 network match is an nftables `range` from first (network) address to last (broadcast) address
+                        _ => expr::Expression::Range(expr::Range {
+                            range: vec![
+                                expr::Expression::String(v4network.network().to_string()),
+                                expr::Expression::String(v4network.broadcast().to_string()),
+                            ],
+                        }),
+                    };
+                    set_elem.push(elem);
+                },
+                (IpNetwork::V6(v6network), IpAddr::V6(_)) => {
+                    // IPv6 network match is an nftables 'prefix' object with address and prefix length
+                    let addr = Box::new(expr::Expression::String(v6network.ip().to_string()));
+                    let prefix: expr::Prefix = expr::Prefix {
+                        addr,
+                        len: v6network.prefix().into(),
+                    };
+                    set_elem.push(expr::Expression::Named(expr::NamedExpression::Prefix(prefix)));
+                },
+                (_, _) => continue, // skip networks that do not match protocol (IPv4/IPv6) of reference ip
+            }
+        }
+
+        if set_elem.is_empty() {
+            None
+        } else {
+            let network_set = expr::Expression::Named(expr::NamedExpression::Set(set_elem));
+            Some(stmt::Statement::Match(nft::stmt::Match {
+                left: expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload { protocol, field })),
+                right: network_set,
+                op: nft::stmt::Operator::EQ,
+            }))
+        }
     }
 }
 
@@ -816,14 +873,22 @@ async fn add_rule_to_batch(
     // ~~Also, nftnl-rs does not support anonymous sets yet.~~ (nft-rs can do this)
     for source_ip in &source_ips {
         for dest_ip in &dest_ips {
-            // Do not create rules which mix IPv4 and IPv6 addresses. Also, save at least one specified IP to match for protocol later on.
-            if let &RuleAddrEntry::AddrEntry(saddr) = source_ip {
-                if let RuleAddrEntry::AddrEntry(daddr) = dest_ip {
+            // Do not create rules which mix IPv4 and IPv6 addresses.
+            // Also extract protocol reference ip.
+            let protocol_reference_ip = match (source_ip, dest_ip) {
+                (RuleAddrEntry::AddrEntry(saddr), RuleAddrEntry::AddrEntry(daddr)) => {
                     if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
                         continue;
                     }
-                }
-            }
+                    saddr
+                },
+                (RuleAddrEntry::AddrEntry(saddr), RuleAddrEntry::AnyAddr) => saddr,
+                (RuleAddrEntry::AnyAddr, RuleAddrEntry::AddrEntry(daddr)) => daddr,
+                (RuleAddrEntry::AnyAddr, RuleAddrEntry::AnyAddr) => {
+                    error!("src==AnyAddr and dest==AnyAddr is not a valid rule, ignoring");
+                    continue;
+                },
+            };
 
             // skip rule if it doesn't match the current scope
             if !scope.rule_address_pair_in_scope(source_ip, dest_ip) {
@@ -846,6 +911,19 @@ async fn add_rule_to_batch(
                     expr.push(NftablesMatcher::match_addresses(device_addr, &AddressMatchOn::Dest));
                 },
                 RuleAddrEntry::AnyAddr => {},
+            }
+
+            // Add network constraint matches
+            if let Some(ScopeConstraint::IpNetworks(networks)) = &rule_spec.network_constraint {
+                let match_on = match (&rule_spec.src, &rule_spec.dst) {
+                    (Some(RuleTargetHost::FirewallDevice), _) => &AddressMatchOn::Dest,
+                    (_, Some(RuleTargetHost::FirewallDevice)) => &AddressMatchOn::Src,
+                    (_, _) => panic!("Rule with neither src nor dst as FirewallDevice."),
+                };
+                if let Some(networks_match) = NftablesMatcher::match_networks(networks, match_on, protocol_reference_ip)
+                {
+                    expr.push(networks_match);
+                };
             }
 
             // Add layer 3 protocol matches
