@@ -9,7 +9,10 @@ use std::{
 #[cfg(feature = "nftables")]
 use ipnetwork::IpNetwork;
 #[cfg(feature = "nftables")]
-use namib_shared::firewall_config::{FirewallDevice, FirewallRule, ScopeConstraint};
+use namib_shared::firewall_config::{
+    FirewallDevice, FirewallRule, IcmpMatches, L3MatchesExtra, PortOrRange, ScopeConstraint, TcpHeaderFlags,
+    TcpMatches, UdpMatches,
+};
 #[cfg(feature = "nftables")]
 use namib_shared::{
     firewall_config::{L4Matches, RuleTargetHost, Verdict},
@@ -247,14 +250,165 @@ fn create_table(scope: &FirewallRuleScope) -> schema::Table {
 }
 
 #[cfg(feature = "nftables")]
-/// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
-fn nf_match_l4payload(matches: &Option<L4Matches>) -> Vec<stmt::Statement> {
-    use namib_shared::firewall_config::PortOrRange;
-    use nft::expr::Expression;
+struct FlagSets {
+    set_pos: Vec<expr::Expression>,
+    set_neg: Vec<expr::Expression>,
+}
 
-    fn match_port(proto: &str, field: &str, port: u16) -> stmt::Statement {
-        match_payload(proto, field, expr::Expression::Number(u32::from(port)))
+#[cfg(feature = "nftables")]
+impl FlagSets {
+    fn add_flag(&mut self, flag: Option<bool>, flag_name: &str) {
+        match flag {
+            Some(true) => self.set_pos.push(expr::Expression::String(flag_name.to_string())),
+            Some(false) => self.set_neg.push(expr::Expression::String(flag_name.to_string())),
+            None => {},
+        }
     }
+
+    fn flags_to_sets(flags: &TcpHeaderFlags) -> FlagSets {
+        let mut fs = FlagSets {
+            set_pos: Vec::new(),
+            set_neg: Vec::new(),
+        };
+        fs.add_flag(flags.cwr, "cwr");
+        fs.add_flag(flags.ece, "ece");
+        fs.add_flag(flags.urg, "urg");
+        fs.add_flag(flags.ack, "ack");
+        fs.add_flag(flags.psh, "psh");
+        fs.add_flag(flags.rst, "rst");
+        fs.add_flag(flags.syn, "syn");
+        fs.add_flag(flags.fin, "fin");
+        fs
+    }
+
+    /// Generates nftables statements that match for TCP flags
+    pub fn flags_to_statements(flags: &namib_shared::firewall_config::TcpHeaderFlags) -> Vec<stmt::Statement> {
+        let fs = FlagSets::flags_to_sets(flags);
+        let mut stmts: Vec<stmt::Statement> = Vec::new();
+        let left = expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload {
+            protocol: "tcp".to_string(),
+            field: "flags".to_string(),
+        }));
+        if !fs.set_pos.is_empty() {
+            stmts.push(stmt::Statement::Match(stmt::Match {
+                left: left.clone(),
+                right: expr::Expression::Named(expr::NamedExpression::Set(fs.set_pos)),
+                op: stmt::Operator::EQ,
+            }));
+        }
+        if !fs.set_neg.is_empty() {
+            stmts.push(stmt::Statement::Match(stmt::Match {
+                left,
+                right: expr::Expression::Named(expr::NamedExpression::Set(fs.set_neg)),
+                op: stmt::Operator::NEQ,
+            }));
+        }
+        stmts
+    }
+}
+
+/// Indicates if `NftablesMatcher::nf_match_addresses()` should match on source or destination address.
+enum AddressMatchOn {
+    Src,
+    Dest,
+}
+
+#[cfg(feature = "nftables")]
+struct NftablesMatcher {}
+
+#[cfg(feature = "nftables")]
+impl NftablesMatcher {
+    /// Adds netfilter expressions to match layer 3 payload, e.g. TCP/UDP port numbers.
+    fn match_l3(matches: &Option<L3MatchesExtra>) -> Vec<stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match matches {
+            Some(L3MatchesExtra::Ipv4(ipv4_matches)) => {
+                const PROTO: &str = "ip";
+                if let Some(dscp) = ipv4_matches.dscp {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "dscp",
+                        expr::Expression::Number(dscp.into()),
+                    ));
+                }
+                // Ipv4MatchesExtra.ecn ==> no nftables equivalent
+                if let Some(length) = ipv4_matches.length {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "length",
+                        expr::Expression::Number(length.into()),
+                    ));
+                }
+                if let Some(ttl) = ipv4_matches.ttl {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "ttl",
+                        expr::Expression::Number(ttl.into()),
+                    ));
+                }
+                // Ipv4MatchesExtra.ihl ==> no nftables equivalent
+                // Ipv4MatchesExtra.flags ==> no nftables equivalent
+                if let Some(offset) = ipv4_matches.offset {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "frag-off",
+                        expr::Expression::Number(offset.into()),
+                    ));
+                }
+                if let Some(identification) = ipv4_matches.identification {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "id",
+                        expr::Expression::Number(identification.into()),
+                    ));
+                }
+            },
+            Some(L3MatchesExtra::Ipv6(ipv6_matches)) => {
+                const PROTO: &str = "ip6";
+                if let Some(dscp) = ipv6_matches.dscp {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "dscp",
+                        expr::Expression::Number(dscp.into()),
+                    ));
+                }
+                // Ipv6MatchesExtra.ecn ==> no nftables equivalent
+                if let Some(length) = ipv6_matches.length {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "length",
+                        expr::Expression::Number(length.into()),
+                    ));
+                }
+                if let Some(ttl) = ipv6_matches.ttl {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "ttl",
+                        expr::Expression::Number(ttl.into()),
+                    ));
+                }
+                if let Some(flow_label) = ipv6_matches.flow_label {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "flowlabel",
+                        expr::Expression::Number(flow_label),
+                    ));
+                }
+            },
+            None => {},
+        }
+        expr
+    }
+
+    /// Generates nftables statements that match for a port (UDP/TCP).
+    /// `field` is either `sport` or `dport`.
+    fn match_port(proto: &str, field: &str, port: u16) -> stmt::Statement {
+        NftablesMatcher::match_payload(proto, field, expr::Expression::Number(u32::from(port)))
+    }
+
+    /// Generates nftables statements that match for port ranges (UDP/TCP).
+    /// `field` is either `sport` or `dport`.
+    /// The port range is defined by start `port1` and end `port2`.
     fn match_portrange(proto: &str, field: &str, port1: u16, port2: u16) -> stmt::Statement {
         let range_expr = expr::Expression::Named(expr::NamedExpression::Range(expr::Range {
             range: vec![
@@ -262,9 +416,11 @@ fn nf_match_l4payload(matches: &Option<L4Matches>) -> Vec<stmt::Statement> {
                 expr::Expression::Number(u32::from(port2)),
             ],
         }));
-        match_payload(proto, field, range_expr)
+        NftablesMatcher::match_payload(proto, field, range_expr)
     }
-    fn match_payload(proto: &str, field: &str, expr: Expression) -> stmt::Statement {
+
+    /// Generates nftables statements that match for payloads (i.e., protocol `proto` field `field` is set to value `expr`).
+    fn match_payload(proto: &str, field: &str, expr: expr::Expression) -> stmt::Statement {
         let payload_expr = expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload {
             protocol: proto.to_string(),
             field: field.to_string(),
@@ -276,69 +432,169 @@ fn nf_match_l4payload(matches: &Option<L4Matches>) -> Vec<stmt::Statement> {
         })
     }
 
-    let mut expr: Vec<stmt::Statement> = Vec::new();
-    match matches {
-        Some(L4Matches::Tcp(tcp_matchable_data)) => {
-            match tcp_matchable_data.dst_port {
-                Some(PortOrRange::Single(port)) => expr.push(match_port("tcp", "dport", port)),
-                Some(PortOrRange::Range(port1, port2)) => expr.push(match_portrange("tcp", "dport", port1, port2)),
-                None => {},
-            }
-            match tcp_matchable_data.src_port {
-                Some(PortOrRange::Single(port)) => expr.push(match_port("tcp", "sport", port)),
-                Some(PortOrRange::Range(port1, port2)) => expr.push(match_portrange("tcp", "sport", port1, port2)),
-                None => {},
-            }
-        },
-        Some(L4Matches::Udp(udp_matchable_data)) => {
-            match udp_matchable_data.dst_port {
-                Some(PortOrRange::Single(port)) => expr.push(match_port("udp", "dport", port)),
-                Some(PortOrRange::Range(port1, port2)) => expr.push(match_portrange("udp", "dport", port1, port2)),
-                None => {},
-            }
-            match udp_matchable_data.src_port {
-                Some(PortOrRange::Single(port)) => expr.push(match_port("udp", "sport", port)),
-                Some(PortOrRange::Range(port1, port2)) => expr.push(match_portrange("udp", "sport", port1, port2)),
-                None => {},
-            }
-        },
-        Some(L4Matches::Icmp(icmp_spec)) => {
-            if let Some(icode) = icmp_spec.icmp_code {
-                expr.push(match_payload("icmp", "code", Expression::Number(u32::from(icode))));
-            }
-            if let Some(itype) = icmp_spec.icmp_type {
-                expr.push(match_payload("icmp", "type", Expression::Number(u32::from(itype))));
-            }
-        },
-        None => {},
+    /// Generates nftables statements that match for TCP data.
+    fn match_tcp_data(tcp_matchable_data: &TcpMatches) -> Vec<stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match tcp_matchable_data.dst_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("tcp", "dport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("tcp", "dport", port1, port2));
+            },
+            None => {},
+        }
+        match tcp_matchable_data.src_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("tcp", "sport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("tcp", "sport", port1, port2));
+            },
+            None => {},
+        }
+        if let Some(sequence_number) = tcp_matchable_data.sequence_number {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "sequence",
+                expr::Expression::Number(sequence_number),
+            ));
+        }
+        if let Some(acknowledgement_number) = tcp_matchable_data.acknowledgement_number {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "ackseq",
+                expr::Expression::Number(acknowledgement_number),
+            ));
+        }
+        if let Some(data_offset) = tcp_matchable_data.data_offset {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "doff",
+                expr::Expression::Number(data_offset.into()),
+            ));
+        }
+        // tcp_matchable_data.reserved ==> 'Reserved for future use.' (RFC8519)
+        if let Some(flags) = &tcp_matchable_data.flags {
+            expr.extend(FlagSets::flags_to_statements(flags));
+        }
+        if let Some(window_size) = tcp_matchable_data.window_size {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "window",
+                expr::Expression::Number(window_size.into()),
+            ));
+        }
+        if let Some(urgent_pointer) = tcp_matchable_data.urgent_pointer {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "urgptr",
+                expr::Expression::Number(urgent_pointer.into()),
+            ));
+        }
+        // tcp_matchable_data.options ==> does not translate to nftables
+        if let Some(direction_initiated) = &tcp_matchable_data.direction_initiated {
+            expr.push(stmt::Statement::Match(stmt::Match {
+                left: expr::Expression::Named(expr::NamedExpression::CT(expr::CT {
+                    key: "direction".to_string(),
+                    family: None,
+                    dir: None,
+                })),
+                right: expr::Expression::String(
+                    match direction_initiated {
+                        // TODO: depends on `saddr` and `daddr`
+                        namib_shared::firewall_config::Direction::ToDevice => "original",
+                        namib_shared::firewall_config::Direction::FromDevice => "reply",
+                    }
+                    .to_string(),
+                ),
+                op: stmt::Operator::EQ,
+            }));
+        }
+        expr
     }
-    expr
-}
 
-/// Indicates if `nf_match_addresses()` should match on source or destination address.
-enum AddressMatchOn {
-    Src,
-    Dest,
-}
+    /// Generates nftables statements that match for UDP data.
+    fn match_udp_data(udp_matchable_data: &UdpMatches) -> Vec<nft::stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match udp_matchable_data.dst_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("udp", "dport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("udp", "dport", port1, port2));
+            },
+            None => {},
+        }
+        match udp_matchable_data.src_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("udp", "sport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("udp", "sport", port1, port2));
+            },
+            None => {},
+        }
+        if let Some(length) = udp_matchable_data.length {
+            expr.push(NftablesMatcher::match_payload(
+                "udp",
+                "length",
+                expr::Expression::Number(length.into()),
+            ));
+        }
+        expr
+    }
 
-/// Adds netfilter instructions to a rule to match on the given IPv4/IPv6 address as source or destination address
-#[cfg(feature = "nftables")]
-fn nf_match_addresses(device_addr: &IpAddr, match_on: &AddressMatchOn) -> stmt::Statement {
-    // Match rule if source or target address is configured device.
+    /// Generates nftables statements that match for ICMP data.
+    fn match_icmp_data(icmp_spec: &IcmpMatches) -> Vec<nft::stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        if let Some(icode) = icmp_spec.icmp_code {
+            expr.push(NftablesMatcher::match_payload(
+                "icmp",
+                "code",
+                expr::Expression::Number(u32::from(icode)),
+            ));
+        }
+        if let Some(itype) = icmp_spec.icmp_type {
+            expr.push(NftablesMatcher::match_payload(
+                "icmp",
+                "type",
+                expr::Expression::Number(u32::from(itype)),
+            ));
+        }
+        // IcmpMatches::rest_of_header ==> no nftables equivalent
+        expr
+    }
 
-    let protocol = match device_addr {
-        IpAddr::V4(_) => "ip".to_string(),
-        IpAddr::V6(_) => "ip6".to_string(),
-    };
-    let field = match match_on {
-        AddressMatchOn::Src => "saddr".to_string(),
-        AddressMatchOn::Dest => "daddr".to_string(),
-    };
-    stmt::Statement::Match(stmt::Match {
-        left: expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload { protocol, field })),
-        right: expr::Expression::String(device_addr.to_string()),
-        op: stmt::Operator::EQ,
-    })
+    /// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
+    fn match_l4(matches: &Option<L4Matches>) -> Vec<stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match matches {
+            Some(L4Matches::Tcp(tcp_matchable_data)) => {
+                expr.extend(NftablesMatcher::match_tcp_data(tcp_matchable_data));
+            },
+            Some(L4Matches::Udp(udp_matchable_data)) => {
+                expr.extend(NftablesMatcher::match_udp_data(udp_matchable_data));
+            },
+            Some(L4Matches::Icmp(icmp_spec)) => {
+                expr.extend(NftablesMatcher::match_icmp_data(icmp_spec));
+            },
+            None => {},
+        }
+        expr
+    }
+
+    /// Adds netfilter instructions to a rule to match on the given IPv4/IPv6 address as source or destination address
+    #[cfg(feature = "nftables")]
+    fn match_addresses(device_addr: &IpAddr, match_on: &AddressMatchOn) -> stmt::Statement {
+        // Match rule if source or target address is configured device.
+
+        let protocol = match device_addr {
+            IpAddr::V4(_) => "ip".to_string(),
+            IpAddr::V6(_) => "ip6".to_string(),
+        };
+        let field = match match_on {
+            AddressMatchOn::Src => "saddr".to_string(),
+            AddressMatchOn::Dest => "daddr".to_string(),
+        };
+        stmt::Statement::Match(stmt::Match {
+            left: expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload { protocol, field })),
+            right: expr::Expression::String(device_addr.to_string()),
+            op: stmt::Operator::EQ,
+        })
+    }
 }
 
 #[cfg(feature = "nftables")]
@@ -352,7 +608,7 @@ fn add_device_jump_rule(
     let mut jump_rules: Vec<schema::Rule> = Vec::new();
     for match_on in [&AddressMatchOn::Src, &AddressMatchOn::Dest] {
         let rule_expr: Vec<stmt::Statement> = vec![
-            nf_match_addresses(device_addr, match_on),
+            NftablesMatcher::match_addresses(device_addr, match_on),
             stmt::Statement::Jump(stmt::JumpTarget {
                 target: target_chain.to_string(),
             }),
@@ -368,7 +624,6 @@ fn add_device_jump_rule(
 }
 
 /// Converts the given firewall config into nft expressions and applies them to the supplied batch.
-#[allow(clippy::unused_async)] // TODO remove
 #[cfg(feature = "nftables")]
 async fn convert_config_to_nft_commands(
     batch: &mut Batch,
@@ -577,23 +832,27 @@ async fn add_rule_to_batch(
 
             // Create rule for current address combination.
             let mut expr: Vec<stmt::Statement> = Vec::new();
-            // Add layer 4 protocol matches
-            expr = [expr, nf_match_l4payload(&rule_spec.l4_matches)].concat();
 
             // Create expressions to match source IP.
             match source_ip {
                 RuleAddrEntry::AddrEntry(device_addr) => {
-                    expr.push(nf_match_addresses(device_addr, &AddressMatchOn::Src));
+                    expr.push(NftablesMatcher::match_addresses(device_addr, &AddressMatchOn::Src));
                 },
                 RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match destination IP.
             match dest_ip {
                 RuleAddrEntry::AddrEntry(device_addr) => {
-                    expr.push(nf_match_addresses(device_addr, &AddressMatchOn::Dest));
+                    expr.push(NftablesMatcher::match_addresses(device_addr, &AddressMatchOn::Dest));
                 },
                 RuleAddrEntry::AnyAddr => {},
             }
+
+            // Add layer 3 protocol matches
+            expr.extend(NftablesMatcher::match_l3(&rule_spec.l3_matches));
+
+            // Add layer 4 protocol matches
+            expr.extend(NftablesMatcher::match_l4(&rule_spec.l4_matches));
 
             // Set verdict if current rule matches.
             match rule_spec.verdict {
