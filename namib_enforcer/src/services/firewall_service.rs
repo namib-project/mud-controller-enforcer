@@ -10,7 +10,7 @@ use std::{
 use ipnetwork::IpNetwork;
 #[cfg(feature = "nftables")]
 use namib_shared::firewall_config::{
-    FirewallDevice, FirewallRule, IcmpMatches, L3MatchesExtra, PortOrRange, ScopeConstraint, TcpHeaderFlags,
+    Direction, FirewallDevice, FirewallRule, IcmpMatches, L3MatchesExtra, PortOrRange, ScopeConstraint, TcpHeaderFlags,
     TcpMatches, UdpMatches,
 };
 #[cfg(feature = "nftables")]
@@ -433,7 +433,7 @@ impl NftablesMatcher {
     }
 
     /// Generates nftables statements that match for TCP data.
-    fn match_tcp_data(tcp_matchable_data: &TcpMatches) -> Vec<stmt::Statement> {
+    fn match_tcp_data(tcp_matchable_data: &TcpMatches, device_is_src: bool) -> Vec<stmt::Statement> {
         let mut expr: Vec<stmt::Statement> = Vec::new();
         match tcp_matchable_data.dst_port {
             Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("tcp", "dport", port)),
@@ -497,10 +497,9 @@ impl NftablesMatcher {
                     dir: None,
                 })),
                 right: expr::Expression::String(
-                    match direction_initiated {
-                        // TODO: depends on `saddr` and `daddr`
-                        namib_shared::firewall_config::Direction::ToDevice => "original",
-                        namib_shared::firewall_config::Direction::FromDevice => "reply",
+                    match (direction_initiated, device_is_src) {
+                        (Direction::FromDevice, true) | (Direction::ToDevice, false) => "original",
+                        (Direction::FromDevice, false) | (Direction::ToDevice, true) => "reply",
                     }
                     .to_string(),
                 ),
@@ -559,11 +558,11 @@ impl NftablesMatcher {
     }
 
     /// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
-    fn match_l4(matches: &Option<L4Matches>) -> Vec<stmt::Statement> {
+    fn match_l4(matches: &Option<L4Matches>, device_is_src: bool) -> Vec<stmt::Statement> {
         let mut expr: Vec<stmt::Statement> = Vec::new();
         match matches {
             Some(L4Matches::Tcp(tcp_matchable_data)) => {
-                expr.extend(NftablesMatcher::match_tcp_data(tcp_matchable_data));
+                expr.extend(NftablesMatcher::match_tcp_data(tcp_matchable_data, device_is_src));
             },
             Some(L4Matches::Udp(udp_matchable_data)) => {
                 expr.extend(NftablesMatcher::match_udp_data(udp_matchable_data));
@@ -833,6 +832,9 @@ async fn add_rule_to_batch(
 ) -> Option<Vec<schema::Rule>> {
     use futures::join;
 
+    // check if managed device is the source, otherwise it must the the destination.
+    let device_is_src = rule_spec.src == Some(RuleTargetHost::FirewallDevice);
+
     // if the rule is constrained to local scope, only add it to the bridge chain.
     if rule_spec.network_constraint == Some(ScopeConstraint::JustLocal) && *scope != FirewallRuleScope::Bridge {
         return None;
@@ -930,7 +932,7 @@ async fn add_rule_to_batch(
             expr.extend(NftablesMatcher::match_l3(&rule_spec.l3_matches));
 
             // Add layer 4 protocol matches
-            expr.extend(NftablesMatcher::match_l4(&rule_spec.l4_matches));
+            expr.extend(NftablesMatcher::match_l4(&rule_spec.l4_matches, device_is_src));
 
             // Set verdict if current rule matches.
             match rule_spec.verdict {
