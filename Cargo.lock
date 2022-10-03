@@ -2342,7 +2342,7 @@ dependencies = [
  "log",
  "namib_shared",
  "nflog",
- "nft",
+ "nftables",
  "notify",
  "pin-project 1.0.12",
  "pktparse",
@@ -2446,9 +2446,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "nft"
-version = "0.1.0"
-source = "git+https://github.com/namib-project/nft-rs#dec4af9132d70d88da57d5f51d1a92657eff5802"
+name = "nftables"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea1c0b8a36c3abb33d66c1f6d1d6b738b7d881ba9ddd0dbb48ec7ec46fa85cb0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3618,9 +3619,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
+checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "snafu"
