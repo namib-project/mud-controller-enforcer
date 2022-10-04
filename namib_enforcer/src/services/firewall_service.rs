@@ -595,6 +595,7 @@ impl NftablesMatcher {
 
     /// Generates nftables statement to match on the given IPv4/IPv6 networks as source or destination address.
     /// `reference_ip` is used to identify the protocol (IPv4 or IPv6).
+    /// Returns `None` if there are no networks of the same protocol in `networks`.
     #[cfg(feature = "nftables")]
     fn match_networks(
         networks: &[IpNetwork],
@@ -650,6 +651,19 @@ impl NftablesMatcher {
                 op: nft::stmt::Operator::EQ,
             }))
         }
+    }
+
+    /// Generates nftables statement that matches for local output interface.
+    /// The current implementation forbids `*wan` as output interface names.
+    fn match_local_output_interface() -> stmt::Statement {
+        let oifnames = vec![expr::Expression::String("*wan".to_string())];
+        stmt::Statement::Match(stmt::Match {
+            left: expr::Expression::Named(expr::NamedExpression::Meta(expr::Meta {
+                key: expr::MetaKey::Oifname,
+            })),
+            right: expr::Expression::Named(expr::NamedExpression::Set(oifnames)),
+            op: stmt::Operator::NEQ,
+        })
     }
 }
 
@@ -835,31 +849,6 @@ async fn add_rule_to_batch(
     // check if managed device is the source, otherwise it must the the destination.
     let device_is_src = rule_spec.src == Some(RuleTargetHost::FirewallDevice);
 
-    // if the rule is constrained to local scope, only add it to the bridge chain.
-    if rule_spec.network_constraint == Some(ScopeConstraint::JustLocal) && *scope != FirewallRuleScope::Bridge {
-        return None;
-    }
-    // TODO(ja_he):
-    //   Consider `ScopeConstraint::IpNetworks`, which lists a number of networks to which (as a
-    //   union) the match should be constrained.
-    //   We could check whether any IP addresses we use for rules are within one of those networks
-    //   and filter this way.
-    //   I would think, the appropriate implementation would be roughly:
-    //
-    //      IF have a target IP
-    //      {
-    //          only generate the rule if it falls within one of the listed networks
-    //          (e.g. for a v4 address we can skip checking any v6 networks and for the v4 networks
-    //           we use the type implementation contains or something)
-    //      }
-    //      ELSE (IF don't have a target IP (i.E. it's a rule that matches ports or sth))
-    //      {
-    //          FOR each network listed
-    //          {
-    //              generate a rule matching the network
-    //          }
-    //      }
-
     let mut rules: Vec<schema::Rule> = Vec::new();
 
     // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
@@ -878,11 +867,11 @@ async fn add_rule_to_batch(
             // Do not create rules which mix IPv4 and IPv6 addresses.
             // Also extract protocol reference ip.
             let protocol_reference_ip = match (source_ip, dest_ip) {
-                (RuleAddrEntry::AddrEntry(saddr), RuleAddrEntry::AddrEntry(daddr)) => {
-                    if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
+                (RuleAddrEntry::AddrEntry(src_addr), RuleAddrEntry::AddrEntry(dest_addr)) => {
+                    if (src_addr.is_ipv4() && dest_addr.is_ipv6()) || (dest_addr.is_ipv4() && src_addr.is_ipv6()) {
                         continue;
                     }
-                    saddr
+                    src_addr
                 },
                 (RuleAddrEntry::AddrEntry(saddr), RuleAddrEntry::AnyAddr) => saddr,
                 (RuleAddrEntry::AnyAddr, RuleAddrEntry::AddrEntry(daddr)) => daddr,
@@ -916,16 +905,21 @@ async fn add_rule_to_batch(
             }
 
             // Add network constraint matches
-            if let Some(ScopeConstraint::IpNetworks(networks)) = &rule_spec.network_constraint {
-                let match_on = match (&rule_spec.src, &rule_spec.dst) {
-                    (Some(RuleTargetHost::FirewallDevice), _) => &AddressMatchOn::Dest,
-                    (_, Some(RuleTargetHost::FirewallDevice)) => &AddressMatchOn::Src,
-                    (_, _) => panic!("Rule with neither src nor dst as FirewallDevice."),
-                };
-                if let Some(networks_match) = NftablesMatcher::match_networks(networks, match_on, protocol_reference_ip)
-                {
-                    expr.push(networks_match);
-                };
+            match &rule_spec.network_constraint {
+                Some(ScopeConstraint::IpNetworks(networks)) => {
+                    let match_on = match (&rule_spec.src, &rule_spec.dst) {
+                        (Some(RuleTargetHost::FirewallDevice), _) => &AddressMatchOn::Dest,
+                        (_, Some(RuleTargetHost::FirewallDevice)) => &AddressMatchOn::Src,
+                        (_, _) => panic!("Rule with neither src nor dst as FirewallDevice."),
+                    };
+                    if let Some(networks_match) =
+                        NftablesMatcher::match_networks(networks, match_on, protocol_reference_ip)
+                    {
+                        expr.push(networks_match);
+                    };
+                },
+                Some(ScopeConstraint::JustLocal) => expr.push(NftablesMatcher::match_local_output_interface()),
+                None => {},
             }
 
             // Add layer 3 protocol matches
