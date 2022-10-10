@@ -38,7 +38,7 @@ const BASE_CHAIN_NAME_BRIDGE: &str = "base_chain";
 /// Service which provides firewall configuration functionality by integrating into the linux system
 /// firewall (nftables).
 /// For more information on the way the linux firewall works, see [the nftables wiki](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page).
-/// To construct nftables expressions, the [nft-rs](https://github.com/namib-project/nft-rs) library is used.
+/// To construct nftables expressions, the [nftables-rs](https://github.com/namib-project/nftables-rs) library is used.
 pub struct FirewallService {
     dns_watcher: Arc<DnsWatcher>,
     enforcer_state: Arc<RwLock<Enforcer>>,
@@ -861,7 +861,7 @@ async fn add_rule_to_batch(
     // Create a rule for each source/destination ip combination.
     // Ideally, we would instead used nftabels sets, but these currently have the limitation that they
     // can only either contain IPv4 or IPv6 addresses, not both.
-    // ~~Also, nftnl-rs does not support anonymous sets yet.~~ (nft-rs can do this)
+    // ~~Also, nftnl-rs does not support anonymous sets yet.~~ (nftables-rs can do this)
     for source_ip in &source_ips {
         for dest_ip in &dest_ips {
             // Do not create rules which mix IPv4 and IPv6 addresses.
