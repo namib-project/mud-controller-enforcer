@@ -21,13 +21,27 @@ We plan on adding these in the near future.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y \
-      git-secret cmake clang \
-      libavahi-compat-libdnssd-dev \
-      libnftnl-dev libmnl-dev libssl-dev \
+      cmake clang \
+      libavahi-compat-libdnssd-dev libssl-dev \
       nftables jq sqlite3 unzip \
-&& curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh \
+&& curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+&& source $HOME/.cargo/env \
 && rustup component add clippy rustfmt rust-src
 ```
+
+## Build dependencies (CentOS/RHEL-like)
+
+```bash
+sudo sh -c "yum groupinstall -y 'Development Tools' \
+  && yum install -y \
+    cmake clang \
+    avahi-compat-libdns_sd-devel openssl-devel \
+    nftables jq sqlite unzip" \
+&& curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+&& source $HOME/.cargo/env \
+&& rustup component add clippy rustfmt rust-src
+```
+
 
 ## Run locally for development
 

@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 [features]
 default = ["uci", "nftables"]
 uci = ["rust-uci", "libc"]
-nftables = ["nftnl", "mnl", "libc"]
+nftables = ["libc"]
 dnsmasq_hook = []
 
 [dependencies]
@@ -37,6 +37,7 @@ pnet_datalink = "0.31.0"
 ipnetwork = "0.19.0"
 nflog = { git = "https://github.com/chifflier/nflog-rs" }
 pktparse = { branch = "feat-tcp-flags", git = "https://github.com/Ti-s-ch/pktparse-rs" }
+nft = { version = "0.2.0", package = "nftables" }
 
 [dev-dependencies]
 serial_test = "0.8.0"
@@ -44,9 +45,6 @@ serial_test = "0.8.0"
 [target.'cfg(unix)'.dependencies]
 rust-uci = { version = "0.1.5", optional = true }
 libc = { version = "0.2.95", optional = true }
-nftnl = { branch = "feature-icmp-musl-log-group", git = "https://github.com/namib-project/nftnl-rs.git", optional = true }
-mnl = { branch = "fix-musl-targets", git = "https://github.com/namib-project/mnl-rs.git", optional = true}
-
 
 [[bin]]
 name = "namib_enforcer"

@@ -1,8 +1,6 @@
 // Copyright 2020-2022, Benjamin Ludewig, Florian Bonetti, Jeffrey Munstermann, Luca Nittscher, Hugo Damer, Michael Bach, Jasper Wiegratz, Hannes Masuch
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-#[cfg(feature = "nftables")]
-use std::ffi::CString;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::Arc,
@@ -10,16 +8,15 @@ use std::{
 
 #[cfg(feature = "nftables")]
 use ipnetwork::IpNetwork;
-use namib_shared::firewall_config::{FirewallDevice, FirewallRule, ScopeConstraint};
+#[cfg(feature = "nftables")]
+use namib_shared::firewall_config::{
+    Direction, FirewallDevice, FirewallRule, IcmpMatches, L3MatchesExtra, PortOrRange, ScopeConstraint, TcpHeaderFlags,
+    TcpMatches, UdpMatches,
+};
 #[cfg(feature = "nftables")]
 use namib_shared::{
     firewall_config::{L4Matches, RuleTargetHost, Verdict},
     EnforcerConfig,
-};
-#[cfg(feature = "nftables")]
-use nftnl::{
-    expr::{IcmpCode, RejectionType, Verdict as VerdictExpr},
-    nft_expr, Batch, Chain, FinalizedBatch, ProtoFamily, Rule, Table,
 };
 #[cfg(feature = "nftables")]
 use pnet_datalink::interfaces;
@@ -28,13 +25,10 @@ use tokio::{
     sync::{Notify, RwLock},
 };
 
-use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
+#[cfg(feature = "nftables")]
+use nft::{batch::Batch, expr, schema, stmt, types};
 
-/// This file represent the service for firewall on openwrt.
-///
-/// Created on 11.11.2020.
-///
-/// @author Namib Group 3.
+use crate::{error::Result, services::dns::DnsWatcher, Enforcer};
 
 const TABLE_NAME: &str = "namib";
 const TABLE_NAME_BRIDGE: &str = "namib_local";
@@ -44,8 +38,7 @@ const BASE_CHAIN_NAME_BRIDGE: &str = "base_chain";
 /// Service which provides firewall configuration functionality by integrating into the linux system
 /// firewall (nftables).
 /// For more information on the way the linux firewall works, see [the nftables wiki](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page).
-/// To construct nftables expressions, the [nftnl-rs](https://github.com/mullvad/nftnl-rs) library is used.
-/// To send commands to the netlink interface, the [mnl-rs](https://github.com/mullvad/mnl-rs) library is used.
+/// To construct nftables expressions, the [nftables-rs](https://github.com/namib-project/nftables-rs) library is used.
 pub struct FirewallService {
     dns_watcher: Arc<DnsWatcher>,
     enforcer_state: Arc<RwLock<Enforcer>>,
@@ -109,7 +102,6 @@ impl FirewallService {
     pub async fn apply_current_config(&self) -> Result<()> {
         debug!("Configuration has changed, applying new rules to nftables");
         let config = &self.enforcer_state.read().await.config;
-        debug!("{:?}", config);
         self.dns_watcher.clear_watched_names().await;
         apply_firewall_config_inner(config, &self.dns_watcher).await
     }
@@ -121,11 +113,21 @@ enum FirewallRuleScope {
     Bridge,
 }
 
+#[cfg(feature = "nftables")]
+fn family_for_scope(scope: &FirewallRuleScope) -> types::NfFamily {
+    match scope {
+        FirewallRuleScope::Inet => types::NfFamily::INet,
+        FirewallRuleScope::Bridge => types::NfFamily::Bridge,
+    }
+}
+
 trait AddressPairInScope {
     fn address_pair_in_scope(&self, src_addr: &IpAddr, dest_addr: &IpAddr) -> bool;
     fn rule_address_pair_in_scope(&self, src_addr: &RuleAddrEntry, dest_addr: &RuleAddrEntry) -> bool;
 }
 
+#[cfg(feature = "nftables")]
+/// retrieve ip addresses configured on local interfaces
 fn get_local_ips() -> Vec<IpNetwork> {
     let mut ips: Vec<IpNetwork> = Vec::new();
     for interface in interfaces() {
@@ -134,6 +136,7 @@ fn get_local_ips() -> Vec<IpNetwork> {
     ips
 }
 
+#[cfg(feature = "nftables")]
 impl AddressPairInScope for FirewallRuleScope {
     /// In `Bridge` scope returns true iff source and destination addr are both contained in a local subnet, else false.
     /// In `Inet` scope returns true if source and destination are in non-local or different subnets, else false.
@@ -182,50 +185,6 @@ impl From<IpAddr> for FirewallRuleProto {
     }
 }
 
-/// Protocol code for either IP protocol or ethertype
-enum EtherNfType {
-    NfType(u8),
-    EtherType(u16),
-}
-
-trait EtherTypeCode {
-    fn ethertype_code(&self, scope: &FirewallRuleScope) -> EtherNfType;
-}
-
-#[allow(clippy::cast_possible_truncation)]
-impl EtherTypeCode for FirewallRuleProto {
-    fn ethertype_code(&self, scope: &FirewallRuleScope) -> EtherNfType {
-        match self {
-            FirewallRuleProto::IPv4 => match scope {
-                FirewallRuleScope::Inet => EtherNfType::NfType(libc::NFPROTO_IPV4 as u8),
-                FirewallRuleScope::Bridge => EtherNfType::EtherType((libc::ETH_P_IP as u16).to_be()),
-            },
-            FirewallRuleProto::IPv6 => match scope {
-                FirewallRuleScope::Inet => EtherNfType::NfType(libc::NFPROTO_IPV6 as u8),
-                FirewallRuleScope::Bridge => EtherNfType::EtherType((libc::ETH_P_IPV6 as u16).to_be()),
-            },
-        }
-    }
-}
-
-trait ProtocolCode {
-    /// Returns IP protocol code
-    fn proto_code(&self, l3proto: &FirewallRuleProto) -> u32;
-}
-
-impl ProtocolCode for L4Matches {
-    fn proto_code(&self, l3proto: &FirewallRuleProto) -> u32 {
-        match self {
-            L4Matches::Tcp(_) => libc::IPPROTO_TCP as u32,
-            L4Matches::Udp(_) => libc::IPPROTO_UDP as u32,
-            L4Matches::Icmp(_) => match l3proto {
-                FirewallRuleProto::IPv4 => libc::IPPROTO_ICMP as u32,
-                FirewallRuleProto::IPv6 => libc::IPPROTO_ICMPV6 as u32,
-            },
-        }
-    }
-}
-
 #[cfg(feature = "nftables")]
 pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_watcher: &DnsWatcher) -> Result<()> {
     for scope in [FirewallRuleScope::Inet, FirewallRuleScope::Bridge] {
@@ -235,14 +194,19 @@ pub(crate) async fn apply_firewall_config_inner(config: &EnforcerConfig, dns_wat
         };
         debug!("Creating rules for table {}", table_name);
         let mut batch = Batch::new();
-        add_old_config_deletion_instructions(&mut batch, &scope);
+        batch.add_all(add_old_config_deletion_instructions(&scope));
         let mut device_batches = Vec::new();
-        convert_config_to_nftnl_commands(&mut batch, config, &scope, dns_watcher, &mut device_batches).await?;
-        let batch = batch.finalize();
+        convert_config_to_nft_commands(&mut batch, config, &scope, dns_watcher, &mut device_batches).await?;
+
         debug!("Applying rules for table {}", table_name);
-        if let Err(e) = send_and_process(&batch, &device_batches) {
-            error!("Error sending firewall configuration to netfilter: {:?}", e);
-            return Err(e);
+        device_batches.insert(0, batch);
+        for batch in device_batches {
+            let nftables = batch.to_nftables();
+            trace!(
+                "Generated ruleset: {}",
+                serde_json::to_string_pretty(&nftables).unwrap()
+            );
+            nft::helper::apply_ruleset(&nftables, None, None)?;
         }
     }
     Ok(())
@@ -256,341 +220,666 @@ pub async fn apply_firewall_config_inner(
     Ok(())
 }
 
-/// Creates nftnl expressions which delete the current namib firewall table (for the given scope) if it exists and adds them to the given batch.
+/// Creates nft commands which delete the current namib firewall table (for the given scope) if it exists and adds them to the given batch.
 #[cfg(feature = "nftables")]
-fn add_old_config_deletion_instructions(batch: &mut Batch, scope: &FirewallRuleScope) {
+fn add_old_config_deletion_instructions(scope: &FirewallRuleScope) -> Vec<schema::NfObject> {
     // Create the table if it doesn't exist, otherwise removing the table might cause a NotFound error.
     // If the table already exists, this doesn't do anything.
-    let table = create_table(scope);
-    batch.add(&table, nftnl::MsgType::Add);
-    // Delete the table.
-    let table = create_table(scope);
-    batch.add(&table, nftnl::MsgType::Del);
+    let table: schema::Table = create_table(scope);
+    vec![
+        schema::NfObject::CmdObject(schema::NfCmd::Add(schema::NfListObject::Table(table.clone()))),
+        schema::NfObject::CmdObject(schema::NfCmd::Delete(schema::NfListObject::Table(table))),
+    ]
 }
 
+/// Creates nft commands which create a Table object
 #[cfg(feature = "nftables")]
-fn create_table(scope: &FirewallRuleScope) -> Table {
+fn create_table(scope: &FirewallRuleScope) -> schema::Table {
     match scope {
-        FirewallRuleScope::Inet => Table::new(&CString::new(TABLE_NAME).unwrap(), ProtoFamily::Inet),
-        FirewallRuleScope::Bridge => Table::new(&CString::new(TABLE_NAME_BRIDGE).unwrap(), ProtoFamily::Bridge),
+        FirewallRuleScope::Inet => schema::Table {
+            family: types::NfFamily::INet,
+            name: TABLE_NAME.to_string(),
+            handle: None,
+        },
+        FirewallRuleScope::Bridge => schema::Table {
+            family: types::NfFamily::Bridge,
+            name: TABLE_NAME_BRIDGE.to_string(),
+            handle: None,
+        },
     }
 }
 
-/// Adds netfilter instructions to match ipv4 or ipv6 protocol in rule.
 #[cfg(feature = "nftables")]
-fn nf_match_l3proto(rule: &mut Rule, scope: &FirewallRuleScope, proto: &FirewallRuleProto) {
-    match scope {
-        FirewallRuleScope::Bridge => rule.add_expr(&nft_expr!(meta proto)), // bridge uses ethertype
-        FirewallRuleScope::Inet => rule.add_expr(&nft_expr!(meta nfproto)), // inet uses ip code
-    }
-    match proto.ethertype_code(scope) {
-        EtherNfType::EtherType(proto_code) => rule.add_expr(&nft_expr!(cmp == proto_code)),
-        EtherNfType::NfType(proto_code) => rule.add_expr(&nft_expr!(cmp == proto_code)),
-    };
+struct FlagSets {
+    set_pos: Vec<expr::Expression>,
+    set_neg: Vec<expr::Expression>,
 }
 
-/// Adds netfilter instructions to match the given layer 4 protocol in rule.
 #[cfg(feature = "nftables")]
-fn nf_match_l4proto(rule: &mut Rule, l3proto: &FirewallRuleProto, maybe_l4proto: &Option<L4Matches>) {
-    if let Some(l4proto) = maybe_l4proto {
-        match l3proto {
-            FirewallRuleProto::IPv4 => rule.add_expr(&nft_expr!(payload ipv4 protocol)),
-            FirewallRuleProto::IPv6 => rule.add_expr(&nft_expr!(payload ipv6 nextheader)),
+impl FlagSets {
+    fn add_flag(&mut self, flag: Option<bool>, flag_name: &str) {
+        match flag {
+            Some(true) => self.set_pos.push(expr::Expression::String(flag_name.to_string())),
+            Some(false) => self.set_neg.push(expr::Expression::String(flag_name.to_string())),
+            None => {},
         }
-        rule.add_expr(&nft_expr!(cmp == l4proto.proto_code(l3proto)));
+    }
+
+    fn flags_to_sets(flags: &TcpHeaderFlags) -> FlagSets {
+        let mut fs = FlagSets {
+            set_pos: Vec::new(),
+            set_neg: Vec::new(),
+        };
+        fs.add_flag(flags.cwr, "cwr");
+        fs.add_flag(flags.ece, "ece");
+        fs.add_flag(flags.urg, "urg");
+        fs.add_flag(flags.ack, "ack");
+        fs.add_flag(flags.psh, "psh");
+        fs.add_flag(flags.rst, "rst");
+        fs.add_flag(flags.syn, "syn");
+        fs.add_flag(flags.fin, "fin");
+        fs
+    }
+
+    /// Generates nftables statements that match for TCP flags
+    pub fn flags_to_statements(flags: &namib_shared::firewall_config::TcpHeaderFlags) -> Vec<stmt::Statement> {
+        let fs = FlagSets::flags_to_sets(flags);
+        let mut stmts: Vec<stmt::Statement> = Vec::new();
+        let left = expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload {
+            protocol: "tcp".to_string(),
+            field: "flags".to_string(),
+        }));
+        if !fs.set_pos.is_empty() {
+            stmts.push(stmt::Statement::Match(stmt::Match {
+                left: left.clone(),
+                right: expr::Expression::Named(expr::NamedExpression::Set(fs.set_pos)),
+                op: stmt::Operator::EQ,
+            }));
+        }
+        if !fs.set_neg.is_empty() {
+            stmts.push(stmt::Statement::Match(stmt::Match {
+                left,
+                right: expr::Expression::Named(expr::NamedExpression::Set(fs.set_neg)),
+                op: stmt::Operator::NEQ,
+            }));
+        }
+        stmts
     }
 }
 
-/// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
-#[cfg(feature = "nftables")]
-fn nf_match_l4payload(rule: &mut Rule, rule_spec: &FirewallRule, l3proto: &Option<FirewallRuleProto>) {
-    use namib_shared::firewall_config::PortOrRange;
-
-    match &rule_spec.l4_matches {
-        // TODO(ja_he): do we not handle port ranges?
-        Some(L4Matches::Tcp(tcp_matchable_data)) => {
-            match tcp_matchable_data.dst_port {
-                Some(PortOrRange::Single(port)) => {
-                    rule.add_expr(&nft_expr!(payload tcp dport));
-                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
-                },
-                Some(PortOrRange::Range(_, _)) => todo!(),
-                None => {},
-            }
-            match tcp_matchable_data.src_port {
-                Some(PortOrRange::Single(port)) => {
-                    rule.add_expr(&nft_expr!(payload tcp sport));
-                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
-                },
-                Some(PortOrRange::Range(_, _)) => todo!(),
-                None => {},
-            }
-        },
-        Some(L4Matches::Udp(udp_matchable_data)) => {
-            match udp_matchable_data.dst_port {
-                Some(PortOrRange::Single(port)) => {
-                    rule.add_expr(&nft_expr!(payload tcp dport));
-                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
-                },
-                Some(PortOrRange::Range(_, _)) => todo!(),
-                None => {},
-            }
-            match udp_matchable_data.src_port {
-                Some(PortOrRange::Single(port)) => {
-                    rule.add_expr(&nft_expr!(payload tcp sport));
-                    rule.add_expr(&nft_expr!(cmp == port.to_be()));
-                },
-                Some(PortOrRange::Range(_, _)) => todo!(),
-                None => {},
-            }
-        },
-        Some(L4Matches::Icmp(icmp_spec)) => {
-            /// TODO: this produces the following `nft list ruleset` output for code==123 and type==234: `@th,0,8 234 @th,8,8 123`
-            use nftnl::expr::IcmpHeaderField;
-            for icmp_data in [
-                (IcmpHeaderField::Type, icmp_spec.icmp_type),
-                (IcmpHeaderField::Code, icmp_spec.icmp_code),
-            ] {
-                match (l3proto, icmp_data) {
-                    (Some(FirewallRuleProto::IPv4), (IcmpHeaderField::Type, Some(_))) => {
-                        rule.add_expr(&nft_expr!(payload icmp icmptype));
-                    },
-                    (Some(FirewallRuleProto::IPv4), (IcmpHeaderField::Code, Some(_))) => {
-                        rule.add_expr(&nft_expr!(payload icmp code));
-                    },
-                    (Some(FirewallRuleProto::IPv6), (IcmpHeaderField::Type, Some(_))) => {
-                        rule.add_expr(&nft_expr!(payload icmpv6 icmptype));
-                    },
-                    (Some(FirewallRuleProto::IPv6), (IcmpHeaderField::Code, Some(_))) => {
-                        rule.add_expr(&nft_expr!(payload icmpv6 code));
-                    },
-                    (None, (_, _)) => panic!("L3 protocol not specified for ICMP rule."),
-                    _ => {},
-                }
-                if let Some(icmp_data) = icmp_data.1 {
-                    rule.add_expr(&nft_expr!(cmp == icmp_data));
-                }
-            }
-        },
-        None => {},
-    }
-}
-
-/// Indicates if `nf_match_addresses()` should match on source or destination address.
+/// Indicates if `NftablesMatcher::nf_match_addresses()` should match on source or destination address.
 enum AddressMatchOn {
     Src,
     Dest,
 }
 
-/// Adds netfilter instructions to a rule to match on the given IPv4/IPv6 address as source or destination address
 #[cfg(feature = "nftables")]
-fn nf_match_addresses(rule: &mut Rule, device_addr: &IpAddr, match_on: &AddressMatchOn) {
-    // Match rule if source or target address is configured device.
-    match device_addr {
-        IpAddr::V4(v4addr) => {
-            match match_on {
-                AddressMatchOn::Src => rule.add_expr(&nft_expr!(payload ipv4 saddr)),
-                AddressMatchOn::Dest => rule.add_expr(&nft_expr!(payload ipv4 daddr)),
+struct NftablesMatcher {}
+
+#[cfg(feature = "nftables")]
+impl NftablesMatcher {
+    /// Adds netfilter expressions to match layer 3 payload, e.g. TCP/UDP port numbers.
+    fn match_l3(matches: &Option<L3MatchesExtra>) -> Vec<stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match matches {
+            Some(L3MatchesExtra::Ipv4(ipv4_matches)) => {
+                const PROTO: &str = "ip";
+                if let Some(dscp) = ipv4_matches.dscp {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "dscp",
+                        expr::Expression::Number(dscp.into()),
+                    ));
+                }
+                // Ipv4MatchesExtra.ecn ==> no nftables equivalent
+                if let Some(length) = ipv4_matches.length {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "length",
+                        expr::Expression::Number(length.into()),
+                    ));
+                }
+                if let Some(ttl) = ipv4_matches.ttl {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "ttl",
+                        expr::Expression::Number(ttl.into()),
+                    ));
+                }
+                // Ipv4MatchesExtra.ihl ==> no nftables equivalent
+                // Ipv4MatchesExtra.flags ==> no nftables equivalent
+                if let Some(offset) = ipv4_matches.offset {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "frag-off",
+                        expr::Expression::Number(offset.into()),
+                    ));
+                }
+                if let Some(identification) = ipv4_matches.identification {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "id",
+                        expr::Expression::Number(identification.into()),
+                    ));
+                }
+            },
+            Some(L3MatchesExtra::Ipv6(ipv6_matches)) => {
+                const PROTO: &str = "ip6";
+                if let Some(dscp) = ipv6_matches.dscp {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "dscp",
+                        expr::Expression::Number(dscp.into()),
+                    ));
+                }
+                // Ipv6MatchesExtra.ecn ==> no nftables equivalent
+                if let Some(length) = ipv6_matches.length {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "length",
+                        expr::Expression::Number(length.into()),
+                    ));
+                }
+                if let Some(ttl) = ipv6_matches.ttl {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "ttl",
+                        expr::Expression::Number(ttl.into()),
+                    ));
+                }
+                if let Some(flow_label) = ipv6_matches.flow_label {
+                    expr.push(NftablesMatcher::match_payload(
+                        PROTO,
+                        "flowlabel",
+                        expr::Expression::Number(flow_label),
+                    ));
+                }
+            },
+            None => {},
+        }
+        expr
+    }
+
+    /// Generates nftables statements that match for a port (UDP/TCP).
+    /// `field` is either `sport` or `dport`.
+    fn match_port(proto: &str, field: &str, port: u16) -> stmt::Statement {
+        NftablesMatcher::match_payload(proto, field, expr::Expression::Number(u32::from(port)))
+    }
+
+    /// Generates nftables statements that match for port ranges (UDP/TCP).
+    /// `field` is either `sport` or `dport`.
+    /// The port range is defined by start `port1` and end `port2`.
+    fn match_portrange(proto: &str, field: &str, port1: u16, port2: u16) -> stmt::Statement {
+        let range_expr = expr::Expression::Range(expr::Range {
+            range: vec![
+                expr::Expression::Number(u32::from(port1)),
+                expr::Expression::Number(u32::from(port2)),
+            ],
+        });
+        NftablesMatcher::match_payload(proto, field, range_expr)
+    }
+
+    /// Generates nftables statements that match for payloads (i.e., protocol `proto` field `field` is set to value `expr`).
+    fn match_payload(proto: &str, field: &str, expr: expr::Expression) -> stmt::Statement {
+        let payload_expr = expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload {
+            protocol: proto.to_string(),
+            field: field.to_string(),
+        }));
+        stmt::Statement::Match(stmt::Match {
+            left: payload_expr,
+            right: expr,
+            op: stmt::Operator::EQ,
+        })
+    }
+
+    /// Generates nftables statements that match for TCP data.
+    fn match_tcp_data(tcp_matchable_data: &TcpMatches, device_is_src: bool) -> Vec<stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match tcp_matchable_data.dst_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("tcp", "dport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("tcp", "dport", port1, port2));
+            },
+            None => {},
+        }
+        match tcp_matchable_data.src_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("tcp", "sport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("tcp", "sport", port1, port2));
+            },
+            None => {},
+        }
+        if let Some(sequence_number) = tcp_matchable_data.sequence_number {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "sequence",
+                expr::Expression::Number(sequence_number),
+            ));
+        }
+        if let Some(acknowledgement_number) = tcp_matchable_data.acknowledgement_number {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "ackseq",
+                expr::Expression::Number(acknowledgement_number),
+            ));
+        }
+        if let Some(data_offset) = tcp_matchable_data.data_offset {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "doff",
+                expr::Expression::Number(data_offset.into()),
+            ));
+        }
+        // tcp_matchable_data.reserved ==> 'Reserved for future use.' (RFC8519)
+        if let Some(flags) = &tcp_matchable_data.flags {
+            expr.extend(FlagSets::flags_to_statements(flags));
+        }
+        if let Some(window_size) = tcp_matchable_data.window_size {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "window",
+                expr::Expression::Number(window_size.into()),
+            ));
+        }
+        if let Some(urgent_pointer) = tcp_matchable_data.urgent_pointer {
+            expr.push(NftablesMatcher::match_payload(
+                "tcp",
+                "urgptr",
+                expr::Expression::Number(urgent_pointer.into()),
+            ));
+        }
+        // tcp_matchable_data.options ==> does not translate to nftables
+        if let Some(direction_initiated) = &tcp_matchable_data.direction_initiated {
+            expr.push(stmt::Statement::Match(stmt::Match {
+                left: expr::Expression::Named(expr::NamedExpression::CT(expr::CT {
+                    key: "direction".to_string(),
+                    family: None,
+                    dir: None,
+                })),
+                right: expr::Expression::String(
+                    match (direction_initiated, device_is_src) {
+                        (Direction::FromDevice, true) | (Direction::ToDevice, false) => "original",
+                        (Direction::FromDevice, false) | (Direction::ToDevice, true) => "reply",
+                    }
+                    .to_string(),
+                ),
+                op: stmt::Operator::EQ,
+            }));
+        }
+        expr
+    }
+
+    /// Generates nftables statements that match for UDP data.
+    fn match_udp_data(udp_matchable_data: &UdpMatches) -> Vec<nft::stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match udp_matchable_data.dst_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("udp", "dport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("udp", "dport", port1, port2));
+            },
+            None => {},
+        }
+        match udp_matchable_data.src_port {
+            Some(PortOrRange::Single(port)) => expr.push(NftablesMatcher::match_port("udp", "sport", port)),
+            Some(PortOrRange::Range(port1, port2)) => {
+                expr.push(NftablesMatcher::match_portrange("udp", "sport", port1, port2));
+            },
+            None => {},
+        }
+        if let Some(length) = udp_matchable_data.length {
+            expr.push(NftablesMatcher::match_payload(
+                "udp",
+                "length",
+                expr::Expression::Number(length.into()),
+            ));
+        }
+        expr
+    }
+
+    /// Generates nftables statements that match for ICMP data.
+    fn match_icmp_data(icmp_spec: &IcmpMatches) -> Vec<nft::stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        if let Some(icode) = icmp_spec.icmp_code {
+            expr.push(NftablesMatcher::match_payload(
+                "icmp",
+                "code",
+                expr::Expression::Number(u32::from(icode)),
+            ));
+        }
+        if let Some(itype) = icmp_spec.icmp_type {
+            expr.push(NftablesMatcher::match_payload(
+                "icmp",
+                "type",
+                expr::Expression::Number(u32::from(itype)),
+            ));
+        }
+        // IcmpMatches::rest_of_header ==> no nftables equivalent
+        expr
+    }
+
+    /// Adds netfilter expressions to match layer 4 payload, e.g. TCP/UDP port numbers.
+    fn match_l4(matches: &Option<L4Matches>, device_is_src: bool) -> Vec<stmt::Statement> {
+        let mut expr: Vec<stmt::Statement> = Vec::new();
+        match matches {
+            Some(L4Matches::Tcp(tcp_matchable_data)) => {
+                expr.extend(NftablesMatcher::match_tcp_data(tcp_matchable_data, device_is_src));
+            },
+            Some(L4Matches::Udp(udp_matchable_data)) => {
+                expr.extend(NftablesMatcher::match_udp_data(udp_matchable_data));
+            },
+            Some(L4Matches::Icmp(icmp_spec)) => {
+                expr.extend(NftablesMatcher::match_icmp_data(icmp_spec));
+            },
+            None => {},
+        }
+        expr
+    }
+
+    /// Generates nftables statement to match on the given IPv4/IPv6 address as source or destination address
+    #[cfg(feature = "nftables")]
+    fn match_addresses(device_addr: &IpAddr, match_on: &AddressMatchOn) -> stmt::Statement {
+        let protocol = match device_addr {
+            IpAddr::V4(_) => "ip".to_string(),
+            IpAddr::V6(_) => "ip6".to_string(),
+        };
+        let field = match match_on {
+            AddressMatchOn::Src => "saddr".to_string(),
+            AddressMatchOn::Dest => "daddr".to_string(),
+        };
+        stmt::Statement::Match(stmt::Match {
+            left: expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload { protocol, field })),
+            right: expr::Expression::String(device_addr.to_string()),
+            op: stmt::Operator::EQ,
+        })
+    }
+
+    /// Generates nftables statement to match on the given IPv4/IPv6 networks as source or destination address.
+    /// `reference_ip` is used to identify the protocol (IPv4 or IPv6).
+    /// Returns `None` if there are no networks of the same protocol in `networks`.
+    #[cfg(feature = "nftables")]
+    fn match_networks(
+        networks: &[IpNetwork],
+        match_on: &AddressMatchOn,
+        reference_ip: &IpAddr,
+    ) -> Option<stmt::Statement> {
+        let protocol = match reference_ip {
+            IpAddr::V4(_) => "ip".to_string(),
+            IpAddr::V6(_) => "ip6".to_string(),
+        };
+        let field = match match_on {
+            AddressMatchOn::Src => "saddr".to_string(),
+            AddressMatchOn::Dest => "daddr".to_string(),
+        };
+
+        let mut set_elem: Vec<expr::Expression> = Vec::new();
+        for network in networks {
+            match (network, reference_ip) {
+                (IpNetwork::V4(v4network), IpAddr::V4(_)) => {
+                    let elem = match v4network.size() {
+                        // network size of 1 is an edge case, it is a single address
+                        1 => expr::Expression::String(v4network.network().to_string()),
+                        // IPv4 network match is an nftables `range` from first (network) address to last (broadcast) address
+                        _ => expr::Expression::Range(expr::Range {
+                            range: vec![
+                                expr::Expression::String(v4network.network().to_string()),
+                                expr::Expression::String(v4network.broadcast().to_string()),
+                            ],
+                        }),
+                    };
+                    set_elem.push(elem);
+                },
+                (IpNetwork::V6(v6network), IpAddr::V6(_)) => {
+                    // IPv6 network match is an nftables 'prefix' object with address and prefix length
+                    let addr = Box::new(expr::Expression::String(v6network.ip().to_string()));
+                    let prefix: expr::Prefix = expr::Prefix {
+                        addr,
+                        len: v6network.prefix().into(),
+                    };
+                    set_elem.push(expr::Expression::Named(expr::NamedExpression::Prefix(prefix)));
+                },
+                (_, _) => continue, // skip networks that do not match protocol (IPv4/IPv6) of reference ip
             }
-            rule.add_expr(&nft_expr!(cmp == *v4addr));
-        },
-        IpAddr::V6(v6addr) => {
-            match match_on {
-                AddressMatchOn::Src => rule.add_expr(&nft_expr!(payload ipv6 saddr)),
-                AddressMatchOn::Dest => rule.add_expr(&nft_expr!(payload ipv6 daddr)),
-            }
-            rule.add_expr(&nft_expr!(cmp == *v6addr));
-        },
+        }
+
+        if set_elem.is_empty() {
+            None
+        } else {
+            let network_set = expr::Expression::Named(expr::NamedExpression::Set(set_elem));
+            Some(stmt::Statement::Match(nft::stmt::Match {
+                left: expr::Expression::Named(expr::NamedExpression::Payload(expr::Payload { protocol, field })),
+                right: network_set,
+                op: nft::stmt::Operator::EQ,
+            }))
+        }
+    }
+
+    /// Generates nftables statement that matches for local output interface.
+    /// The current implementation forbids `*wan` as output interface names.
+    fn match_local_output_interface() -> stmt::Statement {
+        let oifnames = vec![expr::Expression::String("*wan".to_string())];
+        stmt::Statement::Match(stmt::Match {
+            left: expr::Expression::Named(expr::NamedExpression::Meta(expr::Meta {
+                key: expr::MetaKey::Oifname,
+            })),
+            right: expr::Expression::Named(expr::NamedExpression::Set(oifnames)),
+            op: stmt::Operator::NEQ,
+        })
     }
 }
 
 #[cfg(feature = "nftables")]
 fn add_device_jump_rule(
-    batch: &mut Batch,
-    base_chain: &Chain,
     scope: &FirewallRuleScope,
-    device_addr: IpAddr,
+    device_addr: &IpAddr,
+    table: &str,
+    chain: &str,
     target_chain: &str,
-) {
-    // Create two rules in the base chain, one for packets coming from the device and one for packets going to the device.
-    let mut device_jump_rule_src = Rule::new(base_chain);
-    let mut device_jump_rule_dst = Rule::new(base_chain);
-    // Match rule if source or target address is configured device.
-    let l3proto: FirewallRuleProto = device_addr.into();
-    nf_match_l3proto(&mut device_jump_rule_src, scope, &l3proto);
-    nf_match_l3proto(&mut device_jump_rule_dst, scope, &l3proto);
-    nf_match_addresses(&mut device_jump_rule_src, &device_addr, &AddressMatchOn::Src);
-    nf_match_addresses(&mut device_jump_rule_dst, &device_addr, &AddressMatchOn::Dest);
-    // If these rules apply, jump to the chain responsible for handling this device.
-    device_jump_rule_src.add_expr(&nft_expr!(verdict jump CString::new(target_chain).unwrap()));
-    device_jump_rule_dst.add_expr(&nft_expr!(verdict jump CString::new(target_chain).unwrap()));
-    batch.add(&device_jump_rule_src, nftnl::MsgType::Add);
-    batch.add(&device_jump_rule_dst, nftnl::MsgType::Add);
+) -> Vec<schema::Rule> {
+    let mut jump_rules: Vec<schema::Rule> = Vec::new();
+    for match_on in [&AddressMatchOn::Src, &AddressMatchOn::Dest] {
+        let rule_expr: Vec<stmt::Statement> = vec![
+            NftablesMatcher::match_addresses(device_addr, match_on),
+            stmt::Statement::Jump(stmt::JumpTarget {
+                target: target_chain.to_string(),
+            }),
+        ];
+        jump_rules.push(schema::Rule::new(
+            family_for_scope(scope),
+            table.to_string(),
+            chain.to_string(),
+            rule_expr,
+        ));
+    }
+    jump_rules
 }
 
-/// Converts the given firewall config into nftnl expressions and applies them to the supplied batch.
+/// Converts the given firewall config into nft expressions and applies them to the supplied batch.
 #[cfg(feature = "nftables")]
-async fn convert_config_to_nftnl_commands(
+async fn convert_config_to_nft_commands(
     batch: &mut Batch,
     config: &EnforcerConfig,
     scope: &FirewallRuleScope,
     dns_watcher: &DnsWatcher,
-    device_batches: &mut Vec<FinalizedBatch>,
+    device_batches: &mut Vec<Batch>,
 ) -> Result<()> {
+    let family = match scope {
+        FirewallRuleScope::Inet => types::NfFamily::INet,
+        FirewallRuleScope::Bridge => types::NfFamily::Bridge,
+    };
+
     // Create new firewall table.
     let table = create_table(scope);
-    batch.add(&table, nftnl::MsgType::Add);
+    batch.add(schema::NfListObject::Table(table.clone()));
+    let table = table.name.clone();
 
     // Create base chain. This base chain is the entry point for the firewall table and will redirect all
     // packets corresponding to a configured device in the firewall config to its separate chain.
-    let base_chain_name = match scope {
-        FirewallRuleScope::Inet => BASE_CHAIN_NAME,
-        FirewallRuleScope::Bridge => BASE_CHAIN_NAME_BRIDGE,
+    let base_chain_spec = match scope {
+        FirewallRuleScope::Inet => (family.clone(), BASE_CHAIN_NAME, types::NfHook::Forward, 0_i32), // NF_IP_PRI_FILTER
+        FirewallRuleScope::Bridge => (family.clone(), BASE_CHAIN_NAME_BRIDGE, types::NfHook::Input, -200), // NF_BR_PRI_FILTER_BRIDGED
     };
-    let mut base_chain = Chain::new(&CString::new(base_chain_name).unwrap(), &table);
-    let base_chain_hook = match scope {
-        FirewallRuleScope::Inet => nftnl::Hook::Forward,
-        FirewallRuleScope::Bridge => nftnl::Hook::In,
-    };
-    let priority: i32 = match scope {
-        FirewallRuleScope::Inet => 0,      // NF_IP_PRI_FILTER
-        FirewallRuleScope::Bridge => -200, // NF_BR_PRI_FILTER_BRIDGED
-    };
-    base_chain.set_hook(base_chain_hook, priority);
     // If a device is not one of the configured devices, accept packets by default.
-    base_chain.set_policy(nftnl::Policy::Accept);
-    batch.add(&base_chain, nftnl::MsgType::Add);
+    let base_chain_name = base_chain_spec.1.to_string();
+    let base_chain = schema::Chain {
+        family: base_chain_spec.0,
+        table: table.clone(),
+        name: base_chain_name.clone(),
+        newname: None,
+        handle: None,
+        _type: Some(types::NfChainType::Filter),
+        hook: Some(base_chain_spec.2),
+        prio: Some(base_chain_spec.3),
+        dev: None,
+        policy: Some(types::NfChainPolicy::Accept),
+    };
+    batch.add(schema::NfListObject::Chain(base_chain));
 
     // Iterate over all devices.
     for device in config.devices() {
         // Create chain which is responsible for deciding how packets for/from this device will be treated.
-        let device_chain = Chain::new(&CString::new(format!("device_{}", device.id)).unwrap(), &table);
-        batch.add(&device_chain, nftnl::MsgType::Add);
+        let chain = format!("device_{}", device.id);
+        batch.add(schema::NfListObject::Chain(schema::Chain::new(
+            family.clone(),
+            table.clone(),
+            chain.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )));
 
+        // Create batch for this device
         let mut device_batch = Batch::new();
 
         // Create fallback rules for when applying the device batch fails: Reject all packets.
-        let mut device_fallback_rule = Rule::new(&device_chain);
-        device_fallback_rule.add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)));
-        batch.add(&device_fallback_rule, nftnl::MsgType::Add);
-        // If the device batch is successfully applied, delete the fallback rule.
-        device_batch.add(&device_fallback_rule, nftnl::MsgType::Del);
+        let device_fallback_rule = schema::NfListObject::Rule(schema::Rule::new(
+            family.clone(),
+            table.clone(),
+            chain.clone(),
+            vec![stmt::Statement::Reject(Some(stmt::Reject::new(
+                Some(stmt::RejectType::ICMPX),
+                Some(types::RejectCode::AdminProhibited),
+            )))],
+        ));
+        batch.add(device_fallback_rule);
 
+        // Remove the device fallback rule by flushing the device chain in the the device batch.
+        // nftables applies rulesets atomically, so this is safe.
+        device_batch.add_cmd(schema::NfCmd::Flush(schema::FlushObject::Chain(schema::Chain::new(
+            family.clone(),
+            table.clone(),
+            chain.clone(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ))));
+
+        // Add device jump rules to base chain.
         let target_chain = format!("device_{}", device.id);
         if let Some(v4addr) = device.ipv4_addr {
-            add_device_jump_rule(batch, &base_chain, scope, v4addr.into(), target_chain.as_str());
+            add_device_jump_rule(scope, &v4addr.into(), &table, &base_chain_name, target_chain.as_str())
+                .iter()
+                .for_each(|rule| batch.add(schema::NfListObject::Rule(rule.clone())));
         }
         if let Some(v6addr) = device.ipv6_addr {
-            add_device_jump_rule(batch, &base_chain, scope, v6addr.into(), target_chain.as_str());
+            add_device_jump_rule(scope, &v6addr.into(), &table, &base_chain_name, target_chain.as_str())
+                .iter()
+                .for_each(|rule| batch.add(schema::NfListObject::Rule(rule.clone())));
         }
 
-        // Iterate over device rules.
+        // Add device rules to device chain.
         for rule_spec in &device.rules {
-            add_rule_to_batch(&device_chain, &mut device_batch, device, scope, rule_spec, dns_watcher).await?;
+            add_rule_to_batch(&table, &chain, device, scope, rule_spec, dns_watcher)
+                .await
+                .iter()
+                .flatten()
+                .for_each(|rule| device_batch.add(schema::NfListObject::Rule(rule.clone())));
         }
 
-        device_batches.push(device_batch.finalize());
+        device_batches.push(device_batch);
     }
 
     Ok(())
 }
 
-// Adds a rule based on the given `rule_spec` to the given `device_batch` as part of the given `device_chain`
+// Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
+// for the packet source or destination, create a vector of ip addresses for this identifier.
+#[cfg(feature = "nftables")]
+async fn extract_rule_ips(
+    host: &Option<RuleTargetHost>,
+    dns_watcher: &DnsWatcher,
+    device: &FirewallDevice,
+) -> Vec<RuleAddrEntry> {
+    match host {
+        Some(RuleTargetHost::IpAddr(ipaddr)) => {
+            vec![RuleAddrEntry::AddrEntry(*ipaddr)]
+        },
+        // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
+        // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
+        Some(RuleTargetHost::Hostname(dns_name)) => dns_watcher
+            .resolve_and_watch(dns_name.as_str())
+            .await
+            .map(|v| v.iter().map(RuleAddrEntry::from).collect())
+            .unwrap_or_default(),
+        Some(RuleTargetHost::FirewallDevice) => device
+            .ipv4_addr
+            .map(RuleAddrEntry::from)
+            .into_iter()
+            .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
+            .collect(),
+        _ => vec![RuleAddrEntry::AnyAddr],
+    }
+}
+
+// // Adds a rule based on the given `rule_spec` to the given `device_batch` as part of the given `device_chain`
 #[cfg(feature = "nftables")]
 async fn add_rule_to_batch(
-    device_chain: &Chain<'_>,
-    device_batch: &mut Batch,
+    table: &str,
+    device_chain: &str,
     device: &FirewallDevice,
     scope: &FirewallRuleScope,
     rule_spec: &FirewallRule,
     dns_watcher: &DnsWatcher,
-) -> Result<()> {
-    // if the rule is constrained to local scope, only add it to the bridge chain.
-    if rule_spec.network_constraint == Some(ScopeConstraint::JustLocal) && *scope != FirewallRuleScope::Bridge {
-        return Ok(());
-    }
-    // TODO(ja_he):
-    //   Consider `ScopeConstraint::IpNetworks`, which lists a number of networks to which (as a
-    //   union) the match should be constrained.
-    //   We could check whether any IP addresses we use for rules are within one of those networks
-    //   and filter this way.
-    //   I would think, the appropriate implementation would be roughly:
-    //
-    //      IF have a target IP
-    //      {
-    //          only generate the rule if it falls within one of the listed networks
-    //          (e.g. for a v4 address we can skip checking any v6 networks and for the v4 networks
-    //           we use the type implementation contains or something)
-    //      }
-    //      ELSE (IF don't have a target IP (i.E. it's a rule that matches ports or sth))
-    //      {
-    //          FOR each network listed
-    //          {
-    //              generate a rule matching the network
-    //          }
-    //      }
+) -> Option<Vec<schema::Rule>> {
+    use futures::join;
+
+    // check if managed device is the source, otherwise it must the the destination.
+    let device_is_src = rule_spec.src == Some(RuleTargetHost::FirewallDevice);
+
+    let mut rules: Vec<schema::Rule> = Vec::new();
 
     // Depending on the type of host identifier (hostname, IP address or placeholder for device IP)
     // for the packet source or destination, create a vector of ip addresses for this identifier.
-    let source_ips: Vec<RuleAddrEntry> = match &rule_spec.src {
-        Some(RuleTargetHost::IpAddr(ipaddr)) => {
-            vec![RuleAddrEntry::AddrEntry(*ipaddr)]
-        },
-        // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
-        // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-        Some(RuleTargetHost::Hostname(dns_name)) => dns_watcher
-            .resolve_and_watch(dns_name.as_str())
-            .await
-            .map(|v| v.iter().map(RuleAddrEntry::from).collect())
-            .unwrap_or_default(),
-        Some(RuleTargetHost::FirewallDevice) => device
-            .ipv4_addr
-            .map(RuleAddrEntry::from)
-            .into_iter()
-            .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
-            .collect(),
-        _ => vec![RuleAddrEntry::AnyAddr],
-    };
-    let dest_ips: Vec<RuleAddrEntry> = match &rule_spec.dst {
-        Some(RuleTargetHost::IpAddr(ipaddr)) => {
-            vec![RuleAddrEntry::AddrEntry(*ipaddr)]
-        },
-        // Error handling: If host resolution fails, return an empty Vec. This will cause no rules
-        // to be generated for the supplied host (which will then default to being rejected if no other rule matches).
-        Some(RuleTargetHost::Hostname(dns_name)) => dns_watcher
-            .resolve_and_watch(dns_name.as_str())
-            .await
-            .map(|v| v.iter().map(RuleAddrEntry::from).collect())
-            .unwrap_or_default(),
-        Some(RuleTargetHost::FirewallDevice) => device
-            .ipv4_addr
-            .map(RuleAddrEntry::from)
-            .into_iter()
-            .chain(device.ipv6_addr.into_iter().map(RuleAddrEntry::from))
-            .collect(),
-        _ => vec![RuleAddrEntry::AnyAddr],
-    };
+    let (source_ips, dest_ips) = join!(
+        extract_rule_ips(&rule_spec.src, dns_watcher, device),
+        extract_rule_ips(&rule_spec.dst, dns_watcher, device)
+    );
 
     // Create a rule for each source/destination ip combination.
-    // Ideally, we would instead used nftnl sets, but these currently have the limitation that they
-    // can only either contain IPv4 or IPv6 addresses, not both. Also, nftnl-rs does not support anonymous
-    // sets yet.
+    // Ideally, we would instead used nftabels sets, but these currently have the limitation that they
+    // can only either contain IPv4 or IPv6 addresses, not both.
+    // ~~Also, nftnl-rs does not support anonymous sets yet.~~ (nftables-rs can do this)
     for source_ip in &source_ips {
         for dest_ip in &dest_ips {
-            let protocol_reference_ip;
-            // Do not create rules which mix IPv4 and IPv6 addresses. Also, save at least one specified IP to match for protocol later on.
-            if let &RuleAddrEntry::AddrEntry(saddr) = source_ip {
-                if let RuleAddrEntry::AddrEntry(daddr) = dest_ip {
-                    if (saddr.is_ipv4() && daddr.is_ipv6()) || (daddr.is_ipv4() && saddr.is_ipv6()) {
+            // Do not create rules which mix IPv4 and IPv6 addresses.
+            // Also extract protocol reference ip.
+            let protocol_reference_ip = match (source_ip, dest_ip) {
+                (RuleAddrEntry::AddrEntry(src_addr), RuleAddrEntry::AddrEntry(dest_addr)) => {
+                    if (src_addr.is_ipv4() && dest_addr.is_ipv6()) || (dest_addr.is_ipv4() && src_addr.is_ipv6()) {
                         continue;
                     }
-                }
-                protocol_reference_ip = Some(saddr);
-            } else if let &RuleAddrEntry::AddrEntry(daddr) = dest_ip {
-                protocol_reference_ip = Some(daddr);
-            } else {
-                protocol_reference_ip = None;
-            }
+                    src_addr
+                },
+                (RuleAddrEntry::AddrEntry(saddr), RuleAddrEntry::AnyAddr) => saddr,
+                (RuleAddrEntry::AnyAddr, RuleAddrEntry::AddrEntry(daddr)) => daddr,
+                (RuleAddrEntry::AnyAddr, RuleAddrEntry::AnyAddr) => {
+                    error!("src==AnyAddr and dest==AnyAddr is not a valid rule, ignoring");
+                    continue;
+                },
+            };
 
             // skip rule if it doesn't match the current scope
             if !scope.rule_address_pair_in_scope(source_ip, dest_ip) {
@@ -598,135 +887,78 @@ async fn add_rule_to_batch(
             }
 
             // Create rule for current address combination.
-            let mut current_rule = Rule::new(device_chain);
-            // Match for protocol. To do this, we need to differentiate between IPv4 and IPv6.
-            if let Some(ipaddr) = protocol_reference_ip {
-                nf_match_l3proto(&mut current_rule, scope, &ipaddr.into());
-                nf_match_l4proto(&mut current_rule, &ipaddr.into(), &rule_spec.l4_matches);
-            }
+            let mut expr: Vec<stmt::Statement> = Vec::new();
+
             // Create expressions to match source IP.
             match source_ip {
                 RuleAddrEntry::AddrEntry(device_addr) => {
-                    nf_match_addresses(&mut current_rule, device_addr, &AddressMatchOn::Src);
+                    expr.push(NftablesMatcher::match_addresses(device_addr, &AddressMatchOn::Src));
                 },
                 RuleAddrEntry::AnyAddr => {},
             }
             // Create expressions to match destination IP.
             match dest_ip {
                 RuleAddrEntry::AddrEntry(device_addr) => {
-                    nf_match_addresses(&mut current_rule, device_addr, &AddressMatchOn::Dest);
+                    expr.push(NftablesMatcher::match_addresses(device_addr, &AddressMatchOn::Dest));
                 },
                 RuleAddrEntry::AnyAddr => {},
             }
-            // Create expressions to match for port numbers.
-            nf_match_l4payload(
-                &mut current_rule,
-                rule_spec,
-                &protocol_reference_ip.map(FirewallRuleProto::from),
-            );
+
+            // Add network constraint matches
+            match &rule_spec.network_constraint {
+                Some(ScopeConstraint::IpNetworks(networks)) => {
+                    let match_on = match (&rule_spec.src, &rule_spec.dst) {
+                        (Some(RuleTargetHost::FirewallDevice), _) => &AddressMatchOn::Dest,
+                        (_, Some(RuleTargetHost::FirewallDevice)) => &AddressMatchOn::Src,
+                        (_, _) => panic!("Rule with neither src nor dst as FirewallDevice."),
+                    };
+                    if let Some(networks_match) =
+                        NftablesMatcher::match_networks(networks, match_on, protocol_reference_ip)
+                    {
+                        expr.push(networks_match);
+                    };
+                },
+                Some(ScopeConstraint::JustLocal) => expr.push(NftablesMatcher::match_local_output_interface()),
+                None => {},
+            }
+
+            // Add layer 3 protocol matches
+            expr.extend(NftablesMatcher::match_l3(&rule_spec.l3_matches));
+
+            // Add layer 4 protocol matches
+            expr.extend(NftablesMatcher::match_l4(&rule_spec.l4_matches, device_is_src));
 
             // Set verdict if current rule matches.
             match rule_spec.verdict {
-                Verdict::Accept => current_rule.add_expr(&nft_expr!(verdict accept)),
-                Verdict::Reject => {
-                    current_rule.add_expr(&VerdictExpr::Reject(RejectionType::Icmp(IcmpCode::AdminProhibited)));
-                },
-                Verdict::Drop => current_rule.add_expr(&nft_expr!(verdict drop)),
-                Verdict::Log(group) => current_rule.add_expr(&nft_expr!(log group group)),
+                Verdict::Accept => expr.push(stmt::Statement::Accept(Some(stmt::Accept {}))),
+                Verdict::Reject => expr.push(stmt::Statement::Reject(Some(stmt::Reject::new(
+                    Some(stmt::RejectType::ICMPX),
+                    Some(types::RejectCode::AdminProhibited),
+                )))),
+                Verdict::Drop => expr.push(stmt::Statement::Drop(Some(stmt::Drop {}))),
+                Verdict::Log(group) => expr.push(stmt::Statement::Log(Some(stmt::Log {
+                    prefix: None,
+                    group: Some(group),
+                    snaplen: None,
+                    queue_threshold: None,
+                    level: None,
+                    flags: None,
+                }))),
             }
-            device_batch.add(&current_rule, nftnl::MsgType::Add);
+
+            let current_rule = schema::Rule {
+                family: family_for_scope(scope),
+                table: table.to_string(),
+                chain: device_chain.to_string(),
+                expr,
+                handle: None,
+                index: None,
+                comment: Some(rule_spec.rule_name.clone()),
+            };
+            rules.push(current_rule);
         }
     }
-    Ok(())
-}
-
-/// Sends the supplied nftables batches to the kernel for execution.
-///
-/// The `table_batch` parameter should represent the "global" batch that sets the base chain and the jump rules
-/// as well as the empty device chains (except for the default rejection rule), the device batches should
-/// contain a command to delete the default rejection rule and insert the actual device rules.
-/// Taken and adapted from [nftnl add-rules.rs](https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs).
-/// Note: An error of type `IoError` due to an OS error with code 71 might not indicate a protocol
-/// error but a permission error instead (either run as root or use `setcap 'cap_net_admin=+ep' /path/to/program` on the built binary.
-/// For information on how to debug, see [Debugging Netlink Sockets](http://0x90.at/post/netlink-debugging).
-#[cfg(feature = "nftables")]
-fn send_and_process(table_batch: &FinalizedBatch, device_batches: &[FinalizedBatch]) -> Result<()> {
-    // Create a netlink socket to netfilter.
-    let socket = mnl::Socket::new(mnl::Bus::Netfilter)?;
-
-    let portid = socket.portid();
-    let mut buffer = vec![0; nftnl::nft_nlmsg_maxsize() as usize];
-    let mut seq_num = 0;
-    let mut return_value = Ok(());
-
-    send_and_process_batch(table_batch, &socket, portid, &mut buffer, &mut seq_num)?;
-
-    for current_batch in device_batches {
-        return_value = return_value.and(send_and_process_batch(
-            current_batch,
-            &socket,
-            portid,
-            &mut buffer,
-            &mut seq_num,
-        ));
-    }
-
-    return_value
-}
-
-/// Sends a single nftables batch to the kernel for execution
-/// Used by `send_and_process` and adapted from [add-rules.rs in nftnl-rs](https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs)
-#[cfg(feature = "nftables")]
-fn send_and_process_batch(
-    batch: &FinalizedBatch,
-    socket: &mnl::Socket,
-    portid: u32,
-    buffer: &mut [u8],
-    seq_num: &mut u32,
-) -> Result<()> {
-    // Send all the bytes in the batch one by one.
-    for batch_part in batch {
-        socket.send(batch_part)?;
-        // Wait for sent part of batch to be received properly before sending next batch part.
-        // This is needed to prevent some buffer overruns.
-        // This fix was actually mentioned in another issue in another project that uses the netlink API:
-        // https://github.com/acassen/keepalived/issues/392#issuecomment-239609235
-        loop {
-            match socket_recv(socket, buffer) {
-                Ok(Some(message)) => {
-                    match mnl::cb_run(message, *seq_num, portid) {
-                        Ok(mnl::CbResult::Stop) => {
-                            break;
-                        },
-                        Ok(mnl::CbResult::Ok) => (),
-                        Err(e) => {
-                            return Err(e.into());
-                        },
-                    }
-                    *seq_num += 1;
-                },
-                Err(e) => {
-                    return Err(e);
-                },
-                _ => {
-                    break;
-                },
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Helper function for `send_and_process()`.
-/// Taken from [add-rules.rs in nftnl-rs](https://github.com/mullvad/nftnl-rs/blob/master/nftnl/examples/add-rules.rs)
-#[cfg(feature = "nftables")]
-fn socket_recv<'a>(socket: &mnl::Socket, buf: &'a mut [u8]) -> Result<Option<&'a [u8]>> {
-    let ret = socket.recv(buf)?;
-    if ret > 0 {
-        Ok(Some(&buf[..ret]))
-    } else {
-        Ok(None)
-    }
+    Some(rules)
 }
 
 #[cfg(test)]
@@ -737,7 +969,7 @@ mod tests {
 
     use super::*;
     use crate::services::dns::DnsService;
-    use namib_shared::firewall_config::{ScopeConstraint, TcpMatches};
+    use namib_shared::firewall_config::TcpMatches;
 
     fn setup(devices: Vec<FirewallDevice>) -> (EnforcerConfig, DnsWatcher) {
         let config = EnforcerConfig::new(String::from("1"), devices, String::from("test"), None);

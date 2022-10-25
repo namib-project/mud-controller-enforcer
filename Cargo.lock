@@ -1294,20 +1294,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "err-derive"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c34a887c8df3ed90498c1c437ce21f211c8e27672921a8ffa293cb8d6d4caa9e"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn",
- "synstructure",
-]
-
-[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1969,15 +1955,6 @@ checksum = "879d54834c8c76457ef4293a689b2a8c59b076067ad77b15efafbb05f92a592b"
 
 [[package]]
 name = "ipnetwork"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4088d739b183546b239688ddbc79891831df421773df95e236daf7867866d355"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "ipnetwork"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f84f1612606f3753f205a4e9a2efd6fe5b4c573a6269b2cc6c3003d44a0d127"
@@ -2284,25 +2261,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mnl"
-version = "0.2.0"
-source = "git+https://github.com/namib-project/mnl-rs.git?branch=fix-musl-targets#1aeaaadbc4d28d1d9e0527ccedb9f47d86178053"
-dependencies = [
- "libc",
- "log",
- "mnl-sys",
-]
-
-[[package]]
-name = "mnl-sys"
-version = "0.2.0"
-source = "git+https://github.com/namib-project/mnl-rs.git?branch=fix-musl-targets#1aeaaadbc4d28d1d9e0527ccedb9f47d86178053"
-dependencies = [
- "libc",
- "pkg-config",
-]
-
-[[package]]
 name = "namib_controller"
 version = "0.1.0"
 dependencies = [
@@ -2326,7 +2284,7 @@ dependencies = [
  "futures",
  "get_if_addrs",
  "glob",
- "ipnetwork 0.18.0",
+ "ipnetwork",
  "jsonwebtoken",
  "lazy_static",
  "log",
@@ -2370,13 +2328,12 @@ dependencies = [
  "env_logger 0.9.1",
  "futures",
  "hex",
- "ipnetwork 0.19.0",
+ "ipnetwork",
  "libc",
  "log",
- "mnl",
  "namib_shared",
  "nflog",
- "nftnl",
+ "nftables",
  "notify",
  "pin-project 1.0.12",
  "pktparse",
@@ -2400,7 +2357,7 @@ version = "0.5.2"
 dependencies = [
  "chrono",
  "hex",
- "ipnetwork 0.18.0",
+ "ipnetwork",
  "macaddr",
  "serde",
  "snafu 0.6.10",
@@ -2480,24 +2437,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "nftnl"
-version = "0.6.2"
-source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl-log-group#3c1e62298b818b3f325ea5676ae1be38e2b539c9"
+name = "nftables"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea1c0b8a36c3abb33d66c1f6d1d6b738b7d881ba9ddd0dbb48ec7ec46fa85cb0"
 dependencies = [
- "bitflags",
- "err-derive",
- "log",
- "nftnl-sys",
-]
-
-[[package]]
-name = "nftnl-sys"
-version = "0.6.1"
-source = "git+https://github.com/namib-project/nftnl-rs.git?branch=feature-icmp-musl-log-group#3c1e62298b818b3f325ea5676ae1be38e2b539c9"
-dependencies = [
- "cfg-if 1.0.0",
- "libc",
- "pkg-config",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "strum 0.24.1",
+ "strum_macros 0.24.3",
 ]
 
 [[package]]
@@ -2943,7 +2892,7 @@ version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e466faf03a98ad27f6e15cd27a2b7cc89e73e640a43527742977bc503c37f8aa"
 dependencies = [
- "ipnetwork 0.19.0",
+ "ipnetwork",
  "libc",
  "pnet_base",
  "pnet_sys",
@@ -3495,6 +3444,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_path_to_error"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "184c643044780f7ceb59104cef98a5a6f12cb2288a7bc701ab93a362b49fd47d"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3652,9 +3610,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
+checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "snafu"
@@ -3953,6 +3911,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "strum"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+
+[[package]]
 name = "strum_macros"
 version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3973,6 +3937,19 @@ dependencies = [
  "heck 0.3.3",
  "proc-macro2",
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.24.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
+dependencies = [
+ "heck 0.4.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
  "syn",
 ]
 
